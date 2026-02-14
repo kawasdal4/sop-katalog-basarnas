@@ -1,7 +1,3 @@
-// Prisma Schema untuk Production (Supabase PostgreSQL)
-// Untuk development lokal, rename file ini ke schema.pg.prisma
-// dan rename schema.sqlite.prisma ke schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,73 +8,56 @@ datasource db {
   directUrl = env("DIRECT_DATABASE_URL")
 }
 
-// User model with role-based access
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
+  id        String    @id @default(cuid())
+  email     String    @unique
   password  String
   name      String
-  role      String   @default("STAF") // ADMIN or STAF
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  // Relations
-  logs     Log[]
-  sopFiles SopFile[]
+  role      String    @default("STAF")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  logs      Log[]
+  sopFiles  SopFile[]
 }
 
-// SOP/IK File model
 model SopFile {
-  id           String   @id @default(cuid())
-  nomorSop     String   @unique // SOP-0001, IK-0001, etc
-  judul        String
-  tahun        Int
-  kategori     String   // SIAGA, LATIHAN, LAINNYA
-  jenis        String   // SOP or IK
-  status       String   @default("AKTIF") // AKTIF, REVIEW, KADALUARSA
-  
-  // File info
-  fileName     String
-  filePath     String   // Local path (for backward compatibility)
-  fileType     String   // xlsx or pdf
-  driveFileId  String?  // Google Drive file ID
-  
-  // Upload info
-  uploadedBy   String
-  uploadedAt   DateTime @default(now())
-  
-  // For public submissions
-  isPublicSubmission Boolean @default(false)
+  id                 String    @id @default(cuid())
+  nomorSop           String    @unique
+  judul              String
+  tahun              Int
+  kategori           String
+  jenis              String
+  status             String    @default("AKTIF")
+  fileName           String
+  filePath           String
+  fileType           String
+  driveFileId        String?
+  uploadedBy         String
+  uploadedAt         DateTime  @default(now())
+  isPublicSubmission Boolean   @default(false)
   submitterName      String?
   submitterEmail     String?
-  verificationStatus String? @default("MENUNGGU") // MENUNGGU, DISETUJUI, DITOLAK
+  verificationStatus String?   @default("MENUNGGU")
   verifiedBy         String?
   verifiedAt         DateTime?
-  
-  // Relations
-  user     User     @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
-  logs     Log[]
-  
-  updatedAt DateTime @updatedAt
+  updatedAt          DateTime  @updatedAt
+  logs               Log[]
+  user               User      @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
 }
 
-// Activity Log model
 model Log {
-  id          String   @id @default(cuid())
-  userId      String
-  aktivitas   String   // UPLOAD, DOWNLOAD, PREVIEW, EDIT_STATUS, VERIFIKASI, LOGIN
-  deskripsi   String
-  fileId      String?
-  createdAt   DateTime @default(now())
-  
-  // Relations
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sopFile SopFile? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  id        String   @id @default(cuid())
+  userId    String
+  aktivitas String
+  deskripsi String
+  fileId    String?
+  createdAt DateTime @default(now())
+  sopFile   SopFile? @relation(fields: [fileId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// Counter for auto-generate nomor SOP
 model Counter {
-  id        String @id @default("counter")
-  sopCount  Int    @default(0)
-  ikCount   Int    @default(0)
+  id       String @id @default("counter")
+  sopCount Int    @default(0)
+  ikCount  Int    @default(0)
 }

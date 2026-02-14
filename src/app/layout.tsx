@@ -14,24 +14,24 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Z.ai Code Scaffold - AI-Powered Development",
-  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
-  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
-  authors: [{ name: "Z.ai Team" }],
+  title: "Katalog SOP dan IK - BASARNAS",
+  description: "Sistem Informasi Dokumen SOP dan IK - Direktorat Kesiapsiagaan Badan Nasional Pencarian dan Pertolongan",
+  keywords: ["SOP", "IK", "BASARNAS", "Kesiapsiagaan", "Dokumen", "Search and Rescue"],
+  authors: [{ name: "Direktorat Kesiapsiagaan BASARNAS" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/logo.svg",
   },
   openGraph: {
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-    url: "https://chat.z.ai",
-    siteName: "Z.ai",
+    title: "Katalog SOP dan IK - BASARNAS",
+    description: "Sistem Informasi Dokumen SOP dan IK - Direktorat Kesiapsiagaan",
+    url: "https://sop-katalog-basarnas.vercel.app",
+    siteName: "Katalog SOP BASARNAS",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
+    title: "Katalog SOP dan IK - BASARNAS",
+    description: "Sistem Informasi Dokumen SOP dan IK - Direktorat Kesiapsiagaan",
   },
 };
 
@@ -41,7 +41,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="id" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
