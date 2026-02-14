@@ -17,7 +17,7 @@ async function getGoogleDriveModule() {
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies()
-    const userId = cookieStore.get('userId')?.value
+    const userId = cookieStore.get('session')?.value
     
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

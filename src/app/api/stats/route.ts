@@ -6,9 +6,16 @@ import { cookies } from 'next/headers'
 export async function GET() {
   try {
     const cookieStore = await cookies()
-    const userId = cookieStore.get('userId')?.value
+    const sessionData = cookieStore.get('session')?.value
     
-    if (!userId) {
+    if (!sessionData) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    let session
+    try {
+      session = JSON.parse(sessionData)
+    } catch {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     

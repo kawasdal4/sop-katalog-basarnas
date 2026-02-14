@@ -42,10 +42,10 @@ export async function POST(request: NextRequest) {
     }
     
     // Check hardcoded admin credentials from .env
-    const adminEmail = process.env.ADMIN_EMAIL
-    const adminPassword = process.env.ADMIN_PASSWORD
-    const staffEmail = process.env.STAFF_EMAIL
-    const staffPassword = process.env.STAFF_PASSWORD
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@sop.go.id'
+    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123'
+    const staffEmail = process.env.STAFF_EMAIL || 'staf@sop.go.id'
+    const staffPassword = process.env.STAFF_PASSWORD || 'staf123'
     
     let user = null
     
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     if (email === adminEmail && password === adminPassword) {
       user = {
         id: 'admin-hardcoded',
-        email: adminEmail!,
+        email: adminEmail,
         name: 'Administrator',
         role: 'ADMIN',
         isHardcoded: true
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     else if (email === staffEmail && password === staffPassword) {
       user = {
         id: 'staff-hardcoded',
-        email: staffEmail!,
+        email: staffEmail,
         name: 'Staf BASARNAS',
         role: 'STAF',
         isHardcoded: true
@@ -128,9 +128,10 @@ export async function POST(request: NextRequest) {
       role: user.role
     })
     
+    // Set cookie with proper settings for Vercel (HTTPS)
     response.cookies.set('session', sessionData, {
       httpOnly: true,
-      secure: false,
+      secure: true, // Required for Vercel (HTTPS)
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 7 days
       path: '/'

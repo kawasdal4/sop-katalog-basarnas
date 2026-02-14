@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
     } else {
       // For admin uploads, require authentication
       const cookieStore = await cookies()
-      const sessionUserId = cookieStore.get('userId')?.value
+      const sessionUserId = cookieStore.get('session')?.value
       
       if (!sessionUserId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -270,7 +270,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const cookieStore = await cookies()
-    const userId = cookieStore.get('userId')?.value
+    const userId = cookieStore.get('session')?.value
     
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -315,7 +315,7 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const cookieStore = await cookies()
-    const userId = cookieStore.get('userId')?.value
+    const userId = cookieStore.get('session')?.value
     
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
