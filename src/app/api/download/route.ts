@@ -4,6 +4,15 @@ import { cookies } from 'next/headers'
 import { readFile } from 'fs/promises'
 import path from 'path'
 
+// Dynamic import for Google Drive module
+async function getGoogleDriveModule() {
+  try {
+    return await import('@/lib/google-drive')
+  } catch {
+    return null
+  }
+}
+
 // GET - Download file
 export async function GET(request: NextRequest) {
   try {
@@ -27,8 +36,32 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 404 })
     }
     
-    const filePath = path.join(process.cwd(), 'uploads', sopFile.filePath)
-    const fileBuffer = await readFile(filePath)
+    let fileBuffer: Buffer
+    let mimeType: string
+    
+    // Check if Google Drive is configured and file has driveFileId
+    const gdModule = await getGoogleDriveModule()
+    const driveFileId = (sopFile as unknown as Record<string, unknown>).driveFileId
+    
+    if (driveFileId && gdModule && gdModule.isGoogleDriveConfigured()) {
+      try {
+        console.log(`Downloading from Google Drive: ${driveFileId}`)
+        const driveFile = await gdModule.downloadFileFromDrive(driveFileId as string)
+        fileBuffer = driveFile.buffer
+        mimeType = driveFile.mimeType
+      } catch (driveError) {
+        console.error('Google Drive download failed:', driveError)
+        return NextResponse.json({ error: 'Gagal mengunduh dari Google Drive' }, { status: 500 })
+      }
+    } else {
+      // Fallback to local file
+      console.log(`Downloading from local storage: ${sopFile.filePath}`)
+      const filePath = path.join(process.cwd(), 'uploads', sopFile.filePath)
+      fileBuffer = await readFile(filePath)
+      mimeType = sopFile.fileType === 'pdf' 
+        ? 'application/pdf' 
+        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    }
     
     // Create log
     const user = await db.user.findUnique({ where: { id: userId } })
@@ -36,14 +69,14 @@ export async function GET(request: NextRequest) {
       data: {
         userId,
         aktivitas: 'DOWNLOAD',
-        deskripsi: `${user?.name} mengunduh ${sopFile.jenis}: ${sopFile.nomorSop}`,
+        deskripsi: `${user?.name} mengunduh ${sopFile.jenis}: ${sopFile.nomorSop}${driveFileId ? ' [Google Drive]' : ' [Local]'}`,
         fileId: id
       }
     })
     
     return new NextResponse(fileBuffer, {
       headers: {
-        'Content-Type': sopFile.fileType === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Type': mimeType,
         'Content-Disposition': `attachment; filename="${sopFile.fileName}"`
       }
     })

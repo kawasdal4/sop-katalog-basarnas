@@ -1,15 +1,13 @@
-// Prisma Schema untuk Production (Supabase PostgreSQL)
-// Untuk development lokal, rename file ini ke schema.pg.prisma
-// dan rename schema.sqlite.prisma ke schema.prisma
+// SQLite Schema for Local Development
+// Rename this file to schema.prisma for local development
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_DATABASE_URL")
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 // User model with role-based access
@@ -56,7 +54,7 @@ model SopFile {
   verifiedAt         DateTime?
   
   // Relations
-  user     User     @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [uploadedBy], references: [id])
   logs     Log[]
   
   updatedAt DateTime @updatedAt
@@ -72,8 +70,8 @@ model Log {
   createdAt   DateTime @default(now())
   
   // Relations
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sopFile SopFile? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  user    User     @relation(fields: [userId], references: [id])
+  sopFile SopFile? @relation(fields: [fileId], references: [id])
 }
 
 // Counter for auto-generate nomor SOP

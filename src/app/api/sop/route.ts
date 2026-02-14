@@ -1,8 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { cookies } from 'next/headers'
-import { writeFile, mkdir } from 'fs/promises'
+import { writeFile, mkdir, unlink } from 'fs/promises'
 import path from 'path'
+
+// Storage mode - will be determined at runtime
+let storageMode: 'local' | 'drive' | 'unknown' = 'unknown'
+
+// Check if Google Drive is available and working
+async function checkGoogleDriveAvailable(): Promise<boolean> {
+  try {
+    const gd = await import('@/lib/google-drive')
+    if (!gd.isGoogleDriveConfigured()) return false
+    
+    // Test the connection
+    const result = await gd.testDriveConnection()
+    return result.success
+  } catch {
+    return false
+  }
+}
+
+// Initialize storage mode
+async function initStorageMode() {
+  if (storageMode === 'unknown') {
+    const available = await checkGoogleDriveAvailable()
+    storageMode = available ? 'drive' : 'local'
+    console.log(`📦 Storage mode: ${storageMode.toUpperCase()}`)
+  }
+  return storageMode
+}
 
 // GET - Fetch all SOPs with filters
 export async function GET(request: NextRequest) {
@@ -79,6 +106,9 @@ export async function GET(request: NextRequest) {
 // POST - Create new SOP
 export async function POST(request: NextRequest) {
   try {
+    // Initialize storage mode
+    const mode = await initStorageMode()
+    
     const formData = await request.formData()
     const judul = formData.get('judul') as string
     const kategori = formData.get('kategori') as string
@@ -129,36 +159,79 @@ export async function POST(request: NextRequest) {
     const count = jenis === 'SOP' ? (counter?.sopCount || 0) + 1 : (counter?.ikCount || 0) + 1
     const nomorSop = jenis === 'SOP' ? `SOP-${String(count).padStart(4, '0')}` : `IK-${String(count).padStart(4, '0')}`
     
-    // Save file
-    const uploadDir = path.join(process.cwd(), 'uploads')
-    await mkdir(uploadDir, { recursive: true })
-    
+    // Prepare file data
     const fileExtension = file.name.split('.').pop() || 'pdf'
     const fileName = `${nomorSop}.${fileExtension}`
-    const filePath = path.join(uploadDir, fileName)
-    
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
-    await writeFile(filePath, buffer)
+    
+    // Determine MIME type
+    const mimeTypes: Record<string, string> = {
+      'pdf': 'application/pdf',
+      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'xls': 'application/vnd.ms-excel',
+    }
+    const mimeType = mimeTypes[fileExtension.toLowerCase()] || 'application/octet-stream'
+    
+    let driveFileId: string | null = null
+    let filePath = fileName
+    
+    // Upload based on storage mode
+    if (mode === 'drive') {
+      try {
+        const gd = await import('@/lib/google-drive')
+        console.log('📤 Uploading to Google Drive...')
+        const driveResult = await gd.uploadFileToDrive(buffer, fileName, mimeType)
+        driveFileId = driveResult.id
+        filePath = driveResult.id
+        console.log(`✅ File uploaded to Google Drive: ${driveResult.id}`)
+      } catch (driveError) {
+        console.error('❌ Google Drive upload failed, falling back to local:', driveError)
+        // Fallback to local
+        const uploadDir = path.join(process.cwd(), 'uploads')
+        await mkdir(uploadDir, { recursive: true })
+        const localFilePath = path.join(uploadDir, fileName)
+        await writeFile(localFilePath, buffer)
+        filePath = fileName
+        // Update storage mode for future uploads
+        storageMode = 'local'
+      }
+    } else {
+      // Save locally
+      console.log('📤 Saving to local storage...')
+      const uploadDir = path.join(process.cwd(), 'uploads')
+      await mkdir(uploadDir, { recursive: true })
+      const localFilePath = path.join(uploadDir, fileName)
+      await writeFile(localFilePath, buffer)
+      console.log(`✅ File saved locally: ${fileName}`)
+    }
+    
+    // Build data object for Prisma
+    const createData: Record<string, unknown> = {
+      nomorSop,
+      judul,
+      tahun,
+      kategori,
+      jenis,
+      status: status || 'AKTIF',
+      fileName: file.name,
+      filePath,
+      fileType: fileExtension,
+      uploadedBy: userId,
+      isPublicSubmission,
+      submitterName,
+      submitterEmail,
+      verificationStatus: isPublicSubmission ? 'MENUNGGU' : null
+    }
+    
+    // Add driveFileId if available
+    if (driveFileId) {
+      createData.driveFileId = driveFileId
+    }
     
     // Create SOP record
     const sopFile = await db.sopFile.create({
-      data: {
-        nomorSop,
-        judul,
-        tahun,
-        kategori,
-        jenis,
-        status: status || 'AKTIF',
-        fileName: file.name,
-        filePath: fileName,
-        fileType: fileExtension,
-        uploadedBy: userId,
-        isPublicSubmission,
-        submitterName,
-        submitterEmail,
-        verificationStatus: isPublicSubmission ? 'MENUNGGU' : null
-      }
+      data: createData
     })
     
     // Update counter
@@ -181,12 +254,12 @@ export async function POST(request: NextRequest) {
       data: {
         userId,
         aktivitas: 'UPLOAD',
-        deskripsi: `${isPublicSubmission ? 'Submit publik' : 'Upload'} ${jenis}: ${nomorSop} - ${judul}${isPublicSubmission ? ` (${submitterName})` : ''}`,
+        deskripsi: `${isPublicSubmission ? 'Submit publik' : 'Upload'} ${jenis}: ${nomorSop} - ${judul}${isPublicSubmission ? ` (${submitterName})` : ''} [${driveFileId ? 'Google Drive' : 'Local'}]`,
         fileId: sopFile.id
       }
     })
     
-    return NextResponse.json({ success: true, data: sopFile })
+    return NextResponse.json({ success: true, data: sopFile, storage: driveFileId ? 'drive' : 'local' })
   } catch (error) {
     console.error('Create SOP error:', error)
     return NextResponse.json({ error: 'Terjadi kesalahan' }, { status: 500 })
@@ -253,6 +326,33 @@ export async function DELETE(request: NextRequest) {
     
     if (!id) {
       return NextResponse.json({ error: 'ID diperlukan' }, { status: 400 })
+    }
+    
+    // Get the file to check storage location
+    const sopFile = await db.sopFile.findUnique({ where: { id } })
+    
+    if (sopFile) {
+      const driveId = (sopFile as unknown as Record<string, unknown>).driveFileId
+      
+      if (driveId && typeof driveId === 'string') {
+        // Delete from Google Drive
+        try {
+          const gd = await import('@/lib/google-drive')
+          await gd.deleteFileFromDrive(driveId)
+          console.log(`🗑️ Deleted from Google Drive: ${driveId}`)
+        } catch (driveError) {
+          console.error('Failed to delete from Google Drive:', driveError)
+        }
+      } else {
+        // Delete from local storage
+        try {
+          const localPath = path.join(process.cwd(), 'uploads', sopFile.filePath)
+          await unlink(localPath)
+          console.log(`🗑️ Deleted local file: ${sopFile.filePath}`)
+        } catch {
+          // File might not exist, continue
+        }
+      }
     }
     
     await db.sopFile.delete({ where: { id } })

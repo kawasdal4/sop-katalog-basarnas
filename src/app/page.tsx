@@ -1,19 +1,17 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
-import { Progress } from '@/components/ui/progress'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   DropdownMenu,
@@ -67,9 +65,27 @@ import {
   ChevronLeft,
   ChevronRight,
   Printer,
-  Send
+  Send,
+  Shield
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import Image from 'next/image'
+
+// Dynamic imports for preview components to avoid SSR issues with PDF.js
+const ExcelPreview = dynamic(
+  () => import('@/components/preview/ExcelPreview').then(mod => mod.ExcelPreview),
+  { ssr: false }
+)
+
+const PdfPreview = dynamic(
+  () => import('@/components/preview/PdfPreview').then(mod => mod.PdfPreview),
+  { ssr: false }
+)
+
+const DesktopIntegration = dynamic(
+  () => import('@/components/preview/DesktopIntegration').then(mod => mod.DesktopIntegration),
+  { ssr: false }
+)
 
 // Types
 type UserRole = 'ADMIN' | 'STAF' | null
@@ -100,6 +116,7 @@ interface SopFile {
   submitterName?: string
   submitterEmail?: string
   verificationStatus?: string
+  driveFileId?: string | null
 }
 
 interface LogEntry {
@@ -144,8 +161,24 @@ const KATEGORI_OPTIONS = ['SIAGA', 'LATIHAN', 'LAINNYA']
 const JENIS_OPTIONS = ['SOP', 'IK']
 const STATUS_OPTIONS = ['AKTIF', 'REVIEW', 'KADALUARSA']
 
+// Loading State Component
+function LoadingState() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-500 via-orange-400 to-yellow-400 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+        <p className="text-white text-lg">Memuat aplikasi...</p>
+      </div>
+    </div>
+  )
+}
+
 export default function ESOPApp() {
   const { toast } = useToast()
+  
+  // ============ MOUNTED GUARD - Prevents SSR hydration issues ============
+  // Must be declared FIRST before any conditional returns
+  const [isMounted, setIsMounted] = useState(false)
   
   // Auth state
   const [user, setUser] = useState<User | null>(null)
@@ -162,12 +195,13 @@ export default function ESOPApp() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [users, setUsers] = useState<User[]>([])
+  const [storageStatus, setStorageStatus] = useState<{ mode: string; message: string } | null>(null)
   
   // Pagination
   const [sopPagination, setSopPagination] = useState({ page: 1, total: 0, totalPages: 0 })
   const [logsPagination, setLogsPagination] = useState({ page: 1, total: 0, totalPages: 0 })
   
-  // Filters
+  // Filters - initialized with non-empty values to prevent Select errors
   const [sopFilters, setSopFilters] = useState({
     search: '',
     kategori: 'SEMUA',
@@ -214,6 +248,14 @@ export default function ESOPApp() {
   const [previewData, setPreviewData] = useState<{ type: string; data: string; fileName: string } | null>(null)
   const [loading, setLoading] = useState(false)
   
+  // Print iframe ref
+  const printIframeRef = useRef<HTMLIFrameElement>(null)
+  
+  // Mount effect - set mounted flag
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+  
   // Check auth on mount
   useEffect(() => {
     checkAuth()
@@ -223,10 +265,9 @@ export default function ESOPApp() {
   // Fetch data when authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      // Fetch stats for all pages
       fetchStats()
+      fetchStorageStatus()
       
-      // Fetch page-specific data
       if (currentPage === 'katalog') fetchSopFiles()
       if (currentPage === 'verifikasi') fetchVerificationList(verificationFilter)
       if (currentPage === 'logs') fetchLogs()
@@ -310,6 +351,16 @@ export default function ESOPApp() {
     }
   }
   
+  const fetchStorageStatus = async () => {
+    try {
+      const res = await fetch('/api/storage-status')
+      const data = await res.json()
+      setStorageStatus(data)
+    } catch (error) {
+      console.error('Storage status error:', error)
+    }
+  }
+  
   const fetchSopFiles = async (resetPage = false) => {
     try {
       const page = resetPage ? 1 : sopPagination.page
@@ -317,7 +368,6 @@ export default function ESOPApp() {
       params.append('page', page.toString())
       params.append('limit', '10')
       
-      // Only append non-empty and non-SEMUA filters
       if (sopFilters.search) params.append('search', sopFilters.search)
       if (sopFilters.kategori && sopFilters.kategori !== 'SEMUA') params.append('kategori', sopFilters.kategori)
       if (sopFilters.jenis && sopFilters.jenis !== 'SEMUA') params.append('jenis', sopFilters.jenis)
@@ -560,7 +610,6 @@ export default function ESOPApp() {
       }
       
       if (format === 'xlsx') {
-        // Generate CSV for Excel
         const headers = ['Nomor SOP', 'Judul', 'Tahun', 'Kategori', 'Jenis', 'Status', 'Diupload Oleh', 'Tanggal Upload']
         const csvContent = [
           headers.join(','),
@@ -577,7 +626,6 @@ export default function ESOPApp() {
         a.click()
         window.URL.revokeObjectURL(url)
       } else {
-        // Generate printable HTML for PDF
         const printWindow = window.open('', '_blank')
         if (!printWindow) {
           toast({ title: 'Error', description: 'Tidak dapat membuka jendela baru', variant: 'destructive' })
@@ -648,6 +696,90 @@ export default function ESOPApp() {
     }
   }
   
+  // Safe Print Handler - Uses hidden iframe to prevent template corruption
+  const handleDirectPrint = useCallback(async (id: string) => {
+    // Client-side guard
+    if (typeof window === 'undefined') return
+    
+    const sop = sopFiles.find(s => s.id === id)
+    if (!sop) return
+    
+    try {
+      // Fetch the PDF content
+      const res = await fetch(`/api/download?id=${id}`)
+      
+      // Guard 1: Check HTTP status
+      if (!res.ok) {
+        if (res.status === 504) {
+          toast({ title: 'Timeout', description: 'Konversi file membutuhkan waktu terlalu lama', variant: 'destructive' })
+        } else {
+          toast({ title: 'Error', description: 'Gagal mengunduh file', variant: 'destructive' })
+        }
+        return
+      }
+      
+      // Guard 2: Check Content-Type
+      const contentType = res.headers.get('content-type') || ''
+      if (!contentType.includes('application/pdf')) {
+        toast({ title: 'Error', description: 'File bukan PDF', variant: 'destructive' })
+        return
+      }
+      
+      const blob = await res.blob()
+      
+      // Guard 3: Check blob size
+      if (blob.size < 1000) {
+        toast({ title: 'Error', description: 'File terlalu kecil, mungkin rusak', variant: 'destructive' })
+        return
+      }
+      
+      // Guard 4: Check PDF magic number
+      const arrayBuffer = await blob.arrayBuffer()
+      const uint8Array = new Uint8Array(arrayBuffer)
+      const header = String.fromCharCode(...uint8Array.slice(0, 4))
+      if (header !== '%PDF') {
+        toast({ title: 'Error', description: 'File bukan PDF valid', variant: 'destructive' })
+        return
+      }
+      
+      // Create blob URL for printing
+      const pdfUrl = URL.createObjectURL(blob)
+      
+      // Create hidden iframe for printing
+      const printIframe = document.createElement('iframe')
+      printIframe.style.position = 'fixed'
+      printIframe.style.right = '0'
+      printIframe.style.bottom = '0'
+      printIframe.style.width = '0'
+      printIframe.style.height = '0'
+      printIframe.style.border = 'none'
+      printIframe.style.opacity = '0'
+      printIframe.style.pointerEvents = 'none'
+      
+      document.body.appendChild(printIframe)
+      
+      printIframe.onload = () => {
+        try {
+          printIframe.contentWindow?.print()
+        } catch (err) {
+          toast({ title: 'Error', description: 'Gagal mencetak file', variant: 'destructive' })
+        }
+        
+        // Cleanup after print dialog
+        setTimeout(() => {
+          document.body.removeChild(printIframe)
+          URL.revokeObjectURL(pdfUrl)
+        }, 1000)
+      }
+      
+      printIframe.src = pdfUrl
+      
+    } catch (error) {
+      console.error('Print error:', error)
+      toast({ title: 'Error', description: 'Gagal mencetak file', variant: 'destructive' })
+    }
+  }, [sopFiles, toast])
+  
   const handlePrint = useCallback((id: string) => {
     const sop = sopFiles.find(s => s.id === id)
     if (!sop) return
@@ -700,41 +832,58 @@ export default function ESOPApp() {
     { id: 'users' as PageView, label: 'Manajemen User', icon: Users, roles: ['ADMIN'] },
   ]
   
-  // Login Screen
+  // ============ MOUNTED GUARD - Show loading until client-side mounted ============
+  // This MUST come AFTER all hooks are declared to follow React's rules of hooks
+  if (!isMounted) {
+    return <LoadingState />
+  }
+  // ============ END MOUNTED GUARD ============
+  
+  // Login Screen - With Background Image & 16:9 Aspect Layout
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-500 via-orange-400 to-yellow-400 flex flex-col">
-        {/* Header */}
-        <header className="bg-black text-white p-4 shadow-lg">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-yellow-400 rounded-lg flex items-center justify-center">
-                <FileText className="w-6 h-6 text-white" />
+      <div className="h-screen w-screen overflow-hidden flex flex-col background-sar">
+        {/* Dark Overlay for High Legibility */}
+        <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-black/60 to-orange-900/40 z-0"></div>
+        
+        {/* Header with Shimmering Logo - STICKY */}
+        <header className="relative z-10 bg-black/90 backdrop-blur-sm text-white shadow-lg flex-shrink-0">
+          {/* Running Text Marquee */}
+          <div className="bg-gradient-to-r from-orange-600 to-yellow-500 py-1 overflow-hidden">
+            <div className="running-text text-white text-sm font-medium">
+              Katalog SOP dan IK - Direktorat Kesiapsiagaan - Badan Nasional Pencarian dan Pertolongan (BASARNAS) || Selamat Datang di Sistem Informasi Dokumen SOP dan IK
+            </div>
+          </div>
+          <div className="max-w-7xl mx-auto flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-4">
+              {/* Basarnas Logo with Shimmering Effect */}
+              <div className="logo-shimmer-container w-14 h-14 rounded-lg overflow-hidden flex items-center justify-center bg-gradient-to-br from-orange-500 to-yellow-400">
+                <Shield className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold">Katalog SOP dan IK</h1>
-                <p className="text-xs text-orange-300">Direktorat Kesiapsiagaan</p>
+                <h1 className="text-xl font-bold logo-shimmer">Katalog SOP dan IK</h1>
+                <p className="text-xs text-orange-300 text-legibility">Direktorat Kesiapsiagaan - BASARNAS</p>
               </div>
             </div>
             <Button 
               onClick={() => setShowLogin(true)}
-              className="bg-orange-500 hover:bg-orange-600 text-white"
+              className="neon-yellow-btn"
             >
               <LogIn className="w-4 h-4 mr-2" />
-              Login Admin
+              Login
             </Button>
           </div>
         </header>
         
-        {/* Public Content */}
-        <main className="flex-1 flex items-center justify-center p-6">
-          <div className="max-w-md w-full">
-            <Card className="bg-white/95 backdrop-blur shadow-xl">
-              <CardHeader className="text-center">
+        {/* Public Content - 16:9 Aspect Layout with Centered Card */}
+        <main className="relative z-10 flex-1 flex items-center justify-center p-4 sm:p-6 overflow-hidden">
+          <div className="w-full max-w-lg">
+            <Card className="bg-white/95 backdrop-blur-md shadow-2xl border-2 border-orange-300">
+              <CardHeader className="text-center pb-2">
                 <CardTitle className="text-2xl text-orange-600">Submit SOP Publik</CardTitle>
                 <CardDescription>Kirim SOP atau IK untuk diverifikasi oleh admin</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4">
                 <form onSubmit={(e) => handleUpload(e, true)} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -767,7 +916,7 @@ export default function ESOPApp() {
                     <div>
                       <Label>Kategori</Label>
                       <Select value={publicForm.kategori} onValueChange={(v) => setPublicForm({ ...publicForm, kategori: v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder="Pilih Kategori" /></SelectTrigger>
                         <SelectContent>
                           {KATEGORI_OPTIONS.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
                         </SelectContent>
@@ -776,7 +925,7 @@ export default function ESOPApp() {
                     <div>
                       <Label>Jenis</Label>
                       <Select value={publicForm.jenis} onValueChange={(v) => setPublicForm({ ...publicForm, jenis: v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder="Pilih Jenis" /></SelectTrigger>
                         <SelectContent>
                           {JENIS_OPTIONS.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
                         </SelectContent>
@@ -789,14 +938,14 @@ export default function ESOPApp() {
                       <Input 
                         type="number"
                         value={publicForm.tahun}
-                        onChange={(e) => setPublicForm({ ...publicForm, tahun: parseInt(e.target.value) })}
+                        onChange={(e) => setPublicForm({ ...publicForm, tahun: parseInt(e.target.value) || new Date().getFullYear() })}
                         required
                       />
                     </div>
                     <div>
                       <Label>Status</Label>
                       <Select value={publicForm.status} onValueChange={(v) => setPublicForm({ ...publicForm, status: v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder="Pilih Status" /></SelectTrigger>
                         <SelectContent>
                           {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                         </SelectContent>
@@ -822,17 +971,21 @@ export default function ESOPApp() {
           </div>
         </main>
         
-        {/* Footer */}
-        <footer className="bg-black text-white p-4 text-center">
-          <p className="text-sm text-gray-400">created by : Foe</p>
+        {/* Sticky Footer with Glow Effect - FROZEN at bottom */}
+        <footer className="relative z-10 bg-black/90 backdrop-blur-sm text-white py-3 flex-shrink-0">
+          <div className="max-w-7xl mx-auto text-center">
+            <p className="text-sm text-gray-400">
+              <span className="creator-glow text-orange-400">created by : Foe</span>
+            </p>
+          </div>
         </footer>
         
         {/* Login Dialog */}
         <Dialog open={showLogin} onOpenChange={setShowLogin}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle className="text-orange-600">Login Admin</DialogTitle>
-              <DialogDescription>Masukkan kredensial admin untuk mengakses sistem</DialogDescription>
+              <DialogTitle className="text-orange-600 text-center">Login Sistem</DialogTitle>
+              <DialogDescription className="text-center">Masukkan kredensial untuk mengakses sistem</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
@@ -841,7 +994,7 @@ export default function ESOPApp() {
                   type="email"
                   value={loginForm.email}
                   onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                  placeholder="admin@sop.go.id"
+                  placeholder="Masukkan email"
                   required
                 />
               </div>
@@ -851,21 +1004,31 @@ export default function ESOPApp() {
                   type="password"
                   value={loginForm.password}
                   onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                  placeholder="••••••••"
+                  placeholder="Masukkan password"
                   required
                 />
               </div>
-              <Alert className="bg-yellow-50 border-yellow-200">
-                <AlertDescription className="text-xs text-yellow-700">
-                  Default: admin@sop.go.id / admin123
-                </AlertDescription>
-              </Alert>
+              
+              {/* Credentials Info */}
+              <div className="space-y-2">
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-orange-700 mb-1">👤 Admin (Full Access)</p>
+                  <p className="text-xs text-orange-600">Email: admin@sop.go.id</p>
+                  <p className="text-xs text-orange-600">Password: admin123</p>
+                </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-blue-700 mb-1">👥 Staf (View Only)</p>
+                  <p className="text-xs text-blue-600">Email: staf@sop.go.id</p>
+                  <p className="text-xs text-blue-600">Password: staf123</p>
+                </div>
+              </div>
+              
               <div className="flex gap-2">
                 <Button type="button" variant="outline" onClick={() => setShowLogin(false)} className="flex-1">
                   Batal
                 </Button>
                 <Button type="submit" className="flex-1 bg-orange-500 hover:bg-orange-600 text-white" disabled={loading}>
-                  Login
+                  {loading ? 'Memproses...' : 'Login'}
                 </Button>
               </div>
             </form>
@@ -875,11 +1038,17 @@ export default function ESOPApp() {
     )
   }
   
-  // Main Application
+  // Main Application - Zero-Scroll Layout with Sticky Header/Footer
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-black text-white shadow-lg sticky top-0 z-50 no-print">
+    <div className="h-screen w-screen overflow-hidden flex flex-col bg-gray-100">
+      {/* ============ STICKY HEADER - FROZEN AT TOP ============ */}
+      <header className="bg-black text-white shadow-lg flex-shrink-0 z-50 no-print">
+        {/* Running Text Marquee */}
+        <div className="bg-gradient-to-r from-orange-600 to-yellow-500 py-1 overflow-hidden">
+          <div className="running-text text-white text-sm font-medium">
+            Katalog SOP dan IK - Direktorat Kesiapsiagaan - Badan Nasional Pencarian dan Pertolongan (BASARNAS) || Selamat Datang di Sistem Informasi Dokumen SOP dan IK
+          </div>
+        </div>
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <Button 
@@ -891,19 +1060,28 @@ export default function ESOPApp() {
               {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </Button>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-yellow-400 rounded-lg flex items-center justify-center">
-                <FileText className="w-6 h-6 text-white" />
+              {/* Basarnas Logo with Shimmering Effect */}
+              <div className="logo-shimmer-container w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-gradient-to-br from-orange-500 to-yellow-400">
+                <Shield className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold">Katalog SOP dan IK</h1>
-                <p className="text-xs text-orange-300">Direktorat Kesiapsiagaan</p>
+                <h1 className="text-xl font-bold logo-shimmer">Katalog SOP dan IK</h1>
+                <p className="text-xs text-orange-300">Direktorat Kesiapsiagaan - BASARNAS</p>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className="text-sm font-medium">{user?.name}</p>
-              <p className="text-xs text-orange-300">{user?.role}</p>
+              <div className="flex items-center justify-end gap-2">
+                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  user?.role === 'ADMIN' 
+                    ? 'bg-orange-500 text-white' 
+                    : 'bg-blue-500 text-white'
+                }`}>
+                  {user?.role === 'ADMIN' ? '👑 Admin' : '👥 Staf'}
+                </span>
+              </div>
             </div>
             <Button 
               variant="ghost" 
@@ -916,10 +1094,11 @@ export default function ESOPApp() {
         </div>
       </header>
       
-      <div className="flex flex-1">
-        {/* Sidebar */}
-        <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} bg-gray-900 text-white transition-all duration-300 overflow-hidden no-print`}>
-          <nav className="p-4 space-y-2">
+      {/* ============ BODY AREA: Sidebar + Main Content ============ */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* ============ STATIC SIDEBAR - NO SCROLL ============ */}
+        <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} bg-gray-900 text-white transition-all duration-300 overflow-hidden flex-shrink-0 no-print`}>
+          <nav className="p-4 space-y-2 h-full">
             {menuItems.filter(item => item.roles.includes(user?.role || '')).map(item => (
               <Button
                 key={item.id}
@@ -934,8 +1113,8 @@ export default function ESOPApp() {
           </nav>
         </aside>
         
-        {/* Main Content */}
-        <main className="flex-1 p-6 overflow-auto">
+        {/* ============ SCROLLABLE MAIN CONTENT - ONLY AREA WITH SCROLL ============ */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50">
           {/* Dashboard */}
           {currentPage === 'dashboard' && (
             <div className="space-y-6">
@@ -961,6 +1140,17 @@ export default function ESOPApp() {
                   </Button>
                 </div>
               </div>
+              
+              {/* Storage Status Indicator */}
+              {storageStatus && (
+                <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${storageStatus.mode === 'drive' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-yellow-50 text-yellow-700 border border-yellow-200'}`}>
+                  <div className={`w-2 h-2 rounded-full ${storageStatus.mode === 'drive' ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                  <span className="text-sm font-medium">
+                    {storageStatus.mode === 'drive' ? '☁️ Google Drive' : '💾 Penyimpanan Lokal'}
+                  </span>
+                  <span className="text-xs opacity-75">- {storageStatus.message}</span>
+                </div>
+              )}
               
               {/* Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1091,96 +1281,6 @@ export default function ESOPApp() {
                     </ResponsiveContainer>
                   </CardContent>
                 </Card>
-                
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Distribusi per Jenis</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={stats.byJenis}
-                          dataKey="count"
-                          nameKey="jenis"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={100}
-                          label={({ jenis, count }) => `${jenis}: ${count}`}
-                        >
-                          <Cell fill="#f97316" />
-                          <Cell fill="#eab308" />
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Distribusi per Status</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={stats.byStatus}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="status" />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="count" fill="#eab308" name="Jumlah" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              </div>
-              
-              {/* Recent Activity */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Upload Terbaru</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ScrollArea className="h-64">
-                      <div className="space-y-4">
-                        {stats.recentUploads.map((sop) => (
-                          <div key={sop.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div>
-                              <p className="font-medium text-gray-800">{sop.nomorSop}</p>
-                              <p className="text-sm text-gray-500">{sop.judul}</p>
-                            </div>
-                            <Badge variant="outline" className={STATUS_COLORS[sop.status]}>
-                              {sop.status}
-                            </Badge>
-                          </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Aktivitas Terbaru</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ScrollArea className="h-64">
-                      <div className="space-y-4">
-                        {stats.recentLogs.map((log) => (
-                          <div key={log.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                            <div className="w-2 h-2 mt-2 rounded-full bg-orange-500" />
-                            <div>
-                              <p className="text-sm font-medium text-gray-800">{log.user?.name}</p>
-                              <p className="text-sm text-gray-600">{log.deskripsi}</p>
-                              <p className="text-xs text-gray-400">{new Date(log.createdAt).toLocaleString('id-ID')}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  </CardContent>
-                </Card>
               </div>
                 </>
               )}
@@ -1191,87 +1291,19 @@ export default function ESOPApp() {
           {currentPage === 'katalog' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-800">Katalog SOP dan IK</h2>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">Katalog SOP dan IK</h2>
+                  <p className="text-sm text-gray-500 mt-1">Daftar lengkap SOP dan IK yang tersedia</p>
+                </div>
+                {/* Neon Yellow Glowing Tambah SOP Button */}
                 {user?.role === 'ADMIN' && (
-                  <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-                    <DialogTrigger asChild>
-                      <Button className="bg-orange-500 hover:bg-orange-600 text-white">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Tambah SOP/IK
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-lg">
-                      <DialogHeader>
-                        <DialogTitle className="text-orange-600">Upload SOP/IK Baru</DialogTitle>
-                        <DialogDescription>Isi form berikut untuk menambahkan SOP atau IK baru</DialogDescription>
-                      </DialogHeader>
-                      <form onSubmit={(e) => handleUpload(e)} className="space-y-4">
-                        <div>
-                          <Label>Judul SOP/IK</Label>
-                          <Input 
-                            value={uploadForm.judul}
-                            onChange={(e) => setUploadForm({ ...uploadForm, judul: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label>Kategori</Label>
-                            <Select value={uploadForm.kategori} onValueChange={(v) => setUploadForm({ ...uploadForm, kategori: v })}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {KATEGORI_OPTIONS.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <Label>Jenis</Label>
-                            <Select value={uploadForm.jenis} onValueChange={(v) => setUploadForm({ ...uploadForm, jenis: v })}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {JENIS_OPTIONS.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label>Tahun</Label>
-                            <Input 
-                              type="number"
-                              value={uploadForm.tahun}
-                              onChange={(e) => setUploadForm({ ...uploadForm, tahun: parseInt(e.target.value) })}
-                              required
-                            />
-                          </div>
-                          <div>
-                            <Label>Status</Label>
-                            <Select value={uploadForm.status} onValueChange={(v) => setUploadForm({ ...uploadForm, status: v })}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <div>
-                          <Label>Upload File (Excel/PDF)</Label>
-                          <Input 
-                            type="file"
-                            accept=".xlsx,.pdf"
-                            onChange={(e) => setUploadForm({ ...uploadForm, file: e.target.files?.[0] || null })}
-                            className="cursor-pointer"
-                          />
-                        </div>
-                        <DialogFooter>
-                          <Button type="button" variant="outline" onClick={() => setShowUploadDialog(false)}>Batal</Button>
-                          <Button type="submit" className="bg-orange-500 hover:bg-orange-600 text-white" disabled={loading}>
-                            Upload
-                          </Button>
-                        </DialogFooter>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
+                  <Button 
+                    onClick={() => setShowUploadDialog(true)}
+                    className="neon-yellow-btn"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Tambah SOP
+                  </Button>
                 )}
               </div>
               
@@ -1328,52 +1360,60 @@ export default function ESOPApp() {
                           <TableHead className="font-semibold">Kategori</TableHead>
                           <TableHead className="font-semibold">Jenis</TableHead>
                           <TableHead className="font-semibold">Status</TableHead>
-                          <TableHead className="font-semibold">Tanggal Upload</TableHead>
+                          <TableHead className="font-semibold">Diupload</TableHead>
                           <TableHead className="font-semibold text-center">Aksi</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {sopFiles.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={8} className="text-center text-gray-500 py-8">
-                              Tidak ada data
+                            <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                              Tidak ada data ditemukan
                             </TableCell>
                           </TableRow>
                         ) : (
                           sopFiles.map((sop) => (
                             <TableRow key={sop.id} className="hover:bg-gray-50">
-                              <TableCell className="font-medium text-orange-600">{sop.nomorSop}</TableCell>
-                              <TableCell>{sop.judul}</TableCell>
+                              <TableCell className="font-medium">{sop.nomorSop}</TableCell>
+                              <TableCell className="max-w-xs truncate">{sop.judul}</TableCell>
                               <TableCell>{sop.tahun}</TableCell>
                               <TableCell>
-                                <Badge variant="outline">{sop.kategori}</Badge>
+                                <Badge variant="outline" className="border-orange-300 text-orange-700">{sop.kategori}</Badge>
                               </TableCell>
                               <TableCell>
-                                <Badge variant={sop.jenis === 'SOP' ? 'default' : 'secondary'} className={sop.jenis === 'SOP' ? 'bg-orange-500' : 'bg-yellow-500 text-black'}>
+                                <Badge variant="outline" className={sop.jenis === 'SOP' ? 'border-blue-300 text-blue-700' : 'border-purple-300 text-purple-700'}>
                                   {sop.jenis}
                                 </Badge>
                               </TableCell>
                               <TableCell>
-                                <Badge variant="outline" className={STATUS_COLORS[sop.status]}>
-                                  {sop.status}
-                                </Badge>
+                                <Badge className={STATUS_COLORS[sop.status] || ''}>{sop.status}</Badge>
                               </TableCell>
-                              <TableCell>{new Date(sop.uploadedAt).toLocaleDateString('id-ID')}</TableCell>
+                              <TableCell className="text-sm text-gray-500">{sop.user?.name || '-'}</TableCell>
                               <TableCell>
                                 <div className="flex items-center justify-center gap-1">
-                                  <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} title="Preview">
-                                    <Eye className="w-4 h-4 text-blue-500" />
+                                  <Button variant="ghost" size="icon" onClick={() => handlePreview(sop.id)} title="Preview di Browser" className="hover:bg-orange-50">
+                                    <Eye className="w-4 h-4 text-orange-500" />
                                   </Button>
-                                  <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download">
-                                    <Download className="w-4 h-4 text-green-500" />
+                                  <Button variant="ghost" size="icon" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-yellow-50">
+                                    <Download className="w-4 h-4 text-yellow-600" />
                                   </Button>
-                                  <Button size="icon" variant="ghost" onClick={() => handlePrint(sop.id)} title="Print">
+                                  <Button variant="ghost" size="icon" onClick={() => handleDirectPrint(sop.id)} title="Print" className="hover:bg-gray-100">
                                     <Printer className="w-4 h-4 text-gray-500" />
                                   </Button>
+                                  
+                                  {/* Desktop Integration - Open in Desktop App */}
+                                  <DesktopIntegration
+                                    fileId={sop.id}
+                                    fileName={sop.fileName}
+                                    fileType={sop.fileType as 'pdf' | 'xlsx'}
+                                    driveFileId={sop.driveFileId}
+                                    onPreview={() => handlePreview(sop.id)}
+                                  />
+                                  
                                   {user?.role === 'ADMIN' && (
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
-                                        <Button size="icon" variant="ghost">
+                                        <Button variant="ghost" size="icon">
                                           <MoreHorizontal className="w-4 h-4" />
                                         </Button>
                                       </DropdownMenuTrigger>
@@ -1424,6 +1464,89 @@ export default function ESOPApp() {
                   </Button>
                 </div>
               </div>
+            </div>
+          )}
+          
+          {/* Upload SOP */}
+          {currentPage === 'upload' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">Upload SOP Baru</h2>
+                  <p className="text-sm text-gray-500 mt-1">Unggah dokumen SOP atau IK baru ke sistem</p>
+                </div>
+              </div>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Form Upload</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={(e) => handleUpload(e, false)} className="space-y-4">
+                    <div>
+                      <Label>Judul SOP/IK</Label>
+                      <Input 
+                        value={uploadForm.judul}
+                        onChange={(e) => setUploadForm({ ...uploadForm, judul: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Kategori</Label>
+                        <Select value={uploadForm.kategori} onValueChange={(v) => setUploadForm({ ...uploadForm, kategori: v })}>
+                          <SelectTrigger><SelectValue placeholder="Pilih Kategori" /></SelectTrigger>
+                          <SelectContent>
+                            {KATEGORI_OPTIONS.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Jenis</Label>
+                        <Select value={uploadForm.jenis} onValueChange={(v) => setUploadForm({ ...uploadForm, jenis: v })}>
+                          <SelectTrigger><SelectValue placeholder="Pilih Jenis" /></SelectTrigger>
+                          <SelectContent>
+                            {JENIS_OPTIONS.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Tahun</Label>
+                        <Input 
+                          type="number"
+                          value={uploadForm.tahun}
+                          onChange={(e) => setUploadForm({ ...uploadForm, tahun: parseInt(e.target.value) || new Date().getFullYear() })}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label>Status</Label>
+                        <Select value={uploadForm.status} onValueChange={(v) => setUploadForm({ ...uploadForm, status: v })}>
+                          <SelectTrigger><SelectValue placeholder="Pilih Status" /></SelectTrigger>
+                          <SelectContent>
+                            {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Upload File (Excel/PDF)</Label>
+                      <Input 
+                        type="file"
+                        accept=".xlsx,.pdf"
+                        onChange={(e) => setUploadForm({ ...uploadForm, file: e.target.files?.[0] || null })}
+                        className="cursor-pointer"
+                      />
+                    </div>
+                    <Button type="submit" className="neon-yellow-btn" disabled={loading}>
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload SOP
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
             </div>
           )}
           
@@ -1480,7 +1603,7 @@ export default function ESOPApp() {
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-600">Total Ditolak</p>
+                        <p className="text-sm font-medium text-gray-600">Ditolak</p>
                         <p className="text-3xl font-bold text-red-600 mt-1">{stats?.totalPublikDitolak || 0}</p>
                       </div>
                       <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
@@ -1491,78 +1614,76 @@ export default function ESOPApp() {
                 </Card>
               </div>
               
-              {/* Table */}
-              <Card className="shadow-sm">
-                <CardHeader className="bg-gradient-to-r from-orange-500 to-yellow-400 text-white rounded-t-lg">
-                  <CardTitle className="text-lg">Daftar Pengajuan Publik</CardTitle>
-                </CardHeader>
+              {/* Verification Table */}
+              <Card>
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-gray-50">
-                          <TableHead className="font-semibold">Pengirim</TableHead>
                           <TableHead className="font-semibold">Judul</TableHead>
-                          <TableHead className="font-semibold">Jenis</TableHead>
+                          <TableHead className="font-semibold">Pengirim</TableHead>
                           <TableHead className="font-semibold">Kategori</TableHead>
+                          <TableHead className="font-semibold">Jenis</TableHead>
                           <TableHead className="font-semibold">Status</TableHead>
-                          <TableHead className="font-semibold">Tanggal</TableHead>
                           <TableHead className="font-semibold text-center">Aksi</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {sopFiles.length === 0 ? (
+                        {sopFiles.filter(s => s.isPublicSubmission).length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={7} className="text-center text-gray-500 py-12">
-                              <div className="flex flex-col items-center gap-2">
-                                <FileText className="w-12 h-12 text-gray-300" />
-                                <p>Tidak ada pengajuan</p>
-                              </div>
+                            <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                              Tidak ada pengajuan publik
                             </TableCell>
                           </TableRow>
                         ) : (
-                          sopFiles.map((sop) => (
-                            <TableRow key={sop.id} className="hover:bg-orange-50/50 transition-colors">
-                              <TableCell>
-                                <div>
-                                  <p className="font-medium text-gray-800">{sop.submitterName}</p>
-                                  <p className="text-sm text-gray-500">{sop.submitterEmail}</p>
-                                </div>
-                              </TableCell>
+                          sopFiles.filter(s => s.isPublicSubmission).map((sop) => (
+                            <TableRow key={sop.id} className="hover:bg-gray-50">
                               <TableCell className="font-medium">{sop.judul}</TableCell>
                               <TableCell>
-                                <Badge className={sop.jenis === 'SOP' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-yellow-500 hover:bg-yellow-600 text-black'}>
+                                <div className="text-sm">
+                                  <p>{sop.submitterName}</p>
+                                  <p className="text-gray-500">{sop.submitterEmail}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="border-orange-300 text-orange-700">{sop.kategori}</Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className={sop.jenis === 'SOP' ? 'border-blue-300 text-blue-700' : 'border-purple-300 text-purple-700'}>
                                   {sop.jenis}
                                 </Badge>
                               </TableCell>
                               <TableCell>
-                                <Badge variant="outline" className="border-orange-300 text-orange-600">{sop.kategori}</Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge className={
-                                  sop.verificationStatus === 'MENUNGGU' ? 'bg-blue-500 hover:bg-blue-600' :
-                                  sop.verificationStatus === 'DISETUJUI' ? 'bg-green-500 hover:bg-green-600' :
-                                  'bg-red-500 hover:bg-red-600'
-                                }>
-                                  {sop.verificationStatus}
+                                <Badge className={STATUS_COLORS[sop.verificationStatus || 'MENUNGGU'] || ''}>
+                                  {sop.verificationStatus || 'MENUNGGU'}
                                 </Badge>
                               </TableCell>
-                              <TableCell>{new Date(sop.uploadedAt).toLocaleDateString('id-ID')}</TableCell>
                               <TableCell>
-                                <div className="flex items-center justify-center gap-1">
-                                  <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} title="Preview" className="hover:bg-blue-100">
-                                    <Eye className="w-4 h-4 text-blue-500" />
-                                  </Button>
-                                  <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-100">
-                                    <Download className="w-4 h-4 text-green-500" />
+                                <div className="flex items-center justify-center gap-2">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => handleDownload(sop.id)}
+                                    className="text-gray-500"
+                                  >
+                                    <Download className="w-4 h-4 mr-1" /> Unduh
                                   </Button>
                                   {sop.verificationStatus === 'MENUNGGU' && (
                                     <>
-                                      <Button size="icon" variant="ghost" onClick={() => handleVerification(sop.id, 'DISETUJUI')} title="Setujui" className="hover:bg-green-100">
-                                        <Check className="w-4 h-4 text-green-500" />
+                                      <Button 
+                                        size="sm"
+                                        onClick={() => handleVerification(sop.id, 'DISETUJUI')}
+                                        className="bg-green-500 hover:bg-green-600 text-white"
+                                      >
+                                        <Check className="w-4 h-4 mr-1" /> Setujui
                                       </Button>
-                                      <Button size="icon" variant="ghost" onClick={() => handleVerification(sop.id, 'DITOLAK')} title="Tolak" className="hover:bg-red-100">
-                                        <X className="w-4 h-4 text-red-500" />
+                                      <Button 
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={() => handleVerification(sop.id, 'DITOLAK')}
+                                      >
+                                        <X className="w-4 h-4 mr-1" /> Tolak
                                       </Button>
                                     </>
                                   )}
@@ -1582,63 +1703,39 @@ export default function ESOPApp() {
           {/* Log Aktivitas */}
           {currentPage === 'logs' && (
             <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-gray-800">Log Aktivitas</h2>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">Log Aktivitas</h2>
+                  <p className="text-sm text-gray-500 mt-1">Riwayat aktivitas sistem</p>
+                </div>
+              </div>
               
               <Card>
                 <CardContent className="p-0">
                   <ScrollArea className="h-[600px]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-gray-50 sticky top-0">
-                          <TableHead className="font-semibold">Waktu</TableHead>
-                          <TableHead className="font-semibold">User</TableHead>
-                          <TableHead className="font-semibold">Aktivitas</TableHead>
-                          <TableHead className="font-semibold">Deskripsi</TableHead>
-                          <TableHead className="font-semibold">File</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {logs.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={5} className="text-center text-gray-500 py-8">
-                              Tidak ada log
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          logs.map((log) => (
-                            <TableRow key={log.id} className="hover:bg-gray-50">
-                              <TableCell className="text-sm">
+                    <div className="p-4 space-y-3">
+                      {logs.length === 0 ? (
+                        <p className="text-center text-gray-500 py-8">Tidak ada log aktivitas</p>
+                      ) : (
+                        logs.map((log) => (
+                          <div key={log.id} className="flex items-start gap-4 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                            <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                              <History className="w-5 h-5 text-orange-500" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-medium text-gray-800">{log.user?.name || 'System'}</span>
+                                <Badge variant="outline" className="text-xs">{log.aktivitas}</Badge>
+                              </div>
+                              <p className="text-sm text-gray-600">{log.deskripsi}</p>
+                              <p className="text-xs text-gray-400 mt-1">
                                 {new Date(log.createdAt).toLocaleString('id-ID')}
-                              </TableCell>
-                              <TableCell>
-                                <div>
-                                  <p className="font-medium">{log.user?.name}</p>
-                                  <p className="text-xs text-gray-500">{log.user?.email}</p>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className={
-                                  log.aktivitas === 'LOGIN' ? 'bg-blue-100 text-blue-800' :
-                                  log.aktivitas === 'UPLOAD' ? 'bg-green-100 text-green-800' :
-                                  log.aktivitas === 'DOWNLOAD' ? 'bg-purple-100 text-purple-800' :
-                                  log.aktivitas === 'PREVIEW' ? 'bg-cyan-100 text-cyan-800' :
-                                  log.aktivitas === 'VERIFIKASI' ? 'bg-orange-100 text-orange-800' :
-                                  'bg-gray-100 text-gray-800'
-                                }>
-                                  {log.aktivitas}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>{log.deskripsi}</TableCell>
-                              <TableCell>
-                                {log.sopFile && (
-                                  <span className="text-sm text-orange-600">{log.sopFile.nomorSop}</span>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </ScrollArea>
                 </CardContent>
               </Card>
@@ -1646,7 +1743,7 @@ export default function ESOPApp() {
               {/* Pagination */}
               <div className="flex items-center justify-between">
                 <p className="text-sm text-gray-500">
-                  Menampilkan {logs.length} log
+                  Halaman {logsPagination.page} dari {logsPagination.totalPages || 1}
                 </p>
                 <div className="flex items-center gap-2">
                   <Button 
@@ -1657,7 +1754,6 @@ export default function ESOPApp() {
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </Button>
-                  <span className="text-sm">Halaman {logsPagination.page}</span>
                   <Button 
                     variant="outline" 
                     size="sm"
@@ -1672,67 +1768,17 @@ export default function ESOPApp() {
           )}
           
           {/* Manajemen User */}
-          {currentPage === 'users' && (
+          {currentPage === 'users' && user?.role === 'ADMIN' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-800">Manajemen User</h2>
-                <Dialog open={showUserDialog} onOpenChange={setShowUserDialog}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-orange-500 hover:bg-orange-600 text-white">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Tambah User
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle className="text-orange-600">Tambah User Baru</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleCreateUser} className="space-y-4">
-                      <div>
-                        <Label>Nama Lengkap</Label>
-                        <Input 
-                          value={newUserForm.name}
-                          onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label>Email</Label>
-                        <Input 
-                          type="email"
-                          value={newUserForm.email}
-                          onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label>Password</Label>
-                        <Input 
-                          type="password"
-                          value={newUserForm.password}
-                          onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label>Role</Label>
-                        <Select value={newUserForm.role} onValueChange={(v) => setNewUserForm({ ...newUserForm, role: v })}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ADMIN">Admin</SelectItem>
-                            <SelectItem value="STAF">Staf</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setShowUserDialog(false)}>Batal</Button>
-                        <Button type="submit" className="bg-orange-500 hover:bg-orange-600 text-white" disabled={loading}>
-                          Simpan
-                        </Button>
-                      </DialogFooter>
-                    </form>
-                  </DialogContent>
-                </Dialog>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">Manajemen User</h2>
+                  <p className="text-sm text-gray-500 mt-1">Kelola pengguna sistem</p>
+                </div>
+                <Button onClick={() => setShowUserDialog(true)} className="neon-yellow-btn">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Tambah User
+                </Button>
               </div>
               
               <Card>
@@ -1743,14 +1789,13 @@ export default function ESOPApp() {
                         <TableHead className="font-semibold">Nama</TableHead>
                         <TableHead className="font-semibold">Email</TableHead>
                         <TableHead className="font-semibold">Role</TableHead>
-                        <TableHead className="font-semibold">Tanggal Dibuat</TableHead>
                         <TableHead className="font-semibold text-center">Aksi</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {users.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-gray-500 py-8">
+                          <TableCell colSpan={4} className="text-center py-8 text-gray-500">
                             Tidak ada user
                           </TableCell>
                         </TableRow>
@@ -1760,18 +1805,21 @@ export default function ESOPApp() {
                             <TableCell className="font-medium">{u.name}</TableCell>
                             <TableCell>{u.email}</TableCell>
                             <TableCell>
-                              <Badge variant={u.role === 'ADMIN' ? 'default' : 'secondary'} className={u.role === 'ADMIN' ? 'bg-orange-500' : ''}>
+                              <Badge className={u.role === 'ADMIN' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}>
                                 {u.role}
                               </Badge>
                             </TableCell>
-                            <TableCell>{new Date(u.createdAt).toLocaleDateString('id-ID')}</TableCell>
                             <TableCell>
                               <div className="flex items-center justify-center">
-                                {u.id !== user?.id && (
-                                  <Button size="icon" variant="ghost" onClick={() => handleDeleteUser(u.id)} title="Hapus">
-                                    <Trash2 className="w-4 h-4 text-red-500" />
-                                  </Button>
-                                )}
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => handleDeleteUser(u.id)}
+                                  disabled={u.id === user.id}
+                                  title="Hapus"
+                                >
+                                  <Trash2 className="w-4 h-4 text-red-500" />
+                                </Button>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -1783,133 +1831,176 @@ export default function ESOPApp() {
               </Card>
             </div>
           )}
-          
-          {/* Upload SOP */}
-          {currentPage === 'upload' && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-gray-800">Upload SOP/IK</h2>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle>Form Upload SOP/IK Baru</CardTitle>
-                  <CardDescription>Isi form berikut untuk menambahkan SOP atau IK baru ke katalog</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={(e) => handleUpload(e)} className="space-y-6">
-                    <div>
-                      <Label className="text-base font-semibold">Judul SOP/IK *</Label>
-                      <Input 
-                        value={uploadForm.judul}
-                        onChange={(e) => setUploadForm({ ...uploadForm, judul: e.target.value })}
-                        placeholder="Masukkan judul SOP atau IK"
-                        required
-                        className="mt-2"
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-base font-semibold">Kategori *</Label>
-                        <Select value={uploadForm.kategori} onValueChange={(v) => setUploadForm({ ...uploadForm, kategori: v })}>
-                          <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {KATEGORI_OPTIONS.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label className="text-base font-semibold">Jenis *</Label>
-                        <Select value={uploadForm.jenis} onValueChange={(v) => setUploadForm({ ...uploadForm, jenis: v })}>
-                          <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {JENIS_OPTIONS.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-base font-semibold">Tahun *</Label>
-                        <Input 
-                          type="number"
-                          value={uploadForm.tahun}
-                          onChange={(e) => setUploadForm({ ...uploadForm, tahun: parseInt(e.target.value) })}
-                          required
-                          className="mt-2"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-base font-semibold">Status *</Label>
-                        <Select value={uploadForm.status} onValueChange={(v) => setUploadForm({ ...uploadForm, status: v })}>
-                          <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="text-base font-semibold">Upload File (Excel/PDF) *</Label>
-                      <div className="mt-2 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-orange-400 transition-colors">
-                        <Input 
-                          type="file"
-                          accept=".xlsx,.pdf"
-                          onChange={(e) => setUploadForm({ ...uploadForm, file: e.target.files?.[0] || null })}
-                          className="cursor-pointer"
-                        />
-                        {uploadForm.file && (
-                          <p className="mt-2 text-sm text-green-600">File dipilih: {uploadForm.file.name}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex gap-4">
-                      <Button type="button" variant="outline" onClick={() => setUploadForm({
-                        judul: '', kategori: 'SIAGA', jenis: 'SOP',
-                        tahun: new Date().getFullYear(), status: 'AKTIF', file: null
-                      })}>
-                        Reset
-                      </Button>
-                      <Button type="submit" className="bg-orange-500 hover:bg-orange-600 text-white" disabled={loading}>
-                        <Upload className="w-4 h-4 mr-2" />
-                        Upload
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
-            </div>
-          )}
         </main>
       </div>
       
-      {/* Footer */}
-      <footer className="bg-black text-white p-4 text-center mt-auto no-print">
-        <p className="text-sm text-gray-400">created by : Foe</p>
+      {/* ============ STICKY FOOTER - FROZEN AT BOTTOM ============ */}
+      <footer className="bg-black text-white py-2 flex-shrink-0 z-50 no-print">
+        <div className="max-w-7xl mx-auto text-center">
+          <p className="text-sm text-gray-400">
+            <span className="creator-glow text-orange-400">created by : Foe</span>
+          </p>
+        </div>
       </footer>
+      
+      {/* Hidden Print Iframe */}
+      <iframe ref={printIframeRef} style={{ display: 'none' }} title="print-frame" />
+      
+      {/* Upload Dialog */}
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-orange-600">Upload SOP Baru</DialogTitle>
+            <DialogDescription>Isi form berikut untuk mengunggah dokumen baru</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => handleUpload(e, false)} className="space-y-4">
+            <div>
+              <Label>Judul SOP/IK</Label>
+              <Input 
+                value={uploadForm.judul}
+                onChange={(e) => setUploadForm({ ...uploadForm, judul: e.target.value })}
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Kategori</Label>
+                <Select value={uploadForm.kategori} onValueChange={(v) => setUploadForm({ ...uploadForm, kategori: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {KATEGORI_OPTIONS.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Jenis</Label>
+                <Select value={uploadForm.jenis} onValueChange={(v) => setUploadForm({ ...uploadForm, jenis: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {JENIS_OPTIONS.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Tahun</Label>
+                <Input 
+                  type="number"
+                  value={uploadForm.tahun}
+                  onChange={(e) => setUploadForm({ ...uploadForm, tahun: parseInt(e.target.value) || new Date().getFullYear() })}
+                  required
+                />
+              </div>
+              <div>
+                <Label>Status</Label>
+                <Select value={uploadForm.status} onValueChange={(v) => setUploadForm({ ...uploadForm, status: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Upload File (Excel/PDF)</Label>
+              <Input 
+                type="file"
+                accept=".xlsx,.pdf"
+                onChange={(e) => setUploadForm({ ...uploadForm, file: e.target.files?.[0] || null })}
+                className="cursor-pointer"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowUploadDialog(false)}>Batal</Button>
+              <Button type="submit" className="bg-orange-500 hover:bg-orange-600 text-white" disabled={loading}>
+                <Upload className="w-4 h-4 mr-2" />
+                Upload
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* User Dialog */}
+      <Dialog open={showUserDialog} onOpenChange={setShowUserDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-orange-600">Tambah User Baru</DialogTitle>
+            <DialogDescription>Buat akun pengguna baru untuk sistem</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateUser} className="space-y-4">
+            <div>
+              <Label>Nama</Label>
+              <Input 
+                value={newUserForm.name}
+                onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label>Email</Label>
+              <Input 
+                type="email"
+                value={newUserForm.email}
+                onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label>Password</Label>
+              <Input 
+                type="password"
+                value={newUserForm.password}
+                onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label>Role</Label>
+              <Select value={newUserForm.role} onValueChange={(v) => setNewUserForm({ ...newUserForm, role: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ADMIN">Admin</SelectItem>
+                  <SelectItem value="STAF">Staf</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowUserDialog(false)}>Batal</Button>
+              <Button type="submit" className="bg-orange-500 hover:bg-orange-600 text-white" disabled={loading}>
+                Simpan
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       
       {/* Preview Dialog */}
       <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle className="text-orange-600">Preview File: {previewData?.fileName}</DialogTitle>
+        <DialogContent className="sm:max-w-5xl max-h-[90vh] p-0">
+          <DialogHeader className="p-4 border-b">
+            <DialogTitle className="text-orange-600">
+              📄 {previewData?.fileName || 'Preview'}
+            </DialogTitle>
           </DialogHeader>
-          <div className="overflow-auto max-h-[70vh]">
+          <div className="h-[70vh]">
             {previewData?.type === 'pdf' ? (
-              <iframe 
-                src={`data:application/pdf;base64,${previewData.data}`}
-                className="w-full h-[60vh]"
-                title="PDF Preview"
+              <PdfPreview 
+                data={previewData.data} 
+                fileName={previewData.fileName}
+              />
+            ) : previewData?.type === 'excel' ? (
+              <ExcelPreview 
+                data={previewData.data} 
+                fileName={previewData.fileName}
               />
             ) : (
-              <div className="text-center py-8">
-                <FileSpreadsheet className="w-16 h-16 mx-auto text-orange-500 mb-4" />
-                <p className="text-gray-600">Preview file Excel tidak tersedia di browser.</p>
-                <p className="text-sm text-gray-400 mt-2">Silakan download file untuk melihat isinya.</p>
+              <div className="flex items-center justify-center h-full text-gray-500">
+                Preview tidak tersedia
               </div>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPreviewDialog(false)}>Tutup</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
