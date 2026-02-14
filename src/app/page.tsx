@@ -325,9 +325,12 @@ export default function ESOPApp() {
         setShowLogin(false)
         setLoginForm({ email: '', password: '' })
         toast({ title: 'Berhasil', description: 'Login berhasil!' })
-        // Fetch stats immediately after login
-        fetchStats()
-        fetchStorageStatus()
+        // Fetch stats after a short delay to ensure cookie is set
+        setTimeout(() => {
+          console.log('Fetching stats after login...')
+          fetchStats()
+          fetchStorageStatus()
+        }, 500)
       }
     } catch (error) {
       console.error('Login error:', error)
@@ -348,29 +351,47 @@ export default function ESOPApp() {
     }
   }
   
-  const fetchStats = async () => {
+  const fetchStats = async (retryCount = 0) => {
     try {
-      const res = await fetch('/api/stats', { credentials: 'include' })
+      console.log('Fetching stats... attempt:', retryCount + 1)
+      const res = await fetch('/api/stats', { 
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
       const data = await res.json()
+      console.log('Stats response:', data)
+      
       if (res.ok && !data.error) {
         setStats(data)
+        console.log('Stats loaded successfully')
       } else {
-        // If unauthorized, try to re-auth
-        if (data.error === 'Unauthorized') {
-          console.log('Session expired, user needs to re-login')
-          // Don't auto-logout, just show empty stats
-          setStats({
-            totalSop: 0, totalIk: 0, totalAktif: 0, totalReview: 0,
-            totalKadaluarsa: 0, totalPublikMenunggu: 0, totalPublikDitolak: 0,
-            byTahun: [], byKategori: [], byJenis: [], byStatus: [],
-            recentUploads: [], recentLogs: []
-          })
-        } else {
-          console.error('Stats error:', data.error)
+        // If unauthorized and we haven't retried yet, wait and retry
+        if (data.error === 'Unauthorized' && retryCount < 2) {
+          console.log('Unauthorized, retrying in 1 second...')
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          return fetchStats(retryCount + 1)
         }
+        
+        // Set empty stats to prevent infinite loading
+        console.log('Setting empty stats due to error:', data.error)
+        setStats({
+          totalSop: 0, totalIk: 0, totalAktif: 0, totalReview: 0,
+          totalKadaluarsa: 0, totalPublikMenunggu: 0, totalPublikDitolak: 0,
+          byTahun: [], byKategori: [], byJenis: [], byStatus: [],
+          recentUploads: [], recentLogs: []
+        })
       }
     } catch (error) {
       console.error('Stats fetch error:', error)
+      // Set empty stats on error to prevent infinite loading
+      setStats({
+        totalSop: 0, totalIk: 0, totalAktif: 0, totalReview: 0,
+        totalKadaluarsa: 0, totalPublikMenunggu: 0, totalPublikDitolak: 0,
+        byTahun: [], byKategori: [], byJenis: [], byStatus: [],
+        recentUploads: [], recentLogs: []
+      })
     }
   }
   
