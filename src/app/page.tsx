@@ -285,7 +285,7 @@ export default function ESOPApp() {
   
   const checkAuth = async () => {
     try {
-      const res = await fetch('/api/auth')
+      const res = await fetch('/api/auth', { credentials: 'include' })
       const data = await res.json()
       if (data.isAuthenticated && data.user) {
         setUser(data.user)
@@ -311,7 +311,8 @@ export default function ESOPApp() {
       const res = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(loginForm)
+        body: JSON.stringify(loginForm),
+        credentials: 'include'
       })
       const data = await res.json()
       if (data.error) {
@@ -343,7 +344,7 @@ export default function ESOPApp() {
   
   const fetchStats = async () => {
     try {
-      const res = await fetch('/api/stats')
+      const res = await fetch('/api/stats', { credentials: 'include' })
       const data = await res.json()
       if (!data.error) setStats(data)
     } catch (error) {
