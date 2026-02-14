@@ -287,6 +287,7 @@ export default function ESOPApp() {
     try {
       const res = await fetch('/api/auth', { credentials: 'include' })
       const data = await res.json()
+      console.log('Auth check response:', data)
       if (data.isAuthenticated && data.user) {
         setUser(data.user)
         setIsAuthenticated(true)
@@ -315,6 +316,7 @@ export default function ESOPApp() {
         credentials: 'include'
       })
       const data = await res.json()
+      console.log('Login response:', data)
       if (data.error) {
         toast({ title: 'Error', description: data.error, variant: 'destructive' })
       } else {
@@ -323,8 +325,12 @@ export default function ESOPApp() {
         setShowLogin(false)
         setLoginForm({ email: '', password: '' })
         toast({ title: 'Berhasil', description: 'Login berhasil!' })
+        // Fetch stats immediately after login
+        fetchStats()
+        fetchStorageStatus()
       }
     } catch (error) {
+      console.error('Login error:', error)
       toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
     }
     setLoading(false)
@@ -346,9 +352,25 @@ export default function ESOPApp() {
     try {
       const res = await fetch('/api/stats', { credentials: 'include' })
       const data = await res.json()
-      if (!data.error) setStats(data)
+      if (res.ok && !data.error) {
+        setStats(data)
+      } else {
+        // If unauthorized, try to re-auth
+        if (data.error === 'Unauthorized') {
+          console.log('Session expired, user needs to re-login')
+          // Don't auto-logout, just show empty stats
+          setStats({
+            totalSop: 0, totalIk: 0, totalAktif: 0, totalReview: 0,
+            totalKadaluarsa: 0, totalPublikMenunggu: 0, totalPublikDitolak: 0,
+            byTahun: [], byKategori: [], byJenis: [], byStatus: [],
+            recentUploads: [], recentLogs: []
+          })
+        } else {
+          console.error('Stats error:', data.error)
+        }
+      }
     } catch (error) {
-      console.error('Stats error:', error)
+      console.error('Stats fetch error:', error)
     }
   }
   
