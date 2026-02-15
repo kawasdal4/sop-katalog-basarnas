@@ -368,3 +368,4 @@ export async function getFolderInfo(): Promise<{
     isSharedDrive: !!folderInfo.data.driveId,
   }
 }
+// trigger rebuild
