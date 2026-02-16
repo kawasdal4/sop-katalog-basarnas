@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
-    "build": "prisma generate --schema=./prisma/schema.prisma && next build",
+    "build": "cp prisma/schema.prod.prisma prisma/schema.prisma && prisma generate --schema=./prisma/schema.prisma && next build",
     "postinstall": "prisma generate --schema=./prisma/schema.prisma",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
