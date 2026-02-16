@@ -477,7 +477,7 @@ export default function ESOPApp() {
     }
   }
   
-  // Handle large file upload using resumable upload
+  // Handle large file upload using resumable upload (via proxy)
   const handleLargeFileUpload = async (form: typeof uploadForm | typeof publicForm, isPublic: boolean) => {
     const file = form.file!
     const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'pdf'
@@ -492,49 +492,29 @@ export default function ESOPApp() {
     }
     const mimeType = mimeTypes[fileExtension] || 'application/octet-stream'
     
-    // Step 1: Get resumable upload URL
-    toast({ title: 'Step 1/3', description: 'Membuat sesi upload...', duration: 2000 })
+    // Step 1: Upload file via proxy API
+    toast({ title: '📤 Step 1/2', description: `Mengupload file (${(file.size / 1024 / 1024).toFixed(2)} MB) ke Google Drive...`, duration: 5000 })
     
-    const uploadUrlRes = await fetch('/api/upload-url', {
+    const uploadFormData = new FormData()
+    uploadFormData.append('file', file)
+    uploadFormData.append('fileName', file.name)
+    uploadFormData.append('mimeType', mimeType)
+    
+    const uploadRes = await fetch('/api/upload-chunk', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fileName: file.name,
-        mimeType: mimeType,
-        fileSize: file.size
-      })
+      body: uploadFormData
     })
     
-    const uploadUrlData = await uploadUrlRes.json()
+    const uploadData = await uploadRes.json()
     
-    if (!uploadUrlData.success) {
-      throw new Error(uploadUrlData.error || 'Failed to create upload session')
+    if (!uploadData.success) {
+      throw new Error(uploadData.error || 'Failed to upload file')
     }
     
-    // Step 2: Upload file directly to Google Drive
-    toast({ title: 'Step 2/3', description: 'Mengupload file ke Google Drive...', duration: 3000 })
+    const driveFileId = uploadData.driveFileId
     
-    const uploadRes = await fetch(uploadUrlData.uploadUrl, {
-      method: 'PUT',
-      headers: {
-        'Content-Length': file.size.toString(),
-      },
-      body: file
-    })
-    
-    if (!uploadRes.ok) {
-      throw new Error(`Upload failed: ${uploadRes.statusText}`)
-    }
-    
-    const driveFileData = await uploadRes.json()
-    const driveFileId = driveFileData.id
-    
-    if (!driveFileId) {
-      throw new Error('No file ID returned from upload')
-    }
-    
-    // Step 3: Create SOP record with driveFileId
-    toast({ title: 'Step 3/3', description: 'Menyimpan data SOP...', duration: 2000 })
+    // Step 2: Create SOP record with driveFileId
+    toast({ title: '📝 Step 2/2', description: 'Menyimpan data SOP...', duration: 2000 })
     
     const sopRes = await fetch('/api/sop', {
       method: 'POST',
@@ -551,7 +531,7 @@ export default function ESOPApp() {
         isPublicSubmission: isPublic,
         submitterName: isPublic ? publicForm.nama : null,
         submitterEmail: isPublic ? publicForm.email : null,
-        skipFileUpload: true // Flag to skip file upload in API
+        skipFileUpload: true
       })
     })
     
