@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { cookies } from 'next/headers'
-import { readFile } from 'fs/promises'
-import path from 'path'
 
-// GET - Download file
+// Set runtime and max duration for Vercel
+export const runtime = 'nodejs'
+export const maxDuration = 60
+
+// GET - Download file (redirect to Google Drive)
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const userId = cookieStore.get('userId')?.value
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
     
@@ -27,26 +21,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 404 })
     }
     
-    const filePath = path.join(process.cwd(), 'uploads', sopFile.filePath)
-    const fileBuffer = await readFile(filePath)
+    // If file is in Google Drive, redirect to direct download URL
+    if (sopFile.driveFileId) {
+      const directUrl = `https://drive.google.com/uc?export=download&id=${sopFile.driveFileId}`
+      return NextResponse.redirect(directUrl)
+    }
     
-    // Create log
-    const user = await db.user.findUnique({ where: { id: userId } })
-    await db.log.create({
-      data: {
-        userId,
-        aktivitas: 'DOWNLOAD',
-        deskripsi: `${user?.name} mengunduh ${sopFile.jenis}: ${sopFile.nomorSop}`,
-        fileId: id
-      }
-    })
-    
-    return new NextResponse(fileBuffer, {
-      headers: {
-        'Content-Type': sopFile.fileType === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="${sopFile.fileName}"`
-      }
-    })
+    // If no Google Drive ID, return error
+    return NextResponse.json({ 
+      error: 'File tidak tersedia untuk diunduh. File belum diupload ke Google Drive.',
+      fileName: sopFile.fileName
+    }, { status: 404 })
   } catch (error) {
     console.error('Download error:', error)
     return NextResponse.json({ error: 'Terjadi kesalahan' }, { status: 500 })

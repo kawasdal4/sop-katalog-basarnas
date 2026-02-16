@@ -5,6 +5,11 @@
   "framework": "nextjs",
   "outputDirectory": ".next",
   "regions": ["sin1"],
+  "functions": {
+    "src/app/api/**/*.ts": {
+      "maxDuration": 60
+    }
+  },
   "headers": [
     {
       "source": "/api/(.*)",

@@ -4,6 +4,10 @@ import { cookies } from 'next/headers'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
 
+// Set runtime and max duration for Vercel
+export const runtime = 'nodejs'
+export const maxDuration = 60
+
 // Check if running in production (Vercel)
 const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1'
 
