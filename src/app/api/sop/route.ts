@@ -8,6 +8,15 @@ import path from 'path'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
+// Configure body size limit for large file uploads (50MB)
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '50mb',
+    },
+  },
+}
+
 // Check if running in production (Vercel)
 const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1'
 
@@ -115,10 +124,19 @@ export async function POST(request: NextRequest) {
     const submitterName = formData.get('submitterName') as string | null
     const submitterEmail = formData.get('submitterEmail') as string | null
     
-    console.log('Form data:', { judul, kategori, jenis, tahun, fileName: file?.name })
+    console.log('Form data:', { judul, kategori, jenis, tahun, fileName: file?.name, fileSize: file?.size })
     
     if (!file) {
       return NextResponse.json({ error: 'File diperlukan' }, { status: 400 })
+    }
+    
+    // Check file size (max 50MB)
+    const maxSize = 50 * 1024 * 1024 // 50MB
+    if (file.size > maxSize) {
+      return NextResponse.json({ 
+        error: 'File terlalu besar. Maksimal 50MB.',
+        fileSize: `${(file.size / 1024 / 1024).toFixed(2)} MB`
+      }, { status: 400 })
     }
     
     // Get user ID
@@ -164,6 +182,8 @@ export async function POST(request: NextRequest) {
     const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'pdf'
     const fileName = `${nomorSop}.${fileExtension}`
     
+    console.log(`📄 Processing file: ${fileName} (${(file.size / 1024 / 1024).toFixed(2)} MB)`)
+    
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
     
@@ -186,7 +206,7 @@ export async function POST(request: NextRequest) {
     if (driveCheck.success) {
       try {
         const gd = await import('@/lib/google-drive')
-        console.log(`📤 Uploading to Google Drive: ${fileName}`)
+        console.log(`📤 Uploading to Google Drive: ${fileName} (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`)
         
         const driveResult = await gd.uploadFileToDrive(buffer, fileName, mimeType)
         driveFileId = driveResult.id
@@ -195,21 +215,13 @@ export async function POST(request: NextRequest) {
         console.log(`✅ File uploaded to Google Drive: ${driveFileId}`)
       } catch (driveError) {
         console.error('❌ Google Drive upload failed:', driveError)
-        // Fallback to local if not in production
-        if (!isProduction) {
-          console.log('📁 Falling back to local storage')
-          const uploadDir = path.join(process.cwd(), 'uploads')
-          await mkdir(uploadDir, { recursive: true })
-          const localPath = path.join(uploadDir, fileName)
-          await writeFile(localPath, buffer)
-        } else {
-          return NextResponse.json({ 
-            error: 'Gagal mengupload ke Google Drive. Hubungi administrator.' 
-          }, { status: 500 })
-        }
+        return NextResponse.json({ 
+          error: 'Gagal mengupload ke Google Drive. Silakan coba lagi.',
+          details: driveError instanceof Error ? driveError.message : 'Unknown error'
+        }, { status: 500 })
       }
     } else {
-      // Local storage fallback
+      // Local storage fallback (development only)
       if (!isProduction) {
         console.log('📁 Using local storage (Google Drive not configured)')
         const uploadDir = path.join(process.cwd(), 'uploads')
