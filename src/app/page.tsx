@@ -423,50 +423,164 @@ export default function ESOPApp() {
     }
     
     setLoading(true)
+    
+    // Check file size - use resumable upload for files > 4MB
+    const LARGE_FILE_THRESHOLD = 4 * 1024 * 1024 // 4MB
+    const isLargeFile = form.file.size > LARGE_FILE_THRESHOLD
+    
     try {
-      const formData = new FormData()
-      formData.append('judul', form.judul)
-      formData.append('kategori', form.kategori)
-      formData.append('jenis', form.jenis)
-      formData.append('tahun', form.tahun.toString())
-      formData.append('status', form.status)
-      formData.append('file', form.file)
-      
-      if (isPublic) {
-        formData.append('isPublicSubmission', 'true')
-        formData.append('submitterName', publicForm.nama)
-        formData.append('submitterEmail', publicForm.email)
-      }
-      
-      const res = await fetch('/api/sop', {
-        method: 'POST',
-        body: formData
-      })
-      const data = await res.json()
-      
-      if (data.error) {
-        toast({ title: 'Error', description: data.error, variant: 'destructive' })
+      if (isLargeFile) {
+        // Use resumable upload for large files
+        toast({ title: '📤 Upload File Besar', description: `Ukuran file: ${(form.file.size / 1024 / 1024).toFixed(2)} MB. Menggunakan resumable upload...`, duration: 5000 })
+        
+        await handleLargeFileUpload(form, isPublic)
       } else {
-        toast({ title: 'Berhasil', description: isPublic ? 'SOP berhasil dikirim untuk verifikasi!' : 'SOP berhasil diupload!' })
-        setShowUploadDialog(false)
-        if (isPublic) {
-          setPublicForm({
-            nama: '', email: '', judul: '', kategori: 'SIAGA', jenis: 'SOP',
-            tahun: new Date().getFullYear(), status: 'AKTIF', file: null
-          })
-        } else {
-          setUploadForm({
-            judul: '', kategori: 'SIAGA', jenis: 'SOP',
-            tahun: new Date().getFullYear(), status: 'AKTIF', file: null
-          })
-        }
-        fetchSopFiles()
-        fetchStats()
+        // Use regular upload for small files
+        await handleSmallFileUpload(form, isPublic)
       }
     } catch (error) {
-      toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
+      console.error('Upload error:', error)
+      toast({ title: 'Error', description: 'Terjadi kesalahan saat upload', variant: 'destructive' })
     }
     setLoading(false)
+  }
+  
+  // Handle small file upload (< 4MB)
+  const handleSmallFileUpload = async (form: typeof uploadForm | typeof publicForm, isPublic: boolean) => {
+    const formData = new FormData()
+    formData.append('judul', form.judul)
+    formData.append('kategori', form.kategori)
+    formData.append('jenis', form.jenis)
+    formData.append('tahun', form.tahun.toString())
+    formData.append('status', form.status)
+    formData.append('file', form.file!)
+    
+    if (isPublic) {
+      formData.append('isPublicSubmission', 'true')
+      formData.append('submitterName', publicForm.nama)
+      formData.append('submitterEmail', publicForm.email)
+    }
+    
+    const res = await fetch('/api/sop', {
+      method: 'POST',
+      body: formData
+    })
+    const data = await res.json()
+    
+    if (data.error) {
+      toast({ title: 'Error', description: data.error, variant: 'destructive' })
+    } else {
+      toast({ title: 'Berhasil', description: isPublic ? 'SOP berhasil dikirim untuk verifikasi!' : 'SOP berhasil diupload!' })
+      resetUploadForm(isPublic)
+      fetchSopFiles()
+      fetchStats()
+    }
+  }
+  
+  // Handle large file upload using resumable upload
+  const handleLargeFileUpload = async (form: typeof uploadForm | typeof publicForm, isPublic: boolean) => {
+    const file = form.file!
+    const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'pdf'
+    
+    // MIME types
+    const mimeTypes: Record<string, string> = {
+      'pdf': 'application/pdf',
+      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'xls': 'application/vnd.ms-excel',
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'doc': 'application/msword',
+    }
+    const mimeType = mimeTypes[fileExtension] || 'application/octet-stream'
+    
+    // Step 1: Get resumable upload URL
+    toast({ title: 'Step 1/3', description: 'Membuat sesi upload...', duration: 2000 })
+    
+    const uploadUrlRes = await fetch('/api/upload-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileName: file.name,
+        mimeType: mimeType,
+        fileSize: file.size
+      })
+    })
+    
+    const uploadUrlData = await uploadUrlRes.json()
+    
+    if (!uploadUrlData.success) {
+      throw new Error(uploadUrlData.error || 'Failed to create upload session')
+    }
+    
+    // Step 2: Upload file directly to Google Drive
+    toast({ title: 'Step 2/3', description: 'Mengupload file ke Google Drive...', duration: 3000 })
+    
+    const uploadRes = await fetch(uploadUrlData.uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Length': file.size.toString(),
+      },
+      body: file
+    })
+    
+    if (!uploadRes.ok) {
+      throw new Error(`Upload failed: ${uploadRes.statusText}`)
+    }
+    
+    const driveFileData = await uploadRes.json()
+    const driveFileId = driveFileData.id
+    
+    if (!driveFileId) {
+      throw new Error('No file ID returned from upload')
+    }
+    
+    // Step 3: Create SOP record with driveFileId
+    toast({ title: 'Step 3/3', description: 'Menyimpan data SOP...', duration: 2000 })
+    
+    const sopRes = await fetch('/api/sop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        judul: form.judul,
+        kategori: form.kategori,
+        jenis: form.jenis,
+        tahun: form.tahun,
+        status: form.status,
+        fileName: file.name,
+        fileType: fileExtension,
+        driveFileId: driveFileId,
+        isPublicSubmission: isPublic,
+        submitterName: isPublic ? publicForm.nama : null,
+        submitterEmail: isPublic ? publicForm.email : null,
+        skipFileUpload: true // Flag to skip file upload in API
+      })
+    })
+    
+    const sopData = await sopRes.json()
+    
+    if (sopData.error) {
+      throw new Error(sopData.error)
+    }
+    
+    toast({ title: '✅ Berhasil', description: 'File berhasil diupload ke Google Drive!', duration: 3000 })
+    resetUploadForm(isPublic)
+    fetchSopFiles()
+    fetchStats()
+  }
+  
+  // Reset upload form
+  const resetUploadForm = (isPublic: boolean) => {
+    setShowUploadDialog(false)
+    if (isPublic) {
+      setPublicForm({
+        nama: '', email: '', judul: '', kategori: 'SIAGA', jenis: 'SOP',
+        tahun: new Date().getFullYear(), status: 'AKTIF', file: null
+      })
+    } else {
+      setUploadForm({
+        judul: '', kategori: 'SIAGA', jenis: 'SOP',
+        tahun: new Date().getFullYear(), status: 'AKTIF', file: null
+      })
+    }
   }
   
   const handleDownload = async (id: string) => {

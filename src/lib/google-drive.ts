@@ -63,7 +63,7 @@ function bufferToStream(buffer: Buffer): Readable {
   return stream
 }
 
-// Upload file to Google Drive
+// Upload file to Google Drive (supports large files)
 export async function uploadFileToDrive(
   fileBuffer: Buffer,
   fileName: string,
@@ -72,12 +72,19 @@ export async function uploadFileToDrive(
   const drive = createDriveClient()
   const config = getGoogleDriveConfig()
 
+  const fileSize = fileBuffer.length
   console.log(`📤 Uploading "${fileName}" to Google Drive...`)
+  console.log(`   File size: ${(fileSize / 1024 / 1024).toFixed(2)} MB`)
 
   const fileMetadata = {
     name: fileName,
     parents: [config.folderId],
     mimeType: mimeType,
+  }
+
+  // For large files (>5MB), use resumable upload
+  if (fileSize > 5 * 1024 * 1024) {
+    console.log(`   Using resumable upload for large file...`)
   }
 
   const media = {
@@ -117,6 +124,86 @@ export async function uploadFileToDrive(
     name: response.data.name || fileName,
     webViewLink: response.data.webViewLink || '',
   }
+}
+
+// Create upload session for resumable upload (for very large files)
+export async function createResumableUploadSession(
+  fileName: string,
+  mimeType: string,
+  fileSize: number
+): Promise<string> {
+  const config = getGoogleDriveConfig()
+  const auth = new google.auth.OAuth2(
+    config.clientId,
+    config.clientSecret
+  )
+  auth.setCredentials({ refresh_token: config.refreshToken })
+
+  // Get access token
+  const { token } = await auth.getAccessToken()
+  if (!token) {
+    throw new Error('Failed to get access token')
+  }
+
+  // Create resumable upload session
+  const response = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: fileName,
+        parents: [config.folderId],
+        mimeType: mimeType,
+      }),
+    }
+  )
+
+  if (!response.ok) {
+    throw new Error(`Failed to create upload session: ${response.statusText}`)
+  }
+
+  const uploadUrl = response.headers.get('Location')
+  if (!uploadUrl) {
+    throw new Error('No upload URL returned')
+  }
+
+  return uploadUrl
+}
+
+// Upload chunk to resumable session
+export async function uploadChunk(
+  uploadUrl: string,
+  chunk: Buffer,
+  startByte: number,
+  totalSize: number
+): Promise<{ complete: boolean; fileId?: string }> {
+  const endByte = startByte + chunk.length - 1
+
+  const response = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Length': chunk.length.toString(),
+      'Content-Range': `bytes ${startByte}-${endByte}/${totalSize}`,
+    },
+    body: chunk,
+  })
+
+  if (response.status === 308) {
+    // Partial upload - continue
+    return { complete: false }
+  }
+
+  if (response.status === 200 || response.status === 201) {
+    // Upload complete
+    const data = await response.json()
+    return { complete: true, fileId: data.id }
+  }
+
+  throw new Error(`Upload failed: ${response.statusText}`)
 }
 
 // Download file from Google Drive

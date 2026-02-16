@@ -8,15 +8,6 @@ import path from 'path'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-// Configure body size limit for large file uploads (50MB)
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '50mb',
-    },
-  },
-}
-
 // Check if running in production (Vercel)
 const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1'
 
@@ -112,190 +103,16 @@ export async function POST(request: NextRequest) {
   console.log('========================================\n')
   
   try {
-    const formData = await request.formData()
-    const judul = formData.get('judul') as string
-    const kategori = formData.get('kategori') as string
-    const jenis = formData.get('jenis') as string
-    const tahun = parseInt(formData.get('tahun') as string)
-    const status = formData.get('status') as string
-    const file = formData.get('file') as File | null
+    const contentType = request.headers.get('content-type') || ''
     
-    const isPublicSubmission = formData.get('isPublicSubmission') === 'true'
-    const submitterName = formData.get('submitterName') as string | null
-    const submitterEmail = formData.get('submitterEmail') as string | null
-    
-    console.log('Form data:', { judul, kategori, jenis, tahun, fileName: file?.name, fileSize: file?.size })
-    
-    if (!file) {
-      return NextResponse.json({ error: 'File diperlukan' }, { status: 400 })
+    // Check if this is a JSON request (for large file uploads that already have driveFileId)
+    if (contentType.includes('application/json')) {
+      return await handleJsonUpload(request)
     }
     
-    // Check file size (max 50MB)
-    const maxSize = 50 * 1024 * 1024 // 50MB
-    if (file.size > maxSize) {
-      return NextResponse.json({ 
-        error: 'File terlalu besar. Maksimal 50MB.',
-        fileSize: `${(file.size / 1024 / 1024).toFixed(2)} MB`
-      }, { status: 400 })
-    }
+    // Handle form data upload (small files)
+    return await handleFormUpload(request)
     
-    // Get user ID
-    let userId: string
-    
-    if (isPublicSubmission) {
-      let systemUser = await db.user.findUnique({ where: { email: 'system@sop.go.id' } })
-      if (!systemUser) {
-        systemUser = await db.user.create({
-          data: {
-            email: 'system@sop.go.id',
-            password: 'system',
-            name: 'System (Public Submission)',
-            role: 'STAF'
-          }
-        })
-      }
-      userId = systemUser.id
-    } else {
-      const cookieStore = await cookies()
-      const sessionData = cookieStore.get('session')?.value
-      
-      if (!sessionData) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
-      
-      try {
-        const session = JSON.parse(sessionData)
-        userId = session.id
-      } catch {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
-    }
-    
-    // Generate nomor SOP
-    const counter = await db.counter.findUnique({ where: { id: 'counter' } })
-    const count = jenis === 'SOP' ? (counter?.sopCount || 0) + 1 : (counter?.ikCount || 0) + 1
-    const nomorSop = jenis === 'SOP' ? `SOP-${String(count).padStart(4, '0')}` : `IK-${String(count).padStart(4, '0')}`
-    
-    console.log(`📝 Generated nomor: ${nomorSop}`)
-    
-    // Prepare file
-    const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'pdf'
-    const fileName = `${nomorSop}.${fileExtension}`
-    
-    console.log(`📄 Processing file: ${fileName} (${(file.size / 1024 / 1024).toFixed(2)} MB)`)
-    
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-    
-    // MIME types
-    const mimeTypes: Record<string, string> = {
-      'pdf': 'application/pdf',
-      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'xls': 'application/vnd.ms-excel',
-      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'doc': 'application/msword',
-    }
-    const mimeType = mimeTypes[fileExtension] || 'application/octet-stream'
-    
-    let driveFileId: string | null = null
-    let filePath = fileName
-    
-    // Upload to Google Drive
-    const driveCheck = await checkGoogleDriveAvailable()
-    
-    if (driveCheck.success) {
-      try {
-        const gd = await import('@/lib/google-drive')
-        console.log(`📤 Uploading to Google Drive: ${fileName} (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`)
-        
-        const driveResult = await gd.uploadFileToDrive(buffer, fileName, mimeType)
-        driveFileId = driveResult.id
-        filePath = driveResult.id
-        
-        console.log(`✅ File uploaded to Google Drive: ${driveFileId}`)
-      } catch (driveError) {
-        console.error('❌ Google Drive upload failed:', driveError)
-        return NextResponse.json({ 
-          error: 'Gagal mengupload ke Google Drive. Silakan coba lagi.',
-          details: driveError instanceof Error ? driveError.message : 'Unknown error'
-        }, { status: 500 })
-      }
-    } else {
-      // Local storage fallback (development only)
-      if (!isProduction) {
-        console.log('📁 Using local storage (Google Drive not configured)')
-        const uploadDir = path.join(process.cwd(), 'uploads')
-        await mkdir(uploadDir, { recursive: true })
-        const localPath = path.join(uploadDir, fileName)
-        await writeFile(localPath, buffer)
-      } else {
-        return NextResponse.json({ 
-          error: `Google Drive tidak tersedia: ${driveCheck.error}` 
-        }, { status: 500 })
-      }
-    }
-    
-    // Create SOP record
-    const sopFile = await db.sopFile.create({
-      data: {
-        nomorSop,
-        judul,
-        tahun,
-        kategori,
-        jenis,
-        status: status || 'AKTIF',
-        fileName: file.name,
-        filePath,
-        fileType: fileExtension,
-        driveFileId,
-        uploadedBy: userId,
-        isPublicSubmission,
-        submitterName,
-        submitterEmail,
-        verificationStatus: isPublicSubmission ? 'MENUNGGU' : null
-      }
-    })
-    
-    // Update counter
-    if (jenis === 'SOP') {
-      await db.counter.upsert({
-        where: { id: 'counter' },
-        update: { sopCount: count },
-        create: { id: 'counter', sopCount: count, ikCount: 0 }
-      })
-    } else {
-      await db.counter.upsert({
-        where: { id: 'counter' },
-        update: { ikCount: count },
-        create: { id: 'counter', sopCount: 0, ikCount: count }
-      })
-    }
-    
-    // Create log
-    try {
-      await db.log.create({
-        data: {
-          userId,
-          aktivitas: 'UPLOAD',
-          deskripsi: `${isPublicSubmission ? 'Submit publik' : 'Upload'} ${jenis}: ${nomorSop} - ${judul}${driveFileId ? ' [Google Drive]' : ' [Local]'}`,
-          fileId: sopFile.id
-        }
-      })
-    } catch (logError) {
-      console.warn('⚠️ Failed to create log:', logError)
-    }
-    
-    console.log('========================================')
-    console.log('✅ UPLOAD SUCCESS')
-    console.log(`   ID: ${sopFile.id}`)
-    console.log(`   Drive ID: ${driveFileId || 'local'}`)
-    console.log('========================================\n')
-    
-    return NextResponse.json({ 
-      success: true, 
-      data: sopFile,
-      driveFileId 
-    })
   } catch (error) {
     console.error('❌ Upload error:', error)
     return NextResponse.json({ 
@@ -303,6 +120,323 @@ export async function POST(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error' 
     }, { status: 500 })
   }
+}
+
+// Handle JSON upload (for large files already uploaded to Google Drive)
+async function handleJsonUpload(request: NextRequest) {
+  const body = await request.json()
+  const { 
+    judul, kategori, jenis, tahun, status, 
+    fileName, fileType, driveFileId,
+    isPublicSubmission, submitterName, submitterEmail,
+    skipFileUpload 
+  } = body
+  
+  console.log('JSON upload data:', { judul, kategori, jenis, tahun, fileName, driveFileId, skipFileUpload })
+  
+  if (!driveFileId) {
+    return NextResponse.json({ error: 'driveFileId diperlukan untuk JSON upload' }, { status: 400 })
+  }
+  
+  // Get user ID
+  let userId: string
+  
+  if (isPublicSubmission) {
+    let systemUser = await db.user.findUnique({ where: { email: 'system@sop.go.id' } })
+    if (!systemUser) {
+      systemUser = await db.user.create({
+        data: {
+          email: 'system@sop.go.id',
+          password: 'system',
+          name: 'System (Public Submission)',
+          role: 'STAF'
+        }
+      })
+    }
+    userId = systemUser.id
+  } else {
+    const cookieStore = await cookies()
+    const sessionData = cookieStore.get('session')?.value
+    
+    if (!sessionData) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    try {
+      const session = JSON.parse(sessionData)
+      userId = session.id
+    } catch {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+  }
+  
+  // Generate nomor SOP
+  const counter = await db.counter.findUnique({ where: { id: 'counter' } })
+  const count = jenis === 'SOP' ? (counter?.sopCount || 0) + 1 : (counter?.ikCount || 0) + 1
+  const nomorSop = jenis === 'SOP' ? `SOP-${String(count).padStart(4, '0')}` : `IK-${String(count).padStart(4, '0')}`
+  
+  console.log(`📝 Generated nomor: ${nomorSop}`)
+  
+  // Set file to public in Google Drive
+  try {
+    const gd = await import('@/lib/google-drive')
+    await gd.setFilePublic(driveFileId)
+    console.log(`✅ File set to public: ${driveFileId}`)
+  } catch (permError) {
+    console.warn('⚠️ Could not set file to public:', permError)
+  }
+  
+  // Create SOP record
+  const sopFile = await db.sopFile.create({
+    data: {
+      nomorSop,
+      judul,
+      tahun: parseInt(tahun),
+      kategori,
+      jenis,
+      status: status || 'AKTIF',
+      fileName: fileName || `${nomorSop}.${fileType}`,
+      filePath: driveFileId,
+      fileType: fileType || 'pdf',
+      driveFileId,
+      uploadedBy: userId,
+      isPublicSubmission: isPublicSubmission || false,
+      submitterName,
+      submitterEmail,
+      verificationStatus: isPublicSubmission ? 'MENUNGGU' : null
+    }
+  })
+  
+  // Update counter
+  if (jenis === 'SOP') {
+    await db.counter.upsert({
+      where: { id: 'counter' },
+      update: { sopCount: count },
+      create: { id: 'counter', sopCount: count, ikCount: 0 }
+    })
+  } else {
+    await db.counter.upsert({
+      where: { id: 'counter' },
+      update: { ikCount: count },
+      create: { id: 'counter', sopCount: 0, ikCount: count }
+    })
+  }
+  
+  // Create log
+  try {
+    await db.log.create({
+      data: {
+        userId,
+        aktivitas: 'UPLOAD',
+        deskripsi: `${isPublicSubmission ? 'Submit publik' : 'Upload'} ${jenis}: ${nomorSop} - ${judul} [Google Drive Resumable]`,
+        fileId: sopFile.id
+      }
+    })
+  } catch (logError) {
+    console.warn('⚠️ Failed to create log:', logError)
+  }
+  
+  console.log('========================================')
+  console.log('✅ UPLOAD SUCCESS (Resumable)')
+  console.log(`   ID: ${sopFile.id}`)
+  console.log(`   Drive ID: ${driveFileId}`)
+  console.log('========================================\n')
+  
+  return NextResponse.json({ 
+    success: true, 
+    data: sopFile,
+    driveFileId 
+  })
+}
+
+// Handle form data upload (small files)
+async function handleFormUpload(request: NextRequest) {
+  const formData = await request.formData()
+  const judul = formData.get('judul') as string
+  const kategori = formData.get('kategori') as string
+  const jenis = formData.get('jenis') as string
+  const tahun = parseInt(formData.get('tahun') as string)
+  const status = formData.get('status') as string
+  const file = formData.get('file') as File | null
+  
+  const isPublicSubmission = formData.get('isPublicSubmission') === 'true'
+  const submitterName = formData.get('submitterName') as string | null
+  const submitterEmail = formData.get('submitterEmail') as string | null
+  
+  console.log('Form data:', { judul, kategori, jenis, tahun, fileName: file?.name, fileSize: file?.size })
+  
+  if (!file) {
+    return NextResponse.json({ error: 'File diperlukan' }, { status: 400 })
+  }
+  
+  // Check file size (max 4MB for form upload due to Vercel limits)
+  const maxSize = 4 * 1024 * 1024 // 4MB
+  if (file.size > maxSize) {
+    return NextResponse.json({ 
+      error: 'File terlalu besar untuk form upload. Gunakan upload resumable.',
+      fileSize: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+      maxSize: '4 MB',
+      useResumable: true
+    }, { status: 400 })
+  }
+  
+  // Get user ID
+  let userId: string
+  
+  if (isPublicSubmission) {
+    let systemUser = await db.user.findUnique({ where: { email: 'system@sop.go.id' } })
+    if (!systemUser) {
+      systemUser = await db.user.create({
+        data: {
+          email: 'system@sop.go.id',
+          password: 'system',
+          name: 'System (Public Submission)',
+          role: 'STAF'
+        }
+      })
+    }
+    userId = systemUser.id
+  } else {
+    const cookieStore = await cookies()
+    const sessionData = cookieStore.get('session')?.value
+    
+    if (!sessionData) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    try {
+      const session = JSON.parse(sessionData)
+      userId = session.id
+    } catch {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+  }
+  
+  // Generate nomor SOP
+  const counter = await db.counter.findUnique({ where: { id: 'counter' } })
+  const count = jenis === 'SOP' ? (counter?.sopCount || 0) + 1 : (counter?.ikCount || 0) + 1
+  const nomorSop = jenis === 'SOP' ? `SOP-${String(count).padStart(4, '0')}` : `IK-${String(count).padStart(4, '0')}`
+  
+  console.log(`📝 Generated nomor: ${nomorSop}`)
+  
+  // Prepare file
+  const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'pdf'
+  const fileName = `${nomorSop}.${fileExtension}`
+  
+  console.log(`📄 Processing file: ${fileName} (${(file.size / 1024 / 1024).toFixed(2)} MB)`)
+  
+  const bytes = await file.arrayBuffer()
+  const buffer = Buffer.from(bytes)
+  
+  // MIME types
+  const mimeTypes: Record<string, string> = {
+    'pdf': 'application/pdf',
+    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'xls': 'application/vnd.ms-excel',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'doc': 'application/msword',
+  }
+  const mimeType = mimeTypes[fileExtension] || 'application/octet-stream'
+  
+  let driveFileId: string | null = null
+  let filePath = fileName
+  
+  // Upload to Google Drive
+  const driveCheck = await checkGoogleDriveAvailable()
+  
+  if (driveCheck.success) {
+    try {
+      const gd = await import('@/lib/google-drive')
+      console.log(`📤 Uploading to Google Drive: ${fileName} (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`)
+      
+      const driveResult = await gd.uploadFileToDrive(buffer, fileName, mimeType)
+      driveFileId = driveResult.id
+      filePath = driveResult.id
+      
+      console.log(`✅ File uploaded to Google Drive: ${driveFileId}`)
+    } catch (driveError) {
+      console.error('❌ Google Drive upload failed:', driveError)
+      return NextResponse.json({ 
+        error: 'Gagal mengupload ke Google Drive. Silakan coba lagi.',
+        details: driveError instanceof Error ? driveError.message : 'Unknown error'
+      }, { status: 500 })
+    }
+  } else {
+    // Local storage fallback (development only)
+    if (!isProduction) {
+      console.log('📁 Using local storage (Google Drive not configured)')
+      const uploadDir = path.join(process.cwd(), 'uploads')
+      await mkdir(uploadDir, { recursive: true })
+      const localPath = path.join(uploadDir, fileName)
+      await writeFile(localPath, buffer)
+    } else {
+      return NextResponse.json({ 
+        error: `Google Drive tidak tersedia: ${driveCheck.error}` 
+      }, { status: 500 })
+    }
+  }
+  
+  // Create SOP record
+  const sopFile = await db.sopFile.create({
+    data: {
+      nomorSop,
+      judul,
+      tahun,
+      kategori,
+      jenis,
+      status: status || 'AKTIF',
+      fileName: file.name,
+      filePath,
+      fileType: fileExtension,
+      driveFileId,
+      uploadedBy: userId,
+      isPublicSubmission,
+      submitterName,
+      submitterEmail,
+      verificationStatus: isPublicSubmission ? 'MENUNGGU' : null
+    }
+  })
+  
+  // Update counter
+  if (jenis === 'SOP') {
+    await db.counter.upsert({
+      where: { id: 'counter' },
+      update: { sopCount: count },
+      create: { id: 'counter', sopCount: count, ikCount: 0 }
+    })
+  } else {
+    await db.counter.upsert({
+      where: { id: 'counter' },
+      update: { ikCount: count },
+      create: { id: 'counter', sopCount: 0, ikCount: count }
+    })
+  }
+  
+  // Create log
+  try {
+    await db.log.create({
+      data: {
+        userId,
+        aktivitas: 'UPLOAD',
+        deskripsi: `${isPublicSubmission ? 'Submit publik' : 'Upload'} ${jenis}: ${nomorSop} - ${judul}${driveFileId ? ' [Google Drive]' : ' [Local]'}`,
+        fileId: sopFile.id
+      }
+    })
+  } catch (logError) {
+    console.warn('⚠️ Failed to create log:', logError)
+  }
+  
+  console.log('========================================')
+  console.log('✅ UPLOAD SUCCESS')
+  console.log(`   ID: ${sopFile.id}`)
+  console.log(`   Drive ID: ${driveFileId || 'local'}`)
+  console.log('========================================\n')
+  
+  return NextResponse.json({ 
+    success: true, 
+    data: sopFile,
+    driveFileId 
+  })
 }
 
 // PUT - Update SOP status
