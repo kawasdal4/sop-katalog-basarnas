@@ -630,6 +630,11 @@ export default function ESOPApp() {
     return input
   }
 
+  // Get Google Drive Preview URL (works for all file types)
+  const getGoogleDrivePreviewUrl = (driveFileId: string): string => {
+    return `https://drive.google.com/file/d/${driveFileId}/preview`
+  }
+
   // Get Microsoft Office Viewer URL with Direct Download Link
   // Format: https://view.officeapps.live.com/op/view.aspx?src=[DIRECT_URL]
   const getMicrosoftViewerUrl = (driveFileId: string): string => {
@@ -644,83 +649,72 @@ export default function ESOPApp() {
     
     const fileExtension = sop.fileName.toLowerCase().split('.').pop()
     
+    console.log('========================================')
+    console.log('📄 PREVIEW REQUEST')
+    console.log('========================================')
+    console.log('File Name:', sop.fileName)
+    console.log('File Type:', fileExtension)
+    console.log('Drive File ID:', sop.driveFileId)
+    console.log('========================================')
+    
     if (!sop.driveFileId) {
       toast({ 
         title: '❌ Error', 
-        description: 'File tidak tersedia di Google Drive', 
-        variant: 'destructive' 
+        description: 'File tidak tersedia di Google Drive. File mungkin masih disimpan secara lokal.', 
+        variant: 'destructive',
+        duration: 5000
       })
       return
     }
 
-    // ============================================
-    // CONDITION 1: PDF FILES - Open directly in new tab
-    // ============================================
-    if (fileExtension === 'pdf') {
-      const directUrl = convertToDirectDownloadUrl(sop.driveFileId)
-      window.open(directUrl, '_blank')
-      toast({ 
-        title: '📄 Membuka PDF', 
-        description: 'File PDF dibuka di tab baru',
-        duration: 2000
-      })
-      return
-    }
+    // Show loading
+    toast({ 
+      title: '📄 Mempersiapkan Preview...', 
+      description: 'Mengatur akses file...',
+      duration: 2000
+    })
 
-    // ============================================
-    // CONDITION 2: EXCEL/WORD FILES - Use Microsoft Office Viewer
-    // ============================================
-    if (fileExtension === 'xlsx' || fileExtension === 'xls' || fileExtension === 'docx' || fileExtension === 'doc') {
+    try {
+      // Always try to set file to public first
+      const setPublicRes = await fetch(`/api/set-public?fileId=${sop.driveFileId}`)
+      const setPublicData = await setPublicRes.json()
+      
+      console.log('Set public response:', setPublicData)
+      
+      if (!setPublicData.success) {
+        // Still try to open, but show warning
+        console.warn('Could not set file to public:', setPublicData.error)
+      }
+
+      // ============================================
+      // FOR ALL FILES - Use Google Drive Preview
+      // This works for PDF, Excel, Word, and other formats
+      // ============================================
+      const previewUrl = getGoogleDrivePreviewUrl(sop.driveFileId)
+      
+      console.log('Opening preview URL:', previewUrl)
+      
+      window.open(previewUrl, '_blank')
+      
       toast({ 
-        title: '📊 Mempersiapkan Preview...', 
-        description: 'Mengatur akses file untuk Microsoft Office Viewer',
+        title: '✅ Preview Dibuka', 
+        description: 'File ditampilkan di Google Drive Preview',
         duration: 3000
       })
-
-      try {
-        // Call API to set file to public first
-        const res = await fetch(`/api/set-public?fileId=${sop.driveFileId}`)
-        const data = await res.json()
-
-        console.log('Set public response:', data)
-
-        // Build Microsoft Office Viewer URL with Direct Download Link
-        // Direct Link: https://drive.google.com/uc?export=download&id=[FILE_ID]
-        const viewerUrl = getMicrosoftViewerUrl(sop.driveFileId)
-
-        console.log('========================================')
-        console.log('📊 PREVIEW DEBUG INFO')
-        console.log('========================================')
-        console.log('File ID:', sop.driveFileId)
-        console.log('Direct URL:', convertToDirectDownloadUrl(sop.driveFileId))
-        console.log('Viewer URL:', viewerUrl)
-        console.log('========================================')
-
-        // Open in new tab for Microsoft Viewer (better experience)
-        window.open(viewerUrl, '_blank')
-
-        toast({ 
-          title: '✅ Preview Dibuka', 
-          description: 'File ditampilkan dengan Microsoft Office Viewer di tab baru',
-          duration: 3000
-        })
-      } catch (error) {
-        console.error('Preview error:', error)
-        toast({ 
-          title: '❌ Error', 
-          description: 'Pastikan akses file di Google Drive sudah diatur ke "Anyone with the link" (Siapa saja dengan link).', 
-          variant: 'destructive',
-          duration: 5000
-        })
-      }
-      return
+      
+    } catch (error) {
+      console.error('Preview error:', error)
+      
+      // Fallback: Try to open directly anyway
+      const fallbackUrl = getGoogleDrivePreviewUrl(sop.driveFileId)
+      window.open(fallbackUrl, '_blank')
+      
+      toast({ 
+        title: '⚠️ Preview', 
+        description: 'Mencoba membuka file. Jika tidak muncul, pastikan file sudah di-share ke "Anyone with the link".', 
+        duration: 5000
+      })
     }
-
-    // ============================================
-    // OTHER FILES - Try direct download
-    // ============================================
-    const directUrl = convertToDirectDownloadUrl(sop.driveFileId)
-    window.open(directUrl, '_blank')
   }
   
   const handleStatusChange = async (id: string, status: string) => {
