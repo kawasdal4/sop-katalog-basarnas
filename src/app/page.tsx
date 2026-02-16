@@ -424,16 +424,29 @@ export default function ESOPApp() {
     
     setLoading(true)
     
-    // Check file size - use resumable upload for files > 4MB
+    // Vercel serverless function limit is 4.5MB
+    // Use different upload method for files > 4MB to be safe
     const LARGE_FILE_THRESHOLD = 4 * 1024 * 1024 // 4MB
+    const VERCEL_MAX_LIMIT = 4.5 * 1024 * 1024 // 4.5MB - Vercel's hard limit
     const isLargeFile = form.file.size > LARGE_FILE_THRESHOLD
     
     try {
+      if (form.file.size > VERCEL_MAX_LIMIT) {
+        // File too large for Vercel serverless - show helpful message
+        toast({ 
+          title: '⚠️ File Terlalu Besar', 
+          description: `File (${(form.file.size / 1024 / 1024).toFixed(2)} MB) melebihi batas upload (4.5 MB). Silakan upload file ke Google Drive secara manual, lalu hubungi admin untuk menambahkan file ke katalog.`, 
+          variant: 'destructive',
+          duration: 8000
+        })
+        setLoading(false)
+        return
+      }
+      
       if (isLargeFile) {
-        // Use resumable upload for large files
-        toast({ title: '📤 Upload File Besar', description: `Ukuran file: ${(form.file.size / 1024 / 1024).toFixed(2)} MB. Menggunakan resumable upload...`, duration: 5000 })
-        
-        await handleLargeFileUpload(form, isPublic)
+        // Use proxy upload for files between 4MB - 4.5MB
+        toast({ title: '📤 Upload File', description: `Mengupload file (${(form.file.size / 1024 / 1024).toFixed(2)} MB)...`, duration: 5000 })
+        await handleProxyUpload(form, isPublic)
       } else {
         // Use regular upload for small files
         await handleSmallFileUpload(form, isPublic)
@@ -477,8 +490,8 @@ export default function ESOPApp() {
     }
   }
   
-  // Handle large file upload using resumable upload (via proxy)
-  const handleLargeFileUpload = async (form: typeof uploadForm | typeof publicForm, isPublic: boolean) => {
+  // Handle proxy upload for files 4MB - 4.5MB
+  const handleProxyUpload = async (form: typeof uploadForm | typeof publicForm, isPublic: boolean) => {
     const file = form.file!
     const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'pdf'
     
