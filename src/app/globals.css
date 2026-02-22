@@ -740,16 +740,259 @@
 }
 
 /* ============================================
-   PRINT STYLES
+   PRINT STYLES - A4 Landscape, 1cm Margin
    ============================================ */
 
 @media print {
-  .no-print {
-    display: none !important;
+  /* Page Setup - A4 Landscape (297mm x 210mm) */
+  @page {
+    size: 297mm 210mm landscape;
+    margin: 1cm;
   }
-  
+
+  /* Reset for print */
+  html, body {
+    width: 277mm; /* 297mm - 2cm margins */
+    height: 190mm; /* 210mm - 2cm margins */
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
   body {
     background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Hide all non-print elements */
+  .no-print,
+  header,
+  footer,
+  nav,
+  aside,
+  .sidebar,
+  .no-print-section,
+  button:not(.print-button),
+  .btn,
+  [role="button"],
+  .dropdown,
+  .modal-backdrop,
+  .toast,
+  .notification {
+    display: none !important;
+  }
+
+  /* Print area wrapper */
+  .print-area {
+    display: block !important;
+    width: 100% !important;
+    max-width: 277mm !important;
+    height: auto !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+    background: white !important;
+    color: black !important;
+    font-size: 12pt !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Fit to width scaling */
+  .print-area.fit-to-width {
+    transform: scale(0.95);
+    transform-origin: top left;
+  }
+
+  /* Ensure content is visible */
+  .print-area * {
+    overflow: visible !important;
+    max-height: none !important;
+    max-width: none !important;
+  }
+
+  /* Table styling for print */
+  .print-area table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 10pt !important;
+  }
+
+  .print-area th,
+  .print-area td {
+    border: 1px solid #000 !important;
+    padding: 4px 8px !important;
+    text-align: left !important;
+  }
+
+  .print-area th {
+    background-color: #f0f0f0 !important;
+    font-weight: bold !important;
+  }
+
+  /* Image handling */
+  .print-area img {
+    max-width: 100% !important;
+    height: auto !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Avoid page breaks inside elements */
+  .print-area h1,
+  .print-area h2,
+  .print-area h3,
+  .print-area h4,
+  .print-area h5,
+  .print-area h6,
+  .print-area p,
+  .print-area table,
+  .print-area figure,
+  .print-area pre,
+  .print-area blockquote {
+    page-break-inside: avoid !important;
+  }
+
+  /* Page break handling */
+  .print-area h1,
+  .print-area h2,
+  .print-area h3 {
+    page-break-after: avoid !important;
+  }
+
+  .print-area table {
+    page-break-before: auto !important;
+  }
+
+  /* Link styling for print */
+  .print-area a {
+    color: black !important;
+    text-decoration: underline !important;
+  }
+
+  .print-area a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 9pt !important;
+    color: #666 !important;
+  }
+
+  /* Remove shadows and effects */
+  .print-area * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    filter: none !important;
+  }
+
+  /* Background colors for print */
+  .print-area .bg-orange-500,
+  .print-area .bg-orange-600,
+  .print-area .bg-red-500,
+  .print-area .bg-red-600 {
+    background-color: #f0f0f0 !important;
+    color: black !important;
+  }
+
+  /* Ensure text is readable */
+  .print-area .text-white {
+    color: black !important;
+  }
+
+  .print-area .text-orange-500,
+  .print-area .text-orange-600,
+  .print-area .text-red-500,
+  .print-area .text-red-600 {
+    color: black !important;
+  }
+
+  /* Remove animations */
+  .print-area * {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* Grid and flex adjustments */
+  .print-area .grid,
+  .print-area .flex {
+    display: block !important;
+  }
+
+  .print-area .grid > *,
+  .print-area .flex > * {
+    display: block !important;
+    margin-bottom: 8px !important;
+  }
+
+  /* Card styling */
+  .print-area [class*="card"] {
+    border: 1px solid #ccc !important;
+    background: white !important;
+    box-shadow: none !important;
+    margin-bottom: 16px !important;
+  }
+
+  /* Force show print-only content */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Chrome specific adjustments */
+  @supports (-webkit-print-color-adjust: exact) {
+    .print-area {
+      -webkit-print-color-adjust: exact !important;
+    }
+  }
+
+  /* Firefox specific adjustments */
+  @-moz-document url-prefix() {
+    .print-area {
+      width: 100% !important;
+    }
+  }
+}
+
+/* Print-only class - hidden in screen view */
+.print-only {
+  display: none;
+}
+
+/* Screen-only class - hidden in print */
+.screen-only {
+  display: block;
+}
+
+@media print {
+  .screen-only {
+    display: none !important;
+  }
+}
+
+/* Print button styling */
+.print-button {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+  transition: all 0.2s ease;
+}
+
+.print-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(249, 115, 22, 0.4);
+}
+
+@media print {
+  .print-button {
+    display: none !important;
   }
 }
 
