@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String
+  name      String
+  role      String    @default("STAF")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  logs      Log[]
+  sopFiles  SopFile[]
+}
+
+model SopFile {
+  id                    String    @id @default(cuid())
+  nomorSop              String    @unique
+  judul                 String
+  tahun                 Int
+  kategori              String
+  jenis                 String
+  status                String    @default("AKTIF")
+  fileName              String
+  filePath              String
+  fileType              String
+  driveFileId           String?
+  pdfPreviewPath        String?
+  pdfPreviewDriveId     String?
+  pdfPreviewGeneratedAt DateTime?
+  uploadedBy            String
+  uploadedAt            DateTime  @default(now())
+  previewCount          Int       @default(0)
+  downloadCount         Int       @default(0)
+  currentVersion        Int       @default(1)
+  isPublicSubmission    Boolean   @default(false)
+  submitterName         String?
+  submitterEmail        String?
+  verificationStatus    String?   @default("MENUNGGU")
+  verifiedBy            String?
+  verifiedAt            DateTime?
+  updatedAt             DateTime  @updatedAt
+  logs                  Log[]
+  user                  User      @relation(fields: [uploadedBy], references: [id])
+}
+
+model Log {
+  id        String   @id @default(cuid())
+  userId    String
+  aktivitas String
+  deskripsi String
+  fileId    String?
+  createdAt DateTime @default(now())
+  metadata  String?
+  user      User     @relation(fields: [userId], references: [id])
+  sopFile   SopFile? @relation(fields: [fileId], references: [id])
+}
+
+model Counter {
+  id       String @id @default("counter")
+  sopCount Int    @default(0)
+  ikCount  Int    @default(0)
+}
+
+model FileSync {
+  id              String    @id @default(cuid())
+  filename        String
+  mimeType        String
+  fileSize        Int
+  driveFileId     String?   @unique
+  r2Key           String?   @unique
+  checksum        String?
+  source          String    @default("drive")
+  syncStatus      String    @default("pending")
+  lastError       String?
+  driveModifiedAt DateTime?
+  r2ModifiedAt    DateTime?
+  lastSyncedAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model SyncLog {
+  id        String   @id @default(cuid())
+  operation String
+  filename  String
+  status    String
+  message   String?
+  details   String?
+  createdAt DateTime @default(now())
+}
+
+// ============================================
+// FILE EDIT SESSIONS - File Locking System
+// ============================================
+model FileEditSession {
+  id              String    @id @default(cuid())
+  objectKey       String
+  sopFileId       String?
+  editorUserId    String
+  editorEmail     String
+  editorName      String?
+  originalHash    String
+  lockedAt        DateTime  @default(now())
+  expiresAt       DateTime
+  status          String    @default("active")  // active, completed, expired
+  lastSyncedAt    DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  editLogs        FileEditLog[]
+
+  @@index([objectKey])
+  @@index([editorUserId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+// ============================================
+// FILE EDIT LOGS - Edit History Tracking
+// ============================================
+model FileEditLog {
+  id              String   @id @default(cuid())
+  objectKey       String
+  editorUserId    String
+  editorEmail     String
+  editorName      String?
+  action          String   // started, synced, expired, force_overwrite, cancelled
+  details         String?  // JSON string for additional info
+  timestamp       DateTime @default(now())
+  sessionId       String?
+  session         FileEditSession? @relation(fields: [sessionId], references: [id])
+
+  @@index([objectKey])
+  @@index([editorUserId])
+  @@index([timestamp])
+}

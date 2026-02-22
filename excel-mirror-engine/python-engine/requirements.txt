@@ -1,0 +1,14 @@
+# Excel Mirror Preview Engine - Python Requirements
+# Install with: pip install -r requirements.txt
+
+# Windows COM Automation (REQUIRED on Windows)
+pywin32>=305
+
+# Process management for cleanup
+psutil>=5.9.0
+
+# Optional: PDF manipulation
+PyPDF2>=3.0.0
+
+# HTTP server (built-in, no extra package needed)
+# http.server is part of Python standard library

@@ -1,0 +1,123 @@
+// Production Schema - PostgreSQL (Supabase/Vercel)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+// User model with role-based access
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("STAF") // ADMIN or STAF
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  logs     Log[]
+  sopFiles SopFile[]
+}
+
+// SOP/IK File model
+model SopFile {
+  id           String   @id @default(cuid())
+  nomorSop     String   @unique // SOP-0001, IK-0001, etc
+  judul        String
+  tahun        Int
+  kategori     String   // SIAGA, LATIHAN, LAINNYA
+  jenis        String   // SOP or IK
+  status       String   @default("AKTIF") // AKTIF, REVIEW, KADALUARSA
+  
+  // File info
+  fileName     String
+  filePath     String
+  fileType     String   // xlsx or pdf
+  driveFileId  String?  // Google Drive file ID
+  
+  // PDF Preview
+  pdfPreviewPath       String?
+  pdfPreviewDriveId    String?
+  pdfPreviewGeneratedAt DateTime?
+  
+  // Statistics
+  previewCount  Int @default(0)
+  downloadCount Int @default(0)
+  currentVersion Int @default(1)
+  
+  // Upload info
+  uploadedBy   String
+  uploadedAt   DateTime @default(now())
+  
+  // For public submissions
+  isPublicSubmission Boolean   @default(false)
+  submitterName      String?
+  submitterEmail     String?
+  verificationStatus String?   @default("MENUNGGU") // MENUNGGU, DISETUJUI, DITOLAK
+  verifiedBy         String?
+  verifiedAt         DateTime?
+  
+  // Relations
+  user     User     @relation(fields: [uploadedBy], references: [id])
+  logs     Log[]
+  
+  updatedAt DateTime @updatedAt
+}
+
+// Activity Log model
+model Log {
+  id          String   @id @default(cuid())
+  userId      String
+  aktivitas   String   // UPLOAD, DOWNLOAD, PREVIEW, EDIT_STATUS, VERIFIKASI, LOGIN
+  deskripsi   String
+  fileId      String?
+  metadata    String?  // JSON string for additional data
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  user    User     @relation(fields: [userId], references: [id])
+  sopFile SopFile? @relation(fields: [fileId], references: [id])
+}
+
+// Counter for auto-generate nomor SOP
+model Counter {
+  id        String @id @default("counter")
+  sopCount  Int    @default(0)
+  ikCount   Int    @default(0)
+}
+
+// File Sync model for tracking sync between Drive and R2
+model FileSync {
+  id              String   @id @default(cuid())
+  filename        String
+  mimeType        String
+  fileSize        Int
+  driveFileId     String?  @unique
+  r2Key           String?  @unique
+  checksum        String?
+  source          String   @default("drive") // drive, r2, both
+  syncStatus      String   @default("pending") // pending, synced, error, conflict
+  lastError       String?
+  driveModifiedAt DateTime?
+  r2ModifiedAt    DateTime?
+  lastSyncedAt    DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// Sync Log model for tracking sync operations
+model SyncLog {
+  id        String   @id @default(cuid())
+  operation String   // migrate, sync, backup
+  filename  String
+  status    String   // success, error
+  message   String?
+  details   String?  // JSON string for additional data
+  createdAt DateTime @default(now())
+}
