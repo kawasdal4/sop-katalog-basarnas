@@ -121,3 +121,45 @@ model SyncLog {
   details   String?  // JSON string for additional data
   createdAt DateTime @default(now())
 }
+
+// File Edit Session - File Locking System
+model FileEditSession {
+  id           String   @id @default(cuid())
+  objectKey    String
+  sopFileId    String?
+  editorUserId String
+  editorEmail  String
+  editorName   String?
+  originalHash String
+  lockedAt     DateTime  @default(now())
+  expiresAt    DateTime
+  status       String    @default("active") // active, completed, expired
+  lastSyncedAt DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  editLogs     FileEditLog[]
+
+  @@index([objectKey])
+  @@index([editorUserId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+// File Edit Log - Edit History Tracking
+model FileEditLog {
+  id          String   @id @default(cuid())
+  objectKey   String
+  editorUserId String
+  editorEmail String
+  editorName  String?
+  action      String   // started, synced, expired, force_overwrite, cancelled
+  details     String?  // JSON string for additional info
+  timestamp   DateTime @default(now())
+  sessionId   String?
+  session     FileEditSession? @relation(fields: [sessionId], references: [id])
+
+  @@index([objectKey])
+  @@index([editorUserId])
+  @@index([timestamp])
+}
