@@ -3,23 +3,47 @@
  * 
  * STRICT MODE: Excel to PDF conversion with layout preservation
  * 
- * Template: /template-layout-master.xlsx
- * Site: basarnas.sharepoint.com
- * Drive: b!bxLe5TOxnkyWS_JGrus25CMXcMPoJmVKtC9GnhorGWRjehV4F0I8QaahO_sZWAvA
+ * INTERNAL IDENTIFIERS (NO URL/BROWSER PATHS):
+ * - Site: basarnas.sharepoint.com
+ * - DriveId: b!bxLe5TOxnkyWS_JGrus25CMXcMPoJmVKtC9GnhorGWRjehV4F0I8QaahO_sZWAvA
+ * - Template ItemId: 016DYVIFZTTCKHBCRFBZBK4D7SF5KFWMQN
  * 
  * Flow:
- * 1. Copy template (never edit source)
+ * 1. Copy template by ItemId (never edit source)
  * 2. Lock structure (only update VALUES)
  * 3. Data injection via Excel Table
  * 4. Validate layout integrity
- * 5. Convert via Graph API (SharePoint endpoint)
+ * 5. Convert via Graph API using DriveId + ItemId
  * 6. Save to /Export folder
+ * 
+ * DILARANG menggunakan:
+ * - URL browser (/:x:/g/, Doc.aspx, AllItems.aspx)
+ * - Parameter sourcedoc=
+ * - URL share public
+ * - Path-based file references
+ * 
+ * WAJIB menggunakan:
+ * - DriveId internal
+ * - ItemId internal
+ * - Identifier dari file picker SharePoint
  */
 
-// SharePoint Configuration
+// ============================================================
+// SHAREPOINT INTERNAL IDENTIFIERS - FROM FILE PICKER
+// ============================================================
+
+// Site hostname (bukan URL lengkap)
 const SHAREPOINT_SITE = 'basarnas.sharepoint.com'
+
+// Drive ID internal dari SharePoint document library
+// Diperoleh dari file picker Power Automate / Graph API
 const DRIVE_ID = 'b!bxLe5TOxnkyWS_JGrus25CMXcMPoJmVKtC9GnhorGWRjehV4F0I8QaahO_sZWAvA'
-const TEMPLATE_PATH = '/template-layout-master.xlsx'
+
+// Template Item ID internal - DIPEROLEH DARI FILE PICKER
+// INI BUKAN URL BROWSER, INI IDENTIFIER INTERNAL SHAREPOINT
+const TEMPLATE_ITEM_ID = '016DYVIFZTTCKHBCRFBZBK4D7SF5KFWMQN'
+
+// Export folder name (relative path dalam library)
 const EXPORT_FOLDER = 'Export'
 
 // Layout Validation Constants
@@ -32,6 +56,10 @@ const REQUIRED_LAYOUT = {
 
 // Token cache
 let cachedToken: { token: string; expiresAt: number } | null = null
+
+// ============================================================
+// AUTHENTICATION
+// ============================================================
 
 /**
  * Get Azure AD Access Token (Client Credentials Flow)
@@ -80,8 +108,12 @@ export async function getGraphToken(): Promise<string> {
   return data.access_token
 }
 
+// ============================================================
+// GRAPH API HELPER
+// ============================================================
+
 /**
- * Graph API Request Helper
+ * Graph API Request Helper - menggunakan endpoint internal
  */
 async function graphApi(
   token: string,
@@ -92,6 +124,7 @@ async function graphApi(
     headers?: Record<string, string>
   } = {}
 ): Promise<Response> {
+  // SELALU gunakan endpoint Graph API, bukan URL browser
   const url = endpoint.startsWith('http')
     ? endpoint
     : `https://graph.microsoft.com/v1.0${endpoint}`
@@ -113,16 +146,16 @@ async function graphApi(
 }
 
 // ============================================================
-// STEP 1: COPY TEMPLATE
+// STEP 1: COPY TEMPLATE (BY INTERNAL ITEM ID)
 // ============================================================
 
 /**
- * Get or create Export folder
+ * Get or create Export folder - menggunakan Graph API
  */
 async function ensureExportFolder(token: string): Promise<string> {
   console.log(`📁 [Folder] Checking Export folder...`)
 
-  // Try to get existing folder
+  // Gunakan Graph API untuk mendapatkan folder by path relatif
   let response = await graphApi(
     token,
     `/sites/${SHAREPOINT_SITE}/drives/${DRIVE_ID}/root:/${EXPORT_FOLDER}`
@@ -130,11 +163,11 @@ async function ensureExportFolder(token: string): Promise<string> {
 
   if (response.ok) {
     const folder = await response.json()
-    console.log(`✅ [Folder] Export folder exists: ${folder.id}`)
+    console.log(`✅ [Folder] Export folder exists with ItemId: ${folder.id}`)
     return folder.id
   }
 
-  // Create folder
+  // Create folder jika belum ada
   console.log(`📁 [Folder] Creating Export folder...`)
   response = await graphApi(
     token,
@@ -151,7 +184,7 @@ async function ensureExportFolder(token: string): Promise<string> {
 
   if (response.ok) {
     const folder = await response.json()
-    console.log(`✅ [Folder] Export folder created: ${folder.id}`)
+    console.log(`✅ [Folder] Export folder created with ItemId: ${folder.id}`)
     return folder.id
   }
 
@@ -170,39 +203,50 @@ async function ensureExportFolder(token: string): Promise<string> {
 }
 
 /**
- * Copy template file (never edit source!)
+ * Copy template file menggunakan INTERNAL ITEM ID
+ * 
+ * PENTING: Menggunakan ItemId langsung, BUKAN path URL browser
+ * Template tidak pernah di-edit, hanya di-copy
  */
 export async function copyTemplate(
   token: string,
   outputName?: string
-): Promise<{ itemId: string; fileName: string }> {
+): Promise<{ itemId: string; driveId: string; fileName: string }> {
   const timestamp = Date.now()
   const fileName = outputName || `export-${timestamp}.xlsx`
 
-  console.log(`📋 [Step 1] Copying template to: ${fileName}`)
+  console.log(`📋 [Step 1] Copying template using ItemId: ${TEMPLATE_ITEM_ID}`)
+  console.log(`   Output: ${fileName}`)
 
-  // Get template item
+  // VALIDASI: Pastikan TEMPLATE_ITEM_ID sudah dikonfigurasi
+  if (!TEMPLATE_ITEM_ID || TEMPLATE_ITEM_ID === '') {
+    throw new Error('TEMPLATE_ITEM_ID not configured. Get ItemId from SharePoint file picker.')
+  }
+
+  // Get template metadata menggunakan ItemId (BUKAN path)
   const templateResponse = await graphApi(
     token,
-    `/sites/${SHAREPOINT_SITE}/drives/${DRIVE_ID}/root:${TEMPLATE_PATH}`
+    `/sites/${SHAREPOINT_SITE}/drives/${DRIVE_ID}/items/${TEMPLATE_ITEM_ID}`
   )
 
   if (!templateResponse.ok) {
     const error = await templateResponse.text()
-    console.error('❌ [Step 1] Template not found:', error)
-    throw new Error(`Template not found at ${TEMPLATE_PATH}`)
+    console.error('❌ [Step 1] Template not found by ItemId:', error)
+    throw new Error(`Template not found with ItemId: ${TEMPLATE_ITEM_ID}. Verify ItemId from SharePoint file picker.`)
   }
 
   const template = await templateResponse.json()
-  console.log(`   Template: ${template.name} (ID: ${template.id})`)
+  console.log(`   Template: ${template.name} (ItemId: ${template.id})`)
+  console.log(`   Template has edit permission: ${template.permissions?.length > 0 || 'checking via access'}`)
 
   // Ensure Export folder exists
   const folderId = await ensureExportFolder(token)
 
-  // Copy template to Export folder
+  // Copy template to Export folder menggunakan ItemId
+  // INI ADALAH CARA YANG BENAR - menggunakan ItemId, bukan path
   const copyResponse = await graphApi(
     token,
-    `/sites/${SHAREPOINT_SITE}/drives/${DRIVE_ID}/items/${template.id}/copy`,
+    `/sites/${SHAREPOINT_SITE}/drives/${DRIVE_ID}/items/${TEMPLATE_ITEM_ID}/copy`,
     {
       method: 'POST',
       body: {
@@ -231,14 +275,19 @@ export async function copyTemplate(
         if (monitorResponse.ok) {
           const result = await monitorResponse.json()
           if (result.status === 'completed' && result.resourceId) {
-            console.log(`✅ [Step 1] Template copied: ${fileName}`)
-            return { itemId: result.resourceId, fileName }
+            console.log(`✅ [Step 1] Template copied successfully`)
+            console.log(`   New ItemId: ${result.resourceId}`)
+            return { 
+              itemId: result.resourceId, 
+              driveId: DRIVE_ID,
+              fileName 
+            }
           }
         }
       }
     }
 
-    // Fallback: Search for file by name
+    // Fallback: Search for file by name in Export folder
     await new Promise(r => setTimeout(r, 2000))
     
     const searchResponse = await graphApi(
@@ -248,12 +297,17 @@ export async function copyTemplate(
     
     if (searchResponse.ok) {
       const item = await searchResponse.json()
-      console.log(`✅ [Step 1] Template copied (fallback): ${fileName}`)
-      return { itemId: item.id, fileName }
+      console.log(`✅ [Step 1] Template copied (fallback)`)
+      console.log(`   New ItemId: ${item.id}`)
+      return { 
+        itemId: item.id, 
+        driveId: DRIVE_ID,
+        fileName 
+      }
     }
   }
 
-  throw new Error('Failed to copy template')
+  throw new Error('Failed to copy template - copy operation did not complete')
 }
 
 // ============================================================
@@ -261,10 +315,14 @@ export async function copyTemplate(
 // ============================================================
 
 /**
- * Create workbook session
+ * Create workbook session menggunakan ItemId file hasil copy
  */
-export async function createSession(token: string, itemId: string): Promise<string> {
+export async function createSession(
+  token: string, 
+  itemId: string
+): Promise<string> {
   console.log(`📝 [Session] Creating workbook session...`)
+  console.log(`   Using ItemId: ${itemId}`)
 
   const response = await graphApi(
     token,
@@ -305,11 +363,12 @@ export async function closeSession(
 }
 
 // ============================================================
-// STEP 3: DATA INJECTION (LOCK STRUCTURE)
+// STEP 3: DATA INJECTION (LOCK STRUCTURE - ONLY VALUES)
 // ============================================================
 
 /**
- * Inject data into Excel Table (only VALUES, no structure changes)
+ * Inject data into Excel Table menggunakan ItemId file hasil copy
+ * HANYA mengubah VALUES, tidak mengubah struktur
  */
 export async function injectDataToTable(
   token: string,
@@ -319,8 +378,9 @@ export async function injectDataToTable(
   data: Record<string, unknown>[]
 ): Promise<void> {
   console.log(`💉 [Step 3] Injecting ${data.length} rows into table: ${tableName}`)
+  console.log(`   Using ItemId: ${itemId}`)
 
-  // Get table
+  // Get table menggunakan ItemId
   const tableResponse = await graphApi(
     token,
     `/sites/${SHAREPOINT_SITE}/drives/${DRIVE_ID}/items/${itemId}/workbook/tables/${tableName}`,
@@ -439,7 +499,7 @@ export async function updateRange(
 // ============================================================
 
 /**
- * Validate page layout before converting to PDF
+ * Validate page layout menggunakan ItemId file hasil copy
  */
 export async function validateLayout(
   token: string,
@@ -447,6 +507,7 @@ export async function validateLayout(
   sessionId: string
 ): Promise<{ valid: boolean; errors: string[] }> {
   console.log(`🔍 [Step 4] Validating layout integrity...`)
+  console.log(`   Using ItemId: ${itemId}`)
 
   const errors: string[] = []
 
@@ -548,19 +609,32 @@ export async function validateLayout(
 }
 
 // ============================================================
-// STEP 5: CONVERT TO PDF (MANDATORY GRAPH API)
+// STEP 5: CONVERT TO PDF (DRIVEID + ITEMID)
 // ============================================================
 
 /**
- * Convert Excel to PDF using SharePoint Graph API endpoint
+ * Convert Excel to PDF menggunakan DriveId + ItemId
+ * 
+ * PENTING: Menggunakan ItemId file hasil copy, BUKAN template
  */
 export async function convertToPdf(
   token: string,
   itemId: string
 ): Promise<ArrayBuffer> {
   console.log(`📄 [Step 5] Converting to PDF via Graph API...`)
+  console.log(`   DriveId: ${DRIVE_ID}`)
+  console.log(`   ItemId: ${itemId}`)
 
+  // VALIDASI: Pastikan menggunakan ItemId yang valid
+  if (!itemId || itemId === '') {
+    throw new Error('ItemId is required for PDF conversion')
+  }
+
+  // Gunakan endpoint Graph API dengan DriveId + ItemId
+  // INI BUKAN URL BROWSER - ini endpoint Graph API resmi
   const convertUrl = `https://graph.microsoft.com/v1.0/sites/${SHAREPOINT_SITE}/drives/${DRIVE_ID}/items/${itemId}/content?format=pdf`
+
+  console.log(`   Endpoint: /sites/{site}/drives/{driveId}/items/{itemId}/content?format=pdf`)
 
   const response = await fetch(convertUrl, {
     method: 'GET',
@@ -579,6 +653,11 @@ export async function convertToPdf(
   const pdfBuffer = await response.arrayBuffer()
   console.log(`✅ [Step 5] PDF generated: ${pdfBuffer.byteLength} bytes`)
 
+  // Validasi PDF tidak blank
+  if (pdfBuffer.byteLength < 1000) {
+    console.warn(`⚠️ [Step 5] PDF size is very small, might be blank`)
+  }
+
   return pdfBuffer
 }
 
@@ -587,15 +666,18 @@ export async function convertToPdf(
 // ============================================================
 
 /**
- * Delete file from SharePoint (for cleanup on error)
+ * Delete file from SharePoint menggunakan ItemId
  */
 export async function deleteFile(token: string, itemId: string): Promise<void> {
+  console.log(`🗑️ [Cleanup] Deleting file with ItemId: ${itemId}`)
+  
   await graphApi(
     token,
     `/sites/${SHAREPOINT_SITE}/drives/${DRIVE_ID}/items/${itemId}`,
     { method: 'DELETE' }
   )
-  console.log(`🗑️ [Cleanup] File deleted: ${itemId}`)
+  
+  console.log(`✅ [Cleanup] File deleted`)
 }
 
 // ============================================================
@@ -623,39 +705,45 @@ export interface PrintResult {
  * Complete Print Flow - Enterprise Grade
  * 
  * Flow:
- * 1. Copy template (never edit source)
+ * 1. Copy template by ItemId (never edit source)
  * 2. Lock structure (only update VALUES)
  * 3. Data injection via Excel Table
  * 4. Validate layout integrity
- * 5. Convert via Graph API
+ * 5. Convert via Graph API using DriveId + ItemId
  * 6. Return PDF
+ * 
+ * SEMUA OPERASI MENGGUNAKAN INTERNAL IDENTIFIERS:
+ * - DriveId: dari file picker
+ * - ItemId: dari file picker (template) atau hasil copy (output)
  */
 export async function generatePdfFromTemplate(options: PrintOptions = {}): Promise<PrintResult> {
   const startTime = Date.now()
   let token: string
-  let itemId: string | null = null
+  let copiedItemId: string | null = null
   let sessionId: string | null = null
 
   try {
     // Get token
     token = await getGraphToken()
 
-    // STEP 1: Copy template
+    // STEP 1: Copy template menggunakan ItemId
     const copyResult = await copyTemplate(token, options.outputFileName)
-    itemId = copyResult.itemId
+    copiedItemId = copyResult.itemId  // Gunakan ItemId hasil copy untuk semua operasi downstream
 
-    // Create workbook session
-    sessionId = await createSession(token, itemId)
+    console.log(`📌 All downstream operations will use copied ItemId: ${copiedItemId}`)
 
-    // STEP 3: Inject data (if provided)
+    // Create workbook session dengan ItemId hasil copy
+    sessionId = await createSession(token, copiedItemId)
+
+    // STEP 3: Inject data (if provided) menggunakan ItemId hasil copy
     if (options.tableName && options.data && options.data.length > 0) {
-      await injectDataToTable(token, itemId, sessionId, options.tableName, options.data)
+      await injectDataToTable(token, copiedItemId, sessionId, options.tableName, options.data)
     }
 
     // Apply cell updates (if provided)
     if (options.cellUpdates) {
       for (const update of options.cellUpdates) {
-        await updateCell(token, itemId, sessionId, update.worksheet, update.address, update.value)
+        await updateCell(token, copiedItemId, sessionId, update.worksheet, update.address, update.value)
       }
       console.log(`✅ Updated ${options.cellUpdates.length} cells`)
     }
@@ -663,18 +751,18 @@ export async function generatePdfFromTemplate(options: PrintOptions = {}): Promi
     // Apply range updates (if provided)
     if (options.rangeUpdates) {
       for (const update of options.rangeUpdates) {
-        await updateRange(token, itemId, sessionId, update.worksheet, update.range, update.values)
+        await updateRange(token, copiedItemId, sessionId, update.worksheet, update.range, update.values)
       }
       console.log(`✅ Updated ${options.rangeUpdates.length} ranges`)
     }
 
-    // STEP 4: Validate layout
-    const validation = await validateLayout(token, itemId, sessionId)
+    // STEP 4: Validate layout menggunakan ItemId hasil copy
+    const validation = await validateLayout(token, copiedItemId, sessionId)
 
     if (!validation.valid) {
       // Close session and delete file
-      await closeSession(token, itemId, sessionId!)
-      await deleteFile(token, itemId)
+      await closeSession(token, copiedItemId, sessionId!)
+      await deleteFile(token, copiedItemId)
 
       return {
         success: false,
@@ -684,18 +772,18 @@ export async function generatePdfFromTemplate(options: PrintOptions = {}): Promi
     }
 
     // Close session (save changes)
-    await closeSession(token, itemId, sessionId)
+    await closeSession(token, copiedItemId, sessionId)
     sessionId = null
 
-    // STEP 5: Convert to PDF
-    const pdfBuffer = await convertToPdf(token, itemId)
+    // STEP 5: Convert to PDF menggunakan ItemId hasil copy
+    const pdfBuffer = await convertToPdf(token, copiedItemId)
 
     console.log(`✅ [Complete] Total time: ${Date.now() - startTime}ms`)
 
     return {
       success: true,
       pdfBuffer,
-      exportItemId: itemId,
+      exportItemId: copiedItemId,
       exportFileName: copyResult.fileName
     }
 
@@ -703,11 +791,11 @@ export async function generatePdfFromTemplate(options: PrintOptions = {}): Promi
     console.error(`❌ [Flow] FAILED:`, error)
 
     // Cleanup on error
-    if (sessionId && itemId) {
-      try { await closeSession(token!, itemId, sessionId) } catch {}
+    if (sessionId && copiedItemId) {
+      try { await closeSession(token!, copiedItemId, sessionId) } catch {}
     }
-    if (itemId) {
-      try { await deleteFile(token!, itemId) } catch {}
+    if (copiedItemId) {
+      try { await deleteFile(token!, copiedItemId) } catch {}
     }
 
     return {
@@ -718,11 +806,19 @@ export async function generatePdfFromTemplate(options: PrintOptions = {}): Promi
 }
 
 /**
- * Print existing Excel file from SharePoint
+ * Print existing Excel file from SharePoint by ItemId
  */
 export async function printExistingFile(itemId: string): Promise<PrintResult> {
   let token: string
   let sessionId: string | null = null
+
+  // VALIDASI: ItemId harus ada
+  if (!itemId || itemId === '') {
+    return {
+      success: false,
+      error: 'ItemId is required. Use internal SharePoint ItemId, not browser URL.'
+    }
+  }
 
   try {
     token = await getGraphToken()
@@ -742,7 +838,7 @@ export async function printExistingFile(itemId: string): Promise<PrintResult> {
       }
     }
 
-    // Convert to PDF
+    // Convert to PDF menggunakan ItemId
     const pdfBuffer = await convertToPdf(token, itemId)
 
     return {
@@ -760,4 +856,28 @@ export async function printExistingFile(itemId: string): Promise<PrintResult> {
       error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
+}
+
+/**
+ * Get file metadata by ItemId
+ * Berguna untuk debugging dan validasi
+ */
+export async function getFileMetadata(token: string, itemId: string): Promise<{
+  id: string
+  name: string
+  size: number
+  createdDateTime: string
+  lastModifiedDateTime: string
+  webUrl: string
+}> {
+  const response = await graphApi(
+    token,
+    `/sites/${SHAREPOINT_SITE}/drives/${DRIVE_ID}/items/${itemId}`
+  )
+
+  if (!response.ok) {
+    throw new Error(`Failed to get file metadata for ItemId: ${itemId}`)
+  }
+
+  return response.json()
 }

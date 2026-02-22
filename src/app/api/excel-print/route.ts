@@ -114,17 +114,8 @@ export async function GET(request: NextRequest) {
         
         const fileBuffer = Buffer.from(await r2Response.Body.transformToByteArray())
         
-        // For now, use the existing file - upload to SharePoint and convert
-        // This is a simplified flow - full implementation would inject data into template
-        const { printExistingExcel } = await import('@/lib/graph-sharepoint-print')
-        
-        // Alternative: Use existing file from R2 and upload to SharePoint temporarily
-        // For production, you'd want to:
-        // 1. Use the SharePoint template
-        // 2. Inject data from the R2 file
-        // 3. Convert to PDF
-        
-        // For now, let's use the OneDrive-based conversion as fallback
+        // Upload file to OneDrive temp folder and convert via Graph API
+        // This approach preserves shapes and connectors better than other methods
         const { excelToPdfWithLayout } = await import('@/lib/graph-print')
         
         const result = await excelToPdfWithLayout(fileName, fileBuffer)
