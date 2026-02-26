@@ -3425,7 +3425,7 @@ export default function ESOPApp() {
         
         {/* Login Dialog */}
         <Dialog open={showLogin} onOpenChange={setShowLogin}>
-          <DialogContent className="sm:max-w-md bg-white border-0 overflow-hidden p-0">
+          <DialogContent className="sm:max-w-md bg-white border-0 overflow-hidden p-0" aria-describedby={undefined}>
             <DialogTitle className="sr-only">Login Admin</DialogTitle>
             {/* Header with gradient */}
             <div className="bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 p-6 text-white relative overflow-hidden">
@@ -3493,6 +3493,7 @@ export default function ESOPApp() {
                 </Label>
                 <Input 
                   type="password"
+                  autoComplete="current-password"
                   value={loginForm.password}
                   onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
                   placeholder="Masukkan password"
@@ -4433,7 +4434,7 @@ export default function ESOPApp() {
                           Tambah SOP/IK
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="sm:max-w-lg bg-white border-0 shadow-2xl overflow-hidden p-0 rounded-2xl">
+                      <DialogContent className="sm:max-w-lg bg-white border-0 shadow-2xl overflow-hidden p-0 rounded-2xl" aria-describedby={undefined}>
                         {/* Header with Basarnas theme */}
                         <div className="relative bg-gradient-to-br from-orange-500 via-orange-600 to-red-700 p-5 text-white overflow-hidden">
                           {/* Animated background */}
@@ -4694,7 +4695,7 @@ export default function ESOPApp() {
                   
                   {/* Edit SOP Dialog */}
                   <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-                    <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl">
+                    <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
                       <DialogHeader>
                         <DialogTitle className="text-xl font-bold text-gray-900">Edit Data SOP</DialogTitle>
                         <DialogDescription className="text-gray-600">
@@ -4777,7 +4778,7 @@ export default function ESOPApp() {
                   
                   {/* Excel Edit Dialog - Microsoft 365 (No User Login Required) */}
                   <Dialog open={showExcelEditDialog} onOpenChange={setShowExcelEditDialog}>
-                    <DialogContent className="sm:max-w-lg bg-white border-2 border-orange-200 shadow-xl">
+                    <DialogContent className="sm:max-w-lg bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
                       <DialogHeader>
                         <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
                           <FileSpreadsheet className="w-5 h-5 text-green-600" />
@@ -4912,7 +4913,7 @@ export default function ESOPApp() {
 
                   {/* Desktop Sync Dialog - Upload edited file */}
                   <Dialog open={showDesktopSyncDialog} onOpenChange={setShowDesktopSyncDialog}>
-                    <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl">
+                    <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
                       <DialogHeader>
                         <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
                           <RefreshCw className="w-5 h-5 text-orange-600" />
@@ -5028,7 +5029,7 @@ export default function ESOPApp() {
                   
                   {/* Conflict Dialog - When file changed during edit session */}
                   <Dialog open={showConflictDialog} onOpenChange={setShowConflictDialog}>
-                    <DialogContent className="sm:max-w-lg bg-white border-2 border-red-300 shadow-xl">
+                    <DialogContent className="sm:max-w-lg bg-white border-2 border-red-300 shadow-xl" aria-describedby={undefined}>
                       <DialogHeader>
                         <DialogTitle className="text-xl font-bold text-red-800 flex items-center gap-2">
                           <AlertTriangle className="w-6 h-6 text-red-600" />
@@ -5119,7 +5120,7 @@ export default function ESOPApp() {
                   
                   {/* Excel Edit Diagnostic Dialog */}
                   <Dialog open={showDiagnosticDialog} onOpenChange={setShowDiagnosticDialog}>
-                    <DialogContent className="sm:max-w-2xl bg-white border-2 border-orange-200 shadow-xl max-h-[90vh] overflow-y-auto">
+                    <DialogContent className="sm:max-w-2xl bg-white border-2 border-orange-200 shadow-xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
                       <DialogHeader>
                         <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
                           <Activity className="w-5 h-5 text-orange-600" />
@@ -5835,7 +5836,7 @@ export default function ESOPApp() {
                                             setRejectReason('')
                                           }
                                         }}>
-                                          <DialogContent className="sm:max-w-md bg-gradient-to-b from-slate-900 to-slate-800 border-2 border-orange-500 shadow-2xl">
+                                          <DialogContent className="sm:max-w-md bg-gradient-to-b from-slate-900 to-slate-800 border-2 border-orange-500 shadow-2xl" aria-describedby={undefined}>
                                             <DialogHeader>
                                               <DialogTitle className="text-xl font-bold text-white flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg">
@@ -6186,7 +6187,7 @@ export default function ESOPApp() {
                         Tambah User
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl p-0 overflow-hidden">
+                    <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl p-0 overflow-hidden" aria-describedby={undefined}>
                       {/* Header with gradient */}
                       <DialogHeader className="bg-gradient-to-r from-orange-500 to-yellow-500 p-5 text-white">
                         <DialogTitle className="text-lg font-bold flex items-center gap-2 text-white">
@@ -6220,6 +6221,7 @@ export default function ESOPApp() {
                           <Label className="font-semibold text-blue-900">Password</Label>
                           <Input 
                             type="password"
+                            autoComplete="new-password"
                             value={newUserForm.password}
                             onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
                             placeholder="Masukkan password"
@@ -6251,7 +6253,7 @@ export default function ESOPApp() {
 
                   {/* Desktop Sync Dialog - Upload edited file */}
                   <Dialog open={showDesktopSyncDialog} onOpenChange={setShowDesktopSyncDialog}>
-                    <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl">
+                    <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
                       <DialogHeader>
                         <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
                           <RefreshCw className="w-5 h-5 text-orange-600" />
@@ -6367,7 +6369,7 @@ export default function ESOPApp() {
                   
                   {/* Excel Edit Diagnostic Dialog */}
                   <Dialog open={showDiagnosticDialog} onOpenChange={setShowDiagnosticDialog}>
-                    <DialogContent className="sm:max-w-2xl bg-white border-2 border-orange-200 shadow-xl max-h-[90vh] overflow-y-auto">
+                    <DialogContent className="sm:max-w-2xl bg-white border-2 border-orange-200 shadow-xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
                       <DialogHeader>
                         <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
                           <Activity className="w-5 h-5 text-orange-600" />
@@ -6613,7 +6615,7 @@ export default function ESOPApp() {
       
       {/* Edit User Dialog */}
       <Dialog open={showEditUserDialog} onOpenChange={setShowEditUserDialog}>
-        <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl">
+        <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
               <Edit className="w-5 h-5 text-orange-600" />
@@ -6699,7 +6701,7 @@ export default function ESOPApp() {
       
       {/* User Activity Dialog */}
       <Dialog open={showUserActivityDialog} onOpenChange={setShowUserActivityDialog}>
-        <DialogContent className="sm:max-w-2xl bg-white border-2 border-cyan-200 shadow-xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl bg-white border-2 border-cyan-200 shadow-xl max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
               <History className="w-5 h-5 text-cyan-600" />

@@ -8,14 +8,21 @@ export async function GET() {
     const cookieStore = await cookies()
     const userId = cookieStore.get('userId')?.value
     
+    console.log('[Users API] userId from cookie:', userId ? 'found' : 'not found')
+    
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized - Silakan login kembali' }, { status: 401 })
     }
     
     const currentUser = await db.user.findUnique({ where: { id: userId } })
+    console.log('[Users API] currentUser:', currentUser ? `found (${currentUser.role})` : 'not found')
     
-    if (currentUser?.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!currentUser) {
+      return NextResponse.json({ error: 'User tidak ditemukan' }, { status: 401 })
+    }
+    
+    if (currentUser.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Forbidden - Akses ditolak' }, { status: 403 })
     }
     
     const users = await db.user.findMany({
@@ -33,10 +40,16 @@ export async function GET() {
       orderBy: { createdAt: 'desc' }
     })
     
+    console.log('[Users API] Found users:', users.length)
+    
     return NextResponse.json({ data: users })
   } catch (error) {
-    console.error('Fetch users error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan' }, { status: 500 })
+    console.error('[Users API] Fetch users error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Terjadi kesalahan pada server'
+    return NextResponse.json({ 
+      error: 'Terjadi kesalahan',
+      details: process.env.NODE_ENV === 'production' ? undefined : errorMessage 
+    }, { status: 500 })
   }
 }
 
