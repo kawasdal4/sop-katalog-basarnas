@@ -3056,14 +3056,14 @@ export default function ESOPApp() {
         {/* Public Content */}
         <main className="relative z-10 flex-1 flex items-center justify-center p-4 sm:p-6">
           <motion.div 
-            className="w-full max-w-[420px]"
+            className="w-full max-w-[370px]"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.6 }}
           >
             <Card className="bg-white/95 backdrop-blur-xl shadow-2xl border-0 overflow-hidden rounded-2xl">
               {/* Header with BASARNAS styling */}
-              <div className="relative bg-gradient-to-br from-orange-500 via-orange-600 to-red-700 p-5 text-white overflow-hidden">
+              <div className="relative bg-gradient-to-br from-orange-500 via-orange-600 to-red-700 p-4 text-white overflow-hidden">
                 {/* Animated radar pattern */}
                 <div className="absolute inset-0 overflow-hidden">
                   <motion.div 
@@ -3095,7 +3095,7 @@ export default function ESOPApp() {
                 >
                   {/* Logo with beacon animation */}
                   <motion.div 
-                    className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-xl border border-white/20"
+                    className="w-12 h-12 mx-auto mb-2 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-xl border border-white/20"
                     initial={{ scale: 0, rotate: -180 }}
                     animate={{ scale: 1, rotate: 0 }}
                     transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
@@ -3112,14 +3112,14 @@ export default function ESOPApp() {
                         ]
                       }}
                       transition={{ duration: 2, repeat: Infinity }}
-                      className="w-12 h-12 rounded-xl bg-gradient-to-br from-white to-orange-100 flex items-center justify-center"
+                      className="w-9 h-9 rounded-xl bg-gradient-to-br from-white to-orange-100 flex items-center justify-center"
                     >
-                      <Shield className="w-7 h-7 text-orange-600" />
+                      <Shield className="w-5 h-5 text-orange-600" />
                     </motion.div>
                   </motion.div>
                   
                   <motion.h1 
-                    className="text-xl font-bold tracking-wide mb-1"
+                    className="text-lg font-bold tracking-wide mb-1"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.3 }}
@@ -3154,12 +3154,12 @@ export default function ESOPApp() {
               </div>
               
               {/* Form Content */}
-              <CardContent className="p-5 bg-gradient-to-b from-white via-orange-50/20 to-white">
+              <CardContent className="p-4 bg-gradient-to-b from-white via-orange-50/20 to-white">
                 <div className="max-w-[80%] mx-auto">
-                  <form onSubmit={(e) => handleUpload(e, true)} className="space-y-4">
+                  <form onSubmit={(e) => handleUpload(e, true)} className="space-y-3">
                   {/* Section: Informasi Pengirim */}
                   <motion.div 
-                    className="space-y-3"
+                    className="space-y-2"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
@@ -3171,9 +3171,9 @@ export default function ESOPApp() {
                       <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Informasi Pengirim</span>
                     </div>
                     
-                    <div className="grid grid-cols-1 gap-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-semibold text-gray-600 flex items-center gap-1">
+                    <div className="grid grid-cols-1 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-semibold text-gray-600 flex items-center gap-1">
                           Nama Lengkap <span className="text-red-500">*</span>
                         </Label>
                         <Input 
@@ -3181,11 +3181,11 @@ export default function ESOPApp() {
                           onChange={(e) => setPublicForm({ ...publicForm, nama: e.target.value })}
                           placeholder="Masukkan nama lengkap Anda"
                           required
-                          className="h-10 border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 placeholder:text-gray-400 rounded-xl text-sm bg-white shadow-sm"
+                          className="h-8 border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 placeholder:text-gray-400 rounded-xl text-xs bg-white shadow-sm"
                         />
                       </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-semibold text-gray-600 flex items-center gap-1">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-semibold text-gray-600 flex items-center gap-1">
                           Email <span className="text-red-500">*</span>
                         </Label>
                         <Input 
@@ -3194,7 +3194,7 @@ export default function ESOPApp() {
                           onChange={(e) => setPublicForm({ ...publicForm, email: e.target.value })}
                           placeholder="email@contoh.com"
                           required
-                          className="h-10 border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 placeholder:text-gray-400 rounded-xl text-sm bg-white shadow-sm"
+                          className="h-8 border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 placeholder:text-gray-400 rounded-xl text-xs bg-white shadow-sm"
                         />
                       </div>
                     </div>
@@ -3202,7 +3202,7 @@ export default function ESOPApp() {
                   
                   {/* Section: Informasi Dokumen */}
                   <motion.div 
-                    className="space-y-3"
+                    className="space-y-2"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
@@ -3214,8 +3214,8 @@ export default function ESOPApp() {
                       <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Informasi Dokumen</span>
                     </div>
                     
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold text-gray-600 flex items-center gap-1">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-semibold text-gray-600 flex items-center gap-1">
                         Judul SOP/IK <span className="text-red-500">*</span>
                       </Label>
                       <Input 
@@ -3223,15 +3223,15 @@ export default function ESOPApp() {
                         onChange={(e) => setPublicForm({ ...publicForm, judul: e.target.value })}
                         placeholder="Masukkan judul dokumen"
                         required
-                        className="h-10 border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 placeholder:text-gray-400 rounded-xl text-sm bg-white shadow-sm"
+                        className="h-8 border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 placeholder:text-gray-400 rounded-xl text-xs bg-white shadow-sm"
                       />
                     </div>
                     
                     <div className="grid grid-cols-3 gap-2">
-                      <div className="space-y-1.5">
-                        <Label className="text-[10px] font-semibold text-gray-600">Kategori</Label>
+                      <div className="space-y-1">
+                        <Label className="text-[9px] font-semibold text-gray-600">Kategori</Label>
                         <Select value={publicForm.kategori} onValueChange={(v) => setPublicForm({ ...publicForm, kategori: v })}>
-                          <SelectTrigger className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-xs bg-white shadow-sm">
+                          <SelectTrigger className="h-7 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-[10px] bg-white shadow-sm">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="rounded-xl">
@@ -3239,10 +3239,10 @@ export default function ESOPApp() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-[10px] font-semibold text-gray-600">Jenis</Label>
+                      <div className="space-y-1">
+                        <Label className="text-[9px] font-semibold text-gray-600">Jenis</Label>
                         <Select value={publicForm.jenis} onValueChange={(v) => setPublicForm({ ...publicForm, jenis: v })}>
-                          <SelectTrigger className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-xs bg-white shadow-sm">
+                          <SelectTrigger className="h-7 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-[10px] bg-white shadow-sm">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="rounded-xl">
@@ -3250,33 +3250,33 @@ export default function ESOPApp() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-[10px] font-semibold text-gray-600">Tahun</Label>
+                      <div className="space-y-1">
+                        <Label className="text-[9px] font-semibold text-gray-600">Tahun</Label>
                         <Input 
                           type="number"
                           value={publicForm.tahun}
                           onChange={(e) => setPublicForm({ ...publicForm, tahun: parseInt(e.target.value) })}
                           required
-                          className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-xs bg-white shadow-sm text-center"
+                          className="h-7 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-[10px] bg-white shadow-sm text-center"
                         />
                       </div>
                     </div>
                     
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold text-gray-600">Keterangan</Label>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-semibold text-gray-600">Keterangan</Label>
                       <Textarea
                         value={publicForm.keterangan}
                         onChange={(e) => setPublicForm({ ...publicForm, keterangan: e.target.value })}
                         placeholder="Tambahkan keterangan atau catatan (opsional)"
-                        rows={2}
-                        className="border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 placeholder:text-gray-400 rounded-xl text-xs bg-white shadow-sm resize-none"
+                        rows={1}
+                        className="border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 placeholder:text-gray-400 rounded-xl text-[10px] bg-white shadow-sm resize-none"
                       />
                     </div>
                   </motion.div>
                   
                   {/* Section: Upload File */}
                   <motion.div 
-                    className="space-y-3"
+                    className="space-y-2"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 }}
@@ -3288,7 +3288,7 @@ export default function ESOPApp() {
                       <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Upload File</span>
                     </div>
                     
-                    <div className="relative flex items-center justify-center h-24 border-2 border-dashed border-orange-300 rounded-xl bg-gradient-to-br from-orange-50/80 to-white hover:border-orange-500 hover:bg-orange-50 transition-all cursor-pointer overflow-hidden group shadow-sm">
+                    <div className="relative flex items-center justify-center h-[72px] border-2 border-dashed border-orange-300 rounded-xl bg-gradient-to-br from-orange-50/80 to-white hover:border-orange-500 hover:bg-orange-50 transition-all cursor-pointer overflow-hidden group shadow-sm">
                       {/* Hidden file input */}
                       <input 
                         type="file"
@@ -3306,15 +3306,15 @@ export default function ESOPApp() {
                       />
                       
                       {/* Centered content */}
-                      <div className="flex flex-col items-center justify-center text-center gap-2 pointer-events-none relative z-10">
+                      <div className="flex flex-col items-center justify-center text-center gap-1 pointer-events-none relative z-10">
                         <motion.div 
-                          className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg ${publicForm.file ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 'bg-gradient-to-br from-orange-500 to-red-600'}`}
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-lg ${publicForm.file ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 'bg-gradient-to-br from-orange-500 to-red-600'}`}
                           whileHover={{ scale: 1.05 }}
                         >
                           {publicForm.file ? (
-                            <Check className="w-5 h-5 text-white" />
+                            <Check className="w-4 h-4 text-white" />
                           ) : (
-                            <Upload className="w-5 h-5 text-white" />
+                            <Upload className="w-4 h-4 text-white" />
                           )}
                         </motion.div>
                         <div>
@@ -3344,7 +3344,7 @@ export default function ESOPApp() {
                   >
                     <Button 
                       type="submit" 
-                      className="w-full h-12 bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 hover:from-orange-600 hover:via-orange-700 hover:to-red-700 text-white shadow-xl shadow-orange-500/30 text-sm font-bold rounded-xl relative overflow-hidden group"
+                      className="w-full h-10 bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 hover:from-orange-600 hover:via-orange-700 hover:to-red-700 text-white shadow-xl shadow-orange-500/30 text-xs font-bold rounded-xl relative overflow-hidden group"
                       disabled={loading}
                     >
                       {/* Animated shimmer */}
