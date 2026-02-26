@@ -1474,7 +1474,9 @@ export default function ESOPApp() {
     if (savedArsipSeenCount) {
       setArsipSeenCount(parseInt(savedArsipSeenCount, 10) || 0)
     }
-  }, [checkAuth, initSystem])
+    // Fetch R2 status on mount for public page display
+    fetchR2Status()
+  }, [checkAuth, initSystem, fetchR2Status])
   
   // Fetch data when authenticated
   useEffect(() => {
