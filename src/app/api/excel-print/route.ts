@@ -1,0 +1,186 @@
+/**
+ * Excel Print API - Uses Local PDF Converter Service
+ * 
+ * Converts Excel file to PDF with proper print settings:
+ * - Paper: A4
+ * - Orientation: Landscape
+ * - Fit to width: 1 page
+ */
+
+import { NextRequest, NextResponse } from 'next/server'
+import { db } from '@/lib/db'
+import { cookies } from 'next/headers'
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3'
+
+// R2 Configuration
+const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID!
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY!
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_KEY!
+const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME!
+
+// PDF Converter Service (mini-service on port 3004)
+const PDF_CONVERTER_URL = 'http://localhost:3004'
+
+// Initialize R2 client
+const r2Client = new S3Client({
+  region: 'auto',
+  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: R2_ACCESS_KEY_ID,
+    secretAccessKey: R2_SECRET_ACCESS_KEY,
+  },
+})
+
+/**
+ * Convert Excel to PDF using local converter service
+ * Applies print settings: A4 landscape, fitToWidth=1
+ */
+async function convertExcelToPdf(fileName: string, fileBuffer: Buffer): Promise<ArrayBuffer> {
+  console.log(`🖨️ [Print] Converting: ${fileName} (${fileBuffer.length} bytes)`)
+  console.log('📋 [Print] Using local PDF converter with print settings')
+  
+  // Call the local PDF converter service directly (no XTransformPort needed for internal requests)
+  const response = await fetch(`http://localhost:3004/convert/print`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      fileBase64: fileBuffer.toString('base64'),
+      fileName: fileName,
+    }),
+  })
+  
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('❌ [Print] Converter error:', errorText)
+    throw new Error(`PDF conversion failed: ${errorText}`)
+  }
+  
+  const result = await response.json()
+  
+  if (!result.success || !result.pdfBase64) {
+    throw new Error(result.error || 'PDF conversion failed')
+  }
+  
+  console.log(`✅ [Print] PDF created: ${result.pdfSize} bytes`)
+  console.log(`📄 [Print] Print settings applied:`, result.printSettings)
+  
+  // Convert base64 back to ArrayBuffer
+  const pdfBuffer = Buffer.from(result.pdfBase64, 'base64')
+  return pdfBuffer.buffer as ArrayBuffer
+}
+
+/**
+ * GET /api/excel-print?key={objectKey}&id={sopId}
+ */
+export async function GET(request: NextRequest) {
+  const startTime = Date.now()
+  
+  try {
+    // Authentication
+    const cookieStore = await cookies()
+    const userId = cookieStore.get('userId')?.value
+    
+    if (!userId) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
+    
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { role: true }
+    })
+    
+    if (!user || user.role !== 'ADMIN') {
+      return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 })
+    }
+    
+    // Get parameters
+    const { searchParams } = new URL(request.url)
+    const objectKey = searchParams.get('key')
+    const sopId = searchParams.get('id')
+    
+    if (!objectKey) {
+      return NextResponse.json({ success: false, message: 'Parameter key required' }, { status: 400 })
+    }
+    
+    console.log(`🖨️ [Print] Starting print for: ${objectKey}`)
+    
+    // Get filename
+    let fileName = objectKey.split('/').pop() || 'file.xlsx'
+    
+    if (sopId) {
+      const sop = await db.sopFile.findUnique({
+        where: { id: sopId },
+        select: { nomorSop: true, judul: true, fileName: true }
+      })
+      if (sop) {
+        const ext = sop.fileName.split('.').pop() || 'xlsx'
+        const sanitize = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 50)
+        fileName = `${sanitize(sop.nomorSop)} - ${sanitize(sop.judul)}.${ext}`
+      }
+    }
+    
+    // Download from R2
+    console.log(`📥 [Print] Downloading from R2: ${objectKey}`)
+    
+    const r2Response = await r2Client.send(new GetObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: objectKey,
+    }))
+    
+    if (!r2Response.Body) {
+      return NextResponse.json({ success: false, message: 'File not found' }, { status: 404 })
+    }
+    
+    const fileBuffer = Buffer.from(await r2Response.Body.transformToByteArray())
+    console.log(`✅ [Print] Downloaded: ${fileBuffer.length} bytes`)
+    
+    // Convert to PDF with print settings
+    const pdfBuffer = await convertExcelToPdf(fileName, fileBuffer)
+    
+    // Log activity
+    try {
+      await db.log.create({
+        data: {
+          userId,
+          aktivitas: 'EXCEL_PRINT',
+          deskripsi: `Print Excel sebagai PDF: ${fileName}`,
+          fileId: sopId || undefined,
+          metadata: JSON.stringify({
+            objectKey,
+            fileName,
+            originalSize: fileBuffer.length,
+            pdfSize: pdfBuffer.byteLength,
+            duration: Date.now() - startTime
+          }),
+        },
+      })
+    } catch {}
+    
+    console.log(`✅ [Print] Complete in ${Date.now() - startTime}ms`)
+    
+    // Return PDF
+    const pdfFileName = fileName.replace(/\.[^.]+$/, '.pdf')
+    
+    return new NextResponse(pdfBuffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${encodeURIComponent(pdfFileName)}"`,
+        'Content-Length': pdfBuffer.byteLength.toString(),
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      },
+    })
+    
+  } catch (error) {
+    console.error('❌ [Print] Error:', error)
+    
+    const errorMessage = error instanceof Error ? error.message : 'Gagal mengkonversi file ke PDF'
+    
+    return NextResponse.json({
+      success: false,
+      message: errorMessage,
+    }, { status: 500 })
+  }
+}

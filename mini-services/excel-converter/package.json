@@ -1,0 +1,22 @@
+{
+  "name": "excel-converter",
+  "version": "1.0.0",
+  "description": "Excel to PDF converter using Microsoft Graph API",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "bun --hot src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/s3-request-presigner": "^3.600.0",
+    "axios": "^1.7.2",
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "uuid": "^9.0.1",
+    "winston": "^3.13.0",
+    "isomorphic-fetch": "^3.0.0"
+  }
+}

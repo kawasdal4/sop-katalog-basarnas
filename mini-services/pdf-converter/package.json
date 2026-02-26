@@ -1,0 +1,13 @@
+{
+  "name": "pdf-converter",
+  "version": "1.0.0",
+  "description": "Excel to PDF conversion service using LibreOffice",
+  "main": "index.ts",
+  "scripts": {
+    "dev": "bun --hot index.ts",
+    "start": "bun index.ts"
+  },
+  "dependencies": {
+    "libreoffice-convert": "^1.8.1"
+  }
+}
