@@ -157,3 +157,19 @@ model FileEditLog {
   details      String?  // JSON string for additional data
   timestamp    DateTime @default(now())
 }
+
+// File Print Cache model for caching converted PDFs
+model FilePrintCache {
+  id              String   @id @default(cuid())
+  sopFileId       String   @unique // Link to SOP file
+  r2LastModified  DateTime // Last modified time of source Excel
+  fileHash        String   // SHA-256 hash of source Excel
+  cachedPdfPath   String   // R2 path for cached PDF
+  cachedPdfSize   Int      // PDF file size in bytes
+  conversionTime  Int      // Time taken for conversion in ms
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([sopFileId])
+  @@index([fileHash])
+}
