@@ -1,15 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { cookies } from 'next/headers'
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3'
 
-// Excel Converter Mini Service Configuration
-const CONVERTER_PORT = 3031
-const CONVERTER_URL = `http://localhost:${CONVERTER_PORT}`
+// R2 Configuration
+const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID!
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY!
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_KEY!
+const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME!
 
-// R2 Configuration for generating direct URLs
-const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL!
+// Initialize R2 client
+const r2Client = new S3Client({
+  region: 'auto',
+  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: R2_ACCESS_KEY_ID,
+    secretAccessKey: R2_SECRET_ACCESS_KEY,
+  },
+})
 
-// GET - Get print-ready PDF for a file
+// GET - Get print-ready file (proxy through API to avoid CORS)
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies()
@@ -21,7 +31,6 @@ export async function GET(request: NextRequest) {
     
     const { searchParams } = new URL(request.url)
     const fileId = searchParams.get('id')
-    const marginOption = searchParams.get('margin') || 'normal' // normal, wide, extra-wide
     
     if (!fileId) {
       return NextResponse.json({ error: 'File ID required' }, { status: 400 })
@@ -41,11 +50,28 @@ export async function GET(request: NextRequest) {
     
     const fileExtension = sopFile.fileName.toLowerCase().split('.').pop()
     
-    // For PDF files - return direct URL
-    if (fileExtension === 'pdf') {
-      const pdfUrl = `${R2_PUBLIC_URL}/${sopFile.filePath}`
-      
-      // Log print activity
+    // Only PDF files are supported for print in production
+    if (fileExtension !== 'pdf') {
+      return NextResponse.json({ 
+        error: 'Hanya file PDF yang bisa di-print langsung. Untuk file Excel/Word, silakan download dan print dari aplikasi desktop.',
+        fileType: fileExtension 
+      }, { status: 400 })
+    }
+    
+    // Download PDF from R2
+    const r2Response = await r2Client.send(new GetObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: sopFile.filePath,
+    }))
+    
+    if (!r2Response.Body) {
+      return NextResponse.json({ error: 'File not found in storage' }, { status: 404 })
+    }
+    
+    const fileBuffer = Buffer.from(await r2Response.Body.transformToByteArray())
+    
+    // Log print activity
+    try {
       await db.log.create({
         data: {
           userId,
@@ -54,103 +80,21 @@ export async function GET(request: NextRequest) {
           fileId: sopFile.id,
         },
       })
-      
-      return NextResponse.json({
-        success: true,
-        fileName: sopFile.fileName,
-        pdfUrl,
-        fileType: 'pdf',
-      })
-    }
+    } catch {}
     
-    // For Excel files - convert to PDF with print settings
-    if (['xlsx', 'xls', 'xlsm'].includes(fileExtension || '')) {
-      console.log('Converting Excel to PDF for print:', sopFile.filePath, 'margin:', marginOption)
-      
-      try {
-        // Call the Excel converter mini-service with margin option
-        const converterResponse = await fetch(`${CONVERTER_URL}/preview?XTransformPort=${CONVERTER_PORT}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fileKey: sopFile.filePath,
-            force: marginOption !== 'normal', // Force re-convert if using custom margin
-            margin: marginOption,
-          }),
-        })
-        
-        const converterData = await converterResponse.json()
-        
-        if (!converterResponse.ok || !converterData.success) {
-          console.error('Excel conversion failed:', converterData.error)
-          
-          // Fallback: Return R2 URL for Office Online viewer
-          const r2Url = `${R2_PUBLIC_URL}/${sopFile.filePath}`
-          const viewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(r2Url)}`
-          
-          return NextResponse.json({
-            success: true,
-            fileName: sopFile.fileName,
-            pdfUrl: viewerUrl,
-            fileType: 'excel',
-            fallback: true,
-            message: 'Konversi PDF tidak tersedia. Membuka di Office Online Viewer.',
-          })
-        }
-        
-        // Log print activity
-        await db.log.create({
-          data: {
-            userId,
-            aktivitas: 'PRINT_FILE',
-            deskripsi: `Printed Excel (converted to PDF): ${sopFile.nomorSop} - ${sopFile.judul}`,
-            fileId: sopFile.id,
-          },
-        })
-        
-        console.log('Excel converted successfully, PDF URL:', converterData.previewUrl)
-        
-        // Get margin description
-        const marginDesc = {
-          'normal': '1cm',
-          'wide': '1.5cm',
-          'extra-wide': '2cm'
-        }[marginOption] || '1cm'
-        
-        return NextResponse.json({
-          success: true,
-          fileName: sopFile.fileName,
-          pdfUrl: converterData.previewUrl,
-          previewKey: converterData.previewKey,
-          fileType: 'excel',
-          cached: converterData.cached,
-          margin: marginOption,
-          message: `Excel dikonversi ke PDF: Landscape, A4, Margin ${marginDesc}`,
-        })
-        
-      } catch (converterError) {
-        console.error('Converter service error:', converterError)
-        
-        // Fallback: Return R2 URL for Office Online viewer
-        const r2Url = `${R2_PUBLIC_URL}/${sopFile.filePath}`
-        const viewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(r2Url)}`
-        
-        return NextResponse.json({
-          success: true,
-          fileName: sopFile.fileName,
-          pdfUrl: viewerUrl,
-          fileType: 'excel',
-          fallback: true,
-          message: 'Layanan konversi tidak tersedia. Membuka di Office Online Viewer.',
-        })
-      }
-    }
+    // Return PDF with CORS headers for print dialog
+    const sanitizedFileName = sopFile.fileName.replace(/[^\w\-.]/g, '_')
     
-    // For other file types - not supported for print
-    return NextResponse.json({
-      error: 'File type not supported for printing',
-      supportedTypes: ['pdf', 'xlsx', 'xls', 'xlsm'],
-    }, { status: 400 })
+    return new NextResponse(fileBuffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${sanitizedFileName}"`,
+        'Content-Length': fileBuffer.length.toString(),
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Access-Control-Allow-Origin': '*',
+      },
+    })
     
   } catch (error) {
     console.error('Print API error:', error)

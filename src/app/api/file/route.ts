@@ -8,6 +8,7 @@ const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID!
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY!
 const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_KEY!
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME!
+const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || `https://pub-${R2_ACCOUNT_ID}.r2.dev`
 
 // Initialize R2 client
 const r2Client = new S3Client({
@@ -33,7 +34,6 @@ const CONTENT_TYPES: Record<string, string> = {
  * GET /api/file?action=preview|download&id={documentId}
  * 
  * File handler untuk preview dan download dari Cloudflare R2
- * Proxies file through API to avoid CORS issues
  */
 export async function GET(request: NextRequest) {
   try {
@@ -63,21 +63,9 @@ export async function GET(request: NextRequest) {
 
     const fileExtension = document.fileName.toLowerCase().split('.').pop() || 'pdf'
     const fileKey = document.filePath
+    const publicUrl = `${R2_PUBLIC_URL}/${fileKey}`
 
     console.log(`📄 File request: ${action} - ${document.nomorSop} (${fileExtension})`)
-
-    // Download file from R2
-    const r2Response = await r2Client.send(new GetObjectCommand({
-      Bucket: R2_BUCKET_NAME,
-      Key: fileKey,
-    }))
-
-    if (!r2Response.Body) {
-      return NextResponse.json({ error: 'File tidak ditemukan di storage' }, { status: 404 })
-    }
-
-    const fileBuffer = Buffer.from(await r2Response.Body.transformToByteArray())
-    const contentType = CONTENT_TYPES[fileExtension] || 'application/octet-stream'
 
     // Log activity and increment counters
     const logActivity = async (activityType: 'PREVIEW' | 'DOWNLOAD') => {
@@ -111,38 +99,58 @@ export async function GET(request: NextRequest) {
     // Log the activity
     await logActivity(action === 'download' ? 'DOWNLOAD' : 'PREVIEW')
 
+    // For Excel/Word files - return JSON with Office Online Viewer URL
+    if (['xlsx', 'xls', 'csv', 'docx', 'doc'].includes(fileExtension)) {
+      const encodedUrl = encodeURIComponent(publicUrl)
+      const officeViewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodedUrl}`
+      
+      console.log(`📊 Office Online Viewer URL: ${officeViewerUrl.substring(0, 100)}...`)
+      
+      return NextResponse.json({
+        success: true,
+        viewerUrl: officeViewerUrl,
+        viewerType: 'microsoft-office',
+        downloadUrl: publicUrl,
+        fileName: document.fileName
+      })
+    }
+
+    // For PDF files with download action - return JSON with download URL
+    if (action === 'download') {
+      return NextResponse.json({
+        success: true,
+        downloadUrl: publicUrl,
+        fileName: document.fileName
+      })
+    }
+
+    // For PDF preview - download from R2 and return file directly
+    // This avoids CORS issues with direct R2 access
+    const r2Response = await r2Client.send(new GetObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: fileKey,
+    }))
+
+    if (!r2Response.Body) {
+      return NextResponse.json({ error: 'File tidak ditemukan di storage' }, { status: 404 })
+    }
+
+    const fileBuffer = Buffer.from(await r2Response.Body.transformToByteArray())
+    const contentType = CONTENT_TYPES[fileExtension] || 'application/octet-stream'
+
     // Sanitize filename for header
     const sanitizedFileName = document.fileName.replace(/[^\w\-.]/g, '_')
     const encodedFileName = encodeURIComponent(document.fileName)
 
-    // For PDF preview - return file directly with CORS headers
-    if (fileExtension === 'pdf' && action === 'preview') {
-      return new NextResponse(fileBuffer, {
-        status: 200,
-        headers: {
-          'Content-Type': contentType,
-          'Content-Disposition': `inline; filename="${sanitizedFileName}"; filename*=UTF-8''${encodedFileName}`,
-          'Content-Length': fileBuffer.length.toString(),
-          'Cache-Control': 'public, max-age=3600',
-          // CORS headers for cross-origin access
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-      })
-    }
-
-    // For download or other file types
-    const disposition = action === 'download' ? 'attachment' : 'inline'
-    
+    // Return PDF file directly for preview
     return new NextResponse(fileBuffer, {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Content-Disposition': `${disposition}; filename="${sanitizedFileName}"; filename*=UTF-8''${encodedFileName}`,
+        'Content-Disposition': `inline; filename="${sanitizedFileName}"; filename*=UTF-8''${encodedFileName}`,
         'Content-Length': fileBuffer.length.toString(),
         'Cache-Control': 'public, max-age=3600',
-        // CORS headers
+        // CORS headers for cross-origin access
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type',

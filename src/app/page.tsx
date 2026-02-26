@@ -2075,38 +2075,33 @@ export default function ESOPApp() {
 
     setPrintLoading(id) // Start loading animation
 
-    // For PDF files - open in new tab and print
+    // For PDF files - open print dialog
     if (fileExtension === 'pdf') {
       try {
-        const res = await fetch(`/api/print?id=${id}`)
-        const data = await res.json()
+        // Open PDF directly through our API (avoids CORS)
+        const printUrl = `/api/print?id=${id}`
+        const printWindow = window.open(printUrl, '_blank')
         
-        if (data.success && data.pdfUrl) {
-          // Open PDF in new tab
-          const printWindow = window.open(data.pdfUrl, '_blank')
-          if (printWindow) {
-            // Wait for PDF to load then trigger print dialog
-            setTimeout(() => {
-              try {
-                printWindow.print()
-              } catch {
-                // Browser may block print on cross-origin PDFs
-                // User can still use Ctrl+P
-              }
-            }, 1500)
-          }
-          
-          setPrintLoading(null)
-          toast({
-            title: '✅ PDF Dibuka',
-            description: 'Tekan Ctrl+P untuk print jika dialog tidak muncul otomatis',
-            duration: 5000
-          })
-          
-          fetchStats()
-        } else {
-          throw new Error(data.error || 'Gagal mengakses file')
+        if (printWindow) {
+          // Wait for PDF to load then trigger print dialog
+          setTimeout(() => {
+            try {
+              printWindow.print()
+            } catch {
+              // Browser may block print on cross-origin PDFs
+              // User can still use Ctrl+P
+            }
+          }, 1500)
         }
+        
+        setPrintLoading(null)
+        toast({
+          title: '✅ PDF Dibuka',
+          description: 'Tekan Ctrl+P untuk print jika dialog tidak muncul otomatis',
+          duration: 5000
+        })
+        
+        fetchStats()
       } catch (error) {
         console.error('Print error:', error)
         setPrintLoading(null)
@@ -2120,31 +2115,30 @@ export default function ESOPApp() {
       return
     }
 
-    // For Excel/Word files - directly open PDF via Microsoft Graph
+    // For Excel/Word files - download for local printing
+    // (PDF conversion requires LibreOffice which is not available on Vercel)
     try {
-      // Use Excel/Word Print API with Microsoft Graph (A4, Landscape, FitToWidth)
-      const printUrl = `/api/excel-print?key=${encodeURIComponent(sop.filePath)}&id=${sop.id}`
+      // Get download URL from API
+      const res = await fetch(`/api/file?action=download&id=${id}`)
+      const data = await res.json()
       
-      // Open PDF directly in new tab
-      const printWindow = window.open(printUrl, '_blank')
-      
-      if (printWindow) {
-        // Wait for PDF to load then trigger print dialog
-        setTimeout(() => {
-          try {
-            printWindow.print()
-          } catch {
-            // Browser may block print on cross-origin PDFs
-            // User can still use Ctrl+P
-          }
-        }, 2000)
+      if (!data.success || !data.downloadUrl) {
+        throw new Error(data.error || 'Gagal mendapatkan URL download')
       }
+      
+      // Create download link
+      const link = document.createElement('a')
+      link.href = data.downloadUrl
+      link.download = sop.fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
       
       setPrintLoading(null)
       toast({
-        title: '✅ PDF Dibuka',
-        description: 'Dokumen dibuka di tab baru. Tekan Ctrl+P jika dialog print tidak muncul.',
-        duration: 5000
+        title: '📥 File Didownload',
+        description: 'File didownload untuk print lokal. Buka file dengan Excel/Word dan print dari aplikasi tersebut.',
+        duration: 7000
       })
       
       fetchStats()
@@ -2154,7 +2148,7 @@ export default function ESOPApp() {
       setPrintLoading(null)
       toast({
         title: '❌ Error',
-        description: 'Gagal mengkonversi file ke PDF',
+        description: 'Gagal mengunduh file',
         variant: 'destructive',
         duration: 5000
       })
@@ -3161,7 +3155,8 @@ export default function ESOPApp() {
               
               {/* Form Content */}
               <CardContent className="p-5 bg-gradient-to-b from-white via-orange-50/20 to-white">
-                <form onSubmit={(e) => handleUpload(e, true)} className="space-y-4">
+                <div className="max-w-[80%] mx-auto">
+                  <form onSubmit={(e) => handleUpload(e, true)} className="space-y-4">
                   {/* Section: Informasi Pengirim */}
                   <motion.div 
                     className="space-y-3"
@@ -3379,6 +3374,7 @@ export default function ESOPApp() {
                     </Button>
                   </motion.div>
                 </form>
+                </div>
               </CardContent>
             </Card>
             
