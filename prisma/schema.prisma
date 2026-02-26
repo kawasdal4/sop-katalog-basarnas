@@ -1,14 +1,13 @@
-// Local Development Schema - SQLite
-// Use this for local development only
-// To use: cp prisma/schema.local.prisma prisma/schema.prisma
+// Production Schema - PostgreSQL (Supabase/Vercel)
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 // User model with role-based access

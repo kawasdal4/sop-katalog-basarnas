@@ -3870,7 +3870,7 @@ export default function ESOPApp() {
               transition={{ delay: 0.6 }}
             >
               <p className="text-[10px] text-gray-400">
-                © 2026 Badan SAR Nasional • Direktorat Kesiapsiagaan
+                © 2026 Foe • Direktorat Kesiapsiagaan
               </p>
             </motion.div>
           </motion.div>
@@ -4230,7 +4230,7 @@ export default function ESOPApp() {
                     transition={{ delay: 0.7 }}
                   >
                     <p className="text-gray-500 text-xs">
-                      © 2026 Badan SAR Nasional
+                      © 2026 Foe
                     </p>
                   </motion.div>
                 </motion.form>
