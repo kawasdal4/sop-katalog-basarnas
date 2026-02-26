@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     const jenis = searchParams.get('jenis') || ''
     const status = searchParams.get('status') || ''
     const tahun = searchParams.get('tahun') || ''
-    const sortBy = searchParams.get('sortBy') || 'tahun-asc'
+    const sortBy = searchParams.get('sortBy') || 'uploadedAt-desc'
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
     const verificationStatus = searchParams.get('verificationStatus') || ''
@@ -105,7 +105,8 @@ export async function GET(request: NextRequest) {
     const where = whereConditions.length > 0 ? { AND: whereConditions } : {}
     
     // Build orderBy based on sortBy parameter
-    let orderBy: unknown[] = [{ tahun: 'asc' }, { uploadedAt: 'desc' }]
+    // Default: uploadedAt-desc (newest first)
+    let orderBy: unknown[] = [{ uploadedAt: 'desc' }]
     switch (sortBy) {
       case 'tahun-asc':
         orderBy = [{ tahun: 'asc' }, { uploadedAt: 'desc' }]

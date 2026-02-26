@@ -198,6 +198,38 @@ export async function GET() {
       // downloadCount field doesn't exist
     }
     
+    // Top Viewed Documents
+    try {
+      const topViewed = await db.sopFile.findMany({
+        where: { 
+          OR: [{ isPublicSubmission: false }, { verificationStatus: 'DISETUJUI' }],
+          previewCount: { gt: 0 }
+        },
+        orderBy: { previewCount: 'desc' },
+        take: 5,
+        select: { id: true, nomorSop: true, judul: true, previewCount: true }
+      })
+      stats.topViewed = topViewed
+    } catch {
+      stats.topViewed = []
+    }
+
+    // Top Downloaded Documents
+    try {
+      const topDownloaded = await db.sopFile.findMany({
+        where: { 
+          OR: [{ isPublicSubmission: false }, { verificationStatus: 'DISETUJUI' }],
+          downloadCount: { gt: 0 }
+        },
+        orderBy: { downloadCount: 'desc' },
+        take: 5,
+        select: { id: true, nomorSop: true, judul: true, downloadCount: true }
+      })
+      stats.topDownloaded = topDownloaded
+    } catch {
+      stats.topDownloaded = []
+    }
+    
     return NextResponse.json(stats)
     
   } catch (error) {

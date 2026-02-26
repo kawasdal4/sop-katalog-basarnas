@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -623,6 +623,10 @@ export default function ESOPApp() {
   const [katalogLoading, setKatalogLoading] = useState(false)
   const [verifikasiLoading, setVerifikasiLoading] = useState(false)
   const [arsipLoading, setArsipLoading] = useState(false)
+  
+  // Pagination debounce - prevents rapid clicks and double-fetching
+  const isPaginationLoadingRef = useRef(false)
+  const paginationDebounceRef = useRef<NodeJS.Timeout | null>(null)
   
   // Forms
   const [uploadForm, setUploadForm] = useState({
@@ -1319,6 +1323,10 @@ export default function ESOPApp() {
   }, [toast])
   
   const fetchSopFiles = useCallback(async (resetPage = false) => {
+    // Prevent concurrent fetches
+    if (isPaginationLoadingRef.current) return
+    isPaginationLoadingRef.current = true
+    
     setKatalogLoading(true)
     try {
       const page = resetPage ? 1 : sopPagination.page
@@ -1333,17 +1341,35 @@ export default function ESOPApp() {
       params.append('sortBy', sortBy)
       
       const res = await fetch(`/api/sop?${params}`)
-      const data = await res.json()
-      if (!data.error) {
-        setSopFiles(data.data)
-        setSopPagination(p => ({ ...p, total: data.pagination.total, totalPages: data.pagination.totalPages, page }))
+      
+      // Check for HTTP errors
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`)
       }
+      
+      const data = await res.json()
+      if (data.error) {
+        throw new Error(data.error)
+      }
+      
+      setSopFiles(data.data)
+      setSopPagination(p => ({ ...p, total: data.pagination.total, totalPages: data.pagination.totalPages, page }))
     } catch (error) {
       console.error('Fetch SOP error:', error)
+      // Show error toast for user feedback
+      toast({ 
+        title: 'Error', 
+        description: 'Gagal memuat data. Silakan coba lagi.', 
+        variant: 'destructive' 
+      })
     } finally {
       setKatalogLoading(false)
+      // Reset loading flag after a short delay to prevent rapid re-fetching
+      setTimeout(() => {
+        isPaginationLoadingRef.current = false
+      }, 100)
     }
-  }, [sopFilters, sopPagination.page, sopPagination.limit, sortBy])
+  }, [sopFilters, sopPagination.page, sopPagination.limit, sortBy, toast])
   
   const fetchVerificationList = useCallback(async (filter = 'SEMUA', search = '', sortByParam = 'uploadedAt-desc') => {
     setVerifikasiLoading(true)
@@ -1682,14 +1708,15 @@ export default function ESOPApp() {
     formData.append('kategori', form.kategori)
     formData.append('jenis', form.jenis)
     formData.append('tahun', form.tahun.toString())
-    formData.append('status', form.status)
+    // For public submissions, use default 'AKTIF' status since publicForm doesn't have status field
+    formData.append('status', isPublic ? 'AKTIF' : (form as typeof uploadForm).status)
     formData.append('file', form.file!)
     
     if (isPublic) {
       formData.append('isPublicSubmission', 'true')
       formData.append('submitterName', publicForm.nama)
       formData.append('submitterEmail', publicForm.email)
-      formData.append('keterangan', publicForm.keterangan)
+      formData.append('keterangan', publicForm.keterangan || '')
     }
 
     setSyncStatus(prev => ({
@@ -1780,7 +1807,8 @@ export default function ESOPApp() {
       body: JSON.stringify({
         fileName: file.name,
         fileSize: file.size,
-        jenis: form.jenis
+        jenis: form.jenis,
+        isPublicSubmission: isPublic
       })
     })
     
@@ -2002,6 +2030,17 @@ export default function ESOPApp() {
 
     const fileExtension = sop.fileName.toLowerCase().split('.').pop()
     setPreviewLoading(id) // Start loading animation
+
+    // Increment preview counter
+    try {
+      await fetch('/api/sop', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, incrementPreview: true })
+      })
+    } catch (previewError) {
+      console.warn('Failed to increment preview counter:', previewError)
+    }
 
     try {
       const res = await fetch(`/api/file?action=preview&id=${id}`)
@@ -2818,6 +2857,7 @@ export default function ESOPApp() {
         }))
         
         setEditData(null)
+        fetchSopFiles() // Refresh SOP list to show updated timestamp
         fetchStats() // Refresh stats for filters
       }
     } catch (error) {
@@ -2907,90 +2947,524 @@ export default function ESOPApp() {
   const handleExport = async (format: 'xlsx' | 'pdf') => {
     try {
       const res = await fetch(`/api/export?format=${format}`)
-      const data = await res.json()
-      if (data.error) {
-        toast({ title: 'Error', description: data.error, variant: 'destructive' })
+      const response = await res.json()
+      if (response.error) {
+        toast({ title: 'Error', description: response.error, variant: 'destructive' })
         return
       }
       
+      const { data, stats } = response
+      const currentDate = new Date().toLocaleDateString('id-ID', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      })
+      const timestamp = new Date().toISOString()
+      
       if (format === 'xlsx') {
-        const headers = ['Nomor SOP', 'Judul', 'Tahun', 'Kategori', 'Jenis', 'Status', 'Diupload Oleh', 'Tanggal Upload']
-        const csvContent = [
-          headers.join(','),
-          ...data.data.map((item: { nomorSop: string; judul: string; tahun: number; kategori: string; jenis: string; status: string; uploadedBy: string; uploadedAt: string }) => 
-            [item.nomorSop, `"${item.judul}"`, item.tahun, item.kategori, item.jenis, item.status, item.uploadedBy, item.uploadedAt].join(',')
-          )
-        ].join('\n')
+        // Dynamic import for xlsx library
+        const XLSX = await import('xlsx')
         
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        // Create workbook
+        const wb = XLSX.utils.book_new()
+        
+        // === SHEET 1: Data SOP ===
+        const headers = ['No', 'Nomor SOP', 'Judul', 'Tahun', 'Kategori', 'Jenis', 'Status', 'Preview', 'Download', 'Diupload Oleh', 'Tanggal Upload']
+        const wsData = [
+          ['LAPORAN SOP DAN IK - BASARNAS'],
+          ['Direktorat Kesiapsiagaan'],
+          [`Tanggal: ${currentDate}`],
+          [],
+          headers,
+          ...data.map((item: { nomorSop: string; judul: string; tahun: number; kategori: string; jenis: string; status: string; previewCount: number; downloadCount: number; uploadedBy: string; uploadedAt: string }, idx: number) => [
+            idx + 1,
+            item.nomorSop,
+            item.judul,
+            item.tahun,
+            item.kategori,
+            item.jenis,
+            item.status,
+            item.previewCount || 0,
+            item.downloadCount || 0,
+            item.uploadedBy,
+            new Date(item.uploadedAt).toLocaleDateString('id-ID')
+          ])
+        ]
+        
+        const ws = XLSX.utils.aoa_to_sheet(wsData)
+        
+        // Set column widths
+        ws['!cols'] = [
+          { wch: 5 },   // No
+          { wch: 15 },  // Nomor SOP
+          { wch: 50 },  // Judul
+          { wch: 8 },   // Tahun
+          { wch: 12 },  // Kategori
+          { wch: 10 },  // Jenis
+          { wch: 12 },  // Status
+          { wch: 10 },  // Preview
+          { wch: 10 },  // Download
+          { wch: 20 },  // Diupload Oleh
+          { wch: 15 }   // Tanggal Upload
+        ]
+        
+        // Merge title cells
+        ws['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 10 } },
+          { s: { r: 1, c: 0 }, e: { r: 1, c: 10 } },
+          { s: { r: 2, c: 0 }, e: { r: 2, c: 10 } }
+        ]
+        
+        XLSX.utils.book_append_sheet(wb, ws, 'Data SOP')
+        
+        // === SHEET 2: Ringkasan Statistik ===
+        const statsData = [
+          ['RINGKASAN STATISTIK'],
+          [],
+          ['Statistik Utama'],
+          ['Total SOP', stats.totalSop],
+          ['Total IK', stats.totalIk],
+          ['Total Dokumen Aktif', stats.totalAktif],
+          ['Total Dokumen Review', stats.totalReview],
+          ['Total Dokumen Kadaluarsa', stats.totalKadaluarsa],
+          ['Total Pengajuan Publik Menunggu', stats.totalPublikMenunggu],
+          ['Total Pengajuan Publik Ditolak', stats.totalPublikDitolak],
+          ['Total Preview', stats.totalPreviews],
+          ['Total Download', stats.totalDownloads],
+          [],
+          ['Distribusi per Tahun'],
+          ['Tahun', 'Jumlah'],
+          ...stats.byTahun.map((item: { tahun: number; count: number }) => [item.tahun, item.count]),
+          [],
+          ['Distribusi per Kategori'],
+          ['Kategori', 'Jumlah'],
+          ...stats.byKategori.map((item: { kategori: string; count: number }) => [item.kategori, item.count]),
+          [],
+          ['Distribusi per Jenis'],
+          ['Jenis', 'Jumlah'],
+          ...stats.byJenis.map((item: { jenis: string; count: number }) => [item.jenis, item.count]),
+          [],
+          ['Distribusi per Status'],
+          ['Status', 'Jumlah'],
+          ...stats.byStatus.map((item: { status: string; count: number }) => [item.status, item.count]),
+          [],
+          [],
+          [`Diekspor pada: ${currentDate}`],
+          ['Katalog SOP dan IK - Direktorat Kesiapsiagaan - BASARNAS']
+        ]
+        
+        const wsStats = XLSX.utils.aoa_to_sheet(statsData)
+        wsStats['!cols'] = [
+          { wch: 30 },
+          { wch: 15 }
+        ]
+        wsStats['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }
+        ]
+        
+        XLSX.utils.book_append_sheet(wb, wsStats, 'Ringkasan')
+        
+        // Generate and download file
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `laporan-sop-ik-${new Date().toISOString().split('T')[0]}.csv`
+        a.download = `laporan-sop-ik-basarnas-${new Date().toISOString().split('T')[0]}.xlsx`
         a.click()
         window.URL.revokeObjectURL(url)
       } else {
+        // PDF Export with full stats
         const printWindow = window.open('', '_blank')
         if (!printWindow) {
           toast({ title: 'Error', description: 'Tidak dapat membuka jendela baru', variant: 'destructive' })
           return
         }
         
+        // Format status color
+        const getStatusColor = (status: string) => {
+          switch (status) {
+            case 'AKTIF': return '#22c55e'
+            case 'REVIEW': return '#eab308'
+            case 'KADALUARSA': return '#ef4444'
+            default: return '#6b7280'
+          }
+        }
+        
+        // Generate stats card HTML
+        const statsCardsHtml = `
+          <div class="stats-grid">
+            <div class="stat-card orange">
+              <div class="stat-icon">📋</div>
+              <div class="stat-content">
+                <div class="stat-value">${stats.totalSop}</div>
+                <div class="stat-label">Total SOP</div>
+              </div>
+            </div>
+            <div class="stat-card yellow">
+              <div class="stat-icon">📝</div>
+              <div class="stat-content">
+                <div class="stat-value">${stats.totalIk}</div>
+                <div class="stat-label">Total IK</div>
+              </div>
+            </div>
+            <div class="stat-card green">
+              <div class="stat-icon">✅</div>
+              <div class="stat-content">
+                <div class="stat-value">${stats.totalAktif}</div>
+                <div class="stat-label">Aktif</div>
+              </div>
+            </div>
+            <div class="stat-card cyan">
+              <div class="stat-icon">⏳</div>
+              <div class="stat-content">
+                <div class="stat-value">${stats.totalReview}</div>
+                <div class="stat-label">Review</div>
+              </div>
+            </div>
+            <div class="stat-card red">
+              <div class="stat-icon">❌</div>
+              <div class="stat-content">
+                <div class="stat-value">${stats.totalKadaluarsa}</div>
+                <div class="stat-label">Kadaluarsa</div>
+              </div>
+            </div>
+            <div class="stat-card purple">
+              <div class="stat-icon">👁️</div>
+              <div class="stat-content">
+                <div class="stat-value">${stats.totalPreviews}</div>
+                <div class="stat-label">Total Preview</div>
+              </div>
+            </div>
+            <div class="stat-card orange">
+              <div class="stat-icon">⬇️</div>
+              <div class="stat-content">
+                <div class="stat-value">${stats.totalDownloads}</div>
+                <div class="stat-label">Total Download</div>
+              </div>
+            </div>
+            <div class="stat-card yellow">
+              <div class="stat-icon">📨</div>
+              <div class="stat-content">
+                <div class="stat-value">${stats.totalPublikMenunggu}</div>
+                <div class="stat-label">Pengajuan Menunggu</div>
+              </div>
+            </div>
+          </div>
+        `
+        
+        // Generate distribution tables
+        const distributionHtml = `
+          <div class="distribution-section">
+            <h3>Distribusi Data</h3>
+            <div class="distribution-grid">
+              <div class="dist-table">
+                <h4>Per Tahun</h4>
+                <table>
+                  <thead><tr><th>Tahun</th><th>Jumlah</th></tr></thead>
+                  <tbody>
+                    ${stats.byTahun.map((item: { tahun: number; count: number }) => `<tr><td>${item.tahun}</td><td>${item.count}</td></tr>`).join('')}
+                  </tbody>
+                </table>
+              </div>
+              <div class="dist-table">
+                <h4>Per Kategori</h4>
+                <table>
+                  <thead><tr><th>Kategori</th><th>Jumlah</th></tr></thead>
+                  <tbody>
+                    ${stats.byKategori.map((item: { kategori: string; count: number }) => `<tr><td>${item.kategori}</td><td>${item.count}</td></tr>`).join('')}
+                  </tbody>
+                </table>
+              </div>
+              <div class="dist-table">
+                <h4>Per Jenis</h4>
+                <table>
+                  <thead><tr><th>Jenis</th><th>Jumlah</th></tr></thead>
+                  <tbody>
+                    ${stats.byJenis.map((item: { jenis: string; count: number }) => `<tr><td>${item.jenis}</td><td>${item.count}</td></tr>`).join('')}
+                  </tbody>
+                </table>
+              </div>
+              <div class="dist-table">
+                <h4>Per Status</h4>
+                <table>
+                  <thead><tr><th>Status</th><th>Jumlah</th></tr></thead>
+                  <tbody>
+                    ${stats.byStatus.map((item: { status: string; count: number }) => `<tr><td><span class="status-badge" style="background-color: ${getStatusColor(item.status)}">${item.status}</span></td><td>${item.count}</td></tr>`).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        `
+        
         printWindow.document.write(`
           <!DOCTYPE html>
           <html>
           <head>
-            <title>Laporan SOP dan IK</title>
+            <title>Laporan SOP dan IK - BASARNAS</title>
             <style>
-              body { font-family: Arial, sans-serif; padding: 20px; }
-              h1 { color: #f97316; text-align: center; }
-              h2 { color: #666; text-align: center; font-size: 14px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-              th { background-color: #f97316; color: white; }
-              tr:nth-child(even) { background-color: #f9f9f9; }
-              .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #666; }
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              body { 
+                font-family: 'Segoe UI', Arial, sans-serif; 
+                padding: 30px;
+                background: #f8fafc;
+                color: #1e293b;
+              }
+              .header {
+                text-align: center;
+                margin-bottom: 30px;
+                padding-bottom: 20px;
+                border-bottom: 3px solid #f97316;
+              }
+              .logo-section {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 15px;
+                margin-bottom: 15px;
+              }
+              .logo-icon {
+                width: 60px;
+                height: 60px;
+                background: linear-gradient(135deg, #f97316, #ea580c);
+                border-radius: 12px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 30px;
+              }
+              h1 { 
+                color: #1e293b; 
+                font-size: 28px;
+                font-weight: 700;
+              }
+              .subtitle {
+                color: #f97316;
+                font-size: 14px;
+                font-weight: 600;
+                margin-top: 5px;
+              }
+              .date-info {
+                color: #64748b;
+                font-size: 12px;
+                margin-top: 10px;
+              }
+              
+              /* Stats Grid */
+              .stats-grid {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 15px;
+                margin-bottom: 30px;
+              }
+              .stat-card {
+                background: white;
+                border-radius: 12px;
+                padding: 20px;
+                display: flex;
+                align-items: center;
+                gap: 15px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                border-left: 4px solid;
+              }
+              .stat-card.orange { border-left-color: #f97316; }
+              .stat-card.yellow { border-left-color: #eab308; }
+              .stat-card.green { border-left-color: #22c55e; }
+              .stat-card.red { border-left-color: #ef4444; }
+              .stat-card.cyan { border-left-color: #06b6d4; }
+              .stat-card.purple { border-left-color: #8b5cf6; }
+              .stat-icon { font-size: 28px; }
+              .stat-value { font-size: 28px; font-weight: 700; color: #1e293b; }
+              .stat-label { font-size: 12px; color: #64748b; font-weight: 500; }
+              
+              /* Distribution Section */
+              .distribution-section {
+                margin-bottom: 30px;
+              }
+              .distribution-section h3 {
+                color: #1e293b;
+                font-size: 18px;
+                margin-bottom: 15px;
+                padding-bottom: 10px;
+                border-bottom: 2px solid #e2e8f0;
+              }
+              .distribution-grid {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 20px;
+              }
+              .dist-table h4 {
+                color: #64748b;
+                font-size: 12px;
+                text-transform: uppercase;
+                margin-bottom: 10px;
+              }
+              .dist-table table {
+                width: 100%;
+                border-collapse: collapse;
+                background: white;
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+              }
+              .dist-table th, .dist-table td {
+                padding: 10px 12px;
+                text-align: left;
+                font-size: 12px;
+              }
+              .dist-table th {
+                background: #f97316;
+                color: white;
+                font-weight: 600;
+              }
+              .dist-table td {
+                border-bottom: 1px solid #e2e8f0;
+              }
+              
+              /* Main Data Table */
+              .data-section h3 {
+                color: #1e293b;
+                font-size: 18px;
+                margin-bottom: 15px;
+                padding-bottom: 10px;
+                border-bottom: 2px solid #e2e8f0;
+              }
+              table.main-table { 
+                width: 100%; 
+                border-collapse: collapse; 
+                margin-top: 10px;
+                background: white;
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+              }
+              .main-table th, .main-table td { 
+                border: 1px solid #e2e8f0; 
+                padding: 10px 12px; 
+                text-align: left;
+                font-size: 11px;
+              }
+              .main-table th { 
+                background: linear-gradient(135deg, #f97316, #ea580c);
+                color: white;
+                font-weight: 600;
+                text-transform: uppercase;
+                font-size: 10px;
+                letter-spacing: 0.5px;
+              }
+              .main-table tr:nth-child(even) { background-color: #f8fafc; }
+              .main-table tr:hover { background-color: #fff7ed; }
+              
+              .status-badge {
+                display: inline-block;
+                padding: 3px 8px;
+                border-radius: 4px;
+                color: white;
+                font-size: 10px;
+                font-weight: 600;
+              }
+              
+              /* Footer */
+              .footer { 
+                margin-top: 40px;
+                padding-top: 20px;
+                border-top: 2px solid #e2e8f0;
+                text-align: center;
+              }
+              .footer-content {
+                background: #f8fafc;
+                padding: 15px;
+                border-radius: 8px;
+              }
+              .footer p { 
+                font-size: 11px; 
+                color: #64748b;
+                margin: 5px 0;
+              }
+              .footer .generated {
+                color: #94a3b8;
+                font-size: 10px;
+              }
+              
+              @media print {
+                body { padding: 20px; }
+                .stats-grid { grid-template-columns: repeat(4, 1fr); }
+                .distribution-grid { grid-template-columns: repeat(4, 1fr); }
+                .stat-card { box-shadow: none; border: 1px solid #e2e8f0; }
+                table { box-shadow: none; }
+              }
             </style>
           </head>
           <body>
-            <h1>Laporan SOP dan IK</h1>
-            <h2>Direktorat Kesiapsiagaan</h2>
-            <p>Tanggal: ${new Date().toLocaleDateString('id-ID')}</p>
-            <table>
-              <thead>
-                <tr>
-                  <th>Nomor</th>
-                  <th>Judul</th>
-                  <th>Tahun</th>
-                  <th>Kategori</th>
-                  <th>Jenis</th>
-                  <th>Status</th>
-                  <th>Diupload Oleh</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${data.data.map((item: { nomorSop: string; judul: string; tahun: number; kategori: string; jenis: string; status: string; uploadedBy: string }) => `
+            <div class="header">
+              <div class="logo-section">
+                <div class="logo-icon">🛡️</div>
+                <div>
+                  <h1>LAPORAN SOP DAN IK</h1>
+                  <div class="subtitle">Katalog SOP dan IK - Direktorat Kesiapsiagaan - BASARNAS</div>
+                </div>
+              </div>
+              <div class="date-info">Tanggal Laporan: ${currentDate}</div>
+            </div>
+            
+            ${statsCardsHtml}
+            
+            ${distributionHtml}
+            
+            <div class="data-section">
+              <h3>Daftar Dokumen (${data.length} dokumen)</h3>
+              <table class="main-table">
+                <thead>
                   <tr>
-                    <td>${item.nomorSop}</td>
-                    <td>${item.judul}</td>
-                    <td>${item.tahun}</td>
-                    <td>${item.kategori}</td>
-                    <td>${item.jenis}</td>
-                    <td>${item.status}</td>
-                    <td>${item.uploadedBy}</td>
+                    <th>No</th>
+                    <th>Nomor SOP</th>
+                    <th>Judul</th>
+                    <th>Tahun</th>
+                    <th>Kategori</th>
+                    <th>Jenis</th>
+                    <th>Status</th>
+                    <th>Preview</th>
+                    <th>Download</th>
+                    <th>Diupload Oleh</th>
                   </tr>
-                `).join('')}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  ${data.map((item: { nomorSop: string; judul: string; tahun: number; kategori: string; jenis: string; status: string; previewCount: number; downloadCount: number; uploadedBy: string }, idx: number) => `
+                    <tr>
+                      <td>${idx + 1}</td>
+                      <td>${item.nomorSop}</td>
+                      <td>${item.judul.length > 50 ? item.judul.substring(0, 50) + '...' : item.judul}</td>
+                      <td>${item.tahun}</td>
+                      <td>${item.kategori}</td>
+                      <td>${item.jenis}</td>
+                      <td><span class="status-badge" style="background-color: ${getStatusColor(item.status)}">${item.status}</span></td>
+                      <td>${item.previewCount || 0}</td>
+                      <td>${item.downloadCount || 0}</td>
+                      <td>${item.uploadedBy}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+            
             <div class="footer">
-              <p>Dicetak dari: Katalog SOP dan IK - Direktorat Kesiapsiagaan</p>
-              <p>© FOE - 2026</p>
+              <div class="footer-content">
+                <p><strong>Katalog SOP dan IK - Direktorat Kesiapsiagaan - BASARNAS</strong></p>
+                <p class="generated">Dokumen ini digenerate secara otomatis pada ${currentDate}</p>
+                <p class="generated">Timestamp: ${timestamp}</p>
+              </div>
             </div>
           </body>
           </html>
         `)
         printWindow.document.close()
-        printWindow.print()
+        
+        // Wait for content to load before printing
+        setTimeout(() => {
+          printWindow.print()
+        }, 500)
       }
       
       toast({ title: 'Berhasil', description: 'Data berhasil diekspor!' })
@@ -3039,21 +3513,19 @@ export default function ESOPApp() {
                 </p>
               </div>
             </motion.div>
-            <motion.div 
+            <motion.div
               className="flex items-center gap-4"
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3 }}
             >
-              <StorageStatus 
-                compact 
-                syncStatus={syncStatus}
-                lastSyncResult={lastSyncResult}
-                onBackup={handleAutoBackup}
-                isBackingUp={autoBackupStatus.isBackingUp}
-                onDiagnose={handleRunDiagnostic}
-                isDiagnosing={diagnosticLoading}
-              />
+              {/* Simple Storage Status for Public Page */}
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${r2Status?.connected ? 'bg-green-500' : 'bg-red-500'}`} />
+                <span className={`text-sm font-medium ${r2Status?.connected ? 'text-green-400' : 'text-red-400'}`}>
+                  Storage {r2Status?.connected ? 'OK' : 'Tidak Tersedia'}
+                </span>
+              </div>
               <Button 
                 onClick={() => setShowLogin(true)}
                 className="btn-sar bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-500/30"
@@ -3601,14 +4073,30 @@ export default function ESOPApp() {
               ))}
             </div>
             
-            {/* Floating particles */}
-            {[...Array(30)].map((_, i) => (
+            {/* Floating particles - pre-computed for SSR safety */}
+            {[
+              { left: 5, top: 10, delay: 0.35 }, { left: 15, top: 25, delay: 0.52 },
+              { left: 25, top: 5, delay: 0.41 }, { left: 35, top: 40, delay: 0.68 },
+              { left: 45, top: 15, delay: 0.33 }, { left: 55, top: 60, delay: 0.57 },
+              { left: 65, top: 30, delay: 0.44 }, { left: 75, top: 75, delay: 0.71 },
+              { left: 85, top: 20, delay: 0.38 }, { left: 95, top: 55, delay: 0.62 },
+              { left: 10, top: 85, delay: 0.48 }, { left: 20, top: 45, delay: 0.55 },
+              { left: 30, top: 70, delay: 0.42 }, { left: 40, top: 35, delay: 0.67 },
+              { left: 50, top: 90, delay: 0.39 }, { left: 60, top: 10, delay: 0.58 },
+              { left: 70, top: 65, delay: 0.45 }, { left: 80, top: 40, delay: 0.72 },
+              { left: 90, top: 80, delay: 0.36 }, { left: 12, top: 55, delay: 0.53 },
+              { left: 22, top: 8, delay: 0.46 }, { left: 32, top: 62, delay: 0.69 },
+              { left: 42, top: 28, delay: 0.37 }, { left: 52, top: 78, delay: 0.56 },
+              { left: 62, top: 42, delay: 0.43 }, { left: 72, top: 92, delay: 0.66 },
+              { left: 82, top: 18, delay: 0.49 }, { left: 92, top: 48, delay: 0.64 },
+              { left: 8, top: 32, delay: 0.51 }, { left: 18, top: 72, delay: 0.47 }
+            ].map((particle, i) => (
               <motion.div
                 key={`particle-${i}`}
                 className="absolute w-2 h-2 rounded-full bg-yellow-400/60"
                 style={{
-                  left: `${Math.random() * 100}%`,
-                  top: `${Math.random() * 100}%`,
+                  left: `${particle.left}%`,
+                  top: `${particle.top}%`,
                 }}
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ 
@@ -3617,7 +4105,7 @@ export default function ESOPApp() {
                   y: [0, -100]
                 }}
                 transition={{ 
-                  delay: 0.3 + Math.random() * 0.5,
+                  delay: particle.delay,
                   duration: 2,
                   ease: 'easeOut'
                 }}
@@ -3867,6 +4355,7 @@ export default function ESOPApp() {
               isBackingUp={autoBackupStatus.isBackingUp}
               onDiagnose={handleRunDiagnostic}
               isDiagnosing={diagnosticLoading}
+              userRole={user?.role}
             />
             
             {/* Active Edit Session Indicator */}
@@ -5508,9 +5997,11 @@ export default function ESOPApp() {
                                         <Eye className="w-4 h-4 text-cyan-400" />
                                       )}
                                     </Button>
-                                    <Button size="icon" variant="ghost" onClick={() => handleOpenEdit(sop.id)} title="Edit" className="hover:bg-orange-500/20">
-                                      <Edit className="w-4 h-4 text-orange-400" />
-                                    </Button>
+                                    {user?.role === 'ADMIN' && (
+                                      <Button size="icon" variant="ghost" onClick={() => handleOpenEdit(sop.id)} title="Edit" className="hover:bg-orange-500/20">
+                                        <Edit className="w-4 h-4 text-orange-400" />
+                                      </Button>
+                                    )}
                                     <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-500/20" disabled={downloadLoading === sop.id}>
                                       {downloadLoading === sop.id ? (
                                         <div className="relative">
@@ -5600,8 +6091,28 @@ export default function ESOPApp() {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      disabled={sopPagination.page === 1}
-                      onClick={() => setSopPagination(p => ({ ...p, page: p.page - 1 }))}
+                      disabled={sopPagination.page === 1 || katalogLoading}
+                      onClick={() => {
+                        // Prevent double-clicks and rapid clicking
+                        if (isPaginationLoadingRef.current || katalogLoading) return
+                        
+                        // Clear any existing debounce timer
+                        if (paginationDebounceRef.current) {
+                          clearTimeout(paginationDebounceRef.current)
+                        }
+                        
+                        // Set loading flag immediately
+                        isPaginationLoadingRef.current = true
+                        
+                        // Debounce the pagination action
+                        paginationDebounceRef.current = setTimeout(() => {
+                          setSopPagination(p => ({ ...p, page: p.page - 1 }))
+                          // Reset loading flag after a short delay to allow the fetch to complete
+                          setTimeout(() => {
+                            isPaginationLoadingRef.current = false
+                          }, 500)
+                        }, 300)
+                      }}
                       className="border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
                     >
                       <ChevronLeft className="w-4 h-4" />
@@ -5610,8 +6121,28 @@ export default function ESOPApp() {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      disabled={sopPagination.page >= sopPagination.totalPages}
-                      onClick={() => setSopPagination(p => ({ ...p, page: p.page + 1 }))}
+                      disabled={sopPagination.page >= sopPagination.totalPages || katalogLoading}
+                      onClick={() => {
+                        // Prevent double-clicks and rapid clicking
+                        if (isPaginationLoadingRef.current || katalogLoading) return
+                        
+                        // Clear any existing debounce timer
+                        if (paginationDebounceRef.current) {
+                          clearTimeout(paginationDebounceRef.current)
+                        }
+                        
+                        // Set loading flag immediately
+                        isPaginationLoadingRef.current = true
+                        
+                        // Debounce the pagination action
+                        paginationDebounceRef.current = setTimeout(() => {
+                          setSopPagination(p => ({ ...p, page: p.page + 1 }))
+                          // Reset loading flag after a short delay to allow the fetch to complete
+                          setTimeout(() => {
+                            isPaginationLoadingRef.current = false
+                          }, 500)
+                        }, 300)
+                      }}
                       className="border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
                     >
                       <ChevronRight className="w-4 h-4" />

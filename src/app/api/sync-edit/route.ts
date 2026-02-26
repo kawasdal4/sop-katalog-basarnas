@@ -159,6 +159,10 @@ export async function POST(request: NextRequest) {
     let contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     if (fileName.endsWith('.xls')) {
       contentType = 'application/vnd.ms-excel'
+    } else if (fileName.endsWith('.docx')) {
+      contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    } else if (fileName.endsWith('.doc')) {
+      contentType = 'application/msword'
     } else if (fileName.endsWith('.pdf')) {
       contentType = 'application/pdf'
     }

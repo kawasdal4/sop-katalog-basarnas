@@ -41,6 +41,8 @@ export async function GET(request: NextRequest) {
     // Get presigned URL for download (valid for 1 hour)
     const downloadUrl = await getR2PresignedUrl(sopFile.filePath, 3600)
     const isExcel = sopFile.fileName.endsWith('.xlsx') || sopFile.fileName.endsWith('.xls')
+    const isWord = sopFile.fileName.endsWith('.docx') || sopFile.fileName.endsWith('.doc')
+    const canEdit = isExcel || isWord
     
     return NextResponse.json({
       success: true,
@@ -54,8 +56,8 @@ export async function GET(request: NextRequest) {
         fileType: sopFile.fileType,
       },
       downloadUrl,
-      canEdit: isExcel,
-      message: 'Download file, edit di Excel lokal, lalu upload ulang file yang sudah diedit.',
+      canEdit,
+      message: `Download file, edit di ${isExcel ? 'Excel' : isWord ? 'Word' : 'aplikasi'} lokal, lalu upload ulang file yang sudah diedit.`,
     })
     
   } catch (error) {
@@ -129,6 +131,10 @@ export async function POST(request: NextRequest) {
       contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     } else if (newExt === 'xls') {
       contentType = 'application/vnd.ms-excel'
+    } else if (newExt === 'docx') {
+      contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    } else if (newExt === 'doc') {
+      contentType = 'application/msword'
     } else if (newExt === 'pdf') {
       contentType = 'application/pdf'
     }

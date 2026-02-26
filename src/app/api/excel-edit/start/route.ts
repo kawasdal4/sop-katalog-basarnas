@@ -148,8 +148,14 @@ export async function POST(request: NextRequest) {
     const fileName = objectKey.split('/').pop() || objectKey
     const fileExt = fileName.split('.').pop()?.toLowerCase() || 'xlsx'
     
-    if (!['xlsx', 'xls', 'xlsm'].includes(fileExt)) {
-      return NextResponse.json({ success: false, error: 'Only Excel files', step: currentStep }, { status: 400 })
+    // Support both Excel and Word files
+    const supportedExtensions = ['xlsx', 'xls', 'xlsm', 'docx', 'doc']
+    if (!supportedExtensions.includes(fileExt)) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Hanya file Excel (.xlsx, .xls, .xlsm) dan Word (.docx, .doc) yang didukung', 
+        step: currentStep 
+      }, { status: 400 })
     }
     
     console.log(`📝 [Edit] Starting: ${objectKey}`)

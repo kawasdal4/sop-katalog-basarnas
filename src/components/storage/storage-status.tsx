@@ -55,6 +55,7 @@ interface StorageStatusProps {
   }
   onDiagnose?: () => void
   isDiagnosing?: boolean
+  userRole?: 'ADMIN' | 'STAF' | null
 }
 
 interface DriveStatusType {
@@ -108,7 +109,8 @@ export function StorageStatus({
   syncStatus,
   lastSyncResult,
   onDiagnose,
-  isDiagnosing = false
+  isDiagnosing = false,
+  userRole
 }: StorageStatusProps) {
   const [driveStatus, setDriveStatus] = useState<DriveStatusType | null>(null)
   const [r2Status, setR2Status] = useState<R2StatusType | null>(null)
@@ -307,7 +309,7 @@ export function StorageStatus({
               <span className="font-semibold">Storage Status</span>
             </div>
             <div className="flex items-center gap-1">
-              {onDiagnose && (
+              {onDiagnose && userRole === 'ADMIN' && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -320,16 +322,18 @@ export function StorageStatus({
                   <span className="hidden sm:inline">Diagnosa</span>
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleBackup}
-                disabled={isBackingUp || !allConnected}
-                className="h-7 px-2 text-xs gap-1 text-gray-300 hover:text-white hover:bg-white/10"
-              >
-                <HardDrive className={`w-3.5 h-3.5 ${isBackingUp ? 'animate-pulse' : ''}`} />
-                <span className="hidden sm:inline">Backup</span>
-              </Button>
+              {userRole === 'ADMIN' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleBackup}
+                  disabled={isBackingUp || !allConnected}
+                  className="h-7 px-2 text-xs gap-1 text-gray-300 hover:text-white hover:bg-white/10"
+                >
+                  <HardDrive className={`w-3.5 h-3.5 ${isBackingUp ? 'animate-pulse' : ''}`} />
+                  <span className="hidden sm:inline">Backup</span>
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
@@ -524,16 +528,18 @@ export function StorageStatus({
             <span className="text-sm font-medium text-white">Storage</span>
           </div>
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleBackup}
-              disabled={isBackingUp}
-              className="h-7 px-2 text-xs text-gray-400 hover:text-white gap-1"
-              title="Backup Manual"
-            >
-              <HardDrive className={`w-3.5 h-3.5 ${isBackingUp ? 'animate-pulse' : ''}`} />
-            </Button>
+            {userRole === 'ADMIN' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleBackup}
+                disabled={isBackingUp}
+                className="h-7 px-2 text-xs text-gray-400 hover:text-white gap-1"
+                title="Backup Manual"
+              >
+                <HardDrive className={`w-3.5 h-3.5 ${isBackingUp ? 'animate-pulse' : ''}`} />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"

@@ -29,7 +29,7 @@ const MIME_TYPES: Record<string, string> = {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { fileName, fileSize, jenis } = await request.json()
+    const { fileName, fileSize, jenis, isPublicSubmission } = await request.json()
 
     if (!fileName || !fileSize) {
       return NextResponse.json({ error: 'fileName dan fileSize diperlukan' }, { status: 400 })
@@ -44,18 +44,21 @@ export async function POST(request: NextRequest) {
 
     console.log(`📤 Creating R2 presigned upload URL for: ${fileName} (${(fileSize / 1024 / 1024).toFixed(2)} MB)`)
 
-    // Get user session
+    // Get user session - only required for non-public submissions
     const cookieStore = await cookies()
     const userId = cookieStore.get('userId')?.value
     
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized - silakan login terlebih dahulu' }, { status: 401 })
-    }
+    // For public submissions, allow without authentication
+    if (!isPublicSubmission) {
+      if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized - silakan login terlebih dahulu' }, { status: 401 })
+      }
 
-    // Verify user exists
-    const user = await db.user.findUnique({ where: { id: userId } })
-    if (!user) {
-      return NextResponse.json({ error: 'User tidak valid. Silakan login ulang.' }, { status: 401 })
+      // Verify user exists
+      const user = await db.user.findUnique({ where: { id: userId } })
+      if (!user) {
+        return NextResponse.json({ error: 'User tidak valid. Silakan login ulang.' }, { status: 401 })
+      }
     }
 
     // Determine content type from file extension

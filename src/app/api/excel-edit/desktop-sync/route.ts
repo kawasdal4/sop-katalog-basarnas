@@ -189,37 +189,45 @@ export async function POST(request: NextRequest) {
     // ============================================
     // STEP 6: Apply Permanent Print Layout via Microsoft Graph API
     // ============================================
-    console.log(`📐 [Sync] Applying permanent print layout via Microsoft Graph API...`)
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'xlsx'
+    const isWordFile = fileExt === 'docx' || fileExt === 'doc'
     
     let finalBuffer: Buffer
     let worksheetsCount = 0
     
-    try {
-      const layoutResult = await applyPermanentPrintLayout(file.name, newFileBuffer)
+    if (isWordFile) {
+      // Skip print layout for Word files - use file buffer directly
+      console.log(`📄 [Sync] Word file detected (${fileExt}), skipping print layout step`)
+      finalBuffer = newFileBuffer
+    } else {
+      console.log(`📐 [Sync] Applying permanent print layout via Microsoft Graph API...`)
       
-      finalBuffer = layoutResult.modifiedBuffer
-      worksheetsCount = layoutResult.worksheetsCount
-      cleanup = layoutResult.cleanup
-      
-      console.log(`✅ [Sync] Print layout applied to ${worksheetsCount} worksheets`)
-      console.log(`📊 [Sync] Modified file size: ${finalBuffer.length} bytes`)
-      
-    } catch (layoutError) {
-      console.error('❌ [Sync] Failed to apply print layout:', layoutError)
-      
-      // Jika gagal di salah satu step, jangan overwrite R2
-      return NextResponse.json({
-        success: false,
-        error: 'Gagal menerapkan print layout ke file Excel',
-        details: layoutError instanceof Error ? layoutError.message : 'Unknown error',
-        hint: 'Pastikan koneksi ke Microsoft Graph API tersedia dan file dalam format Excel yang valid',
-      }, { status: 500 })
+      try {
+        const layoutResult = await applyPermanentPrintLayout(file.name, newFileBuffer)
+        
+        finalBuffer = layoutResult.modifiedBuffer
+        worksheetsCount = layoutResult.worksheetsCount
+        cleanup = layoutResult.cleanup
+        
+        console.log(`✅ [Sync] Print layout applied to ${worksheetsCount} worksheets`)
+        console.log(`📊 [Sync] Modified file size: ${finalBuffer.length} bytes`)
+        
+      } catch (layoutError) {
+        console.error('❌ [Sync] Failed to apply print layout:', layoutError)
+        
+        // Jika gagal di salah satu step, jangan overwrite R2
+        return NextResponse.json({
+          success: false,
+          error: 'Gagal menerapkan print layout ke file Excel',
+          details: layoutError instanceof Error ? layoutError.message : 'Unknown error',
+          hint: 'Pastikan koneksi ke Microsoft Graph API tersedia dan file dalam format Excel yang valid',
+        }, { status: 500 })
+      }
     }
     
     // ============================================
     // STEP 7: Upload to R2 (Overwrite)
     // ============================================
-    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'xlsx'
     const contentType = CONTENT_TYPES[fileExt] || CONTENT_TYPES.xlsx
     
     console.log(`📤 [Sync] Uploading to R2: ${existingSession.objectKey}`)
@@ -238,7 +246,20 @@ export async function POST(request: NextRequest) {
           'worksheets-count': worksheetsCount.toString(),
         }
       })
-      console.log(`✅ [Sync] File uploaded successfully with permanent print layout`)
+      console.log(`✅ [Sync] File uploaded successfully${isWordFile ? '' : ' with permanent print layout'}`)
+      
+      // Update SopFile updatedAt timestamp
+      if (existingSession.sopFileId) {
+        try {
+          await db.sopFile.update({
+            where: { id: existingSession.sopFileId },
+            data: { updatedAt: new Date() }
+          })
+          console.log(`✅ [Sync] Updated SopFile timestamp`)
+        } catch (updateError) {
+          console.warn('⚠️ [Sync] Failed to update SopFile timestamp:', updateError)
+        }
+      }
     } catch (uploadError) {
       console.error('❌ [Sync] Upload error:', uploadError)
       return NextResponse.json({
