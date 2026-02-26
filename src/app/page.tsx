@@ -1928,7 +1928,7 @@ export default function ESOPApp() {
     // Find file from all available lists
     const sop = sopFiles.find(s => s.id === id) || verificationList.find(s => s.id === id) || arsipList.find(s => s.id === id)
     
-    if (!sop?.filePath) {
+    if (!sop?.filePath && !sop?.driveFileId) {
       toast({
         title: '⚠️ File Tidak Tersedia',
         description: 'File tidak ditemukan di storage.',
@@ -1990,7 +1990,7 @@ export default function ESOPApp() {
     const sop = sopFiles.find(s => s.id === id) || verificationList.find(s => s.id === id) || arsipList.find(s => s.id === id)
     if (!sop) return
 
-    if (!sop.filePath) {
+    if (!sop.filePath && !sop.driveFileId) {
       toast({
         title: '⚠️ File Tidak Tersedia',
         description: 'File tidak ditemukan di storage.',
@@ -2005,6 +2005,21 @@ export default function ESOPApp() {
 
     try {
       const res = await fetch(`/api/file?action=preview&id=${id}`)
+      
+      // Check content-type to determine response type
+      const contentType = res.headers.get('content-type') || ''
+      
+      // If response is PDF binary data, create blob URL and open
+      if (contentType.includes('application/pdf')) {
+        const blob = await res.blob()
+        const url = window.URL.createObjectURL(blob)
+        window.open(url, '_blank')
+        setPreviewLoading(null)
+        fetchStats()
+        return
+      }
+      
+      // Otherwise parse as JSON
       const data = await res.json()
       
       if (!data.success) {
@@ -2012,19 +2027,19 @@ export default function ESOPApp() {
       }
 
       // PDF files - langsung buka URL
-      if (fileExtension === 'pdf') {
+      if (fileExtension === 'pdf' && data.downloadUrl) {
         window.open(data.downloadUrl, '_blank')
         setPreviewLoading(null)
         fetchStats()
         return
       }
 
-      // Excel/Word files - gunakan Microsoft Office Online Viewer
+      // Excel/Word files - gunakan Microsoft Office Online Viewer or Google Drive
       if (data.viewerUrl) {
         window.open(data.viewerUrl, '_blank')
         toast({
-          title: '📊 Preview Dibuka',
-          description: 'Membuka di Microsoft Office Online Viewer',
+          title: data.viewerType === 'google-drive' ? '📁 Preview dari Google Drive' : '📊 Preview Dibuka',
+          description: data.viewerType === 'google-drive' ? 'Membuka file dari Google Drive backup' : 'Membuka di Microsoft Office Online Viewer',
           duration: 3000
         })
       } else if (data.downloadUrl) {
@@ -3155,8 +3170,7 @@ export default function ESOPApp() {
               
               {/* Form Content */}
               <CardContent className="p-4 bg-gradient-to-b from-white via-orange-50/20 to-white">
-                <div className="max-w-[80%] mx-auto">
-                  <form onSubmit={(e) => handleUpload(e, true)} className="space-y-3">
+                <form onSubmit={(e) => handleUpload(e, true)} className="space-y-3">
                   {/* Section: Informasi Pengirim */}
                   <motion.div 
                     className="space-y-2"
@@ -3374,7 +3388,6 @@ export default function ESOPApp() {
                     </Button>
                   </motion.div>
                 </form>
-                </div>
               </CardContent>
             </Card>
             

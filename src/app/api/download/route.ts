@@ -26,9 +26,19 @@ function sanitizeFileName(name: string): string {
 }
 
 /**
+ * Check if filePath is an R2 key or Google Drive ID
+ */
+function isR2Key(path: string | null): boolean {
+  if (!path) return false
+  // R2 keys typically have folder structure like "sop-files/filename.ext"
+  return path.includes('/') || path.startsWith('sop-files')
+}
+
+/**
  * GET /api/download?id={sopId}
  * 
  * Download file with custom filename (No SOP - Judul SOP)
+ * Supports fallback to Google Drive if R2 fails
  */
 export async function GET(request: NextRequest) {
   try {
@@ -36,14 +46,6 @@ export async function GET(request: NextRequest) {
     
     if (!sopId) {
       return NextResponse.json({ error: 'ID SOP diperlukan' }, { status: 400 })
-    }
-
-    // Check R2 configuration
-    if (!isR2Configured()) {
-      return NextResponse.json({ 
-        error: 'Cloudflare R2 tidak terkonfigurasi. Hubungi administrator.',
-        needsSetup: true
-      }, { status: 500 })
     }
 
     // Get SOP data from database
@@ -55,8 +57,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'SOP tidak ditemukan' }, { status: 404 })
     }
 
-    if (!sop.filePath) {
-      return NextResponse.json({ error: 'File tidak tersedia di storage' }, { status: 404 })
+    if (!sop.filePath && !sop.driveFileId) {
+      return NextResponse.json({ error: 'File tidak tersedia di storage manapun' }, { status: 404 })
     }
 
     // Extract file extension
@@ -65,29 +67,63 @@ export async function GET(request: NextRequest) {
     // Generate custom filename
     const customFileName = `${sanitizeFileName(sop.nomorSop)} - ${sanitizeFileName(sop.judul)}.${fileExt}`
     
-    console.log(`📥 [Download] Fetching from R2: ${sop.filePath}`)
+    console.log(`📥 [Download] Request: ${sop.nomorSop}`)
     console.log(`📁 [Download] Custom filename: ${customFileName}`)
+    console.log(`   File path: ${sop.filePath}`)
+    console.log(`   Drive ID: ${sop.driveFileId || 'N/A'}`)
 
-    // Download from R2
-    let fileBuffer: Buffer
-    try {
-      const result = await downloadFromR2(sop.filePath)
-      fileBuffer = result.buffer
-    } catch (downloadError) {
-      console.error('R2 download error:', downloadError)
-      return NextResponse.json({ 
-        error: 'File tidak ditemukan di R2',
-        details: downloadError instanceof Error ? downloadError.message : 'Unknown error'
-      }, { status: 404 })
-    }
-    
     // Get content type
     const contentType = CONTENT_TYPES[fileExt] || 'application/octet-stream'
     
     // Encode filename for Content-Disposition header (RFC 5987)
     const encodedFileName = encodeURIComponent(customFileName)
-    
-    console.log(`✅ [Download] Sending ${fileBuffer.length} bytes`)
+
+    let fileBuffer: Buffer | null = null
+    let usedFallback = false
+
+    // STEP 1: Try R2 if configured and filePath looks like R2 key
+    if (isR2Configured() && isR2Key(sop.filePath)) {
+      console.log(`📥 [Download] Trying R2: ${sop.filePath}`)
+      try {
+        const result = await downloadFromR2(sop.filePath)
+        fileBuffer = result.buffer
+        console.log(`✅ [Download] Got ${fileBuffer.length} bytes from R2`)
+      } catch (r2Error) {
+        console.warn('⚠️ [Download] R2 failed:', r2Error instanceof Error ? r2Error.message : r2Error)
+        fileBuffer = null
+      }
+    }
+
+    // STEP 2: Fallback to Google Drive if R2 failed or not available
+    if (!fileBuffer && sop.driveFileId) {
+      console.log(`📥 [Download] Trying Google Drive fallback: ${sop.driveFileId}`)
+      try {
+        const gd = await import('@/lib/google-drive')
+        fileBuffer = await gd.downloadFileFromDrive(sop.driveFileId)
+        usedFallback = true
+        console.log(`✅ [Download] Got ${fileBuffer.length} bytes from Google Drive`)
+      } catch (driveError) {
+        console.error('❌ [Download] Google Drive fallback also failed:', driveError instanceof Error ? driveError.message : driveError)
+        fileBuffer = null
+      }
+    }
+
+    // STEP 3: Last resort - redirect to Google Drive URL
+    if (!fileBuffer && sop.driveFileId) {
+      console.log(`🔗 [Download] Redirecting to Google Drive URL`)
+      const driveUrl = `https://drive.google.com/uc?export=download&id=${sop.driveFileId}`
+      return NextResponse.redirect(driveUrl)
+    }
+
+    // If still no file, return error
+    if (!fileBuffer) {
+      return NextResponse.json({ 
+        error: 'File tidak ditemukan di storage',
+        details: 'File tidak tersedia di R2 maupun Google Drive'
+      }, { status: 404 })
+    }
+
+    console.log(`✅ [Download] Sending ${fileBuffer.length} bytes${usedFallback ? ' (via Google Drive fallback)' : ''}`)
 
     // Return file with custom filename
     return new NextResponse(fileBuffer, {
