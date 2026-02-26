@@ -1,25 +1,24 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 export default function PrintViewerPage() {
   const searchParams = useSearchParams()
   const fileId = searchParams.get('id')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(!fileId)
+  const [error, setError] = useState<string | null>(fileId ? null : 'File ID tidak ditemukan')
+  const iframeRef = useRef<HTMLIFrameElement | null>(null)
 
   useEffect(() => {
-    if (!fileId) {
-      setError('File ID tidak ditemukan')
-      setLoading(false)
-      return
-    }
+    // Skip if no valid fileId
+    if (!fileId) return
 
     // Create iframe to load PDF and trigger print
     const iframe = document.createElement('iframe')
     iframe.style.display = 'none'
     iframe.src = `/api/print?id=${fileId}`
+    iframeRef.current = iframe
     
     iframe.onload = () => {
       setLoading(false)
@@ -42,7 +41,9 @@ export default function PrintViewerPage() {
 
     // Cleanup on unmount
     return () => {
-      document.body.removeChild(iframe)
+      if (document.body.contains(iframe)) {
+        document.body.removeChild(iframe)
+      }
     }
   }, [fileId])
 
@@ -125,7 +126,7 @@ export default function PrintViewerPage() {
       {/* Instructions */}
       <div className="bg-orange-50 border-t border-orange-200 p-3 text-center">
         <p className="text-orange-700 text-sm">
-          💡 Dialog print akan muncul otomatis. Jika tidak, tekan <strong>Ctrl+P</strong> atau klik tombol Print di atas.
+          Dialog print akan muncul otomatis. Jika tidak, tekan <strong>Ctrl+P</strong> atau klik tombol Print di atas.
         </p>
       </div>
     </div>
