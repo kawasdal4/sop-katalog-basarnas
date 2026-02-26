@@ -19,6 +19,7 @@ model User {
   role      String   @default("STAF") // ADMIN or STAF
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  lastLoginAt DateTime? // Last login timestamp
   
   // Relations
   logs     Log[]
@@ -59,9 +60,12 @@ model SopFile {
   isPublicSubmission Boolean   @default(false)
   submitterName      String?
   submitterEmail     String?
+  keterangan         String?  // Keterangan/catatan dari pengaju
   verificationStatus String?   @default("MENUNGGU") // MENUNGGU, DISETUJUI, DITOLAK
   verifiedBy         String?
   verifiedAt         DateTime?
+  rejectionReason    String?  // Alasan penolakan
+  arsipFolder        String?  // Folder di arsip (e.g., 'Publik-Ditolak')
   
   // Relations
   user     User     @relation(fields: [uploadedBy], references: [id])
@@ -120,4 +124,36 @@ model SyncLog {
   message   String?
   details   String?  // JSON string for additional data
   createdAt DateTime @default(now())
+}
+
+// File Edit Session model for desktop Excel editing
+model FileEditSession {
+  id            String   @id @default(cuid())
+  objectKey     String   // R2 object key
+  sopFileId     String?  // Link to SOP file
+  editorUserId  String
+  editorEmail   String
+  editorName    String?
+  originalHash  String   // Hash of file when edit started
+  lockedAt      DateTime @default(now())
+  expiresAt     DateTime
+  status        String   @default("active") // active, completed, expired
+  lastSyncedAt  DateTime?
+  completedAt   DateTime?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// File Edit Log model for tracking edit actions
+model FileEditLog {
+  id           String   @id @default(cuid())
+  objectKey    String
+  editorUserId String
+  editorEmail  String
+  editorName   String?
+  action       String   // started, synced, expired, force_overwrite, cancelled
+  sessionId    String?
+  details      String?  // JSON string for additional data
+  timestamp    DateTime @default(now())
 }

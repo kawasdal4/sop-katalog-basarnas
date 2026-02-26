@@ -5542,30 +5542,15 @@ export default function ESOPApp() {
                                       )}
                                     </Button>
                                     {user?.role === 'ADMIN' && (
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                          <Button 
-                                            size="icon" 
-                                            variant="ghost" 
-                                            className="hover:bg-green-100"
-                                            title="Edit Excel"
-                                          >
-                                            <FileSpreadsheet className="w-4 h-4 text-green-600" />
-                                          </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                          <DropdownMenuLabel>Pilih Mode Edit</DropdownMenuLabel>
-                                          <DropdownMenuSeparator />
-                                          <DropdownMenuItem onClick={() => handleOpenExcelEdit(sop.id)}>
-                                            <Cloud className="w-4 h-4 mr-2 text-blue-500" />
-                                            Edit Online (Excel Online)
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem onClick={() => handleDesktopEdit(sop.id)}>
-                                            <Download className="w-4 h-4 mr-2 text-orange-500" />
-                                            Edit di Desktop (Download)
-                                          </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
+                                      <Button 
+                                        size="icon" 
+                                        variant="ghost" 
+                                        className="hover:bg-green-100"
+                                        onClick={() => handleDesktopEdit(sop.id)}
+                                        title={`Edit di Desktop (${sop.fileType?.toUpperCase() || 'Excel'})`}
+                                      >
+                                        <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                                      </Button>
                                     )}
                                     {user?.role === 'ADMIN' && desktopEditSessionToken && (
                                       <Button 

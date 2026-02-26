@@ -1,10 +1,8 @@
 /**
- * Excel/Word Print API - Uses Local PDF Converter Service
+ * Excel/Word Print API
  * 
- * Converts Excel/Word files to PDF with proper print settings:
- * - Paper: A4
- * - Orientation: Landscape (Excel) / Portrait (Word)
- * - Fit to width: 1 page
+ * Production: Downloads the file for local printing (LibreOffice conversion not available on Vercel)
+ * Development: Uses local PDF converter service
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -18,8 +16,9 @@ const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || process.env.R2_ACCESS_K
 const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_KEY!
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME!
 
-// PDF Converter Service (mini-service on port 3004)
+// PDF Converter Service (mini-service on port 3004) - only available in development
 const PDF_CONVERTER_URL = 'http://localhost:3004'
+const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1'
 
 // Initialize R2 client
 const r2Client = new S3Client({
@@ -31,6 +30,16 @@ const r2Client = new S3Client({
   },
 })
 
+// Content types for Excel and Word files
+const CONTENT_TYPES: Record<string, string> = {
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  xls: 'application/vnd.ms-excel',
+  xlsm: 'application/vnd.ms-excel.sheet.macroEnabled.12',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  doc: 'application/msword',
+  pdf: 'application/pdf',
+}
+
 /**
  * Convert Excel to PDF using local converter service
  * Applies print settings: A4 landscape, fitToWidth=1
@@ -39,8 +48,8 @@ async function convertExcelToPdf(fileName: string, fileBuffer: Buffer): Promise<
   console.log(`🖨️ [Print] Converting: ${fileName} (${fileBuffer.length} bytes)`)
   console.log('📋 [Print] Using local PDF converter with print settings')
   
-  // Call the local PDF converter service directly (no XTransformPort needed for internal requests)
-  const response = await fetch(`http://localhost:3004/convert/print`, {
+  // Call the local PDF converter service directly
+  const response = await fetch(`${PDF_CONVERTER_URL}/convert/print`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -108,6 +117,7 @@ export async function GET(request: NextRequest) {
     
     // Get filename
     let fileName = objectKey.split('/').pop() || 'file.xlsx'
+    const fileExt = fileName.split('.').pop()?.toLowerCase() || 'xlsx'
     
     if (sopId) {
       const sop = await db.sopFile.findUnique({
@@ -115,7 +125,7 @@ export async function GET(request: NextRequest) {
         select: { nomorSop: true, judul: true, fileName: true }
       })
       if (sop) {
-        const ext = sop.fileName.split('.').pop() || 'xlsx'
+        const ext = sop.fileName.split('.').pop() || fileExt
         const sanitize = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 50)
         fileName = `${sanitize(sop.nomorSop)} - ${sanitize(sop.judul)}.${ext}`
       }
@@ -136,7 +146,37 @@ export async function GET(request: NextRequest) {
     const fileBuffer = Buffer.from(await r2Response.Body.transformToByteArray())
     console.log(`✅ [Print] Downloaded: ${fileBuffer.length} bytes`)
     
-    // Convert to PDF with print settings
+    // In production, just return the file for download (user can print from their app)
+    // PDF conversion requires LibreOffice which is not available on Vercel
+    if (isProduction) {
+      console.log(`📄 [Print] Production mode - returning file for download`)
+      
+      // Log activity
+      try {
+        await db.log.create({
+          data: {
+            userId,
+            aktivitas: 'PRINT_DOWNLOAD',
+            deskripsi: `Download untuk print: ${fileName}`,
+            fileId: sopId || undefined,
+          },
+        })
+      } catch {}
+      
+      const contentType = CONTENT_TYPES[fileExt] || 'application/octet-stream'
+      
+      return new NextResponse(fileBuffer, {
+        status: 200,
+        headers: {
+          'Content-Type': contentType,
+          'Content-Disposition': `attachment; filename="${encodeURIComponent(fileName)}"`,
+          'Content-Length': fileBuffer.length.toString(),
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        },
+      })
+    }
+    
+    // In development, convert to PDF with print settings
     const pdfBuffer = await convertExcelToPdf(fileName, fileBuffer)
     
     // Log activity
@@ -176,7 +216,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('❌ [Print] Error:', error)
     
-    const errorMessage = error instanceof Error ? error.message : 'Gagal mengkonversi file ke PDF'
+    const errorMessage = error instanceof Error ? error.message : 'Gagal memproses file'
     
     return NextResponse.json({
       success: false,

@@ -937,8 +937,12 @@ export async function PUT(request: NextRequest) {
       
       // If DITOLAK, store rejection reason and set arsip folder
       if (verificationStatus === 'DITOLAK') {
-        updateData.rejectionReason = rejectionReason || 'Tidak ada alasan'
-        updateData.arsipFolder = 'Publik-Ditolak'
+        try {
+          updateData.rejectionReason = rejectionReason || 'Tidak ada alasan'
+          updateData.arsipFolder = 'Publik-Ditolak'
+        } catch (fieldError) {
+          console.warn('⚠️ rejectionReason/arsipFolder fields may not exist:', fieldError)
+        }
       }
     }
     
