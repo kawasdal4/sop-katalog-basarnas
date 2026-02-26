@@ -446,7 +446,7 @@ function StatCard({
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className={`text-sm font-bold ${c.titleText}`}>{title}</p>
+              <p className={`text-xl font-bold ${c.titleText}`}>{title}</p>
               <motion.p 
                 className={`text-3xl font-bold ${c.text} mt-2`}
                 initial={{ opacity: 0, scale: 0.5 }}
