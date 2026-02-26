@@ -3548,291 +3548,167 @@ export default function ESOPApp() {
             transition={{ delay: 0.3, duration: 0.6 }}
           >
             <Card className="bg-white/95 backdrop-blur-xl shadow-2xl border-0 overflow-hidden rounded-2xl">
-              {/* Header with BASARNAS styling */}
-              <div className="relative bg-gradient-to-br from-orange-500 via-orange-600 to-red-700 p-4 text-white overflow-hidden">
-                {/* Animated radar pattern */}
-                <div className="absolute inset-0 overflow-hidden">
-                  <motion.div 
-                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] rounded-full opacity-30"
-                    style={{
-                      background: 'conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.15) 30deg, transparent 60deg)'
-                    }}
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
-                  />
-                  {/* Decorative circles */}
-                  <motion.div 
-                    className="absolute -top-10 -right-10 w-40 h-40 rounded-full border border-white/10"
-                    animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
-                    transition={{ duration: 3, repeat: Infinity }}
-                  />
-                  <motion.div 
-                    className="absolute -bottom-10 -left-10 w-32 h-32 rounded-full border border-white/10"
-                    animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.4, 0.2] }}
-                    transition={{ duration: 4, repeat: Infinity }}
-                  />
-                </div>
-                
+              {/* Compact Header */}
+              <div className="relative bg-gradient-to-br from-orange-500 via-orange-600 to-red-700 p-3 text-white overflow-hidden">
                 <motion.div 
-                  className="relative z-10 text-center"
+                  className="relative z-10 flex items-center justify-center gap-3"
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6 }}
+                  transition={{ duration: 0.4 }}
                 >
-                  {/* Logo with beacon animation */}
                   <motion.div 
-                    className="w-12 h-12 mx-auto mb-2 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-xl border border-white/20"
+                    className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg"
                     initial={{ scale: 0, rotate: -180 }}
                     animate={{ scale: 1, rotate: 0 }}
-                    transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-                    style={{
-                      boxShadow: '0 0 30px rgba(249, 115, 22, 0.6), inset 0 0 20px rgba(255,255,255,0.1)'
-                    }}
+                    transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
                   >
-                    <motion.div
-                      animate={{
-                        boxShadow: [
-                          '0 0 10px rgba(255,255,255,0.3)',
-                          '0 0 25px rgba(255,255,255,0.6)',
-                          '0 0 10px rgba(255,255,255,0.3)'
-                        ]
-                      }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                      className="w-9 h-9 rounded-xl bg-gradient-to-br from-white to-orange-100 flex items-center justify-center"
-                    >
-                      <Shield className="w-5 h-5 text-orange-600" />
-                    </motion.div>
+                    <Shield className="w-5 h-5 text-white" />
                   </motion.div>
-                  
-                  <motion.h1 
-                    className="text-lg font-bold tracking-wide mb-1"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    AJUKAN DOKUMEN SOP/IK
-                  </motion.h1>
-                  
-                  <motion.div 
-                    className="flex items-center justify-center gap-1.5 text-orange-100/90"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.4 }}
-                  >
-                    <motion.div
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 1, repeat: Infinity }}
-                    >
-                      <Radio className="w-3 h-3" />
-                    </motion.div>
-                    <span className="text-xs font-medium tracking-wide">DIREKTORAT KESIAPSIAGAAN</span>
-                  </motion.div>
-                  
-                  <motion.p 
-                    className="text-orange-200/80 text-[11px] mt-1.5 font-medium"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.5 }}
-                  >
-                    BADAN SAR NASIONAL
-                  </motion.p>
+                  <div className="text-left">
+                    <h1 className="text-base font-bold tracking-wide">AJUKAN DOKUMEN SOP/IK</h1>
+                    <p className="text-orange-100/80 text-[10px] font-medium">Direktorat Kesiapsiagaan • Foe</p>
+                  </div>
                 </motion.div>
               </div>
               
-              {/* Form Content */}
-              <CardContent className="p-5 bg-gradient-to-b from-white via-orange-50/20 to-white">
-                <form onSubmit={(e) => handleUpload(e, true)} className="space-y-4">
-                  {/* Section: Informasi Pengirim */}
+              {/* Compact Form Content */}
+              <CardContent className="p-3 bg-gradient-to-b from-white via-orange-50/20 to-white">
+                <form onSubmit={(e) => handleUpload(e, true)} className="space-y-2.5">
+                  {/* Section: Informasi Pengirim - Compact */}
                   <motion.div 
-                    className="space-y-3"
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
                   >
-                    <div className="flex items-center gap-2 pb-2 border-b border-orange-200">
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
-                        <Users className="w-3 h-3 text-white" />
-                      </div>
-                      <span className="text-sm font-bold text-gray-700 uppercase tracking-wide">Informasi Pengirim</span>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Users className="w-3.5 h-3.5 text-orange-500" />
+                      <span className="text-[11px] font-bold text-gray-600 uppercase">Informasi Pengirim</span>
                     </div>
-                    
-                    <div className="grid grid-cols-1 gap-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-semibold text-gray-600 flex items-center gap-1">
-                          Nama Lengkap <span className="text-red-500">*</span>
-                        </Label>
-                        <Input 
-                          value={publicForm.nama}
-                          onChange={(e) => setPublicForm({ ...publicForm, nama: e.target.value })}
-                          placeholder="Masukkan nama lengkap Anda"
-                          required
-                          className="h-9 border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 placeholder:text-gray-400 rounded-xl text-xs bg-white shadow-sm w-full"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-semibold text-gray-600 flex items-center gap-1">
-                          Email <span className="text-red-500">*</span>
-                        </Label>
-                        <Input 
-                          type="email"
-                          value={publicForm.email}
-                          onChange={(e) => setPublicForm({ ...publicForm, email: e.target.value })}
-                          placeholder="email@contoh.com"
-                          required
-                          className="h-9 border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 placeholder:text-gray-400 rounded-xl text-xs bg-white shadow-sm w-full"
-                        />
-                      </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input 
+                        value={publicForm.nama}
+                        onChange={(e) => setPublicForm({ ...publicForm, nama: e.target.value })}
+                        placeholder="Nama Lengkap *"
+                        required
+                        className="h-8 border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 rounded-lg text-xs bg-white"
+                      />
+                      <Input 
+                        type="email"
+                        value={publicForm.email}
+                        onChange={(e) => setPublicForm({ ...publicForm, email: e.target.value })}
+                        placeholder="Email *"
+                        required
+                        className="h-8 border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 rounded-lg text-xs bg-white"
+                      />
                     </div>
                   </motion.div>
                   
-                  {/* Section: Informasi Dokumen */}
+                  {/* Section: Informasi Dokumen - Compact */}
                   <motion.div 
-                    className="space-y-3"
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.15 }}
+                  >
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <FileText className="w-3.5 h-3.5 text-orange-500" />
+                      <span className="text-[11px] font-bold text-gray-600 uppercase">Informasi Dokumen</span>
+                    </div>
+                    
+                    <Input 
+                      value={publicForm.judul}
+                      onChange={(e) => setPublicForm({ ...publicForm, judul: e.target.value })}
+                      placeholder="Judul SOP/IK *"
+                      required
+                      className="h-8 border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 rounded-lg text-xs bg-white w-full mb-2"
+                    />
+                    
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <Select value={publicForm.kategori} onValueChange={(v) => setPublicForm({ ...publicForm, kategori: v })}>
+                        <SelectTrigger className="h-7 border-2 border-gray-200 text-gray-900 rounded-lg text-[10px] bg-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-lg">
+                          {KATEGORI_OPTIONS.map(k => <SelectItem key={k} value={k} className="text-xs">{k}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Select value={publicForm.jenis} onValueChange={(v) => setPublicForm({ ...publicForm, jenis: v })}>
+                        <SelectTrigger className="h-7 border-2 border-gray-200 text-gray-900 rounded-lg text-[10px] bg-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-lg">
+                          {JENIS_OPTIONS.map(j => <SelectItem key={j} value={j} className="text-xs">{j}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Input 
+                        type="number"
+                        value={publicForm.tahun}
+                        onChange={(e) => setPublicForm({ ...publicForm, tahun: parseInt(e.target.value) })}
+                        required
+                        className="h-7 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-lg text-[10px] bg-white text-center"
+                      />
+                    </div>
+                    
+                    <Textarea
+                      value={publicForm.keterangan}
+                      onChange={(e) => setPublicForm({ ...publicForm, keterangan: e.target.value })}
+                      placeholder="Keterangan (opsional)"
+                      rows={1}
+                      className="mt-2 border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 rounded-lg text-xs bg-white resize-none w-full"
+                    />
+                  </motion.div>
+                  
+                  {/* Section: Upload File - Compact */}
+                  <motion.div 
+                    initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
                   >
-                    <div className="flex items-center gap-2 pb-2 border-b border-orange-200">
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
-                        <FileText className="w-3 h-3 text-white" />
-                      </div>
-                      <span className="text-sm font-bold text-gray-700 uppercase tracking-wide">Informasi Dokumen</span>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Upload className="w-3.5 h-3.5 text-orange-500" />
+                      <span className="text-[11px] font-bold text-gray-600 uppercase">Upload File</span>
                     </div>
                     
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold text-gray-600 flex items-center gap-1">
-                        Judul SOP/IK <span className="text-red-500">*</span>
-                      </Label>
-                      <Input 
-                        value={publicForm.judul}
-                        onChange={(e) => setPublicForm({ ...publicForm, judul: e.target.value })}
-                        placeholder="Masukkan judul dokumen"
-                        required
-                        className="h-9 border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 placeholder:text-gray-400 rounded-xl text-xs bg-white shadow-sm w-full"
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="space-y-1.5">
-                        <Label className="text-[11px] font-semibold text-gray-600">Kategori</Label>
-                        <Select value={publicForm.kategori} onValueChange={(v) => setPublicForm({ ...publicForm, kategori: v })}>
-                          <SelectTrigger className="h-8 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-[11px] bg-white shadow-sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl">
-                            {KATEGORI_OPTIONS.map(k => <SelectItem key={k} value={k} className="text-xs">{k}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-[11px] font-semibold text-gray-600">Jenis</Label>
-                        <Select value={publicForm.jenis} onValueChange={(v) => setPublicForm({ ...publicForm, jenis: v })}>
-                          <SelectTrigger className="h-8 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-[11px] bg-white shadow-sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl">
-                            {JENIS_OPTIONS.map(j => <SelectItem key={j} value={j} className="text-xs">{j}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-[11px] font-semibold text-gray-600">Tahun</Label>
-                        <Input 
-                          type="number"
-                          value={publicForm.tahun}
-                          onChange={(e) => setPublicForm({ ...publicForm, tahun: parseInt(e.target.value) })}
-                          required
-                          className="h-8 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-[11px] bg-white shadow-sm text-center"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold text-gray-600">Keterangan</Label>
-                      <Textarea
-                        value={publicForm.keterangan}
-                        onChange={(e) => setPublicForm({ ...publicForm, keterangan: e.target.value })}
-                        placeholder="Tambahkan keterangan atau catatan (opsional)"
-                        rows={2}
-                        className="border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 placeholder:text-gray-400 rounded-xl text-xs bg-white shadow-sm resize-none w-full"
-                      />
-                    </div>
-                  </motion.div>
-                  
-                  {/* Section: Upload File */}
-                  <motion.div 
-                    className="space-y-3"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    <div className="flex items-center gap-2 pb-2 border-b border-orange-200">
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
-                        <Upload className="w-3 h-3 text-white" />
-                      </div>
-                      <span className="text-sm font-bold text-gray-700 uppercase tracking-wide">Upload File</span>
-                    </div>
-                    
-                    <div className="relative flex items-center justify-center h-20 border-2 border-dashed border-orange-300 rounded-xl bg-gradient-to-br from-orange-50/80 to-white hover:border-orange-500 hover:bg-orange-50 transition-all cursor-pointer overflow-hidden group shadow-sm">
-                      {/* Hidden file input */}
+                    <div className="relative flex items-center justify-center h-12 border-2 border-dashed border-orange-300 rounded-lg bg-orange-50/50 hover:border-orange-500 hover:bg-orange-50 transition-all cursor-pointer overflow-hidden">
                       <input 
                         type="file"
                         accept=".xlsx,.xls,.pdf,.docx,.doc"
                         onChange={(e) => setPublicForm({ ...publicForm, file: e.target.files?.[0] || null })}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                       />
-                      
-                      {/* Animated background on hover */}
-                      <motion.div 
-                        className="absolute inset-0 bg-gradient-to-r from-orange-500/0 via-orange-500/5 to-orange-500/0"
-                        initial={{ x: '-100%' }}
-                        whileHover={{ x: '100%' }}
-                        transition={{ duration: 0.6 }}
-                      />
-                      
-                      {/* Centered content */}
-                      <div className="flex flex-col items-center justify-center text-center gap-1 pointer-events-none relative z-10">
+                      <div className="flex items-center gap-2 pointer-events-none relative z-10">
                         <motion.div 
-                          className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-lg ${publicForm.file ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 'bg-gradient-to-br from-orange-500 to-red-600'}`}
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center ${publicForm.file ? 'bg-green-500' : 'bg-orange-500'}`}
                           whileHover={{ scale: 1.05 }}
                         >
                           {publicForm.file ? (
-                            <Check className="w-4 h-4 text-white" />
+                            <Check className="w-3.5 h-3.5 text-white" />
                           ) : (
-                            <Upload className="w-4 h-4 text-white" />
+                            <Upload className="w-3.5 h-3.5 text-white" />
                           )}
                         </motion.div>
-                        <div>
-                          <p className="font-semibold text-gray-700 text-xs">
-                            {publicForm.file ? publicForm.file.name : 'Klik atau seret file ke sini'}
+                        <div className="text-left">
+                          <p className="text-xs font-medium text-gray-700">
+                            {publicForm.file ? publicForm.file.name : 'Pilih file'}
                           </p>
-                          {publicForm.file ? (
-                            <p className="text-[10px] text-green-600 font-medium mt-0.5">
-                              ✓ File siap diupload ({(publicForm.file.size / 1024).toFixed(1)} KB)
-                            </p>
-                          ) : (
-                            <p className="text-[10px] text-gray-500 mt-0.5">
-                              Format: XLSX, PDF, DOCX (Maks. 50 MB)
-                            </p>
-                          )}
+                          <p className="text-[9px] text-gray-400">
+                            {publicForm.file ? `${(publicForm.file.size / 1024).toFixed(1)} KB` : 'XLSX, PDF, DOCX'}
+                          </p>
                         </div>
                       </div>
                     </div>
                   </motion.div>
                   
-                  {/* Submit Button */}
+                  {/* Submit Button - Compact */}
                   <motion.div
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
-                    className="pt-2"
+                    transition={{ delay: 0.25 }}
                   >
                     <Button 
                       type="submit" 
-                      className="w-full h-10 bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 hover:from-orange-600 hover:via-orange-700 hover:to-red-700 text-white shadow-xl shadow-orange-500/30 text-xs font-bold rounded-xl relative overflow-hidden group"
+                      className="w-full h-9 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-lg shadow-orange-500/20 text-xs font-bold rounded-lg relative overflow-hidden"
                       disabled={loading}
                     >
-                      {/* Animated shimmer */}
                       <motion.div 
                         className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
                         animate={{ x: ['-100%', '100%'] }}
@@ -3841,17 +3717,14 @@ export default function ESOPApp() {
                       <span className="relative z-10 flex items-center justify-center gap-2">
                         {loading ? (
                           <>
-                            <motion.div
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                            >
-                              <RefreshCw className="w-4 h-4" />
+                            <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
+                              <RefreshCw className="w-3.5 h-3.5" />
                             </motion.div>
-                            <span>Mengirim Dokumen...</span>
+                            <span>Mengirim...</span>
                           </>
                         ) : (
                           <>
-                            <Send className="w-4 h-4" />
+                            <Send className="w-3.5 h-3.5" />
                             <span>KIRIM DOKUMEN</span>
                           </>
                         )}
