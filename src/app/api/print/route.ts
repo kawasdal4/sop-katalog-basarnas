@@ -19,7 +19,13 @@ const r2Client = new S3Client({
   },
 })
 
-// GET - Get print-ready file (proxy through API to avoid CORS)
+// Helper function to check if filePath is an R2 key
+function isR2Key(path: string | null): boolean {
+  if (!path) return false
+  return path.includes('/') || path.startsWith('sop-files')
+}
+
+// GET - Get print-ready PDF file from R2
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies()
@@ -41,46 +47,64 @@ export async function GET(request: NextRequest) {
     })
     
     if (!sopFile) {
-      return NextResponse.json({ error: 'File not found' }, { status: 404 })
+      return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 404 })
     }
     
     if (!sopFile.filePath) {
-      return NextResponse.json({ error: 'File path not available' }, { status: 404 })
+      return NextResponse.json({ error: 'File path tidak tersedia' }, { status: 404 })
     }
     
     const fileExtension = sopFile.fileName.toLowerCase().split('.').pop()
     
-    // Only PDF files are supported for print in production
+    // Only PDF files are supported for direct printing
     if (fileExtension !== 'pdf') {
       return NextResponse.json({ 
-        error: 'Hanya file PDF yang bisa di-print langsung. Untuk file Excel/Word, silakan download dan print dari aplikasi desktop.',
+        error: 'Hanya file PDF yang bisa di-print langsung',
         fileType: fileExtension 
       }, { status: 400 })
     }
     
-    // Download PDF from R2
-    const r2Response = await r2Client.send(new GetObjectCommand({
-      Bucket: R2_BUCKET_NAME,
-      Key: sopFile.filePath,
-    }))
+    let fileBuffer: Buffer | null = null
     
-    if (!r2Response.Body) {
-      return NextResponse.json({ error: 'File not found in storage' }, { status: 404 })
+    // Download PDF from R2
+    if (isR2Key(sopFile.filePath)) {
+      try {
+        console.log(`🖨️ [Print] Downloading from R2: ${sopFile.filePath}`)
+        const r2Response = await r2Client.send(new GetObjectCommand({
+          Bucket: R2_BUCKET_NAME,
+          Key: sopFile.filePath,
+        }))
+        
+        if (r2Response.Body) {
+          fileBuffer = Buffer.from(await r2Response.Body.transformToByteArray())
+          console.log(`✅ [Print] Got ${fileBuffer.length} bytes from R2`)
+        }
+      } catch (r2Error) {
+        console.error('❌ [Print] R2 error:', r2Error)
+        fileBuffer = null
+      }
     }
     
-    const fileBuffer = Buffer.from(await r2Response.Body.transformToByteArray())
+    if (!fileBuffer) {
+      return NextResponse.json({ 
+        error: 'File tidak ditemukan di R2 storage',
+        details: 'Pastikan file sudah di-sync ke R2'
+      }, { status: 404 })
+    }
     
     // Log print activity
     try {
       await db.log.create({
         data: {
           userId,
-          aktivitas: 'PRINT_FILE',
-          deskripsi: `Printed PDF: ${sopFile.nomorSop} - ${sopFile.judul}`,
+          aktivitas: 'PRINT',
+          deskripsi: `Print PDF: ${sopFile.nomorSop} - ${sopFile.judul}`,
           fileId: sopFile.id,
         },
       })
-    } catch {}
+    } catch (logError) {
+      console.warn('⚠️ Failed to log print activity:', logError)
+    }
     
     // Return PDF with CORS headers for print dialog
     const sanitizedFileName = sopFile.fileName.replace(/[^\w\-.]/g, '_')
@@ -99,7 +123,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Print API error:', error)
     return NextResponse.json({
-      error: 'Failed to prepare file for printing',
+      error: 'Gagal mempersiapkan file untuk print',
       details: error instanceof Error ? error.message : 'Unknown error',
     }, { status: 500 })
   }
