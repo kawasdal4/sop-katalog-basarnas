@@ -1,12 +1,12 @@
-// Development Schema - SQLite (Local)
-// For production, use schema.production.prisma
+// Production Schema - PostgreSQL
+// For local development, use SQLite or update DATABASE_URL
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
