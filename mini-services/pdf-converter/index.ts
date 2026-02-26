@@ -75,9 +75,15 @@ if __name__ == "__main__":
 
 writeFileSync(join(tempDir, 'convert_excel.py'), PYTHON_CONVERT_SCRIPT)
 
-// Also copy the print settings script
-const PRINT_SETTINGS_SCRIPT = readFileSync(join(__dirname, 'convert_with_print_settings.py'), 'utf-8')
-writeFileSync(join(tempDir, 'convert_with_print_settings.py'), PRINT_SETTINGS_SCRIPT)
+// Copy the print settings script from the source directory
+const PRINT_SETTINGS_SCRIPT_PATH = join(__dirname, 'convert_with_print_settings.py')
+if (existsSync(PRINT_SETTINGS_SCRIPT_PATH)) {
+  const PRINT_SETTINGS_SCRIPT = readFileSync(PRINT_SETTINGS_SCRIPT_PATH, 'utf-8')
+  writeFileSync(join(tempDir, 'convert_with_print_settings.py'), PRINT_SETTINGS_SCRIPT)
+  console.log('  ✅ Print settings script loaded from source')
+} else {
+  console.log('  ⚠️ Print settings script not found at', PRINT_SETTINGS_SCRIPT_PATH)
+}
 
 /**
  * Convert PDF to PNG images (300 DPI)
@@ -267,7 +273,7 @@ const server = createServer(async (req, res) => {
     return
   }
 
-  // Convert to PDF with print settings (fitToWidth=1, landscape)
+  // Convert to PDF with print settings - preserves source file's settings
   if (req.method === 'POST' && req.url?.startsWith('/convert/print')) {
     try {
       const chunks: Buffer[] = []
@@ -283,7 +289,7 @@ const server = createServer(async (req, res) => {
       const buffer = Buffer.from(body.fileBase64, 'base64')
       const fileName = body.fileName || 'document.xlsx'
       
-      console.log(`[Print] Converting ${fileName} with print settings...`)
+      console.log(`[Print] Converting ${fileName} with source file's print settings...`)
       
       const id = randomUUID()
       const workDir = join(tempDir, id)
@@ -294,10 +300,10 @@ const server = createServer(async (req, res) => {
       const pdfPath = join(workDir, 'output.pdf')
       
       try {
-        // Write Excel file
+        // Write the file
         writeFileSync(inputPath, buffer)
         
-        // Run the print conversion script
+        // Run the print conversion script (preserves source file's settings)
         const scriptPath = join(tempDir, 'convert_with_print_settings.py')
         const { stdout, stderr } = await execAsync(
           `python3 "${scriptPath}" "${inputPath}" "${pdfPath}"`,
@@ -305,7 +311,7 @@ const server = createServer(async (req, res) => {
         )
         
         console.log(stdout)
-        if (stderr) console.error(stderr)
+        if (stderr) console.error('[Print] STDERR:', stderr)
         
         if (!existsSync(pdfPath)) {
           throw new Error('PDF not created')
@@ -315,6 +321,22 @@ const server = createServer(async (req, res) => {
         const pdfBuffer = readFileSync(pdfPath)
         
         console.log(`[Print] ✅ PDF created: ${pdfBuffer.length} bytes`)
+        console.log(`[Print] 📄 Conversion output:\n${stdout}`)
+        
+        // Parse the output to get detected settings
+        const orientationMatch = stdout.match(/Orientation:\s*(\w+)/i)
+        const paperSizeMatch = stdout.match(/Paper Size:\s*(\d+)/i)
+        const fitToPageMatch = stdout.match(/Fit to Page:\s*(\w+)/i)
+        
+        const detectedSettings = {
+          orientation: orientationMatch ? orientationMatch[1].toLowerCase() : 'preserved',
+          paperSize: paperSizeMatch ? parseInt(paperSizeMatch[1]) : 'preserved',
+          fitToPage: fitToPageMatch ? fitToPageMatch[1].toLowerCase() === 'true' : false,
+          source: 'from_file',
+          note: 'PDF uses source file\'s embedded print settings'
+        }
+        
+        console.log(`[Print] 📊 Detected settings:`, detectedSettings)
         
         // Cleanup
         try {
@@ -327,14 +349,8 @@ const server = createServer(async (req, res) => {
           pdfBase64: pdfBuffer.toString('base64'),
           pdfSize: pdfBuffer.length,
           fileName: fileName.replace(/\.[^.]+$/, '.pdf'),
-          printSettings: {
-            paperSize: 'A4',
-            orientation: 'landscape',
-            fitToWidth: 1,
-            fitToHeight: 0,
-            margins: '1cm (original)'
-          },
-          method: 'PRINT-WITH-SETTINGS'
+          printSettings: detectedSettings,
+          method: 'SOURCE-FILE-SETTINGS'
         }))
         
       } catch (error) {

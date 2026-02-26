@@ -36,11 +36,13 @@ const r2Client = new S3Client({
   },
 })
 
-// Content types for Excel files
+// Content types for Excel and Word files
 const CONTENT_TYPES: Record<string, string> = {
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   xls: 'application/vnd.ms-excel',
   xlsm: 'application/vnd.ms-excel.sheet.macroEnabled.12',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  doc: 'application/msword',
 }
 
 /**
@@ -132,10 +134,10 @@ export async function POST(request: NextRequest) {
     const fileExt = originalFileName.split('.').pop()?.toLowerCase() || 'xlsx'
     
     // Validate file type
-    if (!['xlsx', 'xls', 'xlsm'].includes(fileExt)) {
+    if (!['xlsx', 'xls', 'xlsm', 'docx', 'doc'].includes(fileExt)) {
       return NextResponse.json({
         success: false,
-        error: 'Hanya file Excel (.xlsx, .xls, .xlsm) yang dapat diedit',
+        error: 'Hanya file Excel (.xlsx, .xls, .xlsm) dan Word (.docx, .doc) yang dapat diedit',
       }, { status: 400 })
     }
     
@@ -191,8 +193,8 @@ export async function POST(request: NextRequest) {
       await db.log.create({
         data: {
           userId,
-          aktivitas: 'EXCEL_EDIT_START',
-          deskripsi: `Mulai edit Excel: ${originalFileName} (${objectKey})`,
+          aktivitas: 'EDIT_START',
+          deskripsi: `Mulai edit dokumen: ${originalFileName} (${objectKey})`,
           fileId: fileId,
           metadata: JSON.stringify({
             objectKey,

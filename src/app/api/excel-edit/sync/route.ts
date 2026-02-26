@@ -1,9 +1,10 @@
 /**
- * Manual Sync Endpoint
+ * Excel Edit Sync Endpoint
  * 
  * Can be called:
- * 1. By cron job for polling-based sync
- * 2. Manually by admin to force sync
+ * 1. By cron job for polling-based sync (GET with cron secret)
+ * 2. Manually by admin to sync a specific file (POST with driveItemId)
+ * 3. Manually by admin to sync all files (POST without driveItemId)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -11,34 +12,30 @@ import {
   listEditFolderFiles, 
   downloadFileFromOneDrive, 
   parseFileMetadata,
-  deleteFileFromOneDrive 
+  deleteFileFromOneDrive,
+  getFileMetadata
 } from '@/lib/graph-api'
+import { isAzureConfigured } from '@/lib/azure-auth'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { db } from '@/lib/db'
 import { cookies } from 'next/headers'
 
+export const dynamic = 'force-dynamic'
+
 // R2 Configuration
-const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID!
-const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID!
-const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY!
-const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME!
+const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || process.env.CLOUDFLARE_ACCOUNT_ID
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_KEY
+const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || process.env.CLOUDFLARE_BUCKET_NAME
 const CRON_SECRET = process.env.CRON_SECRET || 'default-cron-secret'
 
-// Initialize R2 client
-const r2Client = new S3Client({
-  region: 'auto',
-  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: R2_ACCESS_KEY_ID,
-    secretAccessKey: R2_SECRET_ACCESS_KEY,
-  },
-})
-
-// Content types
+// Content types for Excel and Word files
 const CONTENT_TYPES: Record<string, string> = {
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   xls: 'application/vnd.ms-excel',
   xlsm: 'application/vnd.ms-excel.sheet.macroEnabled.12',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  doc: 'application/msword',
 }
 
 interface SyncResult {
@@ -48,6 +45,26 @@ interface SyncResult {
   size: number
   success: boolean
   error?: string
+}
+
+// Check R2 configuration
+function isR2Configured(): boolean {
+  return !!(R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_NAME)
+}
+
+// Get R2 client (lazy initialization)
+function getR2Client() {
+  if (!isR2Configured()) {
+    throw new Error('R2 credentials not configured')
+  }
+  return new S3Client({
+    region: 'auto',
+    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: R2_ACCESS_KEY_ID!,
+      secretAccessKey: R2_SECRET_ACCESS_KEY!,
+    },
+  })
 }
 
 /**
@@ -85,6 +102,9 @@ export async function GET(request: NextRequest) {
 /**
  * POST - Manual sync trigger
  * Called by admin user
+ * 
+ * Body params:
+ * - driveItemId: (optional) Specific file to sync. If not provided, syncs all files.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -98,25 +118,69 @@ export async function POST(request: NextRequest) {
     
     const user = await db.user.findUnique({
       where: { id: userId },
-      select: { role: true },
+      select: { role: true, name: true },
     })
     
     if (!user || user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
     
-    console.log('🔄 Manual sync triggered by:', userId)
+    // Check R2 configuration
+    if (!isR2Configured()) {
+      return NextResponse.json({ 
+        success: false,
+        error: 'R2 tidak terkonfigurasi. Hubungi administrator.',
+        needsSetup: true
+      }, { status: 500 })
+    }
     
-    const results = await syncAllFiles()
+    // Check Azure/M365 configuration
+    if (!isAzureConfigured()) {
+      return NextResponse.json({ 
+        success: false,
+        error: 'Azure AD / Microsoft 365 tidak terkonfigurasi. Hubungi administrator.',
+        needsSetup: true
+      }, { status: 500 })
+    }
+    
+    // Parse request body
+    let body: { driveItemId?: string } = {}
+    try {
+      const text = await request.text()
+      if (text) {
+        body = JSON.parse(text)
+      }
+    } catch (parseError) {
+      console.warn('Failed to parse request body, using empty body')
+    }
+    
+    const { driveItemId } = body
+    
+    console.log('🔄 Manual sync triggered by:', userId, 'driveItemId:', driveItemId || 'all')
+    
+    let results: SyncResult[]
+    
+    if (driveItemId) {
+      // Sync specific file
+      const result = await syncSpecificFile(driveItemId)
+      results = [result]
+    } else {
+      // Sync all files
+      results = await syncAllFiles()
+    }
     
     // Log activity
-    await db.log.create({
-      data: {
-        userId,
-        aktivitas: 'MANUAL_SYNC',
-        deskripsi: `Manual sync: ${results.length} files processed`,
-      },
-    })
+    try {
+      await db.log.create({
+        data: {
+          userId,
+          aktivitas: 'MANUAL_SYNC',
+          deskripsi: `Manual sync: ${results.length} files processed`,
+        },
+      })
+    } catch (logError) {
+      console.warn('Failed to log activity:', logError)
+    }
     
     return NextResponse.json({
       success: true,
@@ -126,11 +190,28 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('❌ Manual sync error:', error)
+    
+    // Return proper JSON response even on error
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Sync failed',
+      details: error instanceof Error ? error.stack : undefined,
     }, { status: 500 })
   }
+}
+
+/**
+ * Sync a specific file by driveItemId
+ */
+async function syncSpecificFile(driveItemId: string): Promise<SyncResult> {
+  console.log(`📥 Syncing specific file: ${driveItemId}`)
+  
+  // Get file metadata
+  const fileMetadata = await getFileMetadata(driveItemId)
+  const fileName = fileMetadata.name
+  const description = fileMetadata.description || ''
+  
+  return syncFileToR2(driveItemId, fileName, description)
 }
 
 /**
@@ -204,9 +285,12 @@ async function syncFileToR2(
   const fileExt = fileName.split('.').pop()?.toLowerCase() || 'xlsx'
   const contentType = CONTENT_TYPES[fileExt] || CONTENT_TYPES.xlsx
   
+  // Get R2 client
+  const r2Client = getR2Client()
+  
   // Upload to R2
   const putCommand = new PutObjectCommand({
-    Bucket: R2_BUCKET_NAME,
+    Bucket: R2_BUCKET_NAME!,
     Key: r2Path,
     Body: new Uint8Array(fileContent),
     ContentType: contentType,

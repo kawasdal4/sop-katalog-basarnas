@@ -57,13 +57,13 @@ export async function GET(request: NextRequest) {
     // Build where clause with proper AND/OR combination
     const whereConditions: unknown[] = []
     
-    // Search filter - Case insensitive search on judul (Title) and nomorSop
-    // SQLite is case-insensitive by default for contains
+    // Search filter - Case insensitive search focused on judul (Title)
+    // Using mode: 'insensitive' for explicit case-insensitive matching
     if (search) {
       whereConditions.push({
         OR: [
-          { nomorSop: { contains: search } },
-          { judul: { contains: search } }
+          { judul: { contains: search, mode: 'insensitive' } },
+          { nomorSop: { contains: search, mode: 'insensitive' } }
         ]
       })
     }
@@ -188,6 +188,7 @@ async function handleJsonUpload(request: NextRequest) {
     judul, kategori, jenis, tahun, status,
     fileName, fileType, driveFileId,
     isPublicSubmission, submitterName, submitterEmail,
+    keterangan,
     skipFileUpload
   } = body
 
@@ -419,6 +420,7 @@ async function handleJsonUpload(request: NextRequest) {
       isPublicSubmission: isPublicSubmission || false,
       submitterName,
       submitterEmail,
+      keterangan,
       verificationStatus: isPublicSubmission ? 'MENUNGGU' : null
     }
   })
@@ -466,6 +468,7 @@ async function handleFormUpload(request: NextRequest) {
   const isPublicSubmission = formData.get('isPublicSubmission') === 'true'
   const submitterName = formData.get('submitterName') as string | null
   const submitterEmail = formData.get('submitterEmail') as string | null
+  const keterangan = formData.get('keterangan') as string | null
   
   console.log('Form data:', { judul, kategori, jenis, tahun, fileName: file?.name, fileSize: file?.size })
   
@@ -760,6 +763,7 @@ async function handleFormUpload(request: NextRequest) {
         isPublicSubmission,
         submitterName,
         submitterEmail,
+        keterangan,
         verificationStatus: isPublicSubmission ? 'MENUNGGU' : null
       }
     })

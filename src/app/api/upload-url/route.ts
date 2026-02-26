@@ -110,7 +110,8 @@ export async function PUT(request: NextRequest) {
       status,         // AKTIF | REVIEW | KADALUARSA
       isPublicSubmission,
       submitterName,
-      submitterEmail
+      submitterEmail,
+      keterangan
     } = body
 
     if (!uploadKey || !fileName || !judul || !kategori || !jenis || !tahun) {
@@ -230,6 +231,7 @@ export async function PUT(request: NextRequest) {
         isPublicSubmission: isPublicSubmission || false,
         submitterName,
         submitterEmail,
+        keterangan,
         verificationStatus: isPublicSubmission ? 'MENUNGGU' : null
       }
     })

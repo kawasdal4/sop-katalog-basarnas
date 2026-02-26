@@ -32,11 +32,13 @@ const r2Client = new S3Client({
   },
 })
 
-// Content types
+// Content types for Excel and Word files
 const CONTENT_TYPES: Record<string, string> = {
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   xls: 'application/vnd.ms-excel',
   xlsm: 'application/vnd.ms-excel.sheet.macroEnabled.12',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  doc: 'application/msword',
 }
 
 interface WebhookNotification {

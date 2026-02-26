@@ -1,9 +1,9 @@
 /**
- * Excel Print API - Uses Local PDF Converter Service
+ * Excel/Word Print API - Uses Local PDF Converter Service
  * 
- * Converts Excel file to PDF with proper print settings:
+ * Converts Excel/Word files to PDF with proper print settings:
  * - Paper: A4
- * - Orientation: Landscape
+ * - Orientation: Landscape (Excel) / Portrait (Word)
  * - Fit to width: 1 page
  */
 
@@ -144,8 +144,8 @@ export async function GET(request: NextRequest) {
       await db.log.create({
         data: {
           userId,
-          aktivitas: 'EXCEL_PRINT',
-          deskripsi: `Print Excel sebagai PDF: ${fileName}`,
+          aktivitas: 'PRINT_PDF',
+          deskripsi: `Print dokumen sebagai PDF: ${fileName}`,
           fileId: sopId || undefined,
           metadata: JSON.stringify({
             objectKey,

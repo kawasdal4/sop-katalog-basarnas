@@ -59,6 +59,7 @@ model SopFile {
   isPublicSubmission Boolean   @default(false)
   submitterName      String?
   submitterEmail     String?
+  keterangan         String?  // Keterangan/catatan dari pengaju
   verificationStatus String?   @default("MENUNGGU") // MENUNGGU, DISETUJUI, DITOLAK
   verifiedBy         String?
   verifiedAt         DateTime?
