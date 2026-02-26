@@ -3905,110 +3905,337 @@ export default function ESOPApp() {
         
         {/* Login Dialog */}
         <Dialog open={showLogin} onOpenChange={setShowLogin}>
-          <DialogContent className="sm:max-w-md bg-white border-0 overflow-hidden p-0" aria-describedby={undefined}>
+          <DialogContent className="sm:max-w-md bg-transparent border-0 overflow-visible p-0 shadow-none" aria-describedby={undefined}>
             <DialogTitle className="sr-only">Login Admin</DialogTitle>
-            {/* Header with gradient */}
-            <div className="bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 p-6 text-white relative overflow-hidden">
-              {/* Animated background pattern */}
-              <div className="absolute inset-0 opacity-20">
-                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/0 via-white/20 to-white/0 animate-pulse" />
-              </div>
-              
-              <motion.div 
-                className="relative z-10 flex flex-col items-center"
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-              >
-                <motion.div 
-                  className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-4 backdrop-blur-sm"
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.2, type: 'spring' }}
-                >
-                  <Shield className="w-8 h-8 text-white" />
-                </motion.div>
-                <h2 className="text-2xl font-bold">Login Admin</h2>
-                <p className="text-orange-100 text-sm mt-1">Sistem Katalog SOP & IK</p>
-              </motion.div>
-            </div>
             
-            {/* Form */}
-            <motion.form 
-              onSubmit={handleLogin} 
-              className="p-6 space-y-5"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
+            {/* Animated Background Container */}
+            <motion.div
+              className="relative"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
             >
-              <motion.div 
-                className="space-y-2"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4 }}
-              >
-                <Label className="font-semibold text-gray-700 flex items-center gap-2">
-                  <Radio className="w-4 h-4 text-orange-500" />
-                  Email
-                </Label>
-                <Input 
-                  type="email"
-                  value={loginForm.email}
-                  onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                  placeholder="Masukkan email admin"
-                  required
-                  className="border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500 text-gray-900 placeholder:text-gray-400 h-12 rounded-xl"
-                />
-              </motion.div>
+              {/* Outer Glow Ring */}
+              <motion.div
+                className="absolute -inset-4 rounded-3xl"
+                style={{
+                  background: 'conic-gradient(from 0deg, #f97316, #dc2626, #f97316, #fbbf24, #f97316)',
+                  filter: 'blur(20px)',
+                  opacity: 0.4
+                }}
+                animate={{ rotate: 360 }}
+                transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+              />
               
-              <motion.div 
-                className="space-y-2"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.5 }}
-              >
-                <Label className="font-semibold text-gray-700 flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-orange-500" />
-                  Password
-                </Label>
-                <Input 
-                  type="password"
-                  autoComplete="current-password"
-                  value={loginForm.password}
-                  onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                  placeholder="Masukkan password"
-                  required
-                  className="border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500 text-gray-900 placeholder:text-gray-400 h-12 rounded-xl"
+              {/* Radar Sweep Effect */}
+              <motion.div
+                className="absolute -inset-8 rounded-full pointer-events-none"
+                style={{
+                  background: 'conic-gradient(from 0deg, transparent 0deg, rgba(249, 115, 22, 0.15) 30deg, transparent 60deg)'
+                }}
+                animate={{ rotate: 360 }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+              />
+              
+              {/* Floating Particles */}
+              {[...Array(8)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute w-2 h-2 rounded-full"
+                  style={{
+                    background: i % 2 === 0 ? '#f97316' : '#fbbf24',
+                    left: `${10 + i * 12}%`,
+                    top: `${-20 + (i % 3) * 10}%`,
+                    boxShadow: '0 0 10px currentColor'
+                  }}
+                  animate={{
+                    y: [-10, 10, -10],
+                    opacity: [0.3, 1, 0.3],
+                    scale: [0.8, 1.2, 0.8]
+                  }}
+                  transition={{
+                    duration: 2 + i * 0.3,
+                    repeat: Infinity,
+                    delay: i * 0.2
+                  }}
                 />
-              </motion.div>
+              ))}
+              
+              {/* Main Card */}
+              <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl border border-orange-500/30 overflow-hidden backdrop-blur-xl">
+                {/* Animated Grid Background */}
+                <div className="absolute inset-0 opacity-10">
+                  <div className="absolute inset-0" style={{
+                    backgroundImage: `
+                      linear-gradient(rgba(249, 115, 22, 0.3) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(249, 115, 22, 0.3) 1px, transparent 1px)
+                    `,
+                    backgroundSize: '30px 30px'
+                  }} />
+                </div>
+                
+                {/* Header with Animated Beacon */}
+                <div className="relative p-8 text-white overflow-hidden">
+                  {/* Beacon Pulse Effect */}
+                  <motion.div
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+                    animate={{
+                      scale: [1, 2, 1],
+                      opacity: [0.3, 0, 0.3]
+                    }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  >
+                    <div className="w-40 h-40 rounded-full border-2 border-orange-500/30" />
+                  </motion.div>
+                  <motion.div
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+                    animate={{
+                      scale: [1, 2.5, 1],
+                      opacity: [0.2, 0, 0.2]
+                    }}
+                    transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
+                  >
+                    <div className="w-40 h-40 rounded-full border-2 border-orange-500/20" />
+                  </motion.div>
+                  
+                  <motion.div 
+                    className="relative z-10 flex flex-col items-center"
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                  >
+                    {/* Animated SAR Logo */}
+                    <motion.div 
+                      className="relative w-20 h-20 mb-4"
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+                    >
+                      {/* Rotating Ring */}
+                      <motion.div
+                        className="absolute inset-0 rounded-2xl border-2 border-orange-400/50"
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
+                      />
+                      
+                      {/* Inner Glow */}
+                      <motion.div
+                        className="absolute inset-1 rounded-xl bg-gradient-to-br from-orange-500 to-red-600"
+                        animate={{
+                          boxShadow: [
+                            '0 0 20px rgba(249, 115, 22, 0.5)',
+                            '0 0 40px rgba(249, 115, 22, 0.8)',
+                            '0 0 20px rgba(249, 115, 22, 0.5)'
+                          ]
+                        }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                      />
+                      
+                      {/* Icon */}
+                      <div className="absolute inset-2 rounded-lg bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center">
+                        <motion.div
+                          animate={{ scale: [1, 1.1, 1] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        >
+                          <Shield className="w-8 h-8 text-white" />
+                        </motion.div>
+                      </div>
+                    </motion.div>
+                    
+                    {/* Title with Glowing Effect */}
+                    <motion.h2 
+                      className="text-3xl font-bold relative"
+                      animate={{
+                        textShadow: [
+                          '0 0 10px rgba(249, 115, 22, 0.5)',
+                          '0 0 30px rgba(249, 115, 22, 0.8)',
+                          '0 0 10px rgba(249, 115, 22, 0.5)'
+                        ]
+                      }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    >
+                      <span className="bg-gradient-to-r from-orange-300 via-yellow-200 to-orange-300 bg-clip-text text-transparent">
+                        LOGIN ADMIN
+                      </span>
+                    </motion.h2>
+                    
+                    <motion.p 
+                      className="text-orange-200/80 text-sm mt-2 tracking-wider"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.4 }}
+                    >
+                      SISTEM KATALOG SOP & IK
+                    </motion.p>
+                    
+                    <motion.div 
+                      className="flex items-center gap-2 mt-2 text-orange-300/60 text-xs"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.5 }}
+                    >
+                      <Radio className="w-3 h-3 animate-pulse" />
+                      <span>DIREKTORAT KESIAPSIAGAAN</span>
+                    </motion.div>
+                  </motion.div>
+                </div>
+                
+                {/* Form Section */}
+                <motion.form 
+                  onSubmit={handleLogin} 
+                  className="p-8 pt-4 space-y-6 relative"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  {/* Email Input */}
+                  <motion.div 
+                    className="space-y-2"
+                    initial={{ opacity: 0, x: -30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    <Label className="font-semibold text-orange-200/90 flex items-center gap-2 text-sm tracking-wide">
+                      <motion.div
+                        animate={{ rotate: [0, 10, -10, 0] }}
+                        transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
+                      >
+                        <Radio className="w-4 h-4 text-orange-400" />
+                      </motion.div>
+                      EMAIL
+                    </Label>
+                    <div className="relative group">
+                      <motion.div
+                        className="absolute -inset-0.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 opacity-0 group-focus-within:opacity-50 blur transition-opacity"
+                      />
+                      <Input 
+                        type="email"
+                        value={loginForm.email}
+                        onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+                        placeholder="Masukkan email admin"
+                        required
+                        className="relative h-12 bg-slate-800/50 border-2 border-orange-500/30 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 text-white placeholder:text-gray-500 rounded-xl transition-all duration-300"
+                      />
+                    </div>
+                  </motion.div>
+                  
+                  {/* Password Input */}
+                  <motion.div 
+                    className="space-y-2"
+                    initial={{ opacity: 0, x: -30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    <Label className="font-semibold text-orange-200/90 flex items-center gap-2 text-sm tracking-wide">
+                      <motion.div
+                        animate={{ scale: [1, 1.1, 1] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        <Shield className="w-4 h-4 text-orange-400" />
+                      </motion.div>
+                      PASSWORD
+                    </Label>
+                    <div className="relative group">
+                      <motion.div
+                        className="absolute -inset-0.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 opacity-0 group-focus-within:opacity-50 blur transition-opacity"
+                      />
+                      <Input 
+                        type="password"
+                        autoComplete="current-password"
+                        value={loginForm.password}
+                        onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                        placeholder="Masukkan password"
+                        required
+                        className="relative h-12 bg-slate-800/50 border-2 border-orange-500/30 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 text-white placeholder:text-gray-500 rounded-xl transition-all duration-300"
+                      />
+                    </div>
+                  </motion.div>
 
-              <motion.div 
-                className="flex gap-3 pt-2"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-              >
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => setShowLogin(false)} 
-                  className="flex-1 border-2 border-gray-300 text-gray-700 hover:bg-gray-100 h-12 rounded-xl font-semibold"
-                >
-                  Batal
-                </Button>
-                <Button 
-                  type="submit" 
-                  className="flex-1 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white h-12 rounded-xl font-semibold shadow-lg shadow-orange-500/30" 
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <RefreshCw className="w-5 h-5 animate-spin" />
-                  ) : (
-                    'Masuk'
-                  )}
-                </Button>
-              </motion.div>
-            </motion.form>
+                  {/* Buttons */}
+                  <motion.div 
+                    className="flex gap-4 pt-4"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.6 }}
+                  >
+                    <motion.div
+                      className="flex-1"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => setShowLogin(false)} 
+                        className="w-full border-2 border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white h-12 rounded-xl font-semibold transition-all duration-300"
+                      >
+                        Batal
+                      </Button>
+                    </motion.div>
+                    
+                    <motion.div
+                      className="flex-1 relative"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      {/* Shimmer Effect */}
+                      <motion.div
+                        className="absolute inset-0 rounded-xl overflow-hidden"
+                        style={{ zIndex: 0 }}
+                      >
+                        <motion.div
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                          animate={{ x: ['-100%', '200%'] }}
+                          transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                        />
+                      </motion.div>
+                      
+                      <Button 
+                        type="submit" 
+                        className="relative w-full bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 hover:from-orange-600 hover:via-orange-700 hover:to-red-700 text-white h-12 rounded-xl font-bold shadow-xl shadow-orange-500/40 transition-all duration-300 border border-orange-400/30" 
+                        disabled={loading}
+                      >
+                        <motion.span
+                          className="flex items-center justify-center gap-2"
+                          animate={loading ? {} : { scale: [1, 1.02, 1] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        >
+                          {loading ? (
+                            <>
+                              <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                              >
+                                <RefreshCw className="w-5 h-5" />
+                              </motion.div>
+                              <span>Memproses...</span>
+                            </>
+                          ) : (
+                            <>
+                              <LogIn className="w-5 h-5" />
+                              <span>MASUK</span>
+                            </>
+                          )}
+                        </motion.span>
+                      </Button>
+                    </motion.div>
+                  </motion.div>
+                  
+                  {/* Footer */}
+                  <motion.div
+                    className="text-center pt-2"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.7 }}
+                  >
+                    <p className="text-gray-500 text-xs">
+                      © 2026 Badan SAR Nasional
+                    </p>
+                  </motion.div>
+                </motion.form>
+              </div>
+            </motion.div>
           </DialogContent>
         </Dialog>
       </div>
