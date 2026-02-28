@@ -39,18 +39,49 @@ export interface R2UploadResult {
   size: number
 }
 
+// Helper to extract account ID from R2_ENDPOINT
+function extractAccountIdFromEndpoint(endpoint: string): string | null {
+  // Format: https://f8bdefda808aa952cd77b12e7cafa38c.r2.cloudflarestorage.com/...
+  // or: https://account-id.r2.cloudflarestorage.com
+  try {
+    const url = new URL(endpoint)
+    const hostname = url.hostname
+    // Extract account ID from subdomain (first part before .r2.cloudflarestorage.com)
+    const match = hostname.match(/^([a-f0-9]+)\.r2\.cloudflarestorage\.com$/i)
+    if (match) {
+      return match[1]
+    }
+  } catch {
+    // Invalid URL
+  }
+  return null
+}
+
 // Get R2 configuration from environment
 function getR2Config(): R2Config {
   // Support multiple env var naming conventions
-  const accountId = process.env.R2_ACCOUNT_ID
+  
+  // Account ID can come from R2_ACCOUNT_ID or extracted from R2_ENDPOINT
+  let accountId = process.env.R2_ACCOUNT_ID
+  if (!accountId && process.env.R2_ENDPOINT) {
+    accountId = extractAccountIdFromEndpoint(process.env.R2_ENDPOINT)
+  }
+  
+  // Access key can be R2_ACCESS_KEY_ID or R2_ACCESS_KEY
   const accessKeyId = process.env.R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY
+  
+  // Secret key can be R2_SECRET_ACCESS_KEY or R2_SECRET_KEY
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_KEY
-  const bucketName = process.env.R2_BUCKET_NAME || 'sop-katalog-basarnas'
+  
+  // Bucket name can be R2_BUCKET_NAME or R2_BUCKET
+  const bucketName = process.env.R2_BUCKET_NAME || process.env.R2_BUCKET || 'sop-katalog-basarnas'
+  
   const publicUrl = process.env.R2_PUBLIC_URL
 
   if (!accountId || !accessKeyId || !secretAccessKey) {
     console.error('R2 Configuration missing:', {
       hasAccountId: !!accountId,
+      hasR2Endpoint: !!process.env.R2_ENDPOINT,
       hasAccessKeyId: !!accessKeyId,
       hasSecretAccessKey: !!secretAccessKey,
       bucketName
@@ -490,7 +521,7 @@ export async function verifyR2Integrity(key: string, expectedChecksum: string): 
  * Get R2 bucket name
  */
 export function getR2BucketName(): string {
-  return process.env.R2_BUCKET_NAME || 'sop-katalog-basarnas'
+  return process.env.R2_BUCKET_NAME || process.env.R2_BUCKET || 'sop-katalog-basarnas'
 }
 
 /**
