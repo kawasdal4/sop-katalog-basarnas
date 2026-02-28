@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { cookies } from 'next/headers'
 
-// GET - Fetch all users (Admin only)
+// Helper to check if user has access to user management
+const hasUserManagementAccess = (role: string | null) => {
+  return role === 'ADMIN' || role === 'DEVELOPER'
+}
+
+// GET - Fetch all users (Admin or Developer only)
 export async function GET() {
   try {
     const cookieStore = await cookies()
@@ -21,7 +26,7 @@ export async function GET() {
       return NextResponse.json({ error: 'User tidak ditemukan' }, { status: 401 })
     }
     
-    if (currentUser.role !== 'ADMIN') {
+    if (!hasUserManagementAccess(currentUser.role)) {
       return NextResponse.json({ error: 'Forbidden - Akses ditolak' }, { status: 403 })
     }
     
@@ -53,7 +58,7 @@ export async function GET() {
   }
 }
 
-// POST - Create new user (Admin only)
+// POST - Create new user (Admin or Developer only)
 export async function POST(request: NextRequest) {
   try {
     const cookieStore = await cookies()
@@ -69,7 +74,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User tidak ditemukan. Silakan login kembali.' }, { status: 401 })
     }
     
-    if (currentUser.role !== 'ADMIN') {
+    if (!hasUserManagementAccess(currentUser.role)) {
       return NextResponse.json({ error: 'Anda tidak memiliki akses untuk menambah user' }, { status: 403 })
     }
     
@@ -127,7 +132,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT - Update user (Admin only)
+// PUT - Update user (Admin or Developer only)
 export async function PUT(request: NextRequest) {
   try {
     const cookieStore = await cookies()
@@ -139,7 +144,7 @@ export async function PUT(request: NextRequest) {
     
     const currentUser = await db.user.findUnique({ where: { id: userId } })
     
-    if (currentUser?.role !== 'ADMIN') {
+    if (!hasUserManagementAccess(currentUser?.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
     
@@ -167,7 +172,7 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE - Delete user (Admin only)
+// DELETE - Delete user (Admin or Developer only)
 export async function DELETE(request: NextRequest) {
   try {
     const cookieStore = await cookies()
@@ -179,7 +184,7 @@ export async function DELETE(request: NextRequest) {
     
     const currentUser = await db.user.findUnique({ where: { id: userId } })
     
-    if (currentUser?.role !== 'ADMIN') {
+    if (!hasUserManagementAccess(currentUser?.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
     

@@ -86,7 +86,7 @@ import PrintLoadingDialog from '@/components/PrintLoadingDialog'
 import CopyrightPopup from '@/components/CopyrightPopup'
 
 // Types
-type UserRole = 'ADMIN' | 'STAF' | null
+type UserRole = 'ADMIN' | 'STAF' | 'DEVELOPER' | null
 type PageView = 'dashboard' | 'katalog' | 'upload' | 'verifikasi' | 'arsip' | 'logs' | 'users' | 'submit-publik'
 
 interface User {
@@ -722,7 +722,7 @@ export default function ESOPApp() {
   // Login success animation
   const [showLoginSuccess, setShowLoginSuccess] = useState(false)
   const [loginSuccessName, setLoginSuccessName] = useState('')
-  const [loginSuccessRole, setLoginSuccessRole] = useState<'ADMIN' | 'STAF' | null>(null)
+  const [loginSuccessRole, setLoginSuccessRole] = useState<'ADMIN' | 'STAF' | 'DEVELOPER' | null>(null)
   
   // Loading states for operations with Basarnas animation
   const [previewLoading, setPreviewLoading] = useState<string | null>(null)
@@ -1522,7 +1522,7 @@ export default function ESOPApp() {
         isAdmin: user?.role === 'ADMIN'
       })
 
-      if (currentPage === 'users' && user?.role === 'ADMIN') {
+      if (currentPage === 'users' && (user?.role === 'DEVELOPER' || user?.role === 'ADMIN')) {
         console.log('✅ Calling fetchUsers...')
         fetchUsers()
       }
@@ -1577,10 +1577,10 @@ export default function ESOPApp() {
       isAuthenticated, 
       userRole: user?.role, 
       currentPage,
-      shouldFetch: isAuthenticated && user?.role === 'ADMIN' && currentPage === 'users'
+      shouldFetch: isAuthenticated && (user?.role === 'DEVELOPER' || user?.role === 'ADMIN') && currentPage === 'users'
     })
     
-    if (isAuthenticated && user?.role === 'ADMIN' && currentPage === 'users') {
+    if (isAuthenticated && (user?.role === 'DEVELOPER' || user?.role === 'ADMIN') && currentPage === 'users') {
       console.log('✅ Calling fetchUsers...')
       fetchUsers()
     }
@@ -3450,7 +3450,7 @@ export default function ESOPApp() {
     { id: 'verifikasi' as PageView, label: 'Verifikasi SOP', icon: CheckCircle, roles: ['ADMIN'] },
     { id: 'arsip' as PageView, label: 'Arsip', icon: FolderOpen, roles: ['ADMIN'] },
     { id: 'logs' as PageView, label: 'Log Aktivitas', icon: History, roles: ['ADMIN'] },
-    { id: 'users' as PageView, label: 'Manajemen User', icon: Users, roles: ['ADMIN'] },
+    { id: 'users' as PageView, label: 'Manajemen User', icon: Users, roles: ['DEVELOPER'] },
   ]
   
   // Login Screen
@@ -4107,11 +4107,13 @@ export default function ESOPApp() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[9999] flex items-center justify-center"
           >
-            {/* Animated gradient background - Green for STAF, Orange for ADMIN */}
+            {/* Animated gradient background - Green for STAF, Purple for DEVELOPER, Orange for ADMIN */}
             <motion.div 
               className={`absolute inset-0 ${
                 loginSuccessRole === 'STAF' 
                   ? 'bg-gradient-to-br from-green-600 via-emerald-600 to-green-700' 
+                  : loginSuccessRole === 'DEVELOPER'
+                  ? 'bg-gradient-to-br from-purple-600 via-violet-600 to-purple-700'
                   : 'bg-gradient-to-br from-orange-600 via-red-600 to-orange-700'
               }`}
               initial={{ scale: 0, opacity: 0 }}
@@ -4218,6 +4220,8 @@ export default function ESOPApp() {
                 style={{
                   boxShadow: loginSuccessRole === 'STAF' 
                     ? '0 0 60px rgba(34, 197, 94, 0.8), 0 0 100px rgba(34, 197, 94, 0.4)'
+                    : loginSuccessRole === 'DEVELOPER'
+                    ? '0 0 60px rgba(147, 51, 234, 0.8), 0 0 100px rgba(147, 51, 234, 0.4)'
                     : '0 0 60px rgba(249, 115, 22, 0.8), 0 0 100px rgba(249, 115, 22, 0.4)'
                 }}
               >
@@ -4229,6 +4233,12 @@ export default function ESOPApp() {
                           '0 0 60px rgba(34, 197, 94, 0.8)',
                           '0 0 30px rgba(34, 197, 94, 0.5)'
                         ]
+                      : loginSuccessRole === 'DEVELOPER'
+                      ? [
+                          '0 0 30px rgba(147, 51, 234, 0.5)',
+                          '0 0 60px rgba(147, 51, 234, 0.8)',
+                          '0 0 30px rgba(147, 51, 234, 0.5)'
+                        ]
                       : [
                           '0 0 30px rgba(249, 115, 22, 0.5)',
                           '0 0 60px rgba(249, 115, 22, 0.8)',
@@ -4239,6 +4249,8 @@ export default function ESOPApp() {
                   className={`w-full h-full rounded-full flex items-center justify-center ${
                     loginSuccessRole === 'STAF' 
                       ? 'bg-gradient-to-br from-green-500 to-emerald-600' 
+                      : loginSuccessRole === 'DEVELOPER'
+                      ? 'bg-gradient-to-br from-purple-500 to-violet-600'
                       : 'bg-gradient-to-br from-orange-500 to-red-600'
                   }`}
                 >
@@ -4290,7 +4302,7 @@ export default function ESOPApp() {
                 
                 <motion.p 
                   className={`text-xl mb-4 ${
-                    loginSuccessRole === 'STAF' ? 'text-green-100' : 'text-orange-100'
+                    loginSuccessRole === 'STAF' ? 'text-green-100' : loginSuccessRole === 'DEVELOPER' ? 'text-purple-100' : 'text-orange-100'
                   }`}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -4323,7 +4335,7 @@ export default function ESOPApp() {
                 className="mt-8"
               >
                 <p className={`text-sm font-medium ${
-                  loginSuccessRole === 'STAF' ? 'text-green-200' : 'text-orange-200'
+                  loginSuccessRole === 'STAF' ? 'text-green-200' : loginSuccessRole === 'DEVELOPER' ? 'text-purple-200' : 'text-orange-200'
                 }`}>
                   DIREKTORAT KESIAPSIAGAAN
                 </p>
@@ -4360,7 +4372,7 @@ export default function ESOPApp() {
             {/* Corner decorations */}
             <motion.div
               className={`absolute top-8 left-8 w-24 h-24 border-l-4 border-t-4 rounded-tl-3xl ${
-                loginSuccessRole === 'STAF' ? 'border-green-400/50' : 'border-orange-400/50'
+                loginSuccessRole === 'STAF' ? 'border-green-400/50' : loginSuccessRole === 'DEVELOPER' ? 'border-purple-400/50' : 'border-orange-400/50'
               }`}
               initial={{ opacity: 0, x: -50, y: -50 }}
               animate={{ opacity: 1, x: 0, y: 0 }}
@@ -4368,7 +4380,7 @@ export default function ESOPApp() {
             />
             <motion.div
               className={`absolute top-8 right-8 w-24 h-24 border-r-4 border-t-4 rounded-tr-3xl ${
-                loginSuccessRole === 'STAF' ? 'border-green-400/50' : 'border-orange-400/50'
+                loginSuccessRole === 'STAF' ? 'border-green-400/50' : loginSuccessRole === 'DEVELOPER' ? 'border-purple-400/50' : 'border-orange-400/50'
               }`}
               initial={{ opacity: 0, x: 50, y: -50 }}
               animate={{ opacity: 1, x: 0, y: 0 }}
@@ -4376,7 +4388,7 @@ export default function ESOPApp() {
             />
             <motion.div
               className={`absolute bottom-8 left-8 w-24 h-24 border-l-4 border-b-4 rounded-bl-3xl ${
-                loginSuccessRole === 'STAF' ? 'border-green-400/50' : 'border-orange-400/50'
+                loginSuccessRole === 'STAF' ? 'border-green-400/50' : loginSuccessRole === 'DEVELOPER' ? 'border-purple-400/50' : 'border-orange-400/50'
               }`}
               initial={{ opacity: 0, x: -50, y: 50 }}
               animate={{ opacity: 1, x: 0, y: 0 }}
@@ -4384,7 +4396,7 @@ export default function ESOPApp() {
             />
             <motion.div
               className={`absolute bottom-8 right-8 w-24 h-24 border-r-4 border-b-4 rounded-br-3xl ${
-                loginSuccessRole === 'STAF' ? 'border-green-400/50' : 'border-orange-400/50'
+                loginSuccessRole === 'STAF' ? 'border-green-400/50' : loginSuccessRole === 'DEVELOPER' ? 'border-purple-400/50' : 'border-orange-400/50'
               }`}
               initial={{ opacity: 0, x: 50, y: 50 }}
               animate={{ opacity: 1, x: 0, y: 0 }}
@@ -6810,7 +6822,7 @@ export default function ESOPApp() {
               </motion.div>
             )}
             
-            {currentPage === 'users' && user?.role === 'ADMIN' && (
+            {currentPage === 'users' && (user?.role === 'DEVELOPER' || user?.role === 'ADMIN') && (
               <motion.div
                 key="users"
                 variants={fadeInUp}
@@ -6879,6 +6891,7 @@ export default function ESOPApp() {
                             <SelectContent>
                               <SelectItem value="ADMIN">Admin</SelectItem>
                               <SelectItem value="STAF">Staf</SelectItem>
+                              <SelectItem value="DEVELOPER">Developer</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -7189,7 +7202,7 @@ export default function ESOPApp() {
                                 <TableCell className="font-semibold text-blue-900">{u.name}</TableCell>
                                 <TableCell className="text-gray-700">{u.email}</TableCell>
                                 <TableCell>
-                                  <Badge className={u.role === 'ADMIN' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-cyan-500 to-cyan-600 text-white'}>
+                                  <Badge className={u.role === 'ADMIN' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : u.role === 'DEVELOPER' ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white' : 'bg-gradient-to-r from-cyan-500 to-cyan-600 text-white'}>
                                     {u.role}
                                   </Badge>
                                 </TableCell>
@@ -7296,6 +7309,7 @@ export default function ESOPApp() {
                 <SelectContent>
                   <SelectItem value="ADMIN">Admin</SelectItem>
                   <SelectItem value="STAF">Staf</SelectItem>
+                  <SelectItem value="DEVELOPER">Developer</SelectItem>
                 </SelectContent>
               </Select>
             </div>
