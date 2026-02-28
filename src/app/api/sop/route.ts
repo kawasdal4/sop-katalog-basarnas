@@ -40,11 +40,14 @@ export async function GET(request: NextRequest) {
     // Build where clause with proper AND/OR combination
     const whereConditions: unknown[] = []
     
-    // Search filter - Case insensitive search focused on judul (Title)
-    // Note: SQLite doesn't support mode: 'insensitive', but LIKE is case-insensitive by default
+    // Search filter - Case-insensitive search in both judul (Title) and nomorSop (SOP Number)
+    // PostgreSQL supports mode: 'insensitive' for case-insensitive search
     if (search) {
       whereConditions.push({
-        judul: { contains: search }
+        OR: [
+          { judul: { contains: search, mode: 'insensitive' } },
+          { nomorSop: { contains: search, mode: 'insensitive' } }
+        ]
       })
     }
     
@@ -392,7 +395,7 @@ export async function PUT(request: NextRequest) {
     const userId = userIdCookie
 
     const body = await request.json()
-    const { id, status, verificationStatus, verifiedBy, incrementPreview, incrementDownload, judul, kategori, jenis, tahun, rejectionReason } = body
+    const { id, status, verificationStatus, verifiedBy, incrementPreview, incrementDownload, judul, kategori, jenis, tahun, rejectionReason, nomorSop } = body
 
     // Handle counter increments
     if (incrementPreview || incrementDownload) {
@@ -432,8 +435,8 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: true, data: updated })
     }
 
-    // Handle metadata updates (judul, kategori, jenis, tahun, status)
-    if (judul || kategori || jenis || tahun || status) {
+    // Handle metadata updates (nomorSop, judul, kategori, jenis, tahun, status)
+    if (nomorSop !== undefined || judul || kategori || jenis || tahun || status) {
       const existingSop = await db.sopFile.findUnique({ where: { id } })
       if (!existingSop) {
         return NextResponse.json({ error: 'Dokumen tidak ditemukan' }, { status: 404 })
@@ -468,6 +471,7 @@ export async function PUT(request: NextRequest) {
         }
       }
       
+      if (nomorSop !== undefined) updateData.nomorSop = nomorSop || null
       if (judul) updateData.judul = judul
       if (kategori) updateData.kategori = kategori
       if (jenis) updateData.jenis = jenis

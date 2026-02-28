@@ -97,6 +97,7 @@ interface User {
 
 interface SopFile {
   id: string
+  nomorSop?: string
   judul: string
   tahun: number
   kategori: string
@@ -672,6 +673,7 @@ export default function ESOPApp() {
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [editData, setEditData] = useState<SopFile | null>(null)
   const [editForm, setEditForm] = useState({
+    nomorSop: '',
     judul: '',
     kategori: 'SIAGA',
     jenis: 'SOP',
@@ -1499,25 +1501,10 @@ export default function ESOPApp() {
   useEffect(() => {
     if (isAuthenticated && user) {
       fetchStats()
-
       fetchDriveStatus()
       fetchR2Status()
       fetchSyncStatus()
 
-      if (currentPage === 'katalog') fetchSopFiles()
-      if (currentPage === 'verifikasi') {
-        fetchVerificationList(verificationFilter, verificationSearch, verificationSortBy)
-      }
-      if (currentPage === 'arsip') {
-        fetchArsipList(arsipSearch, arsipSortBy)
-        // Save the current rejected file count to localStorage when user visits arsip
-        const currentRejectedCount = stats?.totalPublikDitolak || 0
-        if (currentRejectedCount > 0 && user?.id) {
-          setArsipSeenCount(currentRejectedCount)
-          const userArsipKey = `arsipSeenCount_${user.id}`
-          localStorage.setItem(userArsipKey, currentRejectedCount.toString())
-        }
-      }
       if (currentPage === 'logs') fetchLogs()
 
       // Debug logging for users page
@@ -1532,7 +1519,46 @@ export default function ESOPApp() {
         fetchUsers()
       }
     }
-  }, [isAuthenticated, user, currentPage, sopPagination.page, logsPagination.page, verificationFilter, verificationSearch, verificationSortBy, arsipSearch, arsipSortBy, fetchStats, fetchDriveStatus, fetchR2Status, fetchSyncStatus, fetchSopFiles, fetchVerificationList, fetchArsipList, fetchLogs, fetchUsers])
+  }, [isAuthenticated, user, currentPage, logsPagination.page, fetchStats, fetchDriveStatus, fetchR2Status, fetchSyncStatus, fetchLogs, fetchUsers])
+  
+  // Single useEffect for katalog - handles all fetching including pagination
+  useEffect(() => {
+    if (!isAuthenticated || currentPage !== 'katalog') return
+    
+    // Debounce timer for live search
+    const debounceTimer = setTimeout(async () => {
+      setIsSearching(true)
+      try {
+        const params = new URLSearchParams()
+        if (searchInput) params.append('search', searchInput)
+        if (sopFilters.kategori && sopFilters.kategori !== 'SEMUA') params.append('kategori', sopFilters.kategori)
+        if (sopFilters.jenis && sopFilters.jenis !== 'SEMUA') params.append('jenis', sopFilters.jenis)
+        if (sopFilters.status && sopFilters.status !== 'SEMUA') params.append('status', sopFilters.status)
+        if (sopFilters.tahun) params.append('tahun', sopFilters.tahun)
+        params.append('sortBy', sortBy)
+        params.append('page', sopPagination.page.toString())
+        params.append('limit', sopPagination.limit.toString())
+        
+        const res = await fetch(`/api/sop?${params}`)
+        const data = await res.json()
+        if (!data.error) {
+          setSopFiles(data.data)
+          setSopPagination(p => ({ 
+            ...p, 
+            total: data.pagination.total, 
+            totalPages: data.pagination.totalPages,
+            page: sopPagination.page 
+          }))
+        }
+      } catch (error) {
+        console.error('Fetch error:', error)
+      } finally {
+        setIsSearching(false)
+      }
+    }, 300)
+    
+    return () => clearTimeout(debounceTimer)
+  }, [isAuthenticated, currentPage, searchInput, sopFilters.kategori, sopFilters.jenis, sopFilters.status, sopFilters.tahun, sortBy, sopPagination.page, sopPagination.limit])
   
   // Separate useEffect for fetching users - ensures it's called when navigating to users page
   useEffect(() => {
@@ -1550,55 +1576,12 @@ export default function ESOPApp() {
     }
   }, [isAuthenticated, user?.role, currentPage]) // Removed fetchUsers from deps to prevent infinite loops
   
-  // Live search with debounce - syncs searchInput to sopFilters.search
-  useEffect(() => {
-    if (!isAuthenticated || currentPage !== 'katalog') return
-    
-    // Set searching state immediately
-    setIsSearching(true)
-    
-    // Debounce timer for live search
-    const debounceTimer = setTimeout(async () => {
-      try {
-        // Sync searchInput to sopFilters.search so other parts of code can use it
-        setSopFilters(prev => ({ ...prev, search: searchInput }))
-        
-        const params = new URLSearchParams()
-        if (searchInput) params.append('search', searchInput)
-        if (sopFilters.kategori && sopFilters.kategori !== 'SEMUA') params.append('kategori', sopFilters.kategori)
-        if (sopFilters.jenis && sopFilters.jenis !== 'SEMUA') params.append('jenis', sopFilters.jenis)
-        if (sopFilters.status && sopFilters.status !== 'SEMUA') params.append('status', sopFilters.status)
-        if (sopFilters.tahun) params.append('tahun', sopFilters.tahun)
-        params.append('sortBy', sortBy)
-        params.append('page', '1')
-        params.append('limit', sopPagination.limit.toString())
-        
-        const res = await fetch(`/api/sop?${params}`)
-        const data = await res.json()
-        if (!data.error) {
-          setSopFiles(data.data)
-          setSopPagination(p => ({ ...p, total: data.pagination.total, totalPages: data.pagination.totalPages, page: 1 }))
-        }
-      } catch (error) {
-        console.error('Search error:', error)
-      } finally {
-        setIsSearching(false)
-      }
-    }, 300) // 300ms debounce delay for faster response
-    
-    return () => {
-      clearTimeout(debounceTimer)
-      setIsSearching(false)
-    }
-  }, [searchInput, sopFilters.kategori, sopFilters.jenis, sopFilters.status, sopFilters.tahun, sortBy, isAuthenticated, currentPage, sopPagination.limit])
-  
-  // Reset page when non-search filters change
+  // Reset page when search or filters change (not when page changes)
   useEffect(() => {
     if (isAuthenticated && currentPage === 'katalog') {
       setSopPagination(p => ({ ...p, page: 1 }))
-      setIsSearching(true)
     }
-  }, [sopFilters.kategori, sopFilters.jenis, sopFilters.status, sopFilters.tahun, sortBy, isAuthenticated, currentPage])
+  }, [searchInput, sopFilters.kategori, sopFilters.jenis, sopFilters.status, sopFilters.tahun, sortBy, isAuthenticated, currentPage])
   
   // Live search for verification page with debounce
   useEffect(() => {
@@ -2860,6 +2843,7 @@ export default function ESOPApp() {
     
     setEditData(sop)
     setEditForm({
+      nomorSop: sop.nomorSop || '',
       judul: sop.judul,
       kategori: sop.kategori,
       jenis: sop.jenis,
@@ -2879,6 +2863,7 @@ export default function ESOPApp() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: editData.id,
+          nomorSop: editForm.nomorSop,
           judul: editForm.judul,
           kategori: editForm.kategori,
           jenis: editForm.jenis,
@@ -2907,6 +2892,7 @@ export default function ESOPApp() {
           if (file.id === editData.id) {
             return {
               ...file,
+              nomorSop: editForm.nomorSop,
               judul: editForm.judul,
               kategori: editForm.kategori,
               jenis: editForm.jenis,
@@ -5315,6 +5301,17 @@ export default function ESOPApp() {
                           </div>
                           
                           <div className="space-y-1.5">
+                            <Label htmlFor="edit-nomor-sop" className="text-xs font-semibold text-gray-600">No. SOP</Label>
+                            <Input
+                              id="edit-nomor-sop"
+                              value={editForm.nomorSop}
+                              onChange={(e) => setEditForm({ ...editForm, nomorSop: e.target.value })}
+                              placeholder="Contoh: SOP-0001 atau IK-0001"
+                              className="h-9 border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 rounded-xl text-sm bg-white shadow-sm"
+                            />
+                          </div>
+                          
+                          <div className="space-y-1.5">
                             <Label htmlFor="edit-judul" className="text-xs font-semibold text-gray-600">Judul <span className="text-red-500">*</span></Label>
                             <Input
                               id="edit-judul"
@@ -6080,6 +6077,7 @@ export default function ESOPApp() {
                                   <div className="flex items-center gap-2">
                                     <FileTypeIcon fileName={sop.fileName} className="w-5 h-5 flex-shrink-0" />
                                     <div>
+                                      <div className="text-xs text-orange-500 font-medium">No. SOP : {sop.nomorSop || '...'}</div>
                                       <div className="text-gray-800">{sop.judul}</div>
                                       <div className="text-xs text-gray-500 mt-0.5">
                                         <span className="text-gray-400">Upload:</span> {new Date(sop.uploadedAt).toLocaleString('id-ID', { 
@@ -6238,28 +6236,8 @@ export default function ESOPApp() {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      disabled={sopPagination.page === 1 || katalogLoading}
-                      onClick={() => {
-                        // Prevent double-clicks and rapid clicking
-                        if (isPaginationLoadingRef.current || katalogLoading) return
-                        
-                        // Clear any existing debounce timer
-                        if (paginationDebounceRef.current) {
-                          clearTimeout(paginationDebounceRef.current)
-                        }
-                        
-                        // Set loading flag immediately
-                        isPaginationLoadingRef.current = true
-                        
-                        // Debounce the pagination action
-                        paginationDebounceRef.current = setTimeout(() => {
-                          setSopPagination(p => ({ ...p, page: p.page - 1 }))
-                          // Reset loading flag after a short delay to allow the fetch to complete
-                          setTimeout(() => {
-                            isPaginationLoadingRef.current = false
-                          }, 500)
-                        }, 300)
-                      }}
+                      disabled={sopPagination.page <= 1 || katalogLoading}
+                      onClick={() => setSopPagination(p => ({ ...p, page: p.page - 1 }))}
                       className="border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
                     >
                       <ChevronLeft className="w-4 h-4" />
@@ -6269,27 +6247,7 @@ export default function ESOPApp() {
                       variant="outline" 
                       size="sm"
                       disabled={sopPagination.page >= sopPagination.totalPages || katalogLoading}
-                      onClick={() => {
-                        // Prevent double-clicks and rapid clicking
-                        if (isPaginationLoadingRef.current || katalogLoading) return
-                        
-                        // Clear any existing debounce timer
-                        if (paginationDebounceRef.current) {
-                          clearTimeout(paginationDebounceRef.current)
-                        }
-                        
-                        // Set loading flag immediately
-                        isPaginationLoadingRef.current = true
-                        
-                        // Debounce the pagination action
-                        paginationDebounceRef.current = setTimeout(() => {
-                          setSopPagination(p => ({ ...p, page: p.page + 1 }))
-                          // Reset loading flag after a short delay to allow the fetch to complete
-                          setTimeout(() => {
-                            isPaginationLoadingRef.current = false
-                          }, 500)
-                        }, 300)
-                      }}
+                      onClick={() => setSopPagination(p => ({ ...p, page: p.page + 1 }))}
                       className="border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
                     >
                       <ChevronRight className="w-4 h-4" />
