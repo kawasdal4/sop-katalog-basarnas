@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       select: { role: true, name: true, email: true },
     })
     
-    if (!user || user.role !== 'ADMIN') {
+    if (!user || user.role !== 'ADMIN' && user.role !== 'DEVELOPER') {
       return NextResponse.json({
         success: false,
         error: 'Forbidden - Hanya admin yang dapat melakukan sync',

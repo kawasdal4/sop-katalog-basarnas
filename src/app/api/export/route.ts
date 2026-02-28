@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     
     const user = await db.user.findUnique({ where: { id: userId } })
     
-    if (user?.role !== 'ADMIN') {
+    if (user?.role !== 'ADMIN' && user?.role !== 'DEVELOPER') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
     

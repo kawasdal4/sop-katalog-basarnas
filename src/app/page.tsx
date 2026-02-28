@@ -745,6 +745,14 @@ export default function ESOPApp() {
   const [userActivityLogs, setUserActivityLogs] = useState<LogEntry[]>([])
   const [selectedUserForActivity, setSelectedUserForActivity] = useState<User | null>(null)
 
+  // Password change dialog
+  const [showPasswordChangeDialog, setShowPasswordChangeDialog] = useState(false)
+  const [passwordChangeForm, setPasswordChangeForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [passwordChangeLoading, setPasswordChangeLoading] = useState(false)
+
+  // Password visibility in users table (for DEVELOPER)
+  const [usersIncludePassword, setUsersIncludePassword] = useState(false)
+
   // Google Drive connection status
   const [driveStatus, setDriveStatus] = useState<{
     connected: boolean
@@ -1462,21 +1470,22 @@ export default function ESOPApp() {
       console.log('📋 Users response:', data)
       if (data.error) {
         console.error('Fetch users API error:', data.error)
-        toast({ 
-          title: 'Error', 
-          description: data.error, 
-          variant: 'destructive' 
+        toast({
+          title: 'Error',
+          description: data.error,
+          variant: 'destructive'
         })
       } else {
         console.log('✅ Users loaded:', data.data?.length || 0, 'users')
         setUsers(data.data || [])
+        setUsersIncludePassword(data.includePassword || false)
       }
     } catch (error) {
       console.error('Fetch users error:', error)
-      toast({ 
-        title: 'Error', 
-        description: 'Gagal memuat data user', 
-        variant: 'destructive' 
+      toast({
+        title: 'Error',
+        description: 'Gagal memuat data user',
+        variant: 'destructive'
       })
     }
   }, [toast])
@@ -1648,7 +1657,7 @@ export default function ESOPApp() {
         }, 3000)
         
         // Run auto-rename in background (check and rename files that don't match titles)
-        if (data.user?.role === 'ADMIN') {
+        if (data.user?.role === 'ADMIN' || data.user?.role === 'DEVELOPER') {
           fetch('/api/auto-rename', { method: 'POST' })
             .then(res => res.json())
             .then(renameData => {
@@ -3024,6 +3033,7 @@ export default function ESOPApp() {
         month: 'long', 
         day: 'numeric' 
       })
+      const timestamp = new Date().toISOString()
       
       // PDF Export with full stats
       const printWindow = window.open('', '_blank')
@@ -3445,11 +3455,12 @@ export default function ESOPApp() {
   }, [user?.id, stats?.totalPublikDitolak])
   
   const menuItems = [
-    { id: 'dashboard' as PageView, label: 'Laporan Analitik', icon: LayoutDashboard, roles: ['ADMIN', 'STAF'] },
-    { id: 'katalog' as PageView, label: 'Katalog SOP', icon: FileText, roles: ['ADMIN', 'STAF'] },
-    { id: 'verifikasi' as PageView, label: 'Verifikasi SOP', icon: CheckCircle, roles: ['ADMIN'] },
-    { id: 'arsip' as PageView, label: 'Arsip', icon: FolderOpen, roles: ['ADMIN'] },
-    { id: 'logs' as PageView, label: 'Log Aktivitas', icon: History, roles: ['ADMIN'] },
+    { id: 'dashboard' as PageView, label: 'Laporan Analitik', icon: LayoutDashboard, roles: ['ADMIN', 'STAF', 'DEVELOPER'] },
+    { id: 'katalog' as PageView, label: 'Katalog SOP', icon: FileText, roles: ['ADMIN', 'STAF', 'DEVELOPER'] },
+    { id: 'upload' as PageView, label: 'Upload SOP', icon: Upload, roles: ['ADMIN', 'DEVELOPER'] },
+    { id: 'verifikasi' as PageView, label: 'Verifikasi SOP', icon: CheckCircle, roles: ['ADMIN', 'DEVELOPER'] },
+    { id: 'arsip' as PageView, label: 'Arsip', icon: FolderOpen, roles: ['ADMIN', 'DEVELOPER'] },
+    { id: 'logs' as PageView, label: 'Log Aktivitas', icon: History, roles: ['ADMIN', 'DEVELOPER'] },
     { id: 'users' as PageView, label: 'Manajemen User', icon: Users, roles: ['DEVELOPER'] },
   ]
   
@@ -4918,6 +4929,13 @@ export default function ESOPApp() {
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Switch User
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  setPasswordChangeForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+                  setShowPasswordChangeDialog(true)
+                }}>
+                  <Shield className="w-4 h-4 mr-2" />
+                  Ganti Password
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="w-4 h-4 mr-2" />
                   Logout
@@ -5436,7 +5454,7 @@ export default function ESOPApp() {
                   <div>
                     <ShimmerTitle subtitle="Daftar lengkap dokumen SOP dan IK">Katalog SOP dan IK</ShimmerTitle>
                   </div>
-                  {user?.role === 'ADMIN' && (
+                  {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && (
                     <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
                       <DialogTrigger asChild>
                         <Button className="btn-sar bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-lg shadow-orange-500/30">
@@ -6588,7 +6606,7 @@ export default function ESOPApp() {
                                         <Eye className="w-4 h-4 text-cyan-400" />
                                       )}
                                     </Button>
-                                    {user?.role === 'ADMIN' && (
+                                    {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && (
                                       <Button size="icon" variant="ghost" onClick={() => handleOpenEdit(sop.id)} title="Edit" className="hover:bg-orange-500/20">
                                         <Edit className="w-4 h-4 text-orange-400" />
                                       </Button>
@@ -6629,7 +6647,7 @@ export default function ESOPApp() {
                                         <Printer className="w-4 h-4 text-gray-400" />
                                       )}
                                     </Button>
-                                    {user?.role === 'ADMIN' && ['xlsx', 'xls', 'xlsm', 'docx', 'doc', 'pdf'].includes(sop.fileType || '') && (
+                                    {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && ['xlsx', 'xls', 'xlsm', 'docx', 'doc', 'pdf'].includes(sop.fileType || '') && (
                                       <Button 
                                         size="icon" 
                                         variant="ghost" 
@@ -6646,7 +6664,7 @@ export default function ESOPApp() {
                                         )}
                                       </Button>
                                     )}
-                                    {user?.role === 'ADMIN' && desktopEditSessionToken && (
+                                    {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && desktopEditSessionToken && (
                                       <Button 
                                         size="icon" 
                                         variant="ghost" 
@@ -6657,7 +6675,7 @@ export default function ESOPApp() {
                                         <RefreshCw className="w-4 h-4 text-orange-600" />
                                       </Button>
                                     )}
-                                    {user?.role === 'ADMIN' && (
+                                    {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && (
                                       <Button 
                                         size="icon" 
                                         variant="ghost" 
@@ -7607,6 +7625,9 @@ export default function ESOPApp() {
                         <TableRow className="bg-gradient-to-r from-orange-500 to-yellow-500">
                           <TableHead className="font-bold text-white">Nama</TableHead>
                           <TableHead className="font-bold text-white">Email</TableHead>
+                          {usersIncludePassword && (
+                            <TableHead className="font-bold text-white">Password</TableHead>
+                          )}
                           <TableHead className="font-bold text-white">Role</TableHead>
                           <TableHead className="font-bold text-white">Terakhir Login</TableHead>
                           <TableHead className="font-bold text-white">Aktivitas</TableHead>
@@ -7616,17 +7637,24 @@ export default function ESOPApp() {
                       <TableBody>
                         {users.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                            <TableCell colSpan={usersIncludePassword ? 7 : 6} className="text-center text-gray-500 py-8">
                               Tidak ada user
                             </TableCell>
                           </TableRow>
                         ) : (
                           users.map((u) => {
-                            const userWithExtra = u as User & { lastLoginAt?: string; _count?: { logs: number } }
+                            const userWithExtra = u as User & { lastLoginAt?: string; _count?: { logs: number }; password?: string }
+                            // Only DEVELOPER can delete ADMIN and DEVELOPER users
+                            const canDelete = user?.role === 'DEVELOPER' || (user?.role === 'ADMIN' && u.role === 'STAF')
                             return (
                               <TableRow key={u.id} className="hover:bg-orange-50 border-b border-gray-200">
                                 <TableCell className="font-semibold text-blue-900">{u.name}</TableCell>
                                 <TableCell className="text-gray-700">{u.email}</TableCell>
+                                {usersIncludePassword && (
+                                  <TableCell className="text-gray-600 font-mono text-sm bg-gray-50">
+                                    {userWithExtra.password || '-'}
+                                  </TableCell>
+                                )}
                                 <TableCell>
                                   <Badge className={u.role === 'ADMIN' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : u.role === 'DEVELOPER' ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white' : 'bg-gradient-to-r from-cyan-500 to-cyan-600 text-white'}>
                                     {u.role}
@@ -7640,22 +7668,22 @@ export default function ESOPApp() {
                                 </TableCell>
                                 <TableCell className="text-center">
                                   <div className="flex items-center justify-center gap-1">
-                                    <Button 
-                                      size="icon" 
-                                      variant="ghost" 
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
                                       onClick={() => {
                                         setEditUserData(userWithExtra)
                                         setEditUserForm({ name: u.name, email: u.email, role: u.role || 'STAF' })
                                         setShowEditUserDialog(true)
-                                      }} 
+                                      }}
                                       className="hover:bg-orange-100"
                                       title="Edit User"
                                     >
                                       <Edit className="w-4 h-4 text-orange-500" />
                                     </Button>
-                                    <Button 
-                                      size="icon" 
-                                      variant="ghost" 
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
                                       onClick={async () => {
                                         setSelectedUserForActivity(u)
                                         try {
@@ -7666,21 +7694,23 @@ export default function ESOPApp() {
                                         } catch (error) {
                                           console.error('Error fetching user activity:', error)
                                         }
-                                      }} 
+                                      }}
                                       className="hover:bg-cyan-100"
                                       title="Lihat Riwayat"
                                     >
                                       <History className="w-4 h-4 text-cyan-500" />
                                     </Button>
-                                    <Button 
-                                      size="icon" 
-                                      variant="ghost" 
-                                      onClick={() => handleDeleteUser(u.id)} 
-                                      className="hover:bg-red-100"
-                                      title="Hapus User"
-                                    >
-                                      <Trash2 className="w-4 h-4 text-red-500" />
-                                    </Button>
+                                    {canDelete && (
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => handleDeleteUser(u.id)}
+                                        className="hover:bg-red-100"
+                                        title="Hapus User"
+                                      >
+                                        <Trash2 className="w-4 h-4 text-red-500" />
+                                      </Button>
+                                    )}
                                   </div>
                                 </TableCell>
                               </TableRow>
@@ -7783,7 +7813,113 @@ export default function ESOPApp() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+
+      {/* Password Change Dialog */}
+      <Dialog open={showPasswordChangeDialog} onOpenChange={setShowPasswordChangeDialog}>
+        <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <Shield className="w-5 h-5 text-orange-600" />
+              Ganti Password
+            </DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Ubah password akun Anda
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="font-medium text-gray-700">Password Lama</Label>
+              <Input
+                type="password"
+                value={passwordChangeForm.currentPassword}
+                onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, currentPassword: e.target.value })}
+                className="border-gray-300 bg-white text-gray-900"
+                placeholder="Masukkan password lama"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-medium text-gray-700">Password Baru</Label>
+              <Input
+                type="password"
+                value={passwordChangeForm.newPassword}
+                onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, newPassword: e.target.value })}
+                className="border-gray-300 bg-white text-gray-900"
+                placeholder="Masukkan password baru (min. 4 karakter)"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-medium text-gray-700">Konfirmasi Password Baru</Label>
+              <Input
+                type="password"
+                value={passwordChangeForm.confirmPassword}
+                onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, confirmPassword: e.target.value })}
+                className="border-gray-300 bg-white text-gray-900"
+                placeholder="Konfirmasi password baru"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowPasswordChangeDialog(false)}
+              className="border-gray-300 text-gray-700 hover:bg-gray-100"
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              disabled={passwordChangeLoading}
+              onClick={async () => {
+                // Validation
+                if (!passwordChangeForm.currentPassword || !passwordChangeForm.newPassword || !passwordChangeForm.confirmPassword) {
+                  toast({ title: 'Error', description: 'Semua field harus diisi', variant: 'destructive' })
+                  return
+                }
+                if (passwordChangeForm.newPassword.length < 4) {
+                  toast({ title: 'Error', description: 'Password baru minimal 4 karakter', variant: 'destructive' })
+                  return
+                }
+                if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
+                  toast({ title: 'Error', description: 'Konfirmasi password tidak cocok', variant: 'destructive' })
+                  return
+                }
+
+                setPasswordChangeLoading(true)
+                try {
+                  const res = await fetch('/api/users/password', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      currentPassword: passwordChangeForm.currentPassword,
+                      newPassword: passwordChangeForm.newPassword
+                    })
+                  })
+                  const data = await res.json()
+                  if (data.error) {
+                    toast({ title: 'Error', description: data.error, variant: 'destructive' })
+                  } else {
+                    toast({ title: '✅ Berhasil', description: 'Password berhasil diubah!' })
+                    setShowPasswordChangeDialog(false)
+                  }
+                } catch (error) {
+                  toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
+                } finally {
+                  setPasswordChangeLoading(false)
+                }
+              }}
+              className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
+            >
+              {passwordChangeLoading ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</>
+              ) : (
+                'Simpan Password'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* User Activity Dialog */}
       <Dialog open={showUserActivityDialog} onOpenChange={setShowUserActivityDialog}>
         <DialogContent className="sm:max-w-2xl bg-white border-2 border-cyan-200 shadow-xl max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>

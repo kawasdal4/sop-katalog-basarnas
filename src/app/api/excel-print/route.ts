@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
       select: { role: true }
     })
     
-    if (!user || user.role !== 'ADMIN') {
+    if (!user || user.role !== 'ADMIN' && user.role !== 'DEVELOPER') {
       return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 })
     }
     

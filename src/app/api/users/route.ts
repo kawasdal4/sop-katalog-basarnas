@@ -7,6 +7,11 @@ const hasUserManagementAccess = (role: string | null) => {
   return role === 'ADMIN' || role === 'DEVELOPER'
 }
 
+// Helper to check if user is developer
+const isDeveloper = (role: string | null) => {
+  return role === 'DEVELOPER'
+}
+
 // GET - Fetch all users (Admin or Developer only)
 export async function GET() {
   try {
@@ -30,12 +35,16 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden - Akses ditolak' }, { status: 403 })
     }
     
+    // DEVELOPER can see passwords, ADMIN cannot
+    const includePassword = isDeveloper(currentUser.role)
+    
     const users = await db.user.findMany({
       select: {
         id: true,
         email: true,
         name: true,
         role: true,
+        password: includePassword,
         createdAt: true,
         lastLoginAt: true,
         _count: {
@@ -47,7 +56,7 @@ export async function GET() {
     
     console.log('[Users API] Found users:', users.length)
     
-    return NextResponse.json({ data: users })
+    return NextResponse.json({ data: users, includePassword })
   } catch (error) {
     console.error('[Users API] Fetch users error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Terjadi kesalahan pada server'
@@ -198,6 +207,22 @@ export async function DELETE(request: NextRequest) {
     // Prevent deleting yourself
     if (id === userId) {
       return NextResponse.json({ error: 'Tidak dapat menghapus akun sendiri' }, { status: 400 })
+    }
+    
+    // Get target user to check role
+    const targetUser = await db.user.findUnique({ where: { id } })
+    if (!targetUser) {
+      return NextResponse.json({ error: 'User tidak ditemukan' }, { status: 404 })
+    }
+    
+    // Only DEVELOPER can delete ADMIN users
+    if (targetUser.role === 'ADMIN' && !isDeveloper(currentUser.role)) {
+      return NextResponse.json({ error: 'Hanya DEVELOPER yang dapat menghapus user ADMIN' }, { status: 403 })
+    }
+    
+    // Only DEVELOPER can delete other DEVELOPER users
+    if (targetUser.role === 'DEVELOPER' && !isDeveloper(currentUser.role)) {
+      return NextResponse.json({ error: 'Hanya DEVELOPER yang dapat menghapus user DEVELOPER' }, { status: 403 })
     }
     
     // Check if user has uploaded SOP files

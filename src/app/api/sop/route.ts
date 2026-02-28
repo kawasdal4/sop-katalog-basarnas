@@ -617,10 +617,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if user is admin
+    // Check if user is admin or developer
     const user = await db.user.findUnique({ where: { id: userIdCookie } })
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Hanya admin yang dapat menghapus file' }, { status: 403 })
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'DEVELOPER')) {
+      return NextResponse.json({ error: 'Hanya admin atau developer yang dapat menghapus file' }, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)
