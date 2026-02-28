@@ -24,12 +24,13 @@ export async function getAzureAccessToken(): Promise<string> {
     return tokenCache.accessToken;
   }
 
-  const tenantId = process.env.AZURE_TENANT_ID;
-  const clientId = process.env.AZURE_CLIENT_ID;
-  const clientSecret = process.env.AZURE_CLIENT_SECRET;
+  // Support multiple env var naming conventions
+  const tenantId = process.env.AZURE_TENANT_ID || process.env.TENANT_ID;
+  const clientId = process.env.AZURE_CLIENT_ID || process.env.CLIENT_ID;
+  const clientSecret = process.env.AZURE_CLIENT_SECRET || process.env.CLIENT_SECRET;
 
   if (!tenantId || !clientId || !clientSecret) {
-    throw new Error('Azure AD credentials not configured. Set AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET');
+    throw new Error('Azure AD credentials not configured. Set AZURE_TENANT_ID/TENANT_ID, AZURE_CLIENT_ID/CLIENT_ID, AZURE_CLIENT_SECRET/CLIENT_SECRET');
   }
 
   const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
@@ -79,7 +80,11 @@ export function clearTokenCache(): void {
  * Check if Azure AD is configured
  */
 export function isAzureConfigured(): boolean {
-  return !!(process.env.AZURE_TENANT_ID && process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET);
+  return !!(
+    (process.env.AZURE_TENANT_ID || process.env.TENANT_ID) &&
+    (process.env.AZURE_CLIENT_ID || process.env.CLIENT_ID) &&
+    (process.env.AZURE_CLIENT_SECRET || process.env.CLIENT_SECRET)
+  );
 }
 
 /**

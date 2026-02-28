@@ -247,18 +247,22 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
   
   try {
-    // Check environment variables first
-    const azureConfigured = !!(process.env.AZURE_TENANT_ID && process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET)
+    // Check environment variables first (support multiple naming conventions)
+    const azureConfigured = !!(
+      (process.env.AZURE_TENANT_ID || process.env.TENANT_ID) &&
+      (process.env.AZURE_CLIENT_ID || process.env.CLIENT_ID) &&
+      (process.env.AZURE_CLIENT_SECRET || process.env.CLIENT_SECRET)
+    )
     if (!azureConfigured) {
       console.error('❌ [Preview-Office] Azure AD not configured', {
-        hasTenantId: !!process.env.AZURE_TENANT_ID,
-        hasClientId: !!process.env.AZURE_CLIENT_ID,
-        hasClientSecret: !!process.env.AZURE_CLIENT_SECRET,
+        hasTenantId: !!(process.env.AZURE_TENANT_ID || process.env.TENANT_ID),
+        hasClientId: !!(process.env.AZURE_CLIENT_ID || process.env.CLIENT_ID),
+        hasClientSecret: !!(process.env.AZURE_CLIENT_SECRET || process.env.CLIENT_SECRET),
         hasServiceAccount: !!process.env.M365_SERVICE_ACCOUNT
       })
       return NextResponse.json({ 
         error: 'Azure AD tidak terkonfigurasi. Hubungi administrator.',
-        details: 'Missing AZURE_TENANT_ID, AZURE_CLIENT_ID, or AZURE_CLIENT_SECRET'
+        details: 'Missing AZURE_TENANT_ID/TENANT_ID, AZURE_CLIENT_ID/CLIENT_ID, or AZURE_CLIENT_SECRET/CLIENT_SECRET'
       }, { status: 500 })
     }
     
