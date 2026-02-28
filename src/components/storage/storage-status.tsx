@@ -55,7 +55,7 @@ interface StorageStatusProps {
   }
   onDiagnose?: () => void
   isDiagnosing?: boolean
-  userRole?: 'ADMIN' | 'STAF' | null
+  userRole?: 'ADMIN' | 'STAF' | 'DEVELOPER' | null
 }
 
 interface DriveStatusType {
@@ -309,20 +309,20 @@ export function StorageStatus({
               <span className="font-semibold">Storage Status</span>
             </div>
             <div className="flex items-center gap-1">
-              {onDiagnose && userRole === 'ADMIN' && (
+              {onDiagnose && userRole === 'DEVELOPER' && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onDiagnose}
                   disabled={isDiagnosing}
-                  className="h-7 px-2 text-xs gap-1 text-gray-300 hover:text-white hover:bg-white/10"
-                  title="Diagnosa Excel Edit System"
+                  className="h-7 px-2 text-xs gap-1 text-amber-300 hover:text-yellow-200 hover:bg-amber-500/20"
+                  title="Diagnosa Sistem & Error Tracking"
                 >
                   <Stethoscope className={`w-3.5 h-3.5 ${isDiagnosing ? 'animate-pulse' : ''}`} />
                   <span className="hidden sm:inline">Diagnosa</span>
                 </Button>
               )}
-              {userRole === 'ADMIN' && (
+              {userRole === 'DEVELOPER' && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -528,7 +528,7 @@ export function StorageStatus({
             <span className="text-sm font-medium text-white">Storage</span>
           </div>
           <div className="flex items-center gap-1">
-            {userRole === 'ADMIN' && (
+            {userRole === 'DEVELOPER' && (
               <Button
                 variant="ghost"
                 size="sm"

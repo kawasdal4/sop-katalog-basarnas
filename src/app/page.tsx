@@ -1299,14 +1299,14 @@ export default function ESOPApp() {
     fetchSyncStatus()
   }
 
-  // Run Excel Edit Diagnostic
+  // Run System Diagnostic
   const handleRunDiagnostic = useCallback(async () => {
     setShowDiagnosticDialog(true)
     setDiagnosticLoading(true)
     setDiagnosticResult(null)
 
     try {
-      const res = await fetch('/api/excel-edit/diagnose')
+      const res = await fetch('/api/system-diagnostic')
       const data = await res.json()
 
       setDiagnosticResult(data)
@@ -4100,20 +4100,456 @@ export default function ESOPApp() {
       
       {/* Login Success Full Screen Animation */}
       <AnimatePresence>
-        {showLoginSuccess && (
+        {showLoginSuccess && loginSuccessRole === 'DEVELOPER' ? (
+          /* ==================== DEVELOPER ANIMATION - QING DYNASTY THEME ==================== */
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden"
+          >
+            {/* Imperial Golden Background */}
+            <motion.div 
+              className="absolute inset-0 bg-gradient-to-br from-amber-900 via-yellow-800 to-orange-900"
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 2, opacity: 0 }}
+              transition={{ duration: 0.5 }}
+            />
+            
+            {/* Golden silk texture overlay */}
+            <div 
+              className="absolute inset-0 opacity-30"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23FFD700' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+              }}
+            />
+            
+            {/* Flying Dragon Animation */}
+            <motion.div
+              className="absolute w-full h-full pointer-events-none"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+            >
+              {/* Dragon SVG circling the screen */}
+              <motion.svg
+                viewBox="0 0 800 600"
+                className="absolute w-[600px] h-[450px]"
+                style={{
+                  filter: 'drop-shadow(0 0 30px rgba(255, 215, 0, 0.8)) drop-shadow(0 0 60px rgba(255, 140, 0, 0.5))'
+                }}
+                animate={{
+                  x: [
+                    'calc(0% - 200px)',
+                    'calc(25% - 100px)',
+                    'calc(50% - 300px)',
+                    'calc(75% - 100px)',
+                    'calc(100% - 400px)',
+                    'calc(75% - 300px)',
+                    'calc(50% - 200px)',
+                    'calc(25% - 300px)',
+                    'calc(0% - 200px)'
+                  ],
+                  y: [
+                    'calc(0% - 100px)',
+                    'calc(25% - 50px)',
+                    'calc(50% - 150px)',
+                    'calc(75% - 50px)',
+                    'calc(100% - 200px)',
+                    'calc(75% - 150px)',
+                    'calc(50% - 100px)',
+                    'calc(25% - 150px)',
+                    'calc(0% - 100px)'
+                  ],
+                  rotate: [0, 10, -5, 15, -10, 5, -15, 10, 0],
+                  scale: [1, 1.1, 0.95, 1.05, 1, 1.1, 0.95, 1.05, 1]
+                }}
+                transition={{
+                  duration: 12,
+                  repeat: Infinity,
+                  ease: 'easeInOut'
+                }}
+              >
+                {/* Imperial Chinese Dragon */}
+                <defs>
+                  <linearGradient id="dragonGold" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#FFD700" />
+                    <stop offset="25%" stopColor="#FFA500" />
+                    <stop offset="50%" stopColor="#FFD700" />
+                    <stop offset="75%" stopColor="#FF8C00" />
+                    <stop offset="100%" stopColor="#FFD700" />
+                  </linearGradient>
+                  <linearGradient id="dragonBody" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#FFD700" />
+                    <stop offset="50%" stopColor="#FFA500" />
+                    <stop offset="100%" stopColor="#FF6B00" />
+                  </linearGradient>
+                </defs>
+                
+                {/* Dragon Body */}
+                <motion.path
+                  d="M100,300 
+                     Q150,250 200,280 
+                     Q250,310 300,260 
+                     Q350,210 400,250 
+                     Q450,290 500,240 
+                     Q550,190 600,230 
+                     Q650,270 700,220
+                     Q720,200 740,210"
+                  fill="none"
+                  stroke="url(#dragonBody)"
+                  strokeWidth="25"
+                  strokeLinecap="round"
+                  animate={{
+                    d: [
+                      "M100,300 Q150,250 200,280 Q250,310 300,260 Q350,210 400,250 Q450,290 500,240 Q550,190 600,230 Q650,270 700,220 Q720,200 740,210",
+                      "M100,290 Q150,260 200,290 Q250,320 300,270 Q350,220 400,260 Q450,300 500,250 Q550,200 600,240 Q650,280 700,230 Q720,210 740,220",
+                      "M100,310 Q150,240 200,270 Q250,300 300,250 Q350,200 400,240 Q450,280 500,230 Q550,180 600,220 Q650,260 700,210 Q720,190 740,200",
+                      "M100,300 Q150,250 200,280 Q250,310 300,260 Q350,210 400,250 Q450,290 500,240 Q550,190 600,230 Q650,270 700,220 Q720,200 740,210"
+                    ]
+                  }}
+                  transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                />
+                
+                {/* Dragon Head */}
+                <motion.g
+                  animate={{
+                    x: [0, 5, -5, 0],
+                    y: [0, -3, 3, 0]
+                  }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  {/* Head base */}
+                  <ellipse cx="720" cy="200" rx="45" ry="35" fill="url(#dragonGold)" />
+                  {/* Snout */}
+                  <ellipse cx="760" cy="200" rx="25" ry="18" fill="#FFA500" />
+                  {/* Eye */}
+                  <circle cx="730" cy="190" r="8" fill="#1a1a1a" />
+                  <circle cx="732" cy="188" r="3" fill="#fff" />
+                  {/* Horns */}
+                  <path d="M700,170 Q680,140 690,120" fill="none" stroke="#FFD700" strokeWidth="6" strokeLinecap="round" />
+                  <path d="M710,165 Q695,135 705,115" fill="none" stroke="#FFA500" strokeWidth="5" strokeLinecap="round" />
+                  {/* Whiskers */}
+                  <motion.path
+                    d="M770,195 Q800,180 820,190"
+                    fill="none"
+                    stroke="#FFD700"
+                    strokeWidth="2"
+                    animate={{ d: ["M770,195 Q800,180 820,190", "M770,195 Q800,200 820,185", "M770,195 Q800,180 820,190"] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  />
+                  <motion.path
+                    d="M770,205 Q800,220 820,210"
+                    fill="none"
+                    stroke="#FFA500"
+                    strokeWidth="2"
+                    animate={{ d: ["M770,205 Q800,220 820,210", "M770,205 Q800,210 820,215", "M770,205 Q800,220 820,210"] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  />
+                  {/* Dragon flame from mouth */}
+                  <motion.ellipse
+                    cx="790"
+                    cy="200"
+                    rx="15"
+                    ry="8"
+                    fill="#FF4500"
+                    animate={{ rx: [15, 20, 15], opacity: [0.8, 1, 0.8] }}
+                    transition={{ duration: 0.5, repeat: Infinity }}
+                  />
+                </motion.g>
+                
+                {/* Dragon Legs */}
+                <motion.g
+                  animate={{ rotate: [0, 10, -10, 0] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  style={{ transformOrigin: '300px 280px' }}
+                >
+                  <path d="M280,280 L260,350 L280,350 L300,280" fill="url(#dragonGold)" />
+                  <path d="M350,270 L340,340 L360,340 L370,270" fill="url(#dragonGold)" />
+                </motion.g>
+                
+                {/* Dragon Claws */}
+                <motion.g
+                  animate={{ rotate: [0, 5, -5, 0] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                  style={{ transformOrigin: '270px 350px' }}
+                >
+                  <path d="M250,350 L245,370 M260,350 L258,372 M270,350 L272,368" stroke="#FFD700" strokeWidth="3" strokeLinecap="round" />
+                </motion.g>
+                
+                {/* Dragon Scales pattern */}
+                {[...Array(12)].map((_, i) => (
+                  <motion.ellipse
+                    key={i}
+                    cx={150 + i * 45}
+                    cy={285 + (i % 2) * 20}
+                    rx="15"
+                    ry="10"
+                    fill="rgba(255, 215, 0, 0.3)"
+                    stroke="#FFA500"
+                    strokeWidth="1"
+                    animate={{ opacity: [0.3, 0.6, 0.3] }}
+                    transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.1 }}
+                  />
+                ))}
+                
+                {/* Dorsal fins */}
+                {[...Array(8)].map((_, i) => (
+                  <motion.path
+                    key={`fin-${i}`}
+                    d={`M${180 + i * 55},${260 - (i % 2) * 20} L${200 + i * 55},${220 - (i % 2) * 30} L${220 + i * 55},${265 - (i % 2) * 15}`}
+                    fill="#FF6B00"
+                    animate={{ opacity: [0.7, 1, 0.7] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: i * 0.15 }}
+                  />
+                ))}
+                
+                {/* Dragon Tail */}
+                <motion.path
+                  d="M100,300 Q60,320 40,290 Q20,260 50,240 Q80,220 70,250"
+                  fill="none"
+                  stroke="url(#dragonBody)"
+                  strokeWidth="20"
+                  strokeLinecap="round"
+                  animate={{
+                    d: [
+                      "M100,300 Q60,320 40,290 Q20,260 50,240 Q80,220 70,250",
+                      "M100,300 Q60,310 30,280 Q10,250 40,230 Q70,210 60,240",
+                      "M100,300 Q60,330 50,300 Q30,270 60,250 Q90,230 80,260",
+                      "M100,300 Q60,320 40,290 Q20,260 50,240 Q80,220 70,250"
+                    ]
+                  }}
+                  transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                />
+              </motion.svg>
+            </motion.div>
+            
+            {/* Golden sparkles */}
+            {[...Array(50)].map((_, i) => (
+              <motion.div
+                key={`sparkle-${i}`}
+                className="absolute"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                  width: `${4 + Math.random() * 8}px`,
+                  height: `${4 + Math.random() * 8}px`,
+                  background: `radial-gradient(circle, #FFD700 0%, #FFA500 50%, transparent 70%)`,
+                  borderRadius: '50%',
+                }}
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{
+                  scale: [0, 1, 0],
+                  opacity: [0, 1, 0],
+                }}
+                transition={{
+                  duration: 1 + Math.random() * 1.5,
+                  repeat: Infinity,
+                  delay: Math.random() * 2,
+                  ease: 'easeInOut'
+                }}
+              />
+            ))}
+            
+            {/* Floating golden clouds */}
+            {[...Array(6)].map((_, i) => (
+              <motion.div
+                key={`cloud-${i}`}
+                className="absolute opacity-40"
+                style={{
+                  left: `${-20 + i * 25}%`,
+                  top: `${20 + (i % 3) * 25}%`,
+                  width: '200px',
+                  height: '80px',
+                  background: 'radial-gradient(ellipse, rgba(255, 215, 0, 0.5) 0%, transparent 70%)',
+                  borderRadius: '50%',
+                }}
+                animate={{
+                  x: [0, 100, 0],
+                  opacity: [0.3, 0.6, 0.3]
+                }}
+                transition={{
+                  duration: 8 + i * 2,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                  delay: i * 0.5
+                }}
+              />
+            ))}
+            
+            {/* Imperial emblem rays */}
+            <motion.div
+              className="absolute inset-0"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
+            >
+              {[...Array(16)].map((_, i) => (
+                <div
+                  key={`ray-${i}`}
+                  className="absolute left-1/2 top-1/2 w-1 h-[50vh]"
+                  style={{
+                    background: 'linear-gradient(to top, transparent, rgba(255, 215, 0, 0.2), transparent)',
+                    transform: `rotate(${i * 22.5}deg) translateX(-50%)`,
+                    transformOrigin: 'center bottom',
+                  }}
+                />
+              ))}
+            </motion.div>
+            
+            {/* Main content */}
+            <div className="relative z-10 text-center">
+              {/* Imperial Crown/Logo */}
+              <motion.div
+                className="w-40 h-40 mx-auto mb-6 relative"
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ 
+                  type: 'spring', 
+                  stiffness: 200, 
+                  damping: 15,
+                  delay: 0.2 
+                }}
+              >
+                {/* Outer golden ring */}
+                <motion.div
+                  className="absolute inset-0 rounded-full"
+                  style={{
+                    background: 'conic-gradient(from 0deg, #FFD700, #FFA500, #FF6B00, #FFA500, #FFD700)',
+                    boxShadow: '0 0 60px rgba(255, 215, 0, 0.8), 0 0 100px rgba(255, 140, 0, 0.6), inset 0 0 30px rgba(255, 255, 255, 0.3)'
+                  }}
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
+                />
+                
+                {/* Inner circle */}
+                <div className="absolute inset-2 rounded-full bg-gradient-to-br from-amber-800 via-yellow-700 to-orange-800 flex items-center justify-center">
+                  <motion.div
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                    className="text-5xl"
+                  >
+                    👑
+                  </motion.div>
+                </div>
+                
+                {/* Pulsing glow */}
+                <motion.div
+                  className="absolute inset-0 rounded-full"
+                  animate={{
+                    boxShadow: [
+                      '0 0 30px rgba(255, 215, 0, 0.5), 0 0 60px rgba(255, 140, 0, 0.3)',
+                      '0 0 60px rgba(255, 215, 0, 0.8), 0 0 100px rgba(255, 140, 0, 0.5)',
+                      '0 0 30px rgba(255, 215, 0, 0.5), 0 0 60px rgba(255, 140, 0, 0.3)'
+                    ]
+                  }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
+              </motion.div>
+              
+              {/* Imperial Title */}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+              >
+                <motion.h2 
+                  className="text-5xl font-black mb-2"
+                  style={{
+                    background: 'linear-gradient(135deg, #FFD700, #FFA500, #FF6B00, #FFD700)',
+                    backgroundSize: '300% 300%',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    textShadow: '0 0 40px rgba(255, 215, 0, 0.8)',
+                    fontFamily: 'serif'
+                  }}
+                  animate={{
+                    backgroundPosition: ['0% 50%', '100% 50%', '0% 50%']
+                  }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                >
+                  龍帝降临
+                </motion.h2>
+                <motion.p
+                  className="text-2xl text-amber-300 font-bold tracking-widest mb-4"
+                  animate={{ opacity: [0.7, 1, 0.7] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                >
+                  DRAGON EMPEROR HAS ARRIVED
+                </motion.p>
+              </motion.div>
+              
+              {/* User name with imperial styling */}
+              <motion.div
+                className="inline-block px-10 py-4 mt-4 relative"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 200, delay: 0.8 }}
+              >
+                {/* Decorative frame */}
+                <div className="absolute inset-0 border-2 border-amber-400/50 rounded-lg" />
+                <div className="absolute inset-1 border border-amber-500/30 rounded-md" />
+                
+                <motion.p 
+                  className="text-3xl font-bold text-amber-200 relative z-10"
+                  animate={{ textShadow: ['0 0 10px #FFD700', '0 0 20px #FFA500', '0 0 10px #FFD700'] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  {loginSuccessName}
+                </motion.p>
+                <p className="text-amber-400/80 text-sm mt-1 relative z-10">DEVELOPER ACCESS</p>
+              </motion.div>
+              
+              {/* Status indicator */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1 }}
+                className="mt-8 flex items-center justify-center gap-3"
+              >
+                <motion.div
+                  className="w-3 h-3 rounded-full bg-amber-400"
+                  animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                />
+                <span className="text-amber-200 text-lg font-medium">Memasuki Istana...</span>
+                <motion.div
+                  className="w-3 h-3 rounded-full bg-amber-400"
+                  animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
+                  transition={{ duration: 1, repeat: Infinity, delay: 0.5 }}
+                />
+              </motion.div>
+            </div>
+            
+            {/* Corner decorations - Imperial style */}
+            {[
+              { top: 'top-8', left: 'left-8', borders: 'border-t-4 border-l-4', rounded: 'rounded-tl-3xl' },
+              { top: 'top-8', left: 'right-8', borders: 'border-t-4 border-r-4', rounded: 'rounded-tr-3xl' },
+              { top: 'bottom-8', left: 'left-8', borders: 'border-b-4 border-l-4', rounded: 'rounded-bl-3xl' },
+              { top: 'bottom-8', left: 'right-8', borders: 'border-b-4 border-r-4', rounded: 'rounded-br-3xl' },
+            ].map((corner, i) => (
+              <motion.div
+                key={i}
+                className={`absolute ${corner.top} ${corner.left} w-24 h-24 ${corner.borders} ${corner.rounded} border-amber-400/60`}
+                initial={{ opacity: 0, x: i % 2 === 0 ? -50 : 50, y: i < 2 ? -50 : 50 }}
+                animate={{ opacity: 1, x: 0, y: 0 }}
+                transition={{ delay: 0.3 }}
+              />
+            ))}
+          </motion.div>
+        ) : showLoginSuccess ? (
+          /* ==================== REGULAR ANIMATION FOR STAF AND ADMIN ==================== */
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[9999] flex items-center justify-center"
           >
-            {/* Animated gradient background - Green for STAF, Purple for DEVELOPER, Orange for ADMIN */}
+            {/* Animated gradient background - Green for STAF, Orange for ADMIN */}
             <motion.div 
               className={`absolute inset-0 ${
                 loginSuccessRole === 'STAF' 
                   ? 'bg-gradient-to-br from-green-600 via-emerald-600 to-green-700' 
-                  : loginSuccessRole === 'DEVELOPER'
-                  ? 'bg-gradient-to-br from-purple-600 via-violet-600 to-purple-700'
                   : 'bg-gradient-to-br from-orange-600 via-red-600 to-orange-700'
               }`}
               initial={{ scale: 0, opacity: 0 }}
@@ -4220,8 +4656,6 @@ export default function ESOPApp() {
                 style={{
                   boxShadow: loginSuccessRole === 'STAF' 
                     ? '0 0 60px rgba(34, 197, 94, 0.8), 0 0 100px rgba(34, 197, 94, 0.4)'
-                    : loginSuccessRole === 'DEVELOPER'
-                    ? '0 0 60px rgba(147, 51, 234, 0.8), 0 0 100px rgba(147, 51, 234, 0.4)'
                     : '0 0 60px rgba(249, 115, 22, 0.8), 0 0 100px rgba(249, 115, 22, 0.4)'
                 }}
               >
@@ -4233,12 +4667,6 @@ export default function ESOPApp() {
                           '0 0 60px rgba(34, 197, 94, 0.8)',
                           '0 0 30px rgba(34, 197, 94, 0.5)'
                         ]
-                      : loginSuccessRole === 'DEVELOPER'
-                      ? [
-                          '0 0 30px rgba(147, 51, 234, 0.5)',
-                          '0 0 60px rgba(147, 51, 234, 0.8)',
-                          '0 0 30px rgba(147, 51, 234, 0.5)'
-                        ]
                       : [
                           '0 0 30px rgba(249, 115, 22, 0.5)',
                           '0 0 60px rgba(249, 115, 22, 0.8)',
@@ -4249,8 +4677,6 @@ export default function ESOPApp() {
                   className={`w-full h-full rounded-full flex items-center justify-center ${
                     loginSuccessRole === 'STAF' 
                       ? 'bg-gradient-to-br from-green-500 to-emerald-600' 
-                      : loginSuccessRole === 'DEVELOPER'
-                      ? 'bg-gradient-to-br from-purple-500 to-violet-600'
                       : 'bg-gradient-to-br from-orange-500 to-red-600'
                   }`}
                 >
@@ -4302,7 +4728,7 @@ export default function ESOPApp() {
                 
                 <motion.p 
                   className={`text-xl mb-4 ${
-                    loginSuccessRole === 'STAF' ? 'text-green-100' : loginSuccessRole === 'DEVELOPER' ? 'text-purple-100' : 'text-orange-100'
+                    loginSuccessRole === 'STAF' ? 'text-green-100' : 'text-orange-100'
                   }`}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -4335,7 +4761,7 @@ export default function ESOPApp() {
                 className="mt-8"
               >
                 <p className={`text-sm font-medium ${
-                  loginSuccessRole === 'STAF' ? 'text-green-200' : loginSuccessRole === 'DEVELOPER' ? 'text-purple-200' : 'text-orange-200'
+                  loginSuccessRole === 'STAF' ? 'text-green-200' : 'text-orange-200'
                 }`}>
                   DIREKTORAT KESIAPSIAGAAN
                 </p>
@@ -4372,7 +4798,7 @@ export default function ESOPApp() {
             {/* Corner decorations */}
             <motion.div
               className={`absolute top-8 left-8 w-24 h-24 border-l-4 border-t-4 rounded-tl-3xl ${
-                loginSuccessRole === 'STAF' ? 'border-green-400/50' : loginSuccessRole === 'DEVELOPER' ? 'border-purple-400/50' : 'border-orange-400/50'
+                loginSuccessRole === 'STAF' ? 'border-green-400/50' : 'border-orange-400/50'
               }`}
               initial={{ opacity: 0, x: -50, y: -50 }}
               animate={{ opacity: 1, x: 0, y: 0 }}
@@ -4380,7 +4806,7 @@ export default function ESOPApp() {
             />
             <motion.div
               className={`absolute top-8 right-8 w-24 h-24 border-r-4 border-t-4 rounded-tr-3xl ${
-                loginSuccessRole === 'STAF' ? 'border-green-400/50' : loginSuccessRole === 'DEVELOPER' ? 'border-purple-400/50' : 'border-orange-400/50'
+                loginSuccessRole === 'STAF' ? 'border-green-400/50' : 'border-orange-400/50'
               }`}
               initial={{ opacity: 0, x: 50, y: -50 }}
               animate={{ opacity: 1, x: 0, y: 0 }}
@@ -4388,7 +4814,7 @@ export default function ESOPApp() {
             />
             <motion.div
               className={`absolute bottom-8 left-8 w-24 h-24 border-l-4 border-b-4 rounded-bl-3xl ${
-                loginSuccessRole === 'STAF' ? 'border-green-400/50' : loginSuccessRole === 'DEVELOPER' ? 'border-purple-400/50' : 'border-orange-400/50'
+                loginSuccessRole === 'STAF' ? 'border-green-400/50' : 'border-orange-400/50'
               }`}
               initial={{ opacity: 0, x: -50, y: 50 }}
               animate={{ opacity: 1, x: 0, y: 0 }}
@@ -4396,14 +4822,14 @@ export default function ESOPApp() {
             />
             <motion.div
               className={`absolute bottom-8 right-8 w-24 h-24 border-r-4 border-b-4 rounded-br-3xl ${
-                loginSuccessRole === 'STAF' ? 'border-green-400/50' : loginSuccessRole === 'DEVELOPER' ? 'border-purple-400/50' : 'border-orange-400/50'
+                loginSuccessRole === 'STAF' ? 'border-green-400/50' : 'border-orange-400/50'
               }`}
               initial={{ opacity: 0, x: 50, y: 50 }}
               animate={{ opacity: 1, x: 0, y: 0 }}
               transition={{ delay: 0.3 }}
             />
           </motion.div>
-        )}
+        ) : null}
       </AnimatePresence>
       
       {/* Header */}

@@ -173,3 +173,22 @@ model FilePrintCache {
   @@index([sopFileId])
   @@index([fileHash])
 }
+
+// Error Log model for tracking system errors
+model ErrorLog {
+  id          String   @id @default(cuid())
+  errorType   String   // API_ERROR, DB_ERROR, AUTH_ERROR, FILE_ERROR, SYNC_ERROR, etc.
+  message     String
+  stack       String?  // Stack trace
+  context     String?  // JSON string with additional context (userId, fileId, etc.)
+  severity    String   @default("error") // info, warning, error, critical
+  resolved    Boolean  @default(false)
+  resolvedAt  DateTime?
+  resolvedBy  String?  // User ID who resolved it
+  createdAt   DateTime @default(now())
+  
+  @@index([errorType])
+  @@index([severity])
+  @@index([resolved])
+  @@index([createdAt])
+}
