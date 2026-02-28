@@ -247,6 +247,35 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
   
   try {
+    // Check environment variables first
+    const azureConfigured = !!(process.env.AZURE_TENANT_ID && process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET)
+    if (!azureConfigured) {
+      console.error('❌ [Preview-Office] Azure AD not configured', {
+        hasTenantId: !!process.env.AZURE_TENANT_ID,
+        hasClientId: !!process.env.AZURE_CLIENT_ID,
+        hasClientSecret: !!process.env.AZURE_CLIENT_SECRET,
+        hasServiceAccount: !!process.env.M365_SERVICE_ACCOUNT
+      })
+      return NextResponse.json({ 
+        error: 'Azure AD tidak terkonfigurasi. Hubungi administrator.',
+        details: 'Missing AZURE_TENANT_ID, AZURE_CLIENT_ID, or AZURE_CLIENT_SECRET'
+      }, { status: 500 })
+    }
+    
+    // Check R2 configuration
+    if (!isR2Configured()) {
+      console.error('❌ [Preview-Office] R2 not configured', {
+        hasAccountId: !!process.env.R2_ACCOUNT_ID,
+        hasAccessKey: !!(process.env.R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY),
+        hasSecretKey: !!(process.env.R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_KEY),
+        bucketName: process.env.R2_BUCKET_NAME
+      })
+      return NextResponse.json({ 
+        error: 'R2 storage tidak terkonfigurasi. Hubungi administrator.',
+        details: 'Missing R2 credentials'
+      }, { status: 500 })
+    }
+    
     // Authentication check
     const cookieStore = await cookies()
     const userId = cookieStore.get('userId')?.value
