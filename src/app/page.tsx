@@ -82,6 +82,8 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { StorageStatus } from '@/components/storage'
+import PrintLoadingDialog from '@/components/PrintLoadingDialog'
+import CopyrightPopup from '@/components/CopyrightPopup'
 
 // Types
 type UserRole = 'ADMIN' | 'STAF' | null
@@ -726,7 +728,13 @@ export default function ESOPApp() {
   const [previewLoading, setPreviewLoading] = useState<string | null>(null)
   const [downloadLoading, setDownloadLoading] = useState<string | null>(null)
   const [printLoading, setPrintLoading] = useState<string | null>(null)
-  
+
+  // Print loading dialog state
+  const [showPrintDialog, setShowPrintDialog] = useState(false)
+  const [printDialogFileId, setPrintDialogFileId] = useState<string | null>(null)
+  const [printDialogFileName, setPrintDialogFileName] = useState('')
+  const [printDialogFileType, setPrintDialogFileType] = useState('')
+
   // User edit dialog
   const [showEditUserDialog, setShowEditUserDialog] = useState(false)
   const [editUserData, setEditUserData] = useState<User & { lastLoginAt?: string; _count?: { logs: number } } | null>(null)
@@ -1489,13 +1497,13 @@ export default function ESOPApp() {
       if (savedArsipSeenCount) {
         setArsipSeenCount(parseInt(savedArsipSeenCount, 10) || 0)
       } else {
-        // First time login for this user - set to current rejected count to prevent notification
-        const currentRejected = stats?.totalPublikDitolak || 0
-        setArsipSeenCount(currentRejected)
-        localStorage.setItem(userArsipKey, currentRejected.toString())
+        // First time login for this user - initialize to 0
+        // User will see notification if there are rejected files
+        setArsipSeenCount(0)
+        localStorage.setItem(userArsipKey, '0')
       }
     }
-  }, [user?.id, stats?.totalPublikDitolak])
+  }, [user?.id])
   
   // Fetch data when authenticated
   useEffect(() => {
@@ -1525,7 +1533,8 @@ export default function ESOPApp() {
   useEffect(() => {
     if (!isAuthenticated || currentPage !== 'katalog') return
     
-    // Debounce timer for live search
+    // Debounce timer for live search - only apply debounce when user is typing
+    // No debounce for initial load or filter changes
     const debounceTimer = setTimeout(async () => {
       setIsSearching(true)
       try {
@@ -1554,8 +1563,9 @@ export default function ESOPApp() {
         console.error('Fetch error:', error)
       } finally {
         setIsSearching(false)
+        setKatalogLoading(false) // Clear loading state after fetch
       }
-    }, 300)
+    }, searchInput ? 300 : 0) // No debounce for initial load
     
     return () => clearTimeout(debounceTimer)
   }, [isAuthenticated, currentPage, searchInput, sopFilters.kategori, sopFilters.jenis, sopFilters.status, sopFilters.tahun, sortBy, sopPagination.page, sopPagination.limit])
@@ -1587,9 +1597,11 @@ export default function ESOPApp() {
   useEffect(() => {
     if (!isAuthenticated || currentPage !== 'verifikasi') return
     
+    // Immediate fetch on page load or filter change (no debounce for initial load)
+    // Only debounce when user is typing in search
     const debounceTimer = setTimeout(() => {
       fetchVerificationList(verificationFilter, verificationSearch, verificationSortBy)
-    }, 300)
+    }, verificationSearch ? 300 : 0) // No debounce for initial load or filter changes
     
     return () => clearTimeout(debounceTimer)
   }, [verificationSearch, verificationFilter, verificationSortBy, isAuthenticated, currentPage, fetchVerificationList])
@@ -1598,9 +1610,11 @@ export default function ESOPApp() {
   useEffect(() => {
     if (!isAuthenticated || currentPage !== 'arsip') return
     
+    // Immediate fetch on page load (no debounce for initial load)
+    // Only debounce when user is typing in search
     const debounceTimer = setTimeout(() => {
       fetchArsipList(arsipSearch, arsipSortBy)
-    }, 300)
+    }, arsipSearch ? 300 : 0) // No debounce for initial load
     
     return () => clearTimeout(debounceTimer)
   }, [arsipSearch, arsipSortBy, isAuthenticated, currentPage, fetchArsipList])
@@ -2160,7 +2174,7 @@ export default function ESOPApp() {
     }
   }
   
-  // Print file - Open PDF in new tab (supports PDF, Excel, Word)
+  // Print file - Open loading dialog with progress
   const handlePrint = useCallback(async (id: string) => {
     // Find file from all available lists
     const sop = sopFiles.find(s => s.id === id) || verificationList.find(s => s.id === id) || arsipList.find(s => s.id === id)
@@ -2177,7 +2191,7 @@ export default function ESOPApp() {
     }
 
     const fileExtension = sop.fileName.toLowerCase().split('.').pop()
-    
+
     // Check if file type is supported
     if (!['pdf', 'xlsx', 'xls', 'xlsm', 'docx', 'doc'].includes(fileExtension || '')) {
       toast({
@@ -2189,52 +2203,26 @@ export default function ESOPApp() {
       return
     }
 
-    setPrintLoading(id) // Start loading animation
+    // Open print loading dialog
+    setPrintDialogFileId(id)
+    setPrintDialogFileName(sop.fileName)
+    setPrintDialogFileType(fileExtension || 'pdf')
+    setShowPrintDialog(true)
+    setPrintLoading(id)
+  }, [sopFiles, verificationList, arsipList, toast])
 
-    try {
-      // Generate print token
-      const tokenRes = await fetch('/api/print', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileId: id })
-      })
-      
-      if (!tokenRes.ok) {
-        throw new Error('Gagal membuat token print')
-      }
-      
-      const tokenData = await tokenRes.json()
-      const printToken = tokenData.token
-      
-      // Open PDF directly in new tab
-      const pdfUrl = `/api/print?token=${printToken}`
-      window.open(pdfUrl, '_blank')
-      
-      const fileTypeLabel = fileExtension === 'pdf' ? 'PDF' : 
-        ['xlsx', 'xls', 'xlsm'].includes(fileExtension || '') ? 'Excel' : 'Word'
-      
-      toast({
-        title: '✅ PDF Dibuka',
-        description: fileExtension === 'pdf' 
-          ? 'File PDF dibuka di tab baru'
-          : `${fileTypeLabel} dikonversi ke PDF dan dibuka di tab baru`,
-        duration: 4000
-      })
-      
-      setPrintLoading(null)
-      fetchStats()
-    } catch (error) {
-      console.error('Print error:', error)
-      setPrintLoading(null)
-      toast({
-        title: '❌ Error',
-        description: 'Gagal mempersiapkan file untuk print',
-        variant: 'destructive',
-        duration: 5000
-      })
-    }
-  }, [sopFiles, verificationList, arsipList, toast, fetchStats])
-  
+  // Handle print dialog close
+  const handlePrintDialogClose = useCallback(() => {
+    setShowPrintDialog(false)
+    setPrintDialogFileId(null)
+    setPrintLoading(null)
+  }, [])
+
+  // Handle print complete
+  const handlePrintComplete = useCallback(() => {
+    fetchStats()
+  }, [fetchStats])
+
   const handleStatusChange = async (id: string, status: string) => {
     try {
       const res = await fetch('/api/sop', {
@@ -3433,6 +3421,29 @@ export default function ESOPApp() {
     }
   }
   
+  // Handle navigation with notification clearing and loading state
+  const handleNavigation = useCallback((page: PageView) => {
+    setCurrentPage(page)
+    
+    // Set loading states immediately when navigating to show loading indicator
+    if (page === 'verifikasi') {
+      setVerifikasiLoading(true)
+    }
+    if (page === 'arsip') {
+      setArsipLoading(true)
+    }
+    if (page === 'katalog') {
+      setKatalogLoading(true)
+    }
+    
+    // When navigating to arsip page, mark all rejected files as seen
+    if (page === 'arsip' && user?.id && stats?.totalPublikDitolak !== undefined) {
+      const newSeenCount = stats.totalPublikDitolak
+      setArsipSeenCount(newSeenCount)
+      localStorage.setItem(`arsipSeenCount_${user.id}`, newSeenCount.toString())
+    }
+  }, [user?.id, stats?.totalPublikDitolak])
+  
   const menuItems = [
     { id: 'dashboard' as PageView, label: 'Laporan Analitik', icon: LayoutDashboard, roles: ['ADMIN', 'STAF'] },
     { id: 'katalog' as PageView, label: 'Katalog SOP', icon: FileText, roles: ['ADMIN', 'STAF'] },
@@ -4075,6 +4086,9 @@ export default function ESOPApp() {
             </motion.div>
           </DialogContent>
         </Dialog>
+        
+        {/* Copyright Popup */}
+        <CopyrightPopup show={showCopyrightPopup} onClose={() => setShowCopyrightPopup(false)} />
       </div>
     )
   }
@@ -4506,7 +4520,7 @@ export default function ESOPApp() {
                 <Button
                   variant={currentPage === item.id ? 'default' : 'ghost'}
                   className={`w-full justify-start gap-3 btn-sar ${currentPage === item.id ? 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-500/30' : 'text-gray-300 hover:bg-white/10 hover:text-white'}`}
-                  onClick={() => setCurrentPage(item.id)}
+                  onClick={() => handleNavigation(item.id)}
                 >
                   <item.icon className={`w-5 h-5 ${syncStatus.isSyncing ? 'animate-spin-slow' : ''}`} />
                   {item.label}
@@ -7595,326 +7609,19 @@ export default function ESOPApp() {
         </DialogContent>
       </Dialog>
       
-      {/* Copyright Popup - Beautiful Animated Design */}
-      <AnimatePresence>
-        {showCopyrightPopup && (
-          <motion.div
-            className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            {/* Backdrop */}
-            <motion.div
-              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowCopyrightPopup(false)}
-            />
-            
-            {/* Popup Container */}
-            <motion.div
-              className="relative max-w-md w-full"
-              initial={{ scale: 0.8, opacity: 0, y: 50 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.8, opacity: 0, y: 50 }}
-              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-            >
-              {/* Outer Glow Ring */}
-              <motion.div
-                className="absolute -inset-4 rounded-3xl"
-                style={{
-                  background: 'conic-gradient(from 0deg, #f97316, #dc2626, #fbbf24, #f97316)',
-                  filter: 'blur(25px)',
-                  opacity: 0.5
-                }}
-                animate={{ rotate: 360 }}
-                transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
-              />
-              
-              {/* Radar Sweep Effect */}
-              <motion.div
-                className="absolute -inset-12 rounded-full pointer-events-none"
-                style={{
-                  background: 'conic-gradient(from 0deg, transparent 0deg, rgba(249, 115, 22, 0.12) 30deg, transparent 60deg)'
-                }}
-                animate={{ rotate: 360 }}
-                transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
-              />
-              
-              {/* Floating Particles */}
-              {[...Array(12)].map((_, i) => (
-                <motion.div
-                  key={i}
-                  className="absolute w-2 h-2 rounded-full"
-                  style={{
-                    background: i % 3 === 0 ? '#f97316' : i % 3 === 1 ? '#fbbf24' : '#ef4444',
-                    left: `${5 + i * 8}%`,
-                    top: `${-15 + (i % 4) * 8}%`,
-                    boxShadow: `0 0 8px ${i % 3 === 0 ? '#f97316' : i % 3 === 1 ? '#fbbf24' : '#ef4444'}`
-                  }}
-                  animate={{
-                    y: [-8, 8, -8],
-                    opacity: [0.4, 1, 0.4],
-                    scale: [0.8, 1.2, 0.8]
-                  }}
-                  transition={{
-                    duration: 2 + i * 0.2,
-                    repeat: Infinity,
-                    delay: i * 0.15
-                  }}
-                />
-              ))}
-              
-              {/* Main Card */}
-              <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl border border-orange-500/40 overflow-hidden backdrop-blur-xl shadow-2xl">
-                {/* Animated Grid Background */}
-                <div className="absolute inset-0 opacity-10">
-                  <div className="absolute inset-0" style={{
-                    backgroundImage: `
-                      linear-gradient(rgba(249, 115, 22, 0.3) 1px, transparent 1px),
-                      linear-gradient(90deg, rgba(249, 115, 22, 0.3) 1px, transparent 1px)
-                    `,
-                    backgroundSize: '25px 25px'
-                  }} />
-                </div>
-                
-                {/* Close Button */}
-                <motion.button
-                  className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
-                  onClick={() => setShowCopyrightPopup(false)}
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                >
-                  <X className="w-4 h-4 text-white/70" />
-                </motion.button>
-                
-                {/* Header with Animated Beacon */}
-                <div className="relative p-6 pb-4 text-white overflow-hidden">
-                  {/* Beacon Pulse Effect */}
-                  <motion.div
-                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-                    animate={{
-                      scale: [1, 2, 1],
-                      opacity: [0.2, 0, 0.2]
-                    }}
-                    transition={{ duration: 2.5, repeat: Infinity }}
-                  >
-                    <div className="w-32 h-32 rounded-full border-2 border-orange-500/30" />
-                  </motion.div>
-                  
-                  <motion.div 
-                    className="relative z-10 flex flex-col items-center"
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                  >
-                    {/* Animated SAR Logo */}
-                    <motion.div 
-                      className="relative w-16 h-16 mb-4"
-                      initial={{ scale: 0, rotate: -180 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
-                    >
-                      {/* Rotating Ring */}
-                      <motion.div
-                        className="absolute inset-0 rounded-xl border-2 border-orange-400/50"
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
-                      />
-                      
-                      {/* Inner Glow */}
-                      <motion.div
-                        className="absolute inset-1 rounded-lg bg-gradient-to-br from-orange-500 to-red-600"
-                        animate={{
-                          boxShadow: [
-                            '0 0 15px rgba(249, 115, 22, 0.5)',
-                            '0 0 30px rgba(249, 115, 22, 0.8)',
-                            '0 0 15px rgba(249, 115, 22, 0.5)'
-                          ]
-                        }}
-                        transition={{ duration: 1.5, repeat: Infinity }}
-                      />
-                      
-                      {/* Icon */}
-                      <div className="absolute inset-2 rounded-md bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center">
-                        <motion.div
-                          animate={{ scale: [1, 1.1, 1] }}
-                          transition={{ duration: 2, repeat: Infinity }}
-                        >
-                          <Shield className="w-6 h-6 text-white" />
-                        </motion.div>
-                      </div>
-                    </motion.div>
-                    
-                    {/* Title with Glowing Effect */}
-                    <motion.h2 
-                      className="text-xl font-bold relative text-center"
-                      animate={{
-                        textShadow: [
-                          '0 0 10px rgba(249, 115, 22, 0.5)',
-                          '0 0 25px rgba(249, 115, 22, 0.8)',
-                          '0 0 10px rgba(249, 115, 22, 0.5)'
-                        ]
-                      }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                    >
-                      <span className="bg-gradient-to-r from-orange-300 via-yellow-200 to-orange-300 bg-clip-text text-transparent">
-                        COPYRIGHT NOTICE
-                      </span>
-                    </motion.h2>
-                  </motion.div>
-                </div>
-                
-                {/* Content */}
-                <motion.div 
-                  className="relative p-6 pt-2 space-y-4"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  {/* Main Copyright */}
-                  <motion.div 
-                    className="text-center space-y-2"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    <motion.p 
-                      className="text-lg font-bold"
-                      animate={{
-                        textShadow: [
-                          '0 0 5px rgba(251, 191, 36, 0.3)',
-                          '0 0 15px rgba(251, 191, 36, 0.5)',
-                          '0 0 5px rgba(251, 191, 36, 0.3)'
-                        ]
-                      }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                    >
-                      <span className="bg-gradient-to-r from-orange-400 via-yellow-300 to-orange-400 bg-clip-text text-transparent">
-                        © 2026 Foe Direktorat Kesiapsiagaan – BASARNAS
-                      </span>
-                    </motion.p>
-                    <p className="text-orange-200/80 text-sm font-medium">
-                      Web App SOP/IK Katalog
-                    </p>
-                  </motion.div>
-                  
-                  {/* Divider */}
-                  <motion.div 
-                    className="flex items-center gap-3"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.4 }}
-                  >
-                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-500/50 to-transparent" />
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
-                    >
-                      <Radio className="w-4 h-4 text-orange-400" />
-                    </motion.div>
-                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-500/50 to-transparent" />
-                  </motion.div>
-                  
-                  {/* Developer Info */}
-                  <motion.div 
-                    className="bg-gradient-to-br from-orange-500/10 to-red-500/10 rounded-xl p-4 border border-orange-500/20"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.5 }}
-                  >
-                    <p className="text-orange-300/90 text-xs font-semibold uppercase tracking-wider mb-2">
-                      Developed & Maintained by:
-                    </p>
-                    <p className="text-white font-bold text-base">
-                      Muhammad Fuadunnas, S.I.Kom., M.IKom.
-                    </p>
-                    <p className="text-orange-200/70 text-sm mt-1">
-                      PKPP Ahli Muda – Direktorat Kesiapsiagaan
-                    </p>
-                  </motion.div>
-                  
-                  {/* Contact Info */}
-                  <motion.div 
-                    className="flex items-center justify-center gap-4 text-sm"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.6 }}
-                  >
-                    <div className="flex items-center gap-2 text-orange-300/80">
-                      <motion.div
-                        animate={{ scale: [1, 1.1, 1] }}
-                        transition={{ duration: 1.5, repeat: Infinity }}
-                      >
-                        <Radio className="w-4 h-4" />
-                      </motion.div>
-                      <span>(+62) 811 9292 91</span>
-                    </div>
-                    <span className="text-gray-600">•</span>
-                    <div className="flex items-center gap-2 text-orange-300/80">
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
-                      >
-                        <Target className="w-4 h-4" />
-                      </motion.div>
-                      <span>Jakarta – Indonesia</span>
-                    </div>
-                  </motion.div>
-                  
-                  {/* Footer */}
-                  <motion.div 
-                    className="text-center pt-2"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.7 }}
-                  >
-                    <motion.p 
-                      className="text-xs text-gray-500"
-                      animate={{
-                        opacity: [0.5, 1, 0.5]
-                      }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                    >
-                      All Rights Reserved.
-                    </motion.p>
-                  </motion.div>
-                  
-                  {/* Close Button */}
-                  <motion.div
-                    className="pt-2"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.8 }}
-                  >
-                    <motion.div
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <Button
-                        onClick={() => setShowCopyrightPopup(false)}
-                        className="w-full bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 hover:from-orange-600 hover:via-orange-700 hover:to-red-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-orange-500/25 border border-orange-400/30"
-                      >
-                        <motion.span
-                          className="flex items-center justify-center gap-2"
-                          animate={{ scale: [1, 1.02, 1] }}
-                          transition={{ duration: 2, repeat: Infinity }}
-                        >
-                          <Check className="w-4 h-4" />
-                          <span>TUTUP</span>
-                        </motion.span>
-                      </Button>
-                    </motion.div>
-                  </motion.div>
-                </motion.div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      
+      {/* Copyright Popup */}
+      <CopyrightPopup show={showCopyrightPopup} onClose={() => setShowCopyrightPopup(false)} />
+
+      {/* Print Loading Dialog */}
+      <PrintLoadingDialog
+        open={showPrintDialog}
+        onClose={handlePrintDialogClose}
+        fileId={printDialogFileId}
+        fileName={printDialogFileName}
+        fileType={printDialogFileType}
+        onComplete={handlePrintComplete}
+      />
     </div>
   )
 }

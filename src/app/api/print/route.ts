@@ -15,6 +15,7 @@ import { db } from '@/lib/db'
 import { cookies } from 'next/headers'
 import { downloadFromR2, isR2Configured } from '@/lib/r2-storage'
 import { getAzureAccessToken, getServiceAccount } from '@/lib/azure-auth'
+import { addPdfFooter } from '@/lib/pdf-footer'
 import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -384,8 +385,17 @@ export async function GET(request: NextRequest) {
     console.log(`   File: ${sopFile.fileName} (${fileExtension.toUpperCase()})`)
     console.log(`${'='.repeat(60)}\n`)
     
-    // Step 1: Download from R2
-    console.log(`📥 [Print] Step 1: Downloading from R2: ${sopFile.filePath}`)
+    // Step 1: Get user info for footer
+    console.log(`👤 [Print] Getting user info for footer...`)
+    const user = await db.user.findUnique({
+      where: { id: authenticatedUserId },
+      select: { name: true }
+    })
+    const userName = user?.name || 'Unknown User'
+    console.log(`   User: ${userName}`)
+    
+    // Step 2: Download from R2
+    console.log(`📥 [Print] Step 2: Downloading from R2: ${sopFile.filePath}`)
     const result = await downloadFromR2(sopFile.filePath)
     const fileBuffer = result.buffer
     console.log(`✅ [Print] Downloaded ${fileBuffer.length} bytes from R2`)
@@ -393,22 +403,22 @@ export async function GET(request: NextRequest) {
     let pdfBuffer: ArrayBuffer
     let driveItemId: string | null = null
     
-    // Step 2: Process based on file type
+    // Step 3: Process based on file type
     if (fileExtension === 'pdf') {
       // PDF files don't need conversion
       console.log(`📄 [Print] File is PDF, no conversion needed`)
       pdfBuffer = fileBuffer.buffer.slice(fileBuffer.byteOffset, fileBuffer.byteOffset + fileBuffer.byteLength)
     } else {
       // Office files need to be uploaded to OneDrive and converted
-      console.log(`📤 [Print] Step 2: Getting Azure access token...`)
+      console.log(`📤 [Print] Step 3: Getting Azure access token...`)
       const graphToken = await getAzureAccessToken()
       
       // Ensure temp folder exists
-      console.log(`📁 [Print] Step 3: Ensuring temp folder exists...`)
+      console.log(`📁 [Print] Step 4: Ensuring temp folder exists...`)
       await ensurePrintTempFolder(graphToken)
       
       // Upload to OneDrive temp folder
-      console.log(`📤 [Print] Step 4: Uploading to OneDrive temp folder...`)
+      console.log(`📤 [Print] Step 5: Uploading to OneDrive temp folder...`)
       const contentType = CONTENT_TYPES[fileExtension] || 'application/octet-stream'
       const driveItem = await uploadToTempFolder(graphToken, sopFile.fileName, fileBuffer, contentType)
       driveItemId = driveItem.id
@@ -419,16 +429,22 @@ export async function GET(request: NextRequest) {
         fileName: sopFile.fileName
       })
       
-      // Step 3: Convert to PDF using Graph API
+      // Convert to PDF using Graph API
       // This uses Microsoft's rendering engine which preserves Excel/Word print settings
-      console.log(`📄 [Print] Step 5: Converting to PDF using Graph API...`)
+      console.log(`📄 [Print] Step 6: Converting to PDF using Graph API...`)
       console.log(`   (PDF akan mengikuti print settings dari Office: page layout, margins, print area, dll)`)
       pdfBuffer = await convertToPdf(graphToken, driveItemId, sopFile.fileName)
       
-      // Step 4: Cleanup - delete temp file from OneDrive
-      console.log(`🧹 [Print] Step 6: Cleaning up temp file...`)
+      // Cleanup - delete temp file from OneDrive
+      console.log(`🧹 [Print] Step 7: Cleaning up temp file...`)
       await deleteTempFile(graphToken, driveItemId)
     }
+    
+    // Step 4: Add footer to PDF
+    console.log(`📄 [Print] Step 8: Adding footer to PDF...`)
+    console.log(`   Footer: Printed by: ${userName}`)
+    const pdfWithFooter = await addPdfFooter(pdfBuffer, userName)
+    console.log(`✅ [Print] Footer added, new size: ${pdfWithFooter.byteLength} bytes`)
     
     // Log print activity
     if (authenticatedUserId) {
@@ -452,15 +468,15 @@ export async function GET(request: NextRequest) {
     const printFileName = `${sanitizeFileName(sopFile.judul)}.pdf`
     
     console.log(`\n✅ [Print] Complete in ${Date.now() - startTime}ms`)
-    console.log(`   Output: ${printFileName} (${pdfBuffer.byteLength} bytes)\n`)
+    console.log(`   Output: ${printFileName} (${pdfWithFooter.byteLength} bytes)\n`)
     
     // Return PDF with headers for print dialog
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(pdfWithFooter, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `inline; filename="${encodeURIComponent(printFileName)}"; filename*=UTF-8''${encodeURIComponent(printFileName)}`,
-        'Content-Length': pdfBuffer.byteLength.toString(),
+        'Content-Length': pdfWithFooter.byteLength.toString(),
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Access-Control-Allow-Origin': '*',
         'X-File-Title': encodeURIComponent(sopFile.judul),

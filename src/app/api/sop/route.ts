@@ -203,6 +203,27 @@ export async function POST(request: NextRequest) {
     const fileName = `${sanitizeFileName(judul)}.${fileExtension}`
 
     console.log(`📄 Processing file: ${fileName} (${(file.size / 1024 / 1024).toFixed(2)} MB)`)
+    
+    // ============================================
+    // AUTO-GENERATE SOP NUMBER
+    // Format: SOP-0001, IK-0001, LAINNYA-0001
+    // ============================================
+    const getPrefix = (jenis: string) => {
+      if (jenis === 'SOP') return 'SOP-'
+      if (jenis === 'IK') return 'IK-'
+      return 'LAINNYA-'
+    }
+    
+    const prefix = getPrefix(jenis)
+    
+    // Get count of existing SOPs of the same jenis
+    const existingCount = await db.sopFile.count({
+      where: { jenis }
+    })
+    
+    // Generate new nomorSop (incremental)
+    const nomorSop = `${prefix}${String(existingCount + 1).padStart(4, '0')}`
+    console.log(`📝 Generated nomor: ${nomorSop}`)
 
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
@@ -253,6 +274,7 @@ export async function POST(request: NextRequest) {
     try {
       sopFile = await db.sopFile.create({
         data: {
+          nomorSop,
           judul,
           tahun,
           kategori,

@@ -1,13 +1,14 @@
-// Production Schema - PostgreSQL (for Vercel)
+// Local Development Schema - SQLite
+// Use this for local development only
+// To use: cp prisma/schema.local.prisma prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_DATABASE_URL")
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 // User model with role-based access

@@ -29,7 +29,7 @@ model User {
 // SOP/IK File model
 model SopFile {
   id           String   @id @default(cuid())
-  nomorSop     String   @unique // SOP-0001, IK-0001, etc
+  nomorSop     String?  @unique // SOP-0001, IK-0001, etc (optional for backward compatibility)
   judul        String
   tahun        Int
   kategori     String   // SIAGA, LATIHAN, LAINNYA
