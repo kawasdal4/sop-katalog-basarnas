@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { cookies } from 'next/headers'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
+import { uploadToR2, isR2Configured, deleteFromR2, moveR2Object } from '@/lib/r2-storage'
 
 // Set runtime and max duration for Vercel
 export const runtime = 'nodejs'
@@ -11,32 +12,14 @@ export const maxDuration = 60
 // Check if running in production (Vercel)
 const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1'
 
-// Check if R2 is available (Primary Storage)
-async function checkR2Available(): Promise<{ success: boolean; error?: string }> {
-  try {
-    const r2 = await import('@/lib/r2-storage')
-    if (!r2.isR2Configured()) {
-      return { success: false, error: 'Cloudflare R2 credentials not configured' }
-    }
-    return { success: true }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    return { success: false, error: errorMessage }
-  }
-}
-
-// Check if Google Drive is available (Backup Storage)
-async function checkGoogleDriveAvailable(): Promise<{ success: boolean; error?: string }> {
-  try {
-    const gd = await import('@/lib/google-drive')
-    if (!gd.isGoogleDriveConfigured()) {
-      return { success: false, error: 'Google Drive credentials not configured' }
-    }
-    return { success: true }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    return { success: false, error: errorMessage }
-  }
+// MIME types
+const MIME_TYPES: Record<string, string> = {
+  'pdf': 'application/pdf',
+  'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'xls': 'application/vnd.ms-excel',
+  'xlsm': 'application/vnd.ms-excel.sheet.macroEnabled.12',
+  'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'doc': 'application/msword',
 }
 
 // GET - Fetch all SOPs with filters
@@ -58,13 +41,10 @@ export async function GET(request: NextRequest) {
     const whereConditions: unknown[] = []
     
     // Search filter - Case insensitive search focused on judul (Title)
-    // Using mode: 'insensitive' for explicit case-insensitive matching
+    // Note: SQLite doesn't support mode: 'insensitive', but LIKE is case-insensitive by default
     if (search) {
       whereConditions.push({
-        OR: [
-          { judul: { contains: search, mode: 'insensitive' } },
-          { nomorSop: { contains: search, mode: 'insensitive' } }
-        ]
+        judul: { contains: search }
       })
     }
     
@@ -105,7 +85,6 @@ export async function GET(request: NextRequest) {
     const where = whereConditions.length > 0 ? { AND: whereConditions } : {}
     
     // Build orderBy based on sortBy parameter
-    // Default: uploadedAt-desc (newest first)
     let orderBy: unknown[] = [{ uploadedAt: 'desc' }]
     switch (sortBy) {
       case 'tahun-asc':
@@ -113,9 +92,6 @@ export async function GET(request: NextRequest) {
         break
       case 'tahun-desc':
         orderBy = [{ tahun: 'desc' }, { uploadedAt: 'desc' }]
-        break
-      case 'uploadedAt-desc':
-        orderBy = [{ uploadedAt: 'desc' }]
         break
       case 'uploadedAt-asc':
         orderBy = [{ uploadedAt: 'asc' }]
@@ -155,7 +131,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Create new SOP with Google Drive upload
+// POST - Create new SOP with R2 upload (Primary) and Google Drive backup
 export async function POST(request: NextRequest) {
   console.log('\n========================================')
   console.log('📤 UPLOAD REQUEST')
@@ -163,16 +139,237 @@ export async function POST(request: NextRequest) {
   console.log('========================================\n')
   
   try {
-    const contentType = request.headers.get('content-type') || ''
+    const formData = await request.formData()
+    const judul = formData.get('judul') as string
+    const kategori = formData.get('kategori') as string
+    const jenis = formData.get('jenis') as string
+    const tahun = parseInt(formData.get('tahun') as string)
+    const status = formData.get('status') as string
+    const file = formData.get('file') as File | null
     
-    // Check if this is a JSON request (for large file uploads that already have driveFileId)
-    if (contentType.includes('application/json')) {
-      return await handleJsonUpload(request)
+    const isPublicSubmission = formData.get('isPublicSubmission') === 'true'
+    const submitterName = formData.get('submitterName') as string | null
+    const submitterEmail = formData.get('submitterEmail') as string | null
+    const keterangan = formData.get('keterangan') as string | null
+    
+    console.log('Form data:', { judul, kategori, jenis, tahun, fileName: file?.name, fileSize: file?.size })
+    
+    if (!file) {
+      return NextResponse.json({ error: 'File diperlukan' }, { status: 400 })
     }
     
-    // Handle form data upload (small files)
-    return await handleFormUpload(request)
+    // Get user ID
+    let userId: string
     
+    if (isPublicSubmission) {
+      let systemUser = await db.user.findUnique({ where: { email: 'system@sop.go.id' } })
+      if (!systemUser) {
+        systemUser = await db.user.create({
+          data: {
+            email: 'system@sop.go.id',
+            password: 'system',
+            name: 'System (Public Submission)',
+            role: 'STAF'
+          }
+        })
+      }
+      userId = systemUser.id
+    } else {
+      const cookieStore = await cookies()
+      const userIdCookie = cookieStore.get('userId')?.value
+
+      if (!userIdCookie) {
+        return NextResponse.json({ error: 'Unauthorized - no session' }, { status: 401 })
+      }
+
+      userId = userIdCookie
+      console.log(`🔑 Session user ID: ${userId}`)
+
+      // Verify user exists in database
+      const userExists = await db.user.findUnique({ where: { id: userId } })
+      if (!userExists) {
+        console.error(`❌ User not found: ${userId}`)
+        return NextResponse.json({ error: 'User tidak valid. Silakan login ulang.' }, { status: 401 })
+      }
+      console.log(`✅ User verified: ${userExists.email}`)
+    }
+
+    // Prepare file
+    const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'pdf'
+    const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
+    const fileName = `${sanitizeFileName(judul)}.${fileExtension}`
+
+    console.log(`📄 Processing file: ${fileName} (${(file.size / 1024 / 1024).toFixed(2)} MB)`)
+
+    const bytes = await file.arrayBuffer()
+    const buffer = Buffer.from(bytes)
+    
+    const mimeType = MIME_TYPES[fileExtension] || 'application/octet-stream'
+    
+    let r2Key: string | null = null
+    let filePath = fileName
+    
+    // ============================================
+    // STEP 1: Upload to R2 (PRIMARY STORAGE)
+    // ============================================
+    if (!isR2Configured()) {
+      // Local storage fallback (development only)
+      if (!isProduction) {
+        console.log('📁 Using local storage (R2 not configured)')
+        const uploadDir = path.join(process.cwd(), 'uploads')
+        await mkdir(uploadDir, { recursive: true })
+        const localPath = path.join(uploadDir, fileName)
+        await writeFile(localPath, buffer)
+      } else {
+        return NextResponse.json({ 
+          error: 'Cloudflare R2 tidak terkonfigurasi. Hubungi administrator.' 
+        }, { status: 500 })
+      }
+    } else {
+      try {
+        console.log(`📤 Uploading to R2 (Primary): ${fileName}`)
+        
+        const r2Result = await uploadToR2(buffer, fileName, mimeType, { 
+          folder: 'sop-files' 
+        })
+        r2Key = r2Result.key
+        filePath = r2Result.key
+        
+        console.log(`✅ File uploaded to R2: ${r2Key}`)
+      } catch (r2Error) {
+        console.error('❌ R2 upload failed:', r2Error)
+        return NextResponse.json({ 
+          error: 'Gagal mengupload ke Cloudflare R2. Silakan coba lagi.',
+          details: r2Error instanceof Error ? r2Error.message : 'Unknown error'
+        }, { status: 500 })
+      }
+    }
+    
+    // Create SOP record
+    let sopFile
+    try {
+      sopFile = await db.sopFile.create({
+        data: {
+          judul,
+          tahun,
+          kategori,
+          jenis,
+          status: status || 'AKTIF',
+          fileName,
+          filePath,
+          fileType: fileExtension,
+          driveFileId: null, // Will be set by background backup
+          uploadedBy: userId,
+          isPublicSubmission,
+          submitterName,
+          submitterEmail,
+          keterangan,
+          verificationStatus: isPublicSubmission ? 'MENUNGGU' : null
+        }
+      })
+    } catch (dbError: unknown) {
+      console.error('❌ Database error:', dbError)
+      const prismaError = dbError as { code?: string; meta?: { target?: string[] } }
+      if (prismaError.code === 'P2002') {
+        return NextResponse.json({
+          error: `Dokumen dengan judul serupa sudah ada. Gunakan judul berbeda.`,
+          code: prismaError.code
+        }, { status: 400 })
+      }
+      return NextResponse.json({
+        error: 'Gagal menyimpan ke database',
+        details: dbError instanceof Error ? dbError.message : 'Unknown error'
+      }, { status: 500 })
+    }
+
+    // Create FileSync record
+    if (r2Key) {
+      try {
+        await db.fileSync.create({
+          data: {
+            filename: fileName,
+            mimeType,
+            fileSize: buffer.length,
+            r2Key,
+            source: 'r2',
+            syncStatus: 'synced',
+            r2ModifiedAt: new Date(),
+          }
+        })
+      } catch (syncError) {
+        console.warn('⚠️ Failed to create FileSync record:', syncError)
+      }
+    }
+    
+    // Create log
+    try {
+      await db.log.create({
+        data: {
+          userId,
+          aktivitas: 'UPLOAD',
+          deskripsi: `${isPublicSubmission ? 'Submit publik' : 'Upload'} ${jenis}: ${judul} [R2 Primary]`,
+          fileId: sopFile.id
+        }
+      })
+    } catch (logError) {
+      console.warn('⚠️ Failed to create log:', logError)
+    }
+
+    // ============================================
+    // STEP 2: BACKGROUND Backup to Google Drive
+    // (Async, no await - user gets response immediately)
+    // ============================================
+    import('@/lib/google-drive').then(async (gd) => {
+      if (gd.isGoogleDriveConfigured() && r2Key) {
+        try {
+          console.log(`📤 [Background] Starting backup to Google Drive: ${fileName}`)
+
+          const driveResult = await gd.uploadFileToDriveFolder(buffer, fileName, mimeType)
+
+          // Update SOP record with driveFileId
+          await db.sopFile.update({
+            where: { id: sopFile.id },
+            data: { driveFileId: driveResult.id }
+          })
+
+          // Update FileSync record
+          await db.fileSync.updateMany({
+            where: { r2Key },
+            data: {
+              driveFileId: driveResult.id,
+              source: 'both',
+              syncStatus: 'synced',
+              driveModifiedAt: new Date(),
+              lastSyncedAt: new Date(),
+            }
+          })
+
+          console.log(`✅ [Background] Backup to Google Drive completed: ${driveResult.id}`)
+
+        } catch (backupError) {
+          console.warn('⚠️ [Background] Backup to Google Drive failed:', backupError)
+        }
+      }
+    }).catch(err => {
+      console.warn('⚠️ [Background] Failed to start backup:', err)
+    })
+
+    console.log('========================================')
+    console.log('✅ UPLOAD SUCCESS')
+    console.log(`   ID: ${sopFile.id}`)
+    console.log(`   R2 Key: ${r2Key || 'local'}`)
+    console.log(`   GDrive Backup: Background`)
+    console.log('========================================\n')
+    
+    return NextResponse.json({ 
+      success: true, 
+      data: sopFile,
+      r2Key,
+      syncStatus: {
+        r2: r2Key ? 'synced' : 'pending',
+        googleDrive: 'pending'
+      }
+    })
   } catch (error) {
     console.error('❌ Upload error:', error)
     return NextResponse.json({ 
@@ -180,649 +377,6 @@ export async function POST(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error' 
     }, { status: 500 })
   }
-}
-
-// Handle JSON upload (for large files already uploaded to Google Drive)
-async function handleJsonUpload(request: NextRequest) {
-  const body = await request.json()
-  const {
-    judul, kategori, jenis, tahun, status,
-    fileName, fileType, driveFileId,
-    isPublicSubmission, submitterName, submitterEmail,
-    keterangan,
-    skipFileUpload
-  } = body
-
-  console.log('JSON upload data:', { judul, kategori, jenis, tahun, fileName, driveFileId, skipFileUpload })
-
-  if (!driveFileId) {
-    return NextResponse.json({ error: 'driveFileId diperlukan untuk JSON upload' }, { status: 400 })
-  }
-
-  // Get user ID
-  let userId: string
-
-  if (isPublicSubmission) {
-    let systemUser = await db.user.findUnique({ where: { email: 'system@sop.go.id' } })
-    if (!systemUser) {
-      systemUser = await db.user.create({
-        data: {
-          email: 'system@sop.go.id',
-          password: 'system',
-          name: 'System (Public Submission)',
-          role: 'STAF'
-        }
-      })
-    }
-    userId = systemUser.id
-  } else {
-    const cookieStore = await cookies()
-    const userIdCookie = cookieStore.get('userId')?.value
-
-    if (!userIdCookie) {
-      return NextResponse.json({ error: 'Unauthorized - no session' }, { status: 401 })
-    }
-
-    userId = userIdCookie
-    console.log(`🔑 Session user ID (JSON): ${userId}`)
-
-    // Verify user exists in database
-    const userExists = await db.user.findUnique({ where: { id: userId } })
-    if (!userExists) {
-      console.error(`❌ User not found: ${userId}`)
-      return NextResponse.json({ error: 'User tidak valid. Silakan login ulang.' }, { status: 401 })
-    }
-    console.log(`✅ User verified: ${userExists.email}`)
-  }
-
-  // ============================================
-  // AUTO-GENERATE SOP NUMBER BASED ON TIMESTAMP
-  // Newest file = Number 1
-  // ============================================
-  
-  // Get prefix based on jenis
-  const getPrefix = (jenis: string) => {
-    if (jenis === 'SOP') return 'SOP-'
-    if (jenis === 'IK') return 'IK-'
-    return 'LAINNYA-' // For LAINNYA jenis
-  }
-  
-  const prefix = getPrefix(jenis)
-  
-  // Get all SOPs of the same jenis, ordered by uploadedAt DESC (newest first)
-  const allSopsOfJenis = await db.sopFile.findMany({
-    where: { jenis },
-    orderBy: { uploadedAt: 'desc' },
-    select: { id: true, nomorSop: true, uploadedAt: true }
-  })
-  
-  // The new file will be inserted at position 1 (newest)
-  // So we need to shift all existing ones down by 1
-  
-  // Generate new nomorSop for the new file (it will be #1)
-  const nomorSop = `${prefix}${String(1).padStart(4, '0')}`
-  
-  console.log(`📝 Generated nomor: ${nomorSop} (newest file)`)
-  
-  // Renumber all existing SOPs of this jenis (shift by 1)
-  // Files are already ordered by uploadedAt DESC, so position 0 becomes #2, position 1 becomes #3, etc.
-  for (let i = 0; i < allSopsOfJenis.length; i++) {
-    const existingSop = allSopsOfJenis[i]
-    const newNumber = i + 2 // Position 0 gets #2, position 1 gets #3, etc.
-    const newNomorSop = `${prefix}${String(newNumber).padStart(4, '0')}`
-    
-    try {
-      await db.sopFile.update({
-        where: { id: existingSop.id },
-        data: { nomorSop: newNomorSop }
-      })
-      console.log(`📝 Renumbered: ${existingSop.nomorSop} → ${newNomorSop}`)
-    } catch (updateError) {
-      console.warn(`⚠️ Failed to renumber ${existingSop.nomorSop}:`, updateError)
-    }
-  }
-
-  // Update counter for backwards compatibility
-  const newCount = allSopsOfJenis.length + 1
-  if (jenis === 'SOP') {
-    await db.counter.upsert({
-      where: { id: 'counter' },
-      update: { sopCount: newCount },
-      create: { id: 'counter', sopCount: newCount, ikCount: 0 }
-    })
-  } else if (jenis === 'IK') {
-    await db.counter.upsert({
-      where: { id: 'counter' },
-      update: { ikCount: newCount },
-      create: { id: 'counter', sopCount: 0, ikCount: newCount }
-    })
-  }
-
-  // Set file to public in Google Drive
-  try {
-    const gd = await import('@/lib/google-drive')
-    await gd.setFilePublic(driveFileId)
-    console.log(`✅ File set to public: ${driveFileId}`)
-  } catch (permError) {
-    console.warn('⚠️ Could not set file to public:', permError)
-  }
-
-  // Determine file name
-  const finalFileName = fileName || `${nomorSop}.${fileType || 'pdf'}`
-  const r2Key = `sop-files/${finalFileName}`
-  let filePath = driveFileId
-
-  // ============================================
-  // AUTO SYNC: Also upload to R2 (Primary Storage)
-  // ============================================
-  const r2Check = await checkR2Available()
-
-  if (r2Check.success) {
-    try {
-      console.log(`📤 Auto-sync: Downloading from Google Drive to upload to R2...`)
-
-      // Download from Google Drive
-      const gd = await import('@/lib/google-drive')
-      const fileBuffer = await gd.downloadFileFromDrive(driveFileId)
-
-      // MIME types
-      const mimeTypes: Record<string, string> = {
-        'pdf': 'application/pdf',
-        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'xls': 'application/vnd.ms-excel',
-        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'doc': 'application/msword',
-      }
-      const mimeType = mimeTypes[fileType || 'pdf'] || 'application/octet-stream'
-
-      // Upload to R2
-      const r2 = await import('@/lib/r2-storage')
-      const r2Result = await r2.uploadToR2(fileBuffer, finalFileName, mimeType, {
-        folder: 'sop-files'
-      })
-
-      console.log(`✅ Auto-sync: File uploaded to R2: ${r2Result.key}`)
-      filePath = r2Result.key
-
-      // Create FileSync record
-      await db.fileSync.upsert({
-        where: { r2Key: r2Result.key },
-        create: {
-          filename: finalFileName,
-          mimeType,
-          fileSize: fileBuffer.length,
-          r2Key: r2Result.key,
-          driveFileId,
-          source: 'both',
-          syncStatus: 'synced',
-          r2ModifiedAt: new Date(),
-          driveModifiedAt: new Date(),
-          lastSyncedAt: new Date(),
-        },
-        update: {
-          driveFileId,
-          source: 'both',
-          syncStatus: 'synced',
-          fileSize: fileBuffer.length,
-          r2ModifiedAt: new Date(),
-          driveModifiedAt: new Date(),
-          lastSyncedAt: new Date(),
-        }
-      })
-
-      // Log the auto-sync
-      await db.syncLog.create({
-        data: {
-          operation: 'auto_sync_large_upload',
-          filename: finalFileName,
-          status: 'success',
-          message: `Auto-synced large file: Drive (${driveFileId}) → R2 (${r2Result.key})`,
-          details: { r2Key: r2Result.key, driveFileId, fileSize: fileBuffer.length }
-        }
-      })
-
-    } catch (syncError) {
-      console.warn('⚠️ Auto-sync to R2 failed (file still available in Google Drive):', syncError instanceof Error ? syncError.message : syncError)
-
-      // Create pending FileSync record
-      try {
-        await db.fileSync.create({
-          data: {
-            filename: finalFileName,
-            mimeType: 'application/octet-stream',
-            fileSize: 0,
-            driveFileId,
-            source: 'drive',
-            syncStatus: 'pending',
-            driveModifiedAt: new Date(),
-            lastError: syncError instanceof Error ? syncError.message : 'Unknown error',
-          }
-        })
-      } catch (fsError) {
-        console.warn('⚠️ Failed to create FileSync record:', fsError)
-      }
-    }
-  }
-
-  // Create SOP record
-  const sopFile = await db.sopFile.create({
-    data: {
-      nomorSop,
-      judul,
-      tahun: parseInt(tahun),
-      kategori,
-      jenis,
-      status: status || 'AKTIF',
-      fileName: finalFileName,
-      filePath,
-      fileType: fileType || 'pdf',
-      driveFileId,
-      uploadedBy: userId,
-      isPublicSubmission: isPublicSubmission || false,
-      submitterName,
-      submitterEmail,
-      keterangan,
-      verificationStatus: isPublicSubmission ? 'MENUNGGU' : null
-    }
-  })
-
-  // Counter already updated above with newCount
-
-  // Create log
-  try {
-    await db.log.create({
-      data: {
-        userId,
-        aktivitas: 'UPLOAD',
-        deskripsi: `${isPublicSubmission ? 'Submit publik' : 'Upload'} ${jenis}: ${nomorSop} - ${judul} [Resumable + Auto-sync]`,
-        fileId: sopFile.id
-      }
-    })
-  } catch (logError) {
-    console.warn('⚠️ Failed to create log:', logError)
-  }
-
-  console.log('========================================')
-  console.log('✅ UPLOAD SUCCESS (Resumable)')
-  console.log(`   ID: ${sopFile.id}`)
-  console.log(`   Drive ID: ${driveFileId}`)
-  console.log(`   R2 Sync: ${filePath !== driveFileId ? 'Yes' : 'Pending'}`)
-  console.log('========================================\n')
-
-  return NextResponse.json({
-    success: true,
-    data: sopFile,
-    driveFileId
-  })
-}
-
-// Handle form data upload (small files)
-async function handleFormUpload(request: NextRequest) {
-  const formData = await request.formData()
-  const judul = formData.get('judul') as string
-  const kategori = formData.get('kategori') as string
-  const jenis = formData.get('jenis') as string
-  const tahun = parseInt(formData.get('tahun') as string)
-  const status = formData.get('status') as string
-  const file = formData.get('file') as File | null
-  
-  const isPublicSubmission = formData.get('isPublicSubmission') === 'true'
-  const submitterName = formData.get('submitterName') as string | null
-  const submitterEmail = formData.get('submitterEmail') as string | null
-  const keterangan = formData.get('keterangan') as string | null
-  
-  console.log('Form data:', { judul, kategori, jenis, tahun, fileName: file?.name, fileSize: file?.size })
-  
-  if (!file) {
-    return NextResponse.json({ error: 'File diperlukan' }, { status: 400 })
-  }
-  
-  // Check file size (max 4MB for form upload due to Vercel limits)
-  const maxSize = 4 * 1024 * 1024 // 4MB
-  if (file.size > maxSize) {
-    return NextResponse.json({ 
-      error: 'File terlalu besar untuk form upload. Gunakan upload resumable.',
-      fileSize: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-      maxSize: '4 MB',
-      useResumable: true
-    }, { status: 400 })
-  }
-  
-  // Get user ID
-  let userId: string
-  
-  if (isPublicSubmission) {
-    let systemUser = await db.user.findUnique({ where: { email: 'system@sop.go.id' } })
-    if (!systemUser) {
-      systemUser = await db.user.create({
-        data: {
-          email: 'system@sop.go.id',
-          password: 'system',
-          name: 'System (Public Submission)',
-          role: 'STAF'
-        }
-      })
-    }
-    userId = systemUser.id
-  } else {
-    const cookieStore = await cookies()
-    const userIdCookie = cookieStore.get('userId')?.value
-
-    if (!userIdCookie) {
-      return NextResponse.json({ error: 'Unauthorized - no session' }, { status: 401 })
-    }
-
-    userId = userIdCookie
-    console.log(`🔑 Session user ID (Form): ${userId}`)
-
-    // Verify user exists in database
-    const userExists = await db.user.findUnique({ where: { id: userId } })
-    if (!userExists) {
-      console.error(`❌ User not found: ${userId}`)
-      return NextResponse.json({ error: 'User tidak valid. Silakan login ulang.' }, { status: 401 })
-    }
-    console.log(`✅ User verified: ${userExists.email}`)
-  }
-
-  // ============================================
-  // AUTO-GENERATE SOP NUMBER BASED ON TIMESTAMP
-  // Newest file = Number 1
-  // ============================================
-  
-  // Get prefix based on jenis
-  const getPrefixForm = (jenis: string) => {
-    if (jenis === 'SOP') return 'SOP-'
-    if (jenis === 'IK') return 'IK-'
-    return 'LAINNYA-' // For LAINNYA jenis
-  }
-  
-  const prefixForm = getPrefixForm(jenis)
-  
-  // Get all SOPs of the same jenis, ordered by uploadedAt DESC (newest first)
-  const allSopsOfJenisForm = await db.sopFile.findMany({
-    where: { jenis },
-    orderBy: { uploadedAt: 'desc' },
-    select: { id: true, nomorSop: true, uploadedAt: true }
-  })
-  
-  // The new file will be inserted at position 1 (newest)
-  // Generate new nomorSop for the new file (it will be #1)
-  const nomorSop = `${prefixForm}${String(1).padStart(4, '0')}`
-  
-  console.log(`📝 Generated nomor: ${nomorSop} (newest file)`)
-  
-  // Renumber all existing SOPs of this jenis (shift by 1)
-  for (let i = 0; i < allSopsOfJenisForm.length; i++) {
-    const existingSop = allSopsOfJenisForm[i]
-    const newNumber = i + 2
-    const newNomorSop = `${prefixForm}${String(newNumber).padStart(4, '0')}`
-    
-    try {
-      await db.sopFile.update({
-        where: { id: existingSop.id },
-        data: { nomorSop: newNomorSop }
-      })
-      console.log(`📝 Renumbered: ${existingSop.nomorSop} → ${newNomorSop}`)
-    } catch (updateError) {
-      console.warn(`⚠️ Failed to renumber ${existingSop.nomorSop}:`, updateError)
-    }
-  }
-
-  // Update counter for backwards compatibility
-  const newCountForm = allSopsOfJenisForm.length + 1
-  if (jenis === 'SOP') {
-    await db.counter.upsert({
-      where: { id: 'counter' },
-      update: { sopCount: newCountForm },
-      create: { id: 'counter', sopCount: newCountForm, ikCount: 0 }
-    })
-  } else if (jenis === 'IK') {
-    await db.counter.upsert({
-      where: { id: 'counter' },
-      update: { ikCount: newCountForm },
-      create: { id: 'counter', sopCount: 0, ikCount: newCountForm }
-    })
-  }
-
-  // Prepare file
-  const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'pdf'
-  const fileName = `${nomorSop}.${fileExtension}`
-
-  console.log(`📄 Processing file: ${fileName} (${(file.size / 1024 / 1024).toFixed(2)} MB)`)
-
-  const bytes = await file.arrayBuffer()
-  const buffer = Buffer.from(bytes)
-  
-  // MIME types
-  const mimeTypes: Record<string, string> = {
-    'pdf': 'application/pdf',
-    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'xls': 'application/vnd.ms-excel',
-    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'doc': 'application/msword',
-  }
-  const mimeType = mimeTypes[fileExtension] || 'application/octet-stream'
-  
-  let r2Key: string | null = null
-  let driveFileId: string | null = null
-  let filePath = fileName
-  
-  // ============================================
-  // STEP 1: Upload to R2 (PRIMARY STORAGE)
-  // ============================================
-  const r2Check = await checkR2Available()
-  
-  if (r2Check.success) {
-    try {
-      const r2 = await import('@/lib/r2-storage')
-      console.log(`📤 Uploading to R2 (Primary): ${fileName} (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`)
-      
-      const r2Result = await r2.uploadToR2(buffer, fileName, mimeType, { 
-        folder: 'sop-files' 
-      })
-      r2Key = r2Result.key
-      filePath = r2Result.key
-      
-      console.log(`✅ File uploaded to R2: ${r2Key}`)
-    } catch (r2Error) {
-      console.error('❌ R2 upload failed:', r2Error)
-      return NextResponse.json({ 
-        error: 'Gagal mengupload ke Cloudflare R2. Silakan coba lagi.',
-        details: r2Error instanceof Error ? r2Error.message : 'Unknown error'
-      }, { status: 500 })
-    }
-  } else {
-    // Local storage fallback (development only)
-    if (!isProduction) {
-      console.log('📁 Using local storage (R2 not configured)')
-      const uploadDir = path.join(process.cwd(), 'uploads')
-      await mkdir(uploadDir, { recursive: true })
-      const localPath = path.join(uploadDir, fileName)
-      await writeFile(localPath, buffer)
-    } else {
-      return NextResponse.json({ 
-        error: `Cloudflare R2 tidak tersedia: ${r2Check.error}` 
-      }, { status: 500 })
-    }
-  }
-  
-  // ============================================
-  // STEP 2: Backup to Google Drive (AUTO SYNC)
-  // ============================================
-  const driveCheck = await checkGoogleDriveAvailable()
-
-  if (driveCheck.success && r2Key) {
-    try {
-      // Upload to Google Drive synchronously (await the result)
-      const gd = await import('@/lib/google-drive')
-      console.log(`📤 Auto-backup to Google Drive: ${fileName}`)
-
-      const driveResult = await gd.uploadFileToDriveFolder(buffer, fileName, mimeType)
-      driveFileId = driveResult.id
-
-      console.log(`✅ Auto-backup successful: ${driveFileId}`)
-
-      // Create or update FileSync record for tracking
-      await db.fileSync.upsert({
-        where: { r2Key },
-        create: {
-          filename: fileName,
-          mimeType,
-          fileSize: buffer.length,
-          r2Key,
-          driveFileId,
-          source: 'both',
-          syncStatus: 'synced',
-          r2ModifiedAt: new Date(),
-          driveModifiedAt: new Date(),
-          lastSyncedAt: new Date(),
-        },
-        update: {
-          driveFileId,
-          source: 'both',
-          syncStatus: 'synced',
-          fileSize: buffer.length,
-          r2ModifiedAt: new Date(),
-          driveModifiedAt: new Date(),
-          lastSyncedAt: new Date(),
-        }
-      })
-
-      // Log the auto-sync
-      await db.syncLog.create({
-        data: {
-          operation: 'auto_sync_upload',
-          filename: fileName,
-          status: 'success',
-          message: `Auto-synced to Google Drive on upload: ${driveFileId}`,
-          details: { r2Key, driveFileId, fileSize: buffer.length }
-        }
-      })
-
-    } catch (backupError) {
-      console.warn('⚠️ Auto-backup to Google Drive failed:', backupError instanceof Error ? backupError.message : backupError)
-
-      // Still create FileSync record but mark as pending
-      try {
-        await db.fileSync.upsert({
-          where: { r2Key },
-          create: {
-            filename: fileName,
-            mimeType,
-            fileSize: buffer.length,
-            r2Key,
-            source: 'r2',
-            syncStatus: 'pending',
-            r2ModifiedAt: new Date(),
-            lastError: backupError instanceof Error ? backupError.message : 'Unknown error',
-          },
-          update: {
-            source: 'r2',
-            syncStatus: 'pending',
-            lastError: backupError instanceof Error ? backupError.message : 'Unknown error',
-          }
-        })
-      } catch (syncError) {
-        console.warn('⚠️ Failed to create FileSync record:', syncError)
-      }
-    }
-  } else if (r2Key) {
-    // Google Drive not available, create pending FileSync record
-    try {
-      await db.fileSync.create({
-        data: {
-          filename: fileName,
-          mimeType,
-          fileSize: buffer.length,
-          r2Key,
-          source: 'r2',
-          syncStatus: 'pending',
-          r2ModifiedAt: new Date(),
-        }
-      })
-    } catch (syncError) {
-      console.warn('⚠️ Failed to create pending FileSync record:', syncError)
-    }
-  }
-  
-  // Create SOP record
-  let sopFile
-  try {
-    sopFile = await db.sopFile.create({
-      data: {
-        nomorSop,
-        judul,
-        tahun,
-        kategori,
-        jenis,
-        status: status || 'AKTIF',
-        fileName: file.name,
-        filePath,
-        fileType: fileExtension,
-        driveFileId,
-        uploadedBy: userId,
-        isPublicSubmission,
-        submitterName,
-        submitterEmail,
-        keterangan,
-        verificationStatus: isPublicSubmission ? 'MENUNGGU' : null
-      }
-    })
-  } catch (dbError: unknown) {
-    console.error('❌ Database error:', dbError)
-    const prismaError = dbError as { code?: string; meta?: { target?: string[] } }
-    if (prismaError.code === 'P2002') {
-      return NextResponse.json({
-        error: `Nomor SOP ${nomorSop} sudah ada. Coba lagi.`,
-        code: prismaError.code
-      }, { status: 400 })
-    }
-    if (prismaError.code === 'P2003') {
-      return NextResponse.json({
-        error: 'User tidak valid. Silakan login ulang.',
-        code: prismaError.code
-      }, { status: 401 })
-    }
-    return NextResponse.json({
-      error: 'Gagal menyimpan ke database',
-      details: dbError instanceof Error ? dbError.message : 'Unknown error',
-      code: prismaError.code
-    }, { status: 500 })
-  }
-  
-  // Counter already updated above with newCountForm
-  
-  // Create log
-  try {
-    await db.log.create({
-      data: {
-        userId,
-        aktivitas: 'UPLOAD',
-        deskripsi: `${isPublicSubmission ? 'Submit publik' : 'Upload'} ${jenis}: ${nomorSop} - ${judul}${r2Key ? ' [R2 Primary]' : ' [Local]'}${driveFileId ? ' + GDrive Backup' : ''}`,
-        fileId: sopFile.id
-      }
-    })
-  } catch (logError) {
-    console.warn('⚠️ Failed to create log:', logError)
-  }
-  
-  console.log('========================================')
-  console.log('✅ UPLOAD SUCCESS')
-  console.log(`   ID: ${sopFile.id}`)
-  console.log(`   R2 Key: ${r2Key || 'local'}`)
-  console.log(`   GDrive Backup: ${driveFileId || 'pending'}`)
-  console.log('========================================\n')
-  
-  return NextResponse.json({ 
-    success: true, 
-    data: sopFile,
-    r2Key,
-    driveFileId,
-    syncStatus: {
-      r2: r2Key ? 'synced' : 'pending',
-      googleDrive: driveFileId ? 'synced' : 'pending'
-    }
-  })
 }
 
 // PUT - Update SOP metadata, status, or increment counters
@@ -867,7 +421,7 @@ export async function PUT(request: NextRequest) {
           data: {
             userId,
             aktivitas: incrementPreview ? 'PREVIEW' : 'DOWNLOAD',
-            deskripsi: `${incrementPreview ? 'Preview' : 'Download'} ${sopFile.jenis}: ${sopFile.nomorSop}`,
+            deskripsi: `${incrementPreview ? 'Preview' : 'Download'} ${sopFile.jenis}: ${sopFile.judul}`,
             fileId: id
           }
         })
@@ -886,6 +440,33 @@ export async function PUT(request: NextRequest) {
       }
 
       const updateData: Record<string, unknown> = {}
+      let newFilePath: string | null = null
+      let newFileName: string | null = null
+      
+      // Auto-rename file when judul changes
+      if (judul && judul !== existingSop.judul && existingSop.filePath && isR2Configured()) {
+        const fileExtension = existingSop.fileName.split('.').pop()?.toLowerCase() || 'pdf'
+        const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
+        newFileName = `${sanitizeFileName(judul)}.${fileExtension}`
+        
+        // Get folder path from existing file
+        const folderPath = existingSop.filePath.substring(0, existingSop.filePath.lastIndexOf('/'))
+        newFilePath = folderPath ? `${folderPath}/${newFileName}` : newFileName
+        
+        // Move file in R2 to new name
+        try {
+          console.log(`🔄 Auto-renaming file: ${existingSop.filePath} → ${newFilePath}`)
+          await moveR2Object(existingSop.filePath, newFilePath)
+          updateData.fileName = newFileName
+          updateData.filePath = newFilePath
+          console.log(`✅ File renamed successfully: ${newFileName}`)
+        } catch (renameError) {
+          console.warn('⚠️ Failed to rename file in R2:', renameError)
+          // Continue with metadata update even if rename fails
+          newFilePath = null
+          newFileName = null
+        }
+      }
       
       if (judul) updateData.judul = judul
       if (kategori) updateData.kategori = kategori
@@ -902,7 +483,10 @@ export async function PUT(request: NextRequest) {
       try {
         const user = await db.user.findUnique({ where: { id: userId } })
         const changes = []
-        if (judul && judul !== existingSop.judul) changes.push(`judul: "${existingSop.judul}" → "${judul}"`)
+        if (judul && judul !== existingSop.judul) {
+          changes.push(`judul: "${existingSop.judul}" → "${judul}"`)
+          if (newFileName) changes.push(`file renamed: "${existingSop.fileName}" → "${newFileName}"`)
+        }
         if (kategori && kategori !== existingSop.kategori) changes.push(`kategori: ${existingSop.kategori} → ${kategori}`)
         if (jenis && jenis !== existingSop.jenis) changes.push(`jenis: ${existingSop.jenis} → ${jenis}`)
         if (tahun && tahun !== existingSop.tahun) changes.push(`tahun: ${existingSop.tahun} → ${tahun}`)
@@ -912,7 +496,7 @@ export async function PUT(request: NextRequest) {
           data: {
             userId,
             aktivitas: 'EDIT_METADATA',
-            deskripsi: `${user?.name} mengubah ${existingSop.jenis}: ${existingSop.nomorSop}${changes.length > 0 ? ' - ' + changes.join(', ') : ''}`,
+            deskripsi: `${user?.name} mengubah ${existingSop.jenis}: ${existingSop.judul}${changes.length > 0 ? ' - ' + changes.join(', ') : ''}`,
             fileId: id
           }
         })
@@ -920,13 +504,20 @@ export async function PUT(request: NextRequest) {
         console.warn('⚠️ Failed to create log:', logError)
       }
       
-      return NextResponse.json({ success: true, data: sopFile })
+      return NextResponse.json({ 
+        success: true, 
+        data: sopFile, 
+        renamed: newFileName ? { oldName: existingSop.fileName, newName: newFileName } : null
+      })
     }
 
     // Handle verification status updates
     const updateData: Record<string, unknown> = {}
 
     if (verificationStatus) {
+      // Get existing file info first
+      const existingFile = await db.sopFile.findUnique({ where: { id } })
+      
       updateData.verificationStatus = verificationStatus
       updateData.verifiedBy = verifiedBy || userId
       updateData.verifiedAt = new Date()
@@ -936,11 +527,28 @@ export async function PUT(request: NextRequest) {
         updateData.status = 'REVIEW'
       }
       
-      // If DITOLAK, store rejection reason and set arsip folder
+      // If DITOLAK, store rejection reason, set arsip folder, and move file
       if (verificationStatus === 'DITOLAK') {
         try {
           updateData.rejectionReason = rejectionReason || 'Tidak ada alasan'
           updateData.arsipFolder = 'Publik-Ditolak'
+          
+          // Move file to 'publik-ditolak' folder in R2
+          if (existingFile?.filePath && isR2Configured()) {
+            const oldPath = existingFile.filePath
+            const fileName = oldPath.split('/').pop() || existingFile.fileName
+            const newPath = `publik-ditolak/${fileName}`
+            
+            try {
+              console.log(`📦 Moving rejected file: ${oldPath} → ${newPath}`)
+              await moveR2Object(oldPath, newPath)
+              updateData.filePath = newPath
+              console.log(`✅ File moved to rejected folder: ${newPath}`)
+            } catch (moveError) {
+              console.warn('⚠️ Failed to move rejected file:', moveError)
+              // Continue with status update even if move fails
+            }
+          }
         } catch (fieldError) {
           console.warn('⚠️ rejectionReason/arsipFolder fields may not exist:', fieldError)
         }
@@ -958,7 +566,7 @@ export async function PUT(request: NextRequest) {
         data: {
           userId,
           aktivitas: verificationStatus ? 'VERIFIKASI' : 'EDIT_STATUS',
-          deskripsi: `${user?.name} ${verificationStatus ? 'memverifikasi' : 'mengubah status'} ${sopFile.jenis}: ${sopFile.nomorSop}`,
+          deskripsi: `${user?.name} ${verificationStatus ? 'memverifikasi' : 'mengubah status'} ${sopFile.jenis}: ${sopFile.judul}`,
           fileId: id
         }
       })
@@ -1003,30 +611,28 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 404 })
     }
 
-    // ============================================
-    // DELETE: R2 First, then Google Drive
-    // ============================================
-    
-    // Delete from R2 (Primary Storage) first
+    // Delete from R2 (Primary Storage)
     if (sopFile.filePath && sopFile.filePath.includes('/')) {
       try {
-        const r2 = await import('@/lib/r2-storage')
-        await r2.deleteFromR2(sopFile.filePath)
+        await deleteFromR2(sopFile.filePath)
         console.log(`🗑️ Deleted from R2: ${sopFile.filePath}`)
       } catch (r2Error) {
         console.warn('⚠️ Failed to delete from R2:', r2Error)
       }
     }
     
-    // Then delete from Google Drive (Backup Storage)
+    // Delete from Google Drive (Backup) - in background
     if (sopFile.driveFileId) {
-      try {
-        const gd = await import('@/lib/google-drive')
-        await gd.deleteFileFromDrive(sopFile.driveFileId)
-        console.log(`🗑️ Deleted from Google Drive: ${sopFile.driveFileId}`)
-      } catch (driveError) {
-        console.warn('⚠️ Failed to delete from Google Drive:', driveError)
-      }
+      import('@/lib/google-drive').then(async (gd) => {
+        try {
+          await gd.deleteFileFromDrive(sopFile.driveFileId!)
+          console.log(`🗑️ [Background] Deleted from Google Drive: ${sopFile.driveFileId}`)
+        } catch (driveError) {
+          console.warn('⚠️ [Background] Failed to delete from Google Drive:', driveError)
+        }
+      }).catch(err => {
+        console.warn('⚠️ Failed to start Google Drive deletion:', err)
+      })
     }
 
     // Delete FileSync record if exists
@@ -1052,7 +658,7 @@ export async function DELETE(request: NextRequest) {
         data: {
           userId: userIdCookie,
           aktivitas: 'DELETE',
-          deskripsi: `Hapus ${sopFile.jenis}: ${sopFile.nomorSop} - ${sopFile.judul}`,
+          deskripsi: `Hapus ${sopFile.jenis}: ${sopFile.judul}`,
           fileId: id
         }
       })

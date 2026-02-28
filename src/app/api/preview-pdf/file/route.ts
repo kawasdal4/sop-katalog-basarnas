@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Length': pdfData.length.toString(),
-        'Content-Disposition': `inline; filename="${document.nomorSop}.pdf"`,
+        'Content-Disposition': `inline; filename="${document.judul}.pdf"`,
         'Cache-Control': 'public, max-age=3600'
       }
     })

@@ -154,49 +154,10 @@ export async function PUT(request: NextRequest) {
 
     console.log(`📤 Confirming upload: ${uploadKey}`)
 
-    // ============================================
-    // AUTO-GENERATE SOP NUMBER BASED ON TIMESTAMP
-    // Newest file = Number 1
-    // ============================================
-    
-    const getPrefix = (jenis: string) => {
-      if (jenis === 'SOP') return 'SOP-'
-      if (jenis === 'IK') return 'IK-'
-      return 'LAINNYA-'
-    }
-    
-    const prefix = getPrefix(jenis)
-    
-    // Get all SOPs of the same jenis, ordered by uploadedAt DESC
-    const allSopsOfJenis = await db.sopFile.findMany({
-      where: { jenis },
-      orderBy: { uploadedAt: 'desc' },
-      select: { id: true, nomorSop: true }
-    })
-    
-    // Generate new nomorSop for the new file (it will be #1)
-    const nomorSop = `${prefix}${String(1).padStart(4, '0')}`
-    console.log(`📝 Generated nomor: ${nomorSop} (newest file)`)
-    
-    // Renumber all existing SOPs of this jenis
-    for (let i = 0; i < allSopsOfJenis.length; i++) {
-      const existingSop = allSopsOfJenis[i]
-      const newNumber = i + 2
-      const newNomorSop = `${prefix}${String(newNumber).padStart(4, '0')}`
-      
-      try {
-        await db.sopFile.update({
-          where: { id: existingSop.id },
-          data: { nomorSop: newNomorSop }
-        })
-      } catch (updateError) {
-        console.warn(`⚠️ Failed to renumber ${existingSop.nomorSop}:`, updateError)
-      }
-    }
-
-    // Determine final file name and key
+    // Generate file name from judul
     const fileExt = fileName.split('.').pop()?.toLowerCase() || 'pdf'
-    const finalFileName = `${nomorSop}.${fileExt}`
+    const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
+    const finalFileName = `${sanitizeFileName(judul)}.${fileExt}`
     const finalKey = `sop-files/${finalFileName}`
 
     // Move file from temp location to final location in R2
@@ -220,7 +181,6 @@ export async function PUT(request: NextRequest) {
     // Create SOP record
     const sopFile = await db.sopFile.create({
       data: {
-        nomorSop,
         judul,
         tahun: parseInt(tahun),
         kategori,
@@ -310,28 +270,12 @@ export async function PUT(request: NextRequest) {
         data: {
           userId,
           aktivitas: 'UPLOAD',
-          deskripsi: `${isPublicSubmission ? 'Submit publik' : 'Upload'} ${jenis}: ${nomorSop} - ${judul} [R2 Primary]`,
+          deskripsi: `${isPublicSubmission ? 'Submit publik' : 'Upload'} ${jenis}: ${judul} [R2 Primary]`,
           fileId: sopFile.id
         }
       })
     } catch (logError) {
       console.warn('⚠️ Failed to create log:', logError)
-    }
-
-    // Update counter
-    const newCount = allSopsOfJenis.length + 1
-    if (jenis === 'SOP') {
-      await db.counter.upsert({
-        where: { id: 'counter' },
-        update: { sopCount: newCount },
-        create: { id: 'counter', sopCount: newCount, ikCount: 0 }
-      })
-    } else if (jenis === 'IK') {
-      await db.counter.upsert({
-        where: { id: 'counter' },
-        update: { ikCount: newCount },
-        create: { id: 'counter', sopCount: 0, ikCount: newCount }
-      })
     }
 
     console.log('========================================')

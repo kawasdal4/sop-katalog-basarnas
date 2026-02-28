@@ -97,7 +97,6 @@ interface User {
 
 interface SopFile {
   id: string
-  nomorSop: string
   judul: string
   tahun: number
   kategori: string
@@ -131,7 +130,7 @@ interface LogEntry {
   fileId?: string
   createdAt: string
   user?: { name: string; email: string }
-  sopFile?: { nomorSop: string; judul: string }
+  sopFile?: { judul: string }
 }
 
 interface Stats {
@@ -662,6 +661,12 @@ export default function ESOPApp() {
   const [showUserDialog, setShowUserDialog] = useState(false)
   const [previewData, setPreviewData] = useState<{ type: string; data: string; fileName: string } | null>(null)
   const [loading, setLoading] = useState(false)
+  
+  // PDF Edit Warning Dialog
+  const [showPdfWarningDialog, setShowPdfWarningDialog] = useState(false)
+  
+  // Copyright Popup
+  const [showCopyrightPopup, setShowCopyrightPopup] = useState(false)
   
   // Edit Dialog
   const [showEditDialog, setShowEditDialog] = useState(false)
@@ -1331,7 +1336,8 @@ export default function ESOPApp() {
     try {
       const page = resetPage ? 1 : sopPagination.page
       const params = new URLSearchParams()
-      if (sopFilters.search) params.append('search', sopFilters.search)
+      // Use searchInput for search - this is the live search value that's always in sync
+      if (searchInput) params.append('search', searchInput)
       if (sopFilters.kategori && sopFilters.kategori !== 'SEMUA') params.append('kategori', sopFilters.kategori)
       if (sopFilters.jenis && sopFilters.jenis !== 'SEMUA') params.append('jenis', sopFilters.jenis)
       if (sopFilters.status && sopFilters.status !== 'SEMUA') params.append('status', sopFilters.status)
@@ -1369,7 +1375,7 @@ export default function ESOPApp() {
         isPaginationLoadingRef.current = false
       }, 100)
     }
-  }, [sopFilters, sopPagination.page, sopPagination.limit, sortBy, toast])
+  }, [searchInput, sopFilters.kategori, sopFilters.jenis, sopFilters.status, sopFilters.tahun, sopPagination.page, sopPagination.limit, sortBy, toast])
   
   const fetchVerificationList = useCallback(async (filter = 'SEMUA', search = '', sortByParam = 'uploadedAt-desc') => {
     setVerifikasiLoading(true)
@@ -1469,14 +1475,25 @@ export default function ESOPApp() {
   useEffect(() => {
     checkAuth()
     initSystem()
-    // Load arsipSeenCount from localStorage
-    const savedArsipSeenCount = localStorage.getItem('arsipSeenCount')
-    if (savedArsipSeenCount) {
-      setArsipSeenCount(parseInt(savedArsipSeenCount, 10) || 0)
-    }
     // Fetch R2 status on mount for public page display
     fetchR2Status()
   }, [checkAuth, initSystem, fetchR2Status])
+  
+  // Load user-specific arsipSeenCount when user logs in
+  useEffect(() => {
+    if (user?.id) {
+      const userArsipKey = `arsipSeenCount_${user.id}`
+      const savedArsipSeenCount = localStorage.getItem(userArsipKey)
+      if (savedArsipSeenCount) {
+        setArsipSeenCount(parseInt(savedArsipSeenCount, 10) || 0)
+      } else {
+        // First time login for this user - set to current rejected count to prevent notification
+        const currentRejected = stats?.totalPublikDitolak || 0
+        setArsipSeenCount(currentRejected)
+        localStorage.setItem(userArsipKey, currentRejected.toString())
+      }
+    }
+  }, [user?.id, stats?.totalPublikDitolak])
   
   // Fetch data when authenticated
   useEffect(() => {
@@ -1488,14 +1505,17 @@ export default function ESOPApp() {
       fetchSyncStatus()
 
       if (currentPage === 'katalog') fetchSopFiles()
-      if (currentPage === 'verifikasi') fetchVerificationList(verificationFilter, verificationSearch, verificationSortBy)
+      if (currentPage === 'verifikasi') {
+        fetchVerificationList(verificationFilter, verificationSearch, verificationSortBy)
+      }
       if (currentPage === 'arsip') {
         fetchArsipList(arsipSearch, arsipSortBy)
         // Save the current rejected file count to localStorage when user visits arsip
         const currentRejectedCount = stats?.totalPublikDitolak || 0
-        if (currentRejectedCount > 0) {
+        if (currentRejectedCount > 0 && user?.id) {
           setArsipSeenCount(currentRejectedCount)
-          localStorage.setItem('arsipSeenCount', currentRejectedCount.toString())
+          const userArsipKey = `arsipSeenCount_${user.id}`
+          localStorage.setItem(userArsipKey, currentRejectedCount.toString())
         }
       }
       if (currentPage === 'logs') fetchLogs()
@@ -1530,7 +1550,7 @@ export default function ESOPApp() {
     }
   }, [isAuthenticated, user?.role, currentPage]) // Removed fetchUsers from deps to prevent infinite loops
   
-  // Live search with debounce - direct API call
+  // Live search with debounce - syncs searchInput to sopFilters.search
   useEffect(() => {
     if (!isAuthenticated || currentPage !== 'katalog') return
     
@@ -1540,6 +1560,9 @@ export default function ESOPApp() {
     // Debounce timer for live search
     const debounceTimer = setTimeout(async () => {
       try {
+        // Sync searchInput to sopFilters.search so other parts of code can use it
+        setSopFilters(prev => ({ ...prev, search: searchInput }))
+        
         const params = new URLSearchParams()
         if (searchInput) params.append('search', searchInput)
         if (sopFilters.kategori && sopFilters.kategori !== 'SEMUA') params.append('kategori', sopFilters.kategori)
@@ -1626,6 +1649,18 @@ export default function ESOPApp() {
         setTimeout(() => {
           setShowLoginSuccess(false)
         }, 3000)
+        
+        // Run auto-rename in background (check and rename files that don't match titles)
+        if (data.user?.role === 'ADMIN') {
+          fetch('/api/auto-rename', { method: 'POST' })
+            .then(res => res.json())
+            .then(renameData => {
+              if (renameData.success && renameData.renamed > 0) {
+                console.log(`✅ [Auto-Rename] ${renameData.renamed} files renamed`)
+              }
+            })
+            .catch(err => console.warn('[Auto-Rename] Error:', err))
+        }
         
         // Fetch data immediately after login
         fetchStats()
@@ -1974,8 +2009,8 @@ export default function ESOPApp() {
       // Generate custom filename for display
       const fileExt = sop.fileName.split('.').pop()?.toLowerCase() || 'pdf'
       const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
-      const customFileName = `${sanitizeFileName(sop.nomorSop)} - ${sanitizeFileName(sop.judul)}.${fileExt}`
-      
+      const customFileName = `${sanitizeFileName(sop.judul)}.${fileExt}`
+
       // Fetch file from our download API (avoids CORS issues)
       const res = await fetch(`/api/download?id=${id}`)
       
@@ -2014,7 +2049,7 @@ export default function ESOPApp() {
     }
   }
   
-  // Preview file dari Cloudflare R2
+  // Preview file dari Cloudflare R2 - Upload ke OneDrive untuk Office Online
   const handlePreview = async (id: string) => {
     // Find file from all available lists
     const sop = sopFiles.find(s => s.id === id) || verificationList.find(s => s.id === id) || arsipList.find(s => s.id === id)
@@ -2033,77 +2068,119 @@ export default function ESOPApp() {
     const fileExtension = sop.fileName.toLowerCase().split('.').pop()
     setPreviewLoading(id) // Start loading animation
 
-    // Increment preview counter
     try {
-      await fetch('/api/sop', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, incrementPreview: true })
-      })
-    } catch (previewError) {
-      console.warn('Failed to increment preview counter:', previewError)
-    }
-
-    try {
-      const res = await fetch(`/api/file?action=preview&id=${id}`)
-      
-      // Check content-type to determine response type
-      const contentType = res.headers.get('content-type') || ''
-      
-      // If response is PDF binary data, create blob URL and open
-      if (contentType.includes('application/pdf')) {
-        const blob = await res.blob()
-        const url = window.URL.createObjectURL(blob)
-        window.open(url, '_blank')
+      // For PDF files - download directly from R2 and open
+      if (fileExtension === 'pdf') {
+        const res = await fetch(`/api/file?action=preview&id=${id}`)
+        const contentType = res.headers.get('content-type') || ''
+        
+        if (contentType.includes('application/pdf')) {
+          const blob = await res.blob()
+          const url = window.URL.createObjectURL(blob)
+          window.open(url, '_blank')
+          setPreviewLoading(null)
+          fetchStats()
+          return
+        }
+        
+        const data = await res.json()
+        if (data.downloadUrl) {
+          window.open(data.downloadUrl, '_blank')
+        }
         setPreviewLoading(null)
         fetchStats()
         return
       }
       
-      // Otherwise parse as JSON
-      const data = await res.json()
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Gagal mengakses file')
-      }
-
-      // PDF files - langsung buka URL
-      if (fileExtension === 'pdf' && data.downloadUrl) {
-        window.open(data.downloadUrl, '_blank')
-        setPreviewLoading(null)
-        fetchStats()
-        return
-      }
-
-      // Excel/Word files - gunakan Microsoft Office Online Viewer or Google Drive
-      if (data.viewerUrl) {
-        window.open(data.viewerUrl, '_blank')
+      // For Excel/Word files - upload to OneDrive temp and open in Office Online
+      if (['xlsx', 'xls', 'xlsm', 'docx', 'doc'].includes(fileExtension || '')) {
         toast({
-          title: data.viewerType === 'google-drive' ? '📁 Preview dari Google Drive' : '📊 Preview Dibuka',
-          description: data.viewerType === 'google-drive' ? 'Membuka file dari Google Drive backup' : 'Membuka di Microsoft Office Online Viewer',
-          duration: 3000
+          title: '📤 Mempersiapkan Preview...',
+          description: 'Mengupload file ke OneDrive untuk preview di Office Online',
+          duration: 10000
         })
-      } else if (data.downloadUrl) {
-        window.open(data.downloadUrl, '_blank')
+        
+        const res = await fetch('/api/preview-office', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileId: id })
+        })
+        
+        const data = await res.json()
+        
+        console.log('📋 [Preview] Response:', { success: data.success, viewerUrl: data.viewerUrl?.substring(0, 100) })
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Gagal mempersiapkan preview')
+        }
+        
+        // Open in Office Online viewer
+        if (data.viewerUrl) {
+          console.log('🔗 [Preview] Opening URL:', data.viewerUrl.substring(0, 150))
+          
+          const previewWindow = window.open(data.viewerUrl, '_blank')
+          
+          // Handle popup blocker
+          if (!previewWindow || previewWindow.closed) {
+            toast({
+              title: '⚠️ Popup Diblokir',
+              description: `Klik link ini untuk membuka: ${data.viewerUrl}`,
+              duration: 30000
+            })
+          } else {
+            toast({
+              title: '📊 Preview Dibuka',
+              description: 'File dibuka di Microsoft Office Online. File temp akan dihapus setelah ditutup.',
+              duration: 5000
+            })
+            
+            // Track the window and clean up when closed
+            if (data.driveItemId) {
+              const checkClosed = setInterval(() => {
+                if (previewWindow.closed) {
+                  clearInterval(checkClosed)
+                  // Delete temp file from OneDrive
+                  fetch('/api/preview-office', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ driveItemId: data.driveItemId })
+                  }).catch(err => console.warn('Failed to cleanup temp file:', err))
+                }
+              }, 2000) // Check every 2 seconds
+            }
+          }
+        }
+        
+        setPreviewLoading(null)
+        fetchStats()
+        return
       }
       
+      // For other file types - fallback to download
+      toast({
+        title: '⚠️ Preview Tidak Tersedia',
+        description: 'Tipe file ini tidak mendukung preview. Gunakan tombol download.',
+        variant: 'destructive',
+        duration: 5000
+      })
       setPreviewLoading(null)
-      fetchStats()
+      
     } catch (error) {
       console.error('Preview error:', error)
       setPreviewLoading(null)
       toast({
         title: '❌ Error',
-        description: 'Gagal membuka preview file',
+        description: error instanceof Error ? error.message : 'Gagal membuka preview file',
         variant: 'destructive',
         duration: 5000
       })
     }
   }
   
-  // Print file - Open PDF in new tab and trigger print dialog
+  // Print file - Open PDF in new tab (supports PDF, Excel, Word)
   const handlePrint = useCallback(async (id: string) => {
-    const sop = sopFiles.find(s => s.id === id)
+    // Find file from all available lists
+    const sop = sopFiles.find(s => s.id === id) || verificationList.find(s => s.id === id) || arsipList.find(s => s.id === id)
     if (!sop) return
 
     if (!sop.filePath) {
@@ -2122,7 +2199,7 @@ export default function ESOPApp() {
     if (!['pdf', 'xlsx', 'xls', 'xlsm', 'docx', 'doc'].includes(fileExtension || '')) {
       toast({
         title: '⚠️ Tidak Didukung',
-        description: 'Hanya file PDF, Excel, dan Word yang bisa di-print',
+        description: 'Hanya file PDF, Excel (.xlsx, .xls), dan Word (.docx, .doc) yang bisa di-print',
         variant: 'destructive',
         duration: 5000
       })
@@ -2131,82 +2208,49 @@ export default function ESOPApp() {
 
     setPrintLoading(id) // Start loading animation
 
-    // For PDF files - open in print viewer with auto print dialog
-    if (fileExtension === 'pdf') {
-      try {
-        // Open print viewer page that will auto-trigger print dialog
-        const printViewerUrl = `/print-viewer?id=${id}`
-        const printWindow = window.open(printViewerUrl, '_blank')
-        
-        if (printWindow) {
-          toast({
-            title: '✅ Print Preview Dibuka',
-            description: 'Dialog print akan muncul otomatis di tab baru',
-            duration: 3000
-          })
-        } else {
-          toast({
-            title: '⚠️ Popup Diblokir',
-            description: 'Izinkan popup untuk membuka print preview',
-            variant: 'destructive',
-            duration: 5000
-          })
-        }
-        
-        setPrintLoading(null)
-        fetchStats()
-      } catch (error) {
-        console.error('Print error:', error)
-        setPrintLoading(null)
-        toast({
-          title: '❌ Error',
-          description: 'Gagal mempersiapkan file untuk print',
-          variant: 'destructive',
-          duration: 5000
-        })
-      }
-      return
-    }
-
-    // For Excel/Word files - download for local printing
-    // (PDF conversion requires LibreOffice which is not available on Vercel)
     try {
-      // Get download URL from API
-      const res = await fetch(`/api/file?action=download&id=${id}`)
-      const data = await res.json()
-      
-      if (!data.success || !data.downloadUrl) {
-        throw new Error(data.error || 'Gagal mendapatkan URL download')
-      }
-      
-      // Create download link
-      const link = document.createElement('a')
-      link.href = data.downloadUrl
-      link.download = sop.fileName
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      
-      setPrintLoading(null)
-      toast({
-        title: '📥 File Didownload',
-        description: 'File didownload untuk print lokal. Buka file dengan Excel/Word dan print dari aplikasi tersebut.',
-        duration: 7000
+      // Generate print token
+      const tokenRes = await fetch('/api/print', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileId: id })
       })
       
-      fetchStats()
+      if (!tokenRes.ok) {
+        throw new Error('Gagal membuat token print')
+      }
       
+      const tokenData = await tokenRes.json()
+      const printToken = tokenData.token
+      
+      // Open PDF directly in new tab
+      const pdfUrl = `/api/print?token=${printToken}`
+      window.open(pdfUrl, '_blank')
+      
+      const fileTypeLabel = fileExtension === 'pdf' ? 'PDF' : 
+        ['xlsx', 'xls', 'xlsm'].includes(fileExtension || '') ? 'Excel' : 'Word'
+      
+      toast({
+        title: '✅ PDF Dibuka',
+        description: fileExtension === 'pdf' 
+          ? 'File PDF dibuka di tab baru'
+          : `${fileTypeLabel} dikonversi ke PDF dan dibuka di tab baru`,
+        duration: 4000
+      })
+      
+      setPrintLoading(null)
+      fetchStats()
     } catch (error) {
       console.error('Print error:', error)
       setPrintLoading(null)
       toast({
         title: '❌ Error',
-        description: 'Gagal mengunduh file',
+        description: 'Gagal mempersiapkan file untuk print',
         variant: 'destructive',
         duration: 5000
       })
     }
-  }, [sopFiles, toast, fetchStats])
+  }, [sopFiles, verificationList, arsipList, toast, fetchStats])
   
   const handleStatusChange = async (id: string, status: string) => {
     try {
@@ -2283,7 +2327,7 @@ export default function ESOPApp() {
     setExcelEditLoading(false)
   }
   
-  // Handle Desktop Excel Edit - Download file for local editing
+  // Handle Desktop Excel/Word Edit - Download file for local editing
   const handleDesktopEdit = async (id: string) => {
     const sop = sopFiles.find(s => s.id === id)
     if (!sop) return
@@ -2298,6 +2342,13 @@ export default function ESOPApp() {
       return
     }
     
+    // Check if file is PDF - PDF cannot be edited, show warning dialog
+    const fileExtension = sop.fileName.toLowerCase().split('.').pop()
+    if (fileExtension === 'pdf') {
+      setShowPdfWarningDialog(true)
+      return
+    }
+    
     try {
       toast({
         title: '📥 Mengunduh File...',
@@ -2305,14 +2356,13 @@ export default function ESOPApp() {
         duration: 30000
       })
       
-      // Generate custom filename from SOP number and title
+      // Generate custom filename from title
       const fileExt = sop.fileName.split('.').pop()?.toLowerCase() || 'xlsx'
       const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
-      const customFileName = `${sanitizeFileName(sop.nomorSop)} - ${sanitizeFileName(sop.judul)}.${fileExt}`
+      const customFileName = `${sanitizeFileName(sop.judul)}.${fileExt}`
       
       console.log('🔍 [Desktop Edit] SOP Data:', {
         id: sop.id,
-        nomorSop: sop.nomorSop,
         judul: sop.judul,
         fileName: sop.fileName,
         customFileName
@@ -2325,7 +2375,6 @@ export default function ESOPApp() {
         body: JSON.stringify({
           objectKey: sop.filePath,
           fileId: sop.id,
-          sopNumber: sop.nomorSop,
           sopTitle: sop.judul
         })
       })
@@ -2417,7 +2466,8 @@ export default function ESOPApp() {
       window.URL.revokeObjectURL(url)
       
       // Show session info
-      let description = `Edit file di Excel Desktop, lalu klik "Selesai Edit & Sync" untuk upload. Sesi tidak ada batas waktu.`
+      const fileTypeLabel = sop.fileType === 'docx' || sop.fileType === 'doc' ? 'Word' : 'Excel'
+      let description = `Edit file di ${fileTypeLabel} Desktop, lalu klik "Selesai Edit & Sync" untuk upload. Sesi tidak ada batas waktu.`
       if (lastEditorEmail) {
         description += ` Terakhir diedit oleh ${lastEditorName || lastEditorEmail}.`
       }
@@ -2840,7 +2890,16 @@ export default function ESOPApp() {
       if (data.error) {
         toast({ title: 'Error', description: data.error, variant: 'destructive' })
       } else {
-        toast({ title: '✅ Berhasil', description: 'Data SOP berhasil diperbarui!' })
+        // Show toast with rename info if file was renamed
+        if (data.renamed) {
+          toast({ 
+            title: '✅ Berhasil Diperbarui', 
+            description: `Data SOP diperbarui. File di-rename: "${data.renamed.oldName}" → "${data.renamed.newName}"`,
+            duration: 5000
+          })
+        } else {
+          toast({ title: '✅ Berhasil', description: 'Data SOP berhasil diperbarui!' })
+        }
         setShowEditDialog(false)
         
         // Update local state immediately for instant UI update
@@ -2852,7 +2911,8 @@ export default function ESOPApp() {
               kategori: editForm.kategori,
               jenis: editForm.jenis,
               tahun: editForm.tahun,
-              status: editForm.status
+              status: editForm.status,
+              fileName: data.data?.fileName || file.fileName
             }
           }
           return file
@@ -2948,7 +3008,35 @@ export default function ESOPApp() {
   
   const handleExport = async (format: 'xlsx' | 'pdf') => {
     try {
-      const res = await fetch(`/api/export?format=${format}`)
+      if (format === 'xlsx') {
+        // Server-side Excel export with charts and styling
+        toast({ title: '📤 Mengunduh Excel...', description: 'Membuat laporan dengan visualisasi data' })
+        
+        const res = await fetch(`/api/export?format=xlsx`)
+        
+        if (!res.ok) {
+          const errorData = await res.json()
+          toast({ title: 'Error', description: errorData.error || 'Gagal mengekspor data', variant: 'destructive' })
+          return
+        }
+        
+        // Download the file directly
+        const blob = await res.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `laporan-sop-ik-basarnas-${new Date().toISOString().split('T')[0]}.xlsx`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+        
+        toast({ title: '✅ Export Berhasil', description: 'File Excel telah diunduh' })
+        return
+      }
+      
+      // PDF Export
+      const res = await fetch(`/api/export?format=pdf`)
       const response = await res.json()
       if (response.error) {
         toast({ title: 'Error', description: response.error, variant: 'destructive' })
@@ -2962,140 +3050,26 @@ export default function ESOPApp() {
         month: 'long', 
         day: 'numeric' 
       })
-      const timestamp = new Date().toISOString()
       
-      if (format === 'xlsx') {
-        // Dynamic import for xlsx library
-        const XLSX = await import('xlsx')
-        
-        // Create workbook
-        const wb = XLSX.utils.book_new()
-        
-        // === SHEET 1: Data SOP ===
-        const headers = ['No', 'Nomor SOP', 'Judul', 'Tahun', 'Kategori', 'Jenis', 'Status', 'Preview', 'Download', 'Diupload Oleh', 'Tanggal Upload']
-        const wsData = [
-          ['LAPORAN SOP DAN IK - BASARNAS'],
-          ['Direktorat Kesiapsiagaan'],
-          [`Tanggal: ${currentDate}`],
-          [],
-          headers,
-          ...data.map((item: { nomorSop: string; judul: string; tahun: number; kategori: string; jenis: string; status: string; previewCount: number; downloadCount: number; uploadedBy: string; uploadedAt: string }, idx: number) => [
-            idx + 1,
-            item.nomorSop,
-            item.judul,
-            item.tahun,
-            item.kategori,
-            item.jenis,
-            item.status,
-            item.previewCount || 0,
-            item.downloadCount || 0,
-            item.uploadedBy,
-            new Date(item.uploadedAt).toLocaleDateString('id-ID')
-          ])
-        ]
-        
-        const ws = XLSX.utils.aoa_to_sheet(wsData)
-        
-        // Set column widths
-        ws['!cols'] = [
-          { wch: 5 },   // No
-          { wch: 15 },  // Nomor SOP
-          { wch: 50 },  // Judul
-          { wch: 8 },   // Tahun
-          { wch: 12 },  // Kategori
-          { wch: 10 },  // Jenis
-          { wch: 12 },  // Status
-          { wch: 10 },  // Preview
-          { wch: 10 },  // Download
-          { wch: 20 },  // Diupload Oleh
-          { wch: 15 }   // Tanggal Upload
-        ]
-        
-        // Merge title cells
-        ws['!merges'] = [
-          { s: { r: 0, c: 0 }, e: { r: 0, c: 10 } },
-          { s: { r: 1, c: 0 }, e: { r: 1, c: 10 } },
-          { s: { r: 2, c: 0 }, e: { r: 2, c: 10 } }
-        ]
-        
-        XLSX.utils.book_append_sheet(wb, ws, 'Data SOP')
-        
-        // === SHEET 2: Ringkasan Statistik ===
-        const statsData = [
-          ['RINGKASAN STATISTIK'],
-          [],
-          ['Statistik Utama'],
-          ['Total SOP', stats.totalSop],
-          ['Total IK', stats.totalIk],
-          ['Total Dokumen Aktif', stats.totalAktif],
-          ['Total Dokumen Review', stats.totalReview],
-          ['Total Dokumen Kadaluarsa', stats.totalKadaluarsa],
-          ['Total Pengajuan Publik Menunggu', stats.totalPublikMenunggu],
-          ['Total Pengajuan Publik Ditolak', stats.totalPublikDitolak],
-          ['Total Preview', stats.totalPreviews],
-          ['Total Download', stats.totalDownloads],
-          [],
-          ['Distribusi per Tahun'],
-          ['Tahun', 'Jumlah'],
-          ...stats.byTahun.map((item: { tahun: number; count: number }) => [item.tahun, item.count]),
-          [],
-          ['Distribusi per Kategori'],
-          ['Kategori', 'Jumlah'],
-          ...stats.byKategori.map((item: { kategori: string; count: number }) => [item.kategori, item.count]),
-          [],
-          ['Distribusi per Jenis'],
-          ['Jenis', 'Jumlah'],
-          ...stats.byJenis.map((item: { jenis: string; count: number }) => [item.jenis, item.count]),
-          [],
-          ['Distribusi per Status'],
-          ['Status', 'Jumlah'],
-          ...stats.byStatus.map((item: { status: string; count: number }) => [item.status, item.count]),
-          [],
-          [],
-          [`Diekspor pada: ${currentDate}`],
-          ['Katalog SOP dan IK - Direktorat Kesiapsiagaan - BASARNAS']
-        ]
-        
-        const wsStats = XLSX.utils.aoa_to_sheet(statsData)
-        wsStats['!cols'] = [
-          { wch: 30 },
-          { wch: 15 }
-        ]
-        wsStats['!merges'] = [
-          { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }
-        ]
-        
-        XLSX.utils.book_append_sheet(wb, wsStats, 'Ringkasan')
-        
-        // Generate and download file
-        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
-        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `laporan-sop-ik-basarnas-${new Date().toISOString().split('T')[0]}.xlsx`
-        a.click()
-        window.URL.revokeObjectURL(url)
-      } else {
-        // PDF Export with full stats
-        const printWindow = window.open('', '_blank')
-        if (!printWindow) {
-          toast({ title: 'Error', description: 'Tidak dapat membuka jendela baru', variant: 'destructive' })
-          return
+      // PDF Export with full stats
+      const printWindow = window.open('', '_blank')
+      if (!printWindow) {
+        toast({ title: 'Error', description: 'Tidak dapat membuka jendela baru', variant: 'destructive' })
+        return
+      }
+      
+      // Format status color
+      const getStatusColor = (status: string) => {
+        switch (status) {
+          case 'AKTIF': return '#22c55e'
+          case 'REVIEW': return '#eab308'
+          case 'KADALUARSA': return '#ef4444'
+          default: return '#6b7280'
         }
-        
-        // Format status color
-        const getStatusColor = (status: string) => {
-          switch (status) {
-            case 'AKTIF': return '#22c55e'
-            case 'REVIEW': return '#eab308'
-            case 'KADALUARSA': return '#ef4444'
-            default: return '#6b7280'
-          }
-        }
-        
-        // Generate stats card HTML
-        const statsCardsHtml = `
+      }
+      
+      // Generate stats card HTML
+      const statsCardsHtml = `
           <div class="stats-grid">
             <div class="stat-card orange">
               <div class="stat-icon">📋</div>
@@ -3155,9 +3129,9 @@ export default function ESOPApp() {
             </div>
           </div>
         `
-        
-        // Generate distribution tables
-        const distributionHtml = `
+      
+      // Generate distribution tables
+      const distributionHtml = `
           <div class="distribution-section">
             <h3>Distribusi Data</h3>
             <div class="distribution-grid">
@@ -3200,8 +3174,8 @@ export default function ESOPApp() {
             </div>
           </div>
         `
-        
-        printWindow.document.write(`
+      
+      printWindow.document.write(`
           <!DOCTYPE html>
           <html>
           <head>
@@ -3421,7 +3395,6 @@ export default function ESOPApp() {
                 <thead>
                   <tr>
                     <th>No</th>
-                    <th>Nomor SOP</th>
                     <th>Judul</th>
                     <th>Tahun</th>
                     <th>Kategori</th>
@@ -3433,10 +3406,9 @@ export default function ESOPApp() {
                   </tr>
                 </thead>
                 <tbody>
-                  ${data.map((item: { nomorSop: string; judul: string; tahun: number; kategori: string; jenis: string; status: string; previewCount: number; downloadCount: number; uploadedBy: string }, idx: number) => `
+                  ${data.map((item: { judul: string; tahun: number; kategori: string; jenis: string; status: string; previewCount: number; downloadCount: number; uploadedBy: string }, idx: number) => `
                     <tr>
                       <td>${idx + 1}</td>
-                      <td>${item.nomorSop}</td>
                       <td>${item.judul.length > 50 ? item.judul.substring(0, 50) + '...' : item.judul}</td>
                       <td>${item.tahun}</td>
                       <td>${item.kategori}</td>
@@ -3461,15 +3433,14 @@ export default function ESOPApp() {
           </body>
           </html>
         `)
-        printWindow.document.close()
-        
-        // Wait for content to load before printing
-        setTimeout(() => {
-          printWindow.print()
-        }, 500)
-      }
+      printWindow.document.close()
       
-      toast({ title: 'Berhasil', description: 'Data berhasil diekspor!' })
+      // Wait for content to load before printing
+      setTimeout(() => {
+        printWindow.print()
+      }, 500)
+      
+      toast({ title: 'Berhasil', description: 'Data berhasil diekspor ke PDF!' })
     } catch (error) {
       console.error('Export error:', error)
       toast({ title: 'Error', description: 'Gagal mengekspor data', variant: 'destructive' })
@@ -3756,19 +3727,19 @@ export default function ESOPApp() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
         >
-          <div className="relative">
+          <div className="relative cursor-pointer" onClick={() => setShowCopyrightPopup(true)}>
             {/* Glow effect */}
             <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-yellow-400 rounded-lg blur-md opacity-60 animate-pulse" />
             
             {/* Shimmer container */}
-            <div className="relative px-4 py-2 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 rounded-lg border border-orange-500/30 overflow-hidden">
+            <div className="relative px-4 py-2 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 rounded-lg border border-orange-500/30 overflow-hidden hover:border-orange-500/60 transition-colors">
               {/* Animated shimmer */}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-400/20 to-transparent animate-shimmer" />
               
               {/* Text with glow */}
               <p className="text-sm font-medium relative z-10">
                 <span className="text-gray-400">© </span>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-yellow-300 to-orange-400 animate-pulse font-bold">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-yellow-300 to-orange-400 animate-pulse font-bold hover:from-yellow-300 hover:via-orange-400 hover:to-yellow-300 transition-all">
                   FOE - 2026
                 </span>
               </p>
@@ -4102,9 +4073,16 @@ export default function ESOPApp() {
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.7 }}
                   >
-                    <p className="text-gray-500 text-xs">
+                    <button 
+                      type="button"
+                      className="text-gray-500 text-xs hover:text-orange-400 transition-colors cursor-pointer focus:outline-none focus:text-orange-400"
+                      onClick={() => {
+                        setShowLogin(false)
+                        setShowCopyrightPopup(true)
+                      }}
+                    >
                       © 2026 Foe
-                    </p>
+                    </button>
                   </motion.div>
                 </motion.form>
               </div>
@@ -4871,8 +4849,7 @@ export default function ESOPApp() {
                                   <div className="flex items-center gap-2">
                                     <FileTypeIcon fileName={sop.fileName} className="w-4 h-4 flex-shrink-0" />
                                     <div>
-                                      <p className="font-medium text-blue-900">{sop.nomorSop}</p>
-                                      <p className="text-sm text-gray-600 truncate max-w-[200px]">{sop.judul}</p>
+                                      <p className="font-medium text-blue-900 truncate max-w-[200px]">{sop.judul}</p>
                                     </div>
                                   </div>
                                   <Badge variant="outline" className={STATUS_COLORS[sop.status]}>
@@ -4946,8 +4923,7 @@ export default function ESOPApp() {
                                   <div className="flex items-center gap-2 flex-1">
                                     <FileTypeIcon fileName={sop.fileName} className="w-4 h-4 flex-shrink-0" />
                                     <div>
-                                      <p className="font-medium text-blue-900">{sop.nomorSop}</p>
-                                      <p className="text-sm text-gray-600 truncate">{sop.judul}</p>
+                                      <p className="font-medium text-blue-900 truncate">{sop.judul}</p>
                                     </div>
                                   </div>
                                   <div className="text-right">
@@ -4987,8 +4963,7 @@ export default function ESOPApp() {
                                   <div className="flex items-center gap-2 flex-1">
                                     <FileTypeIcon fileName={sop.fileName} className="w-4 h-4 flex-shrink-0" />
                                     <div>
-                                      <p className="font-medium text-blue-900">{sop.nomorSop}</p>
-                                      <p className="text-sm text-gray-600 truncate">{sop.judul}</p>
+                                      <p className="font-medium text-blue-900 truncate">{sop.judul}</p>
                                     </div>
                                   </div>
                                   <div className="text-right">
@@ -5292,84 +5267,144 @@ export default function ESOPApp() {
                   
                   {/* Edit SOP Dialog */}
                   <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-                    <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
-                      <DialogHeader>
-                        <DialogTitle className="text-xl font-bold text-gray-900">Edit Data SOP</DialogTitle>
-                        <DialogDescription className="text-gray-600">
-                          Perbarui informasi dokumen {editData?.nomorSop}
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="edit-judul" className="text-gray-800 font-medium">Judul</Label>
-                          <Input
-                            id="edit-judul"
-                            value={editForm.judul}
-                            onChange={(e) => setEditForm({ ...editForm, judul: e.target.value })}
-                            className="border-gray-300 bg-white text-gray-900"
+                    <DialogContent className="sm:max-w-md bg-white border-0 shadow-2xl overflow-hidden p-0 rounded-2xl" aria-describedby={undefined}>
+                      {/* Header with Basarnas theme */}
+                      <div className="relative bg-gradient-to-br from-orange-500 via-orange-600 to-red-700 p-5 text-white overflow-hidden">
+                        {/* Animated background */}
+                        <div className="absolute inset-0 overflow-hidden">
+                          <motion.div 
+                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] h-[200px] rounded-full opacity-20"
+                            style={{
+                              background: 'conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.2) 30deg, transparent 60deg)'
+                            }}
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
                           />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label className="text-gray-800 font-medium">Kategori</Label>
-                            <Select value={editForm.kategori} onValueChange={(v) => setEditForm({ ...editForm, kategori: v })}>
-                              <SelectTrigger className="border-gray-300 bg-white text-gray-900">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {KATEGORI_OPTIONS.map(k => (
-                                  <SelectItem key={k} value={k}>{k}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-gray-800 font-medium">Jenis</Label>
-                            <Select value={editForm.jenis} onValueChange={(v) => setEditForm({ ...editForm, jenis: v })}>
-                              <SelectTrigger className="border-gray-300 bg-white text-gray-900">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {JENIS_OPTIONS.map(j => (
-                                  <SelectItem key={j} value={j}>{j}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label className="text-gray-800 font-medium">Tahun</Label>
-                            <Input
-                              type="number"
-                              value={editForm.tahun}
-                              onChange={(e) => setEditForm({ ...editForm, tahun: parseInt(e.target.value) || new Date().getFullYear() })}
-                              className="border-gray-300 bg-white text-gray-900"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-gray-800 font-medium">Status</Label>
-                            <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
-                              <SelectTrigger className="border-gray-300 bg-white text-gray-900">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {STATUS_OPTIONS.map(s => (
-                                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                        
+                        <div className="relative z-10 flex items-center gap-4">
+                          <motion.div 
+                            className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-xl border border-white/20"
+                            initial={{ scale: 0, rotate: -180 }}
+                            animate={{ scale: 1, rotate: 0 }}
+                            transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center">
+                              <Edit className="w-4 h-4 text-orange-600" />
+                            </div>
+                          </motion.div>
+                          <div>
+                            <DialogTitle className="text-lg font-bold text-white">
+                              Edit Data SOP
+                            </DialogTitle>
+                            <DialogDescription className="text-orange-100/80 text-sm mt-0.5">
+                              Perbarui informasi dokumen
+                            </DialogDescription>
                           </div>
                         </div>
                       </div>
-                      <DialogFooter className="gap-2">
-                        <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)} className="border-gray-300 text-gray-700 hover:bg-gray-100">
-                          Batal
-                        </Button>
-                        <Button type="button" onClick={handleSaveEdit} className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white">
-                          Simpan Perubahan
-                        </Button>
-                      </DialogFooter>
+                      
+                      {/* Form Content */}
+                      <form onSubmit={(e) => { e.preventDefault(); handleSaveEdit(); }} className="p-5 space-y-4 bg-gradient-to-b from-white via-orange-50/10 to-white">
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2 pb-2 border-b border-orange-100">
+                            <div className="w-4 h-4 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
+                              <FileText className="w-2 h-2 text-white" />
+                            </div>
+                            <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Informasi Dokumen</span>
+                          </div>
+                          
+                          <div className="space-y-1.5">
+                            <Label htmlFor="edit-judul" className="text-xs font-semibold text-gray-600">Judul <span className="text-red-500">*</span></Label>
+                            <Input
+                              id="edit-judul"
+                              value={editForm.judul}
+                              onChange={(e) => setEditForm({ ...editForm, judul: e.target.value })}
+                              className="h-9 border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 rounded-xl text-sm bg-white shadow-sm"
+                            />
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs font-semibold text-gray-600">Kategori</Label>
+                              <Select value={editForm.kategori} onValueChange={(v) => setEditForm({ ...editForm, kategori: v })}>
+                                <SelectTrigger className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-xs bg-white shadow-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-xl">
+                                  {KATEGORI_OPTIONS.map(k => (
+                                    <SelectItem key={k} value={k} className="text-xs">{k}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs font-semibold text-gray-600">Jenis</Label>
+                              <Select value={editForm.jenis} onValueChange={(v) => setEditForm({ ...editForm, jenis: v })}>
+                                <SelectTrigger className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-xs bg-white shadow-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-xl">
+                                  {JENIS_OPTIONS.map(j => (
+                                    <SelectItem key={j} value={j} className="text-xs">{j}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs font-semibold text-gray-600">Tahun</Label>
+                              <Input
+                                type="number"
+                                value={editForm.tahun}
+                                onChange={(e) => setEditForm({ ...editForm, tahun: parseInt(e.target.value) || new Date().getFullYear() })}
+                                className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-sm bg-white shadow-sm text-center"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs font-semibold text-gray-600">Status</Label>
+                              <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
+                                <SelectTrigger className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-xs bg-white shadow-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-xl">
+                                  {STATUS_OPTIONS.map(s => (
+                                    <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Action Buttons */}
+                        <div className="flex gap-3 pt-2">
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            onClick={() => setShowEditDialog(false)} 
+                            className="flex-1 h-10 border-2 border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl font-medium"
+                          >
+                            Batal
+                          </Button>
+                          <Button 
+                            type="submit" 
+                            className="flex-1 h-10 bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 hover:from-orange-600 hover:via-orange-700 hover:to-red-700 text-white shadow-lg shadow-orange-500/30 rounded-xl font-bold relative overflow-hidden"
+                          >
+                            <motion.div 
+                              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                              animate={{ x: ['-100%', '100%'] }}
+                              transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                            />
+                            <span className="relative z-10 flex items-center justify-center gap-2">
+                              <Check className="w-4 h-4" />
+                              Simpan Perubahan
+                            </span>
+                          </Button>
+                        </div>
+                      </form>
                     </DialogContent>
                   </Dialog>
                   
@@ -5394,7 +5429,7 @@ export default function ESOPApp() {
                               <FileSpreadsheet className="w-10 h-10 text-green-600 mt-1" />
                               <div>
                                 <p className="font-bold text-gray-900">{excelEditData.fileName}</p>
-                                <p className="text-sm text-gray-600">{excelEditData.nomorSop} - {excelEditData.judul}</p>
+                                <p className="text-sm text-gray-600">{excelEditData.judul}</p>
                                 <div className="flex gap-2 mt-2">
                                   <Badge variant="outline" className="text-xs">{excelEditData.jenis}</Badge>
                                   <Badge variant="outline" className="text-xs">{excelEditData.kategori}</Badge>
@@ -5526,10 +5561,14 @@ export default function ESOPApp() {
                           {/* File Info */}
                           <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                             <div className="flex items-start gap-3">
-                              <FileSpreadsheet className="w-10 h-10 text-green-600 mt-1" />
+                              {['docx', 'doc'].includes(excelEditData.fileType || '') ? (
+                                <FileText className="w-10 h-10 text-blue-600 mt-1" />
+                              ) : (
+                                <FileSpreadsheet className="w-10 h-10 text-green-600 mt-1" />
+                              )}
                               <div>
                                 <p className="font-bold text-gray-900">{excelEditData.fileName}</p>
-                                <p className="text-sm text-gray-600">{excelEditData.nomorSop} - {excelEditData.judul}</p>
+                                <p className="text-sm text-gray-600">{excelEditData.judul}</p>
                               </div>
                             </div>
                           </div>
@@ -5554,7 +5593,7 @@ export default function ESOPApp() {
                             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
                               <input
                                 type="file"
-                                accept=".xlsx,.xls,.xlsm"
+                                accept=".xlsx,.xls,.xlsm,.docx,.doc"
                                 onChange={(e) => {
                                   const file = e.target.files?.[0]
                                   if (file) {
@@ -5580,7 +5619,7 @@ export default function ESOPApp() {
                                       Klik untuk memilih file
                                     </p>
                                     <p className="text-xs text-gray-400 mt-1">
-                                      Format: .xlsx, .xls, .xlsm
+                                      Format: .xlsx, .xls, .xlsm, .docx, .doc
                                     </p>
                                   </>
                                 )}
@@ -5874,11 +5913,12 @@ export default function ESOPApp() {
                         <div className="relative">
                           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                           <Input 
-                            placeholder="Cari nomor atau judul dokumen..."
+                            placeholder="Cari judul dokumen..."
                             value={searchInput}
                             onChange={(e) => {
                               setSearchInput(e.target.value)
-                              setIsSearching(true)
+                              // Reset to page 1 when searching
+                              setSopPagination(p => ({ ...p, page: 1 }))
                             }}
                             className="pl-10 pr-10 h-11 border-2 border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 focus:border-orange-500 focus:ring-orange-500 rounded-lg"
                           />
@@ -5889,7 +5929,8 @@ export default function ESOPApp() {
                             <button
                               onClick={() => {
                                 setSearchInput('')
-                                setIsSearching(true)
+                                setSopFilters(prev => ({ ...prev, search: '' }))
+                                setSopPagination(p => ({ ...p, page: 1 }))
                               }}
                               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                             >
@@ -5975,7 +6016,7 @@ export default function ESOPApp() {
                           onClick={() => {
                             setSearchInput('')
                             setSopFilters({ kategori: 'SEMUA', jenis: 'SEMUA', status: 'SEMUA', tahun: '', search: '' })
-                            setIsSearching(true)
+                            setSopPagination(p => ({ ...p, page: 1 }))
                           }}
                           className="h-10 px-4 border-gray-300 text-gray-600 hover:bg-gray-100 rounded-lg"
                         >
@@ -6014,7 +6055,6 @@ export default function ESOPApp() {
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-gradient-to-r from-orange-500 to-yellow-500">
-                            <TableHead className="font-bold text-white">Nomor</TableHead>
                             <TableHead className="font-bold text-white">Judul</TableHead>
                             <TableHead className="font-bold text-white">Tahun</TableHead>
                             <TableHead className="font-bold text-white">Kategori</TableHead>
@@ -6026,7 +6066,7 @@ export default function ESOPApp() {
                         <TableBody>
                           {sopFiles.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={7} className="text-center text-gray-500 py-8">
+                              <TableCell colSpan={6} className="text-center text-gray-500 py-8">
                                 Tidak ada data
                               </TableCell>
                             </TableRow>
@@ -6036,7 +6076,6 @@ export default function ESOPApp() {
                                 key={sop.id} 
                                 className="hover:bg-orange-50 border-b border-gray-200"
                               >
-                                <TableCell className="font-semibold text-blue-900">{sop.nomorSop}</TableCell>
                                 <TableCell>
                                   <div className="flex items-center gap-2">
                                     <FileTypeIcon fileName={sop.fileName} className="w-5 h-5 flex-shrink-0" />
@@ -6140,15 +6179,21 @@ export default function ESOPApp() {
                                         <Printer className="w-4 h-4 text-gray-400" />
                                       )}
                                     </Button>
-                                    {user?.role === 'ADMIN' && (
+                                    {user?.role === 'ADMIN' && ['xlsx', 'xls', 'xlsm', 'docx', 'doc', 'pdf'].includes(sop.fileType || '') && (
                                       <Button 
                                         size="icon" 
                                         variant="ghost" 
-                                        className="hover:bg-green-100"
+                                        className={`hover:${sop.fileType === 'pdf' ? 'bg-red-100' : 'bg-green-100'}`}
                                         onClick={() => handleDesktopEdit(sop.id)}
-                                        title={`Edit di Desktop (${sop.fileType?.toUpperCase() || 'Excel'})`}
+                                        title={sop.fileType === 'pdf' ? 'Edit Desktop (PDF tidak bisa di-edit)' : `Edit di Desktop (${sop.fileType?.toUpperCase() || 'File'})`}
                                       >
-                                        <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                                        {sop.fileType === 'pdf' ? (
+                                          <FileIcon className="w-4 h-4 text-red-500" />
+                                        ) : ['docx', 'doc'].includes(sop.fileType || '') ? (
+                                          <FileText className="w-4 h-4 text-blue-600" />
+                                        ) : (
+                                          <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                                        )}
                                       </Button>
                                     )}
                                     {user?.role === 'ADMIN' && desktopEditSessionToken && (
@@ -6751,7 +6796,7 @@ export default function ESOPApp() {
                                 <TableCell className="text-gray-700">{log.deskripsi}</TableCell>
                                 <TableCell>
                                   {log.sopFile && (
-                                    <span className="text-sm text-orange-600 font-medium">{log.sopFile.nomorSop}</span>
+                                    <span className="text-sm text-orange-600 font-medium truncate max-w-[200px] block">{log.sopFile.judul}</span>
                                   )}
                                 </TableCell>
                               </TableRow>
@@ -6893,10 +6938,14 @@ export default function ESOPApp() {
                           {/* File Info */}
                           <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                             <div className="flex items-start gap-3">
-                              <FileSpreadsheet className="w-10 h-10 text-green-600 mt-1" />
+                              {['docx', 'doc'].includes(excelEditData.fileType || '') ? (
+                                <FileText className="w-10 h-10 text-blue-600 mt-1" />
+                              ) : (
+                                <FileSpreadsheet className="w-10 h-10 text-green-600 mt-1" />
+                              )}
                               <div>
                                 <p className="font-bold text-gray-900">{excelEditData.fileName}</p>
-                                <p className="text-sm text-gray-600">{excelEditData.nomorSop} - {excelEditData.judul}</p>
+                                <p className="text-sm text-gray-600">{excelEditData.judul}</p>
                               </div>
                             </div>
                           </div>
@@ -6921,7 +6970,7 @@ export default function ESOPApp() {
                             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
                               <input
                                 type="file"
-                                accept=".xlsx,.xls,.xlsm"
+                                accept=".xlsx,.xls,.xlsm,.docx,.doc"
                                 onChange={(e) => {
                                   const file = e.target.files?.[0]
                                   if (file) {
@@ -6947,7 +6996,7 @@ export default function ESOPApp() {
                                       Klik untuk memilih file
                                     </p>
                                     <p className="text-xs text-gray-400 mt-1">
-                                      Format: .xlsx, .xls, .xlsm
+                                      Format: .xlsx, .xls, .xlsm, .docx, .doc
                                     </p>
                                   </>
                                 )}
@@ -7364,7 +7413,7 @@ export default function ESOPApp() {
                       </div>
                       <p className="text-sm text-gray-700 mt-1">{log.deskripsi}</p>
                       {log.sopFile && (
-                        <p className="text-xs text-orange-600 mt-1">{log.sopFile.nomorSop} - {log.sopFile.judul}</p>
+                        <p className="text-xs text-orange-600 mt-1">{log.sopFile.judul}</p>
                       )}
                     </div>
                   </div>
@@ -7392,25 +7441,522 @@ export default function ESOPApp() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.8 }}
       >
-        <div className="relative">
+        <div className="relative cursor-pointer" onClick={() => setShowCopyrightPopup(true)}>
           {/* Glow effect */}
           <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-yellow-400 rounded-lg blur-md opacity-60 animate-pulse" />
           
           {/* Shimmer container */}
-          <div className="relative px-4 py-2 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 rounded-lg border border-orange-500/30 overflow-hidden">
+          <div className="relative px-4 py-2 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 rounded-lg border border-orange-500/30 overflow-hidden hover:border-orange-500/60 transition-colors">
             {/* Animated shimmer */}
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-400/20 to-transparent animate-shimmer" />
             
             {/* Text with glow */}
             <p className="text-sm font-medium relative z-10">
               <span className="text-gray-400">© </span>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-yellow-300 to-orange-400 animate-pulse font-bold">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-yellow-300 to-orange-400 animate-pulse font-bold hover:from-yellow-300 hover:via-orange-400 hover:to-yellow-300 transition-all">
                 FOE - 2026
               </span>
             </p>
           </div>
         </div>
       </motion.div>
+      
+      {/* PDF Edit Warning Dialog - Aesthetic Design */}
+      <Dialog open={showPdfWarningDialog} onOpenChange={setShowPdfWarningDialog}>
+        <DialogContent className="sm:max-w-lg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-red-500/50 shadow-2xl overflow-hidden" aria-describedby={undefined}>
+          {/* Animated background effects */}
+          <div className="absolute inset-0 overflow-hidden">
+            {/* Radar sweep */}
+            <motion.div
+              className="absolute -top-20 -right-20 w-60 h-60 rounded-full"
+              style={{
+                background: 'conic-gradient(from 0deg, transparent 0deg, rgba(239, 68, 68, 0.15) 30deg, transparent 60deg)'
+              }}
+              animate={{ rotate: 360 }}
+              transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+            />
+            
+            {/* Floating particles */}
+            {[...Array(6)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute w-1 h-1 rounded-full bg-red-400/50"
+                style={{
+                  left: `${10 + i * 15}%`,
+                  top: `${20 + (i % 3) * 25}%`,
+                }}
+                animate={{
+                  y: [-10, 10, -10],
+                  opacity: [0.3, 0.7, 0.3]
+                }}
+                transition={{
+                  duration: 2 + i * 0.3,
+                  repeat: Infinity,
+                  delay: i * 0.2
+                }}
+              />
+            ))}
+          </div>
+          
+          <div className="relative z-10">
+            <DialogHeader className="text-center pb-4">
+              {/* Animated warning icon */}
+              <motion.div
+                className="mx-auto mb-4"
+                animate={{
+                  scale: [1, 1.1, 1],
+                  rotate: [0, 5, -5, 0]
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: 'easeInOut'
+                }}
+              >
+                <div className="relative">
+                  {/* Glow ring */}
+                  <motion.div
+                    className="absolute inset-0 rounded-full bg-red-500/30 blur-xl"
+                    animate={{
+                      scale: [1, 1.3, 1],
+                      opacity: [0.5, 0.8, 0.5]
+                    }}
+                    transition={{
+                      duration: 1.5,
+                      repeat: Infinity
+                    }}
+                  />
+                  
+                  {/* Icon container */}
+                  <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-lg shadow-red-500/50">
+                    <FileIcon className="w-10 h-10 text-white" />
+                  </div>
+                  
+                  {/* X mark overlay */}
+                  <motion.div
+                    className="absolute inset-0 flex items-center justify-center"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    <div className="w-24 h-24 rounded-full border-4 border-red-400 flex items-center justify-center">
+                      <XCircle className="w-12 h-12 text-red-400" />
+                    </div>
+                  </motion.div>
+                </div>
+              </motion.div>
+              
+              <DialogTitle className="text-2xl font-bold">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-300 to-red-400">
+                  PDF Tidak Bisa Di-edit
+                </span>
+              </DialogTitle>
+              
+              <DialogDescription className="text-gray-400 text-sm mt-2">
+                File PDF tidak mendukung fitur edit langsung
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              {/* Main message */}
+              <motion.div
+                className="bg-red-500/10 border border-red-500/30 rounded-xl p-4"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                <p className="text-gray-300 text-sm leading-relaxed">
+                  Format <span className="text-red-400 font-semibold">PDF (Portable Document Format)</span> didesain untuk distribusi dokumen yang sudah final, bukan untuk editing. Berbeda dengan file Excel atau Word, PDF tidak dapat dimodifikasi secara langsung.
+                </p>
+              </motion.div>
+              
+              {/* Solution cards */}
+              <motion.div
+                className="grid grid-cols-2 gap-3"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+              >
+                <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileSpreadsheet className="w-4 h-4 text-green-400" />
+                    <span className="text-green-400 text-xs font-semibold">EXCEL</span>
+                  </div>
+                  <p className="text-gray-400 text-xs">
+                    Upload ulang dalam format <span className="text-green-400">.xlsx</span> atau <span className="text-green-400">.xls</span>
+                  </p>
+                </div>
+                
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileText className="w-4 h-4 text-blue-400" />
+                    <span className="text-blue-400 text-xs font-semibold">WORD</span>
+                  </div>
+                  <p className="text-gray-400 text-xs">
+                    Upload ulang dalam format <span className="text-blue-400">.docx</span> atau <span className="text-blue-400">.doc</span>
+                  </p>
+                </div>
+              </motion.div>
+              
+              {/* Tip section */}
+              <motion.div
+                className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6 }}
+              >
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-amber-400 text-xs font-semibold mb-1">TIP</p>
+                    <p className="text-gray-400 text-xs">
+                      Jika Anda memiliki file asli sebelum dikonversi ke PDF, upload file tersebut untuk mengaktifkan fitur edit.
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+            
+            <DialogFooter className="pt-4">
+              <motion.div
+                className="w-full"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <Button
+                  type="button"
+                  onClick={() => setShowPdfWarningDialog(false)}
+                  className="w-full bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-red-500/25"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Tutup
+                </Button>
+              </motion.div>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Copyright Popup - Beautiful Animated Design */}
+      <AnimatePresence>
+        {showCopyrightPopup && (
+          <motion.div
+            className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            {/* Backdrop */}
+            <motion.div
+              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowCopyrightPopup(false)}
+            />
+            
+            {/* Popup Container */}
+            <motion.div
+              className="relative max-w-md w-full"
+              initial={{ scale: 0.8, opacity: 0, y: 50 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.8, opacity: 0, y: 50 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+            >
+              {/* Outer Glow Ring */}
+              <motion.div
+                className="absolute -inset-4 rounded-3xl"
+                style={{
+                  background: 'conic-gradient(from 0deg, #f97316, #dc2626, #fbbf24, #f97316)',
+                  filter: 'blur(25px)',
+                  opacity: 0.5
+                }}
+                animate={{ rotate: 360 }}
+                transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
+              />
+              
+              {/* Radar Sweep Effect */}
+              <motion.div
+                className="absolute -inset-12 rounded-full pointer-events-none"
+                style={{
+                  background: 'conic-gradient(from 0deg, transparent 0deg, rgba(249, 115, 22, 0.12) 30deg, transparent 60deg)'
+                }}
+                animate={{ rotate: 360 }}
+                transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+              />
+              
+              {/* Floating Particles */}
+              {[...Array(12)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute w-2 h-2 rounded-full"
+                  style={{
+                    background: i % 3 === 0 ? '#f97316' : i % 3 === 1 ? '#fbbf24' : '#ef4444',
+                    left: `${5 + i * 8}%`,
+                    top: `${-15 + (i % 4) * 8}%`,
+                    boxShadow: `0 0 8px ${i % 3 === 0 ? '#f97316' : i % 3 === 1 ? '#fbbf24' : '#ef4444'}`
+                  }}
+                  animate={{
+                    y: [-8, 8, -8],
+                    opacity: [0.4, 1, 0.4],
+                    scale: [0.8, 1.2, 0.8]
+                  }}
+                  transition={{
+                    duration: 2 + i * 0.2,
+                    repeat: Infinity,
+                    delay: i * 0.15
+                  }}
+                />
+              ))}
+              
+              {/* Main Card */}
+              <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl border border-orange-500/40 overflow-hidden backdrop-blur-xl shadow-2xl">
+                {/* Animated Grid Background */}
+                <div className="absolute inset-0 opacity-10">
+                  <div className="absolute inset-0" style={{
+                    backgroundImage: `
+                      linear-gradient(rgba(249, 115, 22, 0.3) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(249, 115, 22, 0.3) 1px, transparent 1px)
+                    `,
+                    backgroundSize: '25px 25px'
+                  }} />
+                </div>
+                
+                {/* Close Button */}
+                <motion.button
+                  className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
+                  onClick={() => setShowCopyrightPopup(false)}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                >
+                  <X className="w-4 h-4 text-white/70" />
+                </motion.button>
+                
+                {/* Header with Animated Beacon */}
+                <div className="relative p-6 pb-4 text-white overflow-hidden">
+                  {/* Beacon Pulse Effect */}
+                  <motion.div
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+                    animate={{
+                      scale: [1, 2, 1],
+                      opacity: [0.2, 0, 0.2]
+                    }}
+                    transition={{ duration: 2.5, repeat: Infinity }}
+                  >
+                    <div className="w-32 h-32 rounded-full border-2 border-orange-500/30" />
+                  </motion.div>
+                  
+                  <motion.div 
+                    className="relative z-10 flex flex-col items-center"
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                  >
+                    {/* Animated SAR Logo */}
+                    <motion.div 
+                      className="relative w-16 h-16 mb-4"
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
+                    >
+                      {/* Rotating Ring */}
+                      <motion.div
+                        className="absolute inset-0 rounded-xl border-2 border-orange-400/50"
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+                      />
+                      
+                      {/* Inner Glow */}
+                      <motion.div
+                        className="absolute inset-1 rounded-lg bg-gradient-to-br from-orange-500 to-red-600"
+                        animate={{
+                          boxShadow: [
+                            '0 0 15px rgba(249, 115, 22, 0.5)',
+                            '0 0 30px rgba(249, 115, 22, 0.8)',
+                            '0 0 15px rgba(249, 115, 22, 0.5)'
+                          ]
+                        }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                      />
+                      
+                      {/* Icon */}
+                      <div className="absolute inset-2 rounded-md bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center">
+                        <motion.div
+                          animate={{ scale: [1, 1.1, 1] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        >
+                          <Shield className="w-6 h-6 text-white" />
+                        </motion.div>
+                      </div>
+                    </motion.div>
+                    
+                    {/* Title with Glowing Effect */}
+                    <motion.h2 
+                      className="text-xl font-bold relative text-center"
+                      animate={{
+                        textShadow: [
+                          '0 0 10px rgba(249, 115, 22, 0.5)',
+                          '0 0 25px rgba(249, 115, 22, 0.8)',
+                          '0 0 10px rgba(249, 115, 22, 0.5)'
+                        ]
+                      }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    >
+                      <span className="bg-gradient-to-r from-orange-300 via-yellow-200 to-orange-300 bg-clip-text text-transparent">
+                        COPYRIGHT NOTICE
+                      </span>
+                    </motion.h2>
+                  </motion.div>
+                </div>
+                
+                {/* Content */}
+                <motion.div 
+                  className="relative p-6 pt-2 space-y-4"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  {/* Main Copyright */}
+                  <motion.div 
+                    className="text-center space-y-2"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    <motion.p 
+                      className="text-lg font-bold"
+                      animate={{
+                        textShadow: [
+                          '0 0 5px rgba(251, 191, 36, 0.3)',
+                          '0 0 15px rgba(251, 191, 36, 0.5)',
+                          '0 0 5px rgba(251, 191, 36, 0.3)'
+                        ]
+                      }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    >
+                      <span className="bg-gradient-to-r from-orange-400 via-yellow-300 to-orange-400 bg-clip-text text-transparent">
+                        © 2026 Foe Direktorat Kesiapsiagaan – BASARNAS
+                      </span>
+                    </motion.p>
+                    <p className="text-orange-200/80 text-sm font-medium">
+                      Web App SOP/IK Katalog
+                    </p>
+                  </motion.div>
+                  
+                  {/* Divider */}
+                  <motion.div 
+                    className="flex items-center gap-3"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-500/50 to-transparent" />
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
+                    >
+                      <Radio className="w-4 h-4 text-orange-400" />
+                    </motion.div>
+                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-500/50 to-transparent" />
+                  </motion.div>
+                  
+                  {/* Developer Info */}
+                  <motion.div 
+                    className="bg-gradient-to-br from-orange-500/10 to-red-500/10 rounded-xl p-4 border border-orange-500/20"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    <p className="text-orange-300/90 text-xs font-semibold uppercase tracking-wider mb-2">
+                      Developed & Maintained by:
+                    </p>
+                    <p className="text-white font-bold text-base">
+                      Muhammad Fuadunnas, S.I.Kom., M.IKom.
+                    </p>
+                    <p className="text-orange-200/70 text-sm mt-1">
+                      PKPP Ahli Muda – Direktorat Kesiapsiagaan
+                    </p>
+                  </motion.div>
+                  
+                  {/* Contact Info */}
+                  <motion.div 
+                    className="flex items-center justify-center gap-4 text-sm"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.6 }}
+                  >
+                    <div className="flex items-center gap-2 text-orange-300/80">
+                      <motion.div
+                        animate={{ scale: [1, 1.1, 1] }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                      >
+                        <Radio className="w-4 h-4" />
+                      </motion.div>
+                      <span>(+62) 811 9292 91</span>
+                    </div>
+                    <span className="text-gray-600">•</span>
+                    <div className="flex items-center gap-2 text-orange-300/80">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+                      >
+                        <Target className="w-4 h-4" />
+                      </motion.div>
+                      <span>Jakarta – Indonesia</span>
+                    </div>
+                  </motion.div>
+                  
+                  {/* Footer */}
+                  <motion.div 
+                    className="text-center pt-2"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.7 }}
+                  >
+                    <motion.p 
+                      className="text-xs text-gray-500"
+                      animate={{
+                        opacity: [0.5, 1, 0.5]
+                      }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    >
+                      All Rights Reserved.
+                    </motion.p>
+                  </motion.div>
+                  
+                  {/* Close Button */}
+                  <motion.div
+                    className="pt-2"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.8 }}
+                  >
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <Button
+                        onClick={() => setShowCopyrightPopup(false)}
+                        className="w-full bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 hover:from-orange-600 hover:via-orange-700 hover:to-red-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-orange-500/25 border border-orange-400/30"
+                      >
+                        <motion.span
+                          className="flex items-center justify-center gap-2"
+                          animate={{ scale: [1, 1.02, 1] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        >
+                          <Check className="w-4 h-4" />
+                          <span>TUTUP</span>
+                        </motion.span>
+                      </Button>
+                    </motion.div>
+                  </motion.div>
+                </motion.div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -1,24 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { cookies } from 'next/headers'
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3'
-
-// R2 Configuration
-const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID!
-const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY!
-const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_KEY!
-const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME!
-const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || `https://pub-${R2_ACCOUNT_ID}.r2.dev`
-
-// Initialize R2 client
-const r2Client = new S3Client({
-  region: 'auto',
-  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: R2_ACCESS_KEY_ID,
-    secretAccessKey: R2_SECRET_ACCESS_KEY,
-  },
-})
+import { downloadFromR2, isR2Configured, getR2PublicUrl } from '@/lib/r2-storage'
 
 // Content types
 const CONTENT_TYPES: Record<string, string> = {
@@ -33,7 +16,7 @@ const CONTENT_TYPES: Record<string, string> = {
 /**
  * GET /api/file?action=preview|download&id={documentId}
  * 
- * File handler untuk preview dan download dari Cloudflare R2 dengan fallback ke Google Drive
+ * File handler untuk preview dan download dari Cloudflare R2 (Primary Storage)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -48,6 +31,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Document ID diperlukan' }, { status: 400 })
     }
 
+    // Check R2 configuration
+    if (!isR2Configured()) {
+      return NextResponse.json({ error: 'R2 storage tidak terkonfigurasi' }, { status: 500 })
+    }
+
     // Get document from database
     const document = await db.sopFile.findUnique({
       where: { id: documentId }
@@ -57,17 +45,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Dokumen tidak ditemukan' }, { status: 404 })
     }
 
-    if (!document.filePath && !document.driveFileId) {
-      return NextResponse.json({ error: 'File tidak tersedia di storage' }, { status: 404 })
+    if (!document.filePath) {
+      return NextResponse.json({ error: 'File tidak tersedia' }, { status: 404 })
     }
 
     const fileExtension = document.fileName.toLowerCase().split('.').pop() || 'pdf'
     const fileKey = document.filePath
-    const publicUrl = `${R2_PUBLIC_URL}/${fileKey}`
+    const publicUrl = getR2PublicUrl(fileKey) || `https://pub-r2.example.com/${fileKey}`
 
-    console.log(`📄 File request: ${action} - ${document.nomorSop} (${fileExtension})`)
-    console.log(`   File path: ${fileKey}`)
-    console.log(`   Drive ID: ${document.driveFileId || 'N/A'}`)
+    console.log(`📄 File request: ${action} - ${document.judul} (${fileExtension})`)
+    console.log(`   R2 key: ${fileKey}`)
 
     // Log activity and increment counters
     const logActivity = async (activityType: 'PREVIEW' | 'DOWNLOAD') => {
@@ -88,7 +75,7 @@ export async function GET(request: NextRequest) {
             data: {
               userId,
               aktivitas: activityType,
-              deskripsi: `${activityType === 'PREVIEW' ? 'Preview' : 'Download'} ${document.jenis}: ${document.nomorSop}`,
+              deskripsi: `${activityType === 'PREVIEW' ? 'Preview' : 'Download'} ${document.jenis}: ${document.judul}`,
               fileId: documentId
             }
           })
@@ -101,51 +88,9 @@ export async function GET(request: NextRequest) {
     // Log the activity
     await logActivity(action === 'download' ? 'DOWNLOAD' : 'PREVIEW')
 
-    // Helper function to get Google Drive download URL
-    const getGoogleDriveUrl = (driveFileId: string) => {
-      return `https://drive.google.com/uc?export=download&id=${driveFileId}`
-    }
-
-    // Helper function to check if filePath is an R2 key or Google Drive ID
-    const isR2Key = (path: string | null) => {
-      if (!path) return false
-      // R2 keys typically have folder structure like "sop-files/filename.ext"
-      return path.includes('/') || path.startsWith('sop-files')
-    }
-
     // For Excel/Word files - return JSON with Office Online Viewer URL
     if (['xlsx', 'xls', 'csv', 'docx', 'doc'].includes(fileExtension)) {
-      // Determine which URL to use for Office Online Viewer
-      let viewerFileUrl: string
-      
-      if (isR2Key(fileKey)) {
-        // Use R2 public URL
-        viewerFileUrl = publicUrl
-      } else if (document.driveFileId) {
-        // Fallback to Google Drive - need to use proxy for Office Online
-        // Office Online can't directly access Google Drive, so we'll use a workaround
-        // Return the Google Drive preview URL instead
-        const drivePreviewUrl = `https://drive.google.com/file/d/${document.driveFileId}/preview`
-        
-        console.log(`📊 Using Google Drive fallback: ${drivePreviewUrl}`)
-        
-        return NextResponse.json({
-          success: true,
-          viewerUrl: drivePreviewUrl,
-          viewerType: 'google-drive',
-          downloadUrl: getGoogleDriveUrl(document.driveFileId),
-          fileName: document.fileName,
-          fallback: true,
-          message: 'File tersedia di Google Drive'
-        })
-      } else {
-        // No valid storage
-        return NextResponse.json({ 
-          error: 'File tidak ditemukan di storage manapun' 
-        }, { status: 404 })
-      }
-      
-      const encodedUrl = encodeURIComponent(viewerFileUrl)
+      const encodedUrl = encodeURIComponent(publicUrl)
       const officeViewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodedUrl}`
       
       console.log(`📊 Office Online Viewer URL: ${officeViewerUrl.substring(0, 100)}...`)
@@ -154,115 +99,44 @@ export async function GET(request: NextRequest) {
         success: true,
         viewerUrl: officeViewerUrl,
         viewerType: 'microsoft-office',
-        downloadUrl: viewerFileUrl,
+        downloadUrl: `/api/download?id=${documentId}`,
         fileName: document.fileName
       })
     }
 
     // For PDF files with download action - return JSON with download URL
     if (action === 'download') {
-      let downloadUrl: string
-      
-      if (isR2Key(fileKey)) {
-        downloadUrl = publicUrl
-      } else if (document.driveFileId) {
-        downloadUrl = getGoogleDriveUrl(document.driveFileId)
-      } else {
-        return NextResponse.json({ 
-          error: 'File tidak ditemukan di storage manapun' 
-        }, { status: 404 })
-      }
-      
       return NextResponse.json({
         success: true,
-        downloadUrl,
+        downloadUrl: `/api/download?id=${documentId}`,
         fileName: document.fileName
       })
     }
 
     // For PDF preview - download from R2 and return file directly
     // This avoids CORS issues with direct R2 access
-    if (isR2Key(fileKey)) {
-      try {
-        const r2Response = await r2Client.send(new GetObjectCommand({
-          Bucket: R2_BUCKET_NAME,
-          Key: fileKey,
-        }))
+    const result = await downloadFromR2(fileKey)
+    const fileBuffer = result.buffer
+    const contentType = CONTENT_TYPES[fileExtension] || 'application/octet-stream'
 
-        if (r2Response.Body) {
-          const fileBuffer = Buffer.from(await r2Response.Body.transformToByteArray())
-          const contentType = CONTENT_TYPES[fileExtension] || 'application/octet-stream'
+    // Sanitize filename for header
+    const sanitizedFileName = document.fileName.replace(/[^\w\-.]/g, '_')
+    const encodedFileName = encodeURIComponent(document.fileName)
 
-          // Sanitize filename for header
-          const sanitizedFileName = document.fileName.replace(/[^\w\-.]/g, '_')
-          const encodedFileName = encodeURIComponent(document.fileName)
-
-          // Return PDF file directly for preview
-          return new NextResponse(fileBuffer, {
-            status: 200,
-            headers: {
-              'Content-Type': contentType,
-              'Content-Disposition': `inline; filename="${sanitizedFileName}"; filename*=UTF-8''${encodedFileName}`,
-              'Content-Length': fileBuffer.length.toString(),
-              'Cache-Control': 'public, max-age=3600',
-              // CORS headers for cross-origin access
-              'Access-Control-Allow-Origin': '*',
-              'Access-Control-Allow-Methods': 'GET, OPTIONS',
-              'Access-Control-Allow-Headers': 'Content-Type',
-            },
-          })
-        }
-      } catch (r2Error) {
-        console.warn('⚠️ R2 access failed, trying Google Drive fallback:', r2Error)
-      }
-    }
-
-    // Fallback to Google Drive
-    if (document.driveFileId) {
-      console.log(`📥 Using Google Drive fallback for: ${document.nomorSop}`)
-      
-      // Try to download from Google Drive and proxy
-      try {
-        const gd = await import('@/lib/google-drive')
-        const fileBuffer = await gd.downloadFileFromDrive(document.driveFileId)
-        
-        const contentType = CONTENT_TYPES[fileExtension] || 'application/octet-stream'
-        const sanitizedFileName = document.fileName.replace(/[^\w\-.]/g, '_')
-        const encodedFileName = encodeURIComponent(document.fileName)
-
-        return new NextResponse(fileBuffer, {
-          status: 200,
-          headers: {
-            'Content-Type': contentType,
-            'Content-Disposition': `inline; filename="${sanitizedFileName}"; filename*=UTF-8''${encodedFileName}`,
-            'Content-Length': fileBuffer.length.toString(),
-            'Cache-Control': 'public, max-age=3600',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-          },
-        })
-      } catch (driveError) {
-        console.error('❌ Google Drive fallback also failed:', driveError)
-        
-        // Last resort: return Google Drive URL
-        const driveUrl = `https://drive.google.com/file/d/${document.driveFileId}/preview`
-        return NextResponse.json({
-          success: true,
-          viewerUrl: driveUrl,
-          viewerType: 'google-drive',
-          downloadUrl: getGoogleDriveUrl(document.driveFileId),
-          fileName: document.fileName,
-          fallback: true,
-          message: 'File tersedia di Google Drive'
-        })
-      }
-    }
-
-    return NextResponse.json({ 
-      error: 'File tidak ditemukan di storage',
-      details: 'File tidak tersedia di R2 maupun Google Drive'
-    }, { status: 404 })
+    // Return PDF file directly for preview
+    return new NextResponse(fileBuffer, {
+      status: 200,
+      headers: {
+        'Content-Type': contentType,
+        'Content-Disposition': `inline; filename="${sanitizedFileName}"; filename*=UTF-8''${encodedFileName}`,
+        'Content-Length': fileBuffer.length.toString(),
+        'Cache-Control': 'public, max-age=3600',
+        // CORS headers for cross-origin access
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+      },
+    })
 
   } catch (error) {
     console.error('[File API] Error:', error)

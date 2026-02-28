@@ -49,7 +49,6 @@ export async function GET(request: NextRequest) {
       mode: 'local',
       file: {
         id: sopFile.id,
-        nomorSop: sopFile.nomorSop,
         judul: sopFile.judul,
         fileName: sopFile.fileName,
         filePath: sopFile.filePath,
@@ -160,56 +159,11 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
-    // ============================================
-    // RENUMBER SOP BASED ON UPDATED TIMESTAMP
-    // File yang baru di-update akan menjadi no 1
-    // ============================================
-    
-    const getPrefix = (jenis: string) => {
-      if (jenis === 'SOP') return 'SOP-'
-      if (jenis === 'IK') return 'IK-'
-      return 'LAINNYA-'
-    }
-    
-    const prefix = getPrefix(sopFile.jenis)
-    
-    // Update timestamp untuk trigger renumbering
+    // Update timestamp
     const now = new Date()
     await db.sopFile.update({
       where: { id: fileId },
       data: { updatedAt: now }
-    })
-    
-    // Get all SOPs of the same jenis, ordered by updatedAt DESC (newest first)
-    const allSopsOfJenis = await db.sopFile.findMany({
-      where: { jenis: sopFile.jenis },
-      orderBy: { updatedAt: 'desc' },
-      select: { id: true, nomorSop: true, updatedAt: true }
-    })
-    
-    // Renumber all SOPs based on their position
-    for (let i = 0; i < allSopsOfJenis.length; i++) {
-      const currentSop = allSopsOfJenis[i]
-      const newNumber = i + 1
-      const newNomorSop = `${prefix}${String(newNumber).padStart(4, '0')}`
-      
-      if (currentSop.nomorSop !== newNomorSop) {
-        try {
-          await db.sopFile.update({
-            where: { id: currentSop.id },
-            data: { nomorSop: newNomorSop }
-          })
-          console.log(`📝 Renumbered: ${currentSop.nomorSop} → ${newNomorSop}`)
-        } catch (updateError) {
-          console.warn(`⚠️ Failed to renumber ${currentSop.nomorSop}:`, updateError)
-        }
-      }
-    }
-    
-    // Get the new nomorSop for this file
-    const updatedSop = await db.sopFile.findUnique({
-      where: { id: fileId },
-      select: { nomorSop: true }
     })
     
     // Log activity
@@ -217,7 +171,7 @@ export async function POST(request: NextRequest) {
       data: {
         userId,
         aktivitas: 'UPDATE_FILE',
-        deskripsi: `Updated file: ${sopFile.nomorSop} - ${sopFile.judul} (${file.name}) → ${updatedSop?.nomorSop}`,
+        deskripsi: `Updated file: ${sopFile.judul} (${file.name})`,
         fileId: sopFile.id,
       },
     })
@@ -229,7 +183,7 @@ export async function POST(request: NextRequest) {
       message: `File "${file.name}" berhasil diupload dan menggantikan file lama`,
       file: {
         id: sopFile.id,
-        nomorSop: updatedSop?.nomorSop,
+        judul: sopFile.judul,
         fileName: sopFile.fileName,
         filePath: sopFile.filePath,
         size: fileBuffer.length,

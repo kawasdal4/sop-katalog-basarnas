@@ -122,12 +122,12 @@ export async function GET(request: NextRequest) {
     if (sopId) {
       const sop = await db.sopFile.findUnique({
         where: { id: sopId },
-        select: { nomorSop: true, judul: true, fileName: true }
+        select: { judul: true, fileName: true }
       })
       if (sop) {
         const ext = sop.fileName.split('.').pop() || fileExt
-        const sanitize = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 50)
-        fileName = `${sanitize(sop.nomorSop)} - ${sanitize(sop.judul)}.${ext}`
+        const sanitize = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
+        fileName = `${sanitize(sop.judul)}.${ext}`
       }
     }
     

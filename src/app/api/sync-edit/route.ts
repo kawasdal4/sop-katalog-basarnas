@@ -188,59 +188,13 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
-    // ============================================
-    // RENUMBER SOP BASED ON UPDATED TIMESTAMP
-    // File yang baru di-sync akan menjadi no 1
-    // ============================================
-    
+    // Update timestamp
     if (sopId) {
-      const sopFile = await db.sopFile.findUnique({
+      const now = new Date()
+      await db.sopFile.update({
         where: { id: sopId },
-        select: { jenis: true }
+        data: { updatedAt: now }
       })
-      
-      if (sopFile) {
-        const getPrefix = (jenis: string) => {
-          if (jenis === 'SOP') return 'SOP-'
-          if (jenis === 'IK') return 'IK-'
-          return 'LAINNYA-'
-        }
-        
-        const prefix = getPrefix(sopFile.jenis)
-        
-        // Update timestamp
-        const now = new Date()
-        await db.sopFile.update({
-          where: { id: sopId },
-          data: { updatedAt: now }
-        })
-        
-        // Get all SOPs of the same jenis, ordered by updatedAt DESC
-        const allSopsOfJenis = await db.sopFile.findMany({
-          where: { jenis: sopFile.jenis },
-          orderBy: { updatedAt: 'desc' },
-          select: { id: true, nomorSop: true, updatedAt: true }
-        })
-        
-        // Renumber all SOPs based on their position
-        for (let i = 0; i < allSopsOfJenis.length; i++) {
-          const currentSop = allSopsOfJenis[i]
-          const newNumber = i + 1
-          const newNomorSop = `${prefix}${String(newNumber).padStart(4, '0')}`
-          
-          if (currentSop.nomorSop !== newNomorSop) {
-            try {
-              await db.sopFile.update({
-                where: { id: currentSop.id },
-                data: { nomorSop: newNomorSop }
-              })
-              console.log(`📝 Renumbered: ${currentSop.nomorSop} → ${newNomorSop}`)
-            } catch (updateError) {
-              console.warn(`⚠️ Failed to renumber ${currentSop.nomorSop}:`, updateError)
-            }
-          }
-        }
-      }
     }
     
     // Log activity

@@ -19,11 +19,21 @@ if (!existsSync(PDF_DIR)) mkdirSync(PDF_DIR, { recursive: true })
 // PDF Converter Service URL
 const PDF_CONVERTER_URL = 'http://localhost:3004'
 
+// Supported file types
+const EXCEL_TYPES = ['xlsx', 'xls', 'xlsm']
+const WORD_TYPES = ['docx', 'doc']
+const PDF_TYPES = ['pdf']
+
 /**
  * GET /api/preview-pdf?id={documentId}
  * 
  * Returns PDF preview URL. Generates PDF if not exists.
  * Uses R2 as primary storage.
+ * 
+ * Supported file types:
+ * - PDF: Direct preview
+ * - Excel (xlsx, xls, xlsm): Convert to PDF
+ * - Word (docx, doc): Convert to PDF
  */
 export async function GET(request: NextRequest) {
   try {
@@ -50,8 +60,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Dokumen tidak ditemukan' }, { status: 404 })
     }
 
-    // For PDF files, return directly from R2
-    if (document.fileType === 'pdf') {
+    const fileType = document.fileType?.toLowerCase() || 'pdf'
+
+    // ============================================
+    // PDF FILES - Direct preview
+    // ============================================
+    if (PDF_TYPES.includes(fileType)) {
       console.log(`📄 [Preview] PDF file, fetching from R2: ${document.filePath}`)
       
       if (!document.filePath) {
@@ -86,78 +100,98 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // For Excel files, check if PDF preview exists
-    const pdfPath = `${PDF_DIR}/${documentId}.pdf`
-    
-    if (existsSync(pdfPath)) {
-      // Check if PDF is still fresh (generated after last update)
-      const pdfStats = await import('fs').then(fs => fs.promises.stat(pdfPath))
-      const docUpdatedAt = new Date(document.updatedAt)
+    // ============================================
+    // EXCEL & WORD FILES - Convert to PDF
+    // ============================================
+    if (EXCEL_TYPES.includes(fileType) || WORD_TYPES.includes(fileType)) {
+      const fileTypeName = EXCEL_TYPES.includes(fileType) ? 'Excel' : 'Word'
       
-      if (pdfStats.mtime > docUpdatedAt) {
-        console.log(`[Preview] Cached PDF exists: ${pdfPath}`)
+      // Check if PDF preview exists
+      const pdfPath = `${PDF_DIR}/${documentId}.pdf`
+      
+      if (existsSync(pdfPath)) {
+        // Check if PDF is still fresh (generated after last update)
+        const pdfStats = await import('fs').then(fs => fs.promises.stat(pdfPath))
+        const docUpdatedAt = new Date(document.updatedAt)
         
-        // Increment preview counter
-        await db.sopFile.update({
-          where: { id: documentId },
-          data: { previewCount: { increment: 1 } }
-        })
+        if (pdfStats.mtime > docUpdatedAt) {
+          console.log(`[Preview] Cached PDF exists for ${fileTypeName}: ${pdfPath}`)
+          
+          // Increment preview counter
+          await db.sopFile.update({
+            where: { id: documentId },
+            data: { previewCount: { increment: 1 } }
+          })
 
-        return NextResponse.json({
-          success: true,
-          pdfUrl: `/api/preview-pdf/file?id=${documentId}`,
-          cached: true
-        })
+          return NextResponse.json({
+            success: true,
+            pdfUrl: `/api/preview-pdf/file?id=${documentId}`,
+            cached: true,
+            originalType: fileType
+          })
+        }
       }
-    }
 
-    // Need to generate PDF from Excel
-    console.log(`[Preview] Generating PDF for Excel: ${document.nomorSop}`)
+      // Need to generate PDF from Excel/Word
+      console.log(`[Preview] Generating PDF for ${fileTypeName}: ${document.judul}`)
 
-    if (!document.filePath) {
-      return NextResponse.json({ error: 'File tidak tersedia di storage' }, { status: 404 })
-    }
-
-    // Download Excel from R2
-    let excelData: Buffer
-    try {
-      const result = await downloadFromR2(document.filePath)
-      excelData = result.buffer
-    } catch (downloadError) {
-      console.error('R2 download error:', downloadError)
-      return NextResponse.json({ 
-        error: 'File tidak ditemukan di R2',
-        details: downloadError instanceof Error ? downloadError.message : 'Unknown error'
-      }, { status: 404 })
-    }
-
-    // Convert to PDF
-    const pdfData = await convertToPdf(excelData, document.fileName)
-    
-    if (!pdfData) {
-      return NextResponse.json({ error: 'Gagal mengkonversi ke PDF' }, { status: 500 })
-    }
-
-    // Save PDF locally for caching
-    await writeFileAsync(pdfPath, pdfData)
-
-    // Update database with PDF path
-    await db.sopFile.update({
-      where: { id: documentId },
-      data: {
-        pdfPreviewPath: pdfPath,
-        pdfPreviewGeneratedAt: new Date(),
-        previewCount: { increment: 1 }
+      if (!document.filePath) {
+        return NextResponse.json({ error: 'File tidak tersedia di storage' }, { status: 404 })
       }
-    })
 
-    console.log(`[Preview] PDF generated: ${pdfPath}`)
+      // Download file from R2
+      let fileData: Buffer
+      try {
+        const result = await downloadFromR2(document.filePath)
+        fileData = result.buffer
+      } catch (downloadError) {
+        console.error('R2 download error:', downloadError)
+        return NextResponse.json({ 
+          error: 'File tidak ditemukan di R2',
+          details: downloadError instanceof Error ? downloadError.message : 'Unknown error'
+        }, { status: 404 })
+      }
 
-    return NextResponse.json({
-      success: true,
-      pdfUrl: `/api/preview-pdf/file?id=${documentId}`,
-      cached: false
-    })
+      // Convert to PDF
+      const pdfData = await convertToPdf(fileData, document.fileName, fileType)
+      
+      if (!pdfData) {
+        return NextResponse.json({ 
+          error: 'Gagal mengkonversi ke PDF',
+          details: 'PDF converter service mungkin tidak tersedia'
+        }, { status: 500 })
+      }
+
+      // Save PDF locally for caching
+      await writeFileAsync(pdfPath, pdfData)
+
+      // Update database with PDF path
+      await db.sopFile.update({
+        where: { id: documentId },
+        data: {
+          pdfPreviewPath: pdfPath,
+          pdfPreviewGeneratedAt: new Date(),
+          previewCount: { increment: 1 }
+        }
+      })
+
+      console.log(`[Preview] PDF generated for ${fileTypeName}: ${pdfPath}`)
+
+      return NextResponse.json({
+        success: true,
+        pdfUrl: `/api/preview-pdf/file?id=${documentId}`,
+        cached: false,
+        originalType: fileType
+      })
+    }
+
+    // ============================================
+    // UNSUPPORTED FILE TYPES
+    // ============================================
+    return NextResponse.json({ 
+      error: `Tipe file tidak didukung untuk preview: ${fileType}`,
+      supportedTypes: [...PDF_TYPES, ...EXCEL_TYPES, ...WORD_TYPES]
+    }, { status: 400 })
 
   } catch (error) {
     console.error('[Preview] Error:', error)
@@ -169,17 +203,19 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * Convert Excel to PDF using PDF Converter service
+ * Convert file to PDF using PDF Converter service
  */
-async function convertToPdf(excelData: Buffer, fileName: string): Promise<Buffer | null> {
+async function convertToPdf(fileData: Buffer, fileName: string, fileType: string): Promise<Buffer | null> {
   try {
     const response = await fetch(`${PDF_CONVERTER_URL}/convert`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        fileBase64: excelData.toString('base64'),
-        fileName: fileName
-      })
+        fileBase64: fileData.toString('base64'),
+        fileName: fileName,
+        fileType: fileType
+      }),
+      signal: AbortSignal.timeout(60000) // 60 second timeout
     })
 
     if (!response.ok) {

@@ -279,6 +279,93 @@ export async function copyR2Object(sourceKey: string, destKey: string): Promise<
 }
 
 /**
+ * Move object within R2 (copy + delete)
+ */
+export async function moveR2Object(sourceKey: string, destKey: string): Promise<void> {
+  const config = getR2Config()
+  const client = createR2Client()
+  
+  // Copy to new location
+  const copyCommand = new CopyObjectCommand({
+    Bucket: config.bucketName,
+    CopySource: `${config.bucketName}/${sourceKey}`,
+    Key: destKey,
+  })
+  
+  await client.send(copyCommand)
+  
+  // Delete from old location
+  const deleteCommand = new DeleteObjectCommand({
+    Bucket: config.bucketName,
+    Key: sourceKey,
+  })
+  
+  await client.send(deleteCommand)
+  console.log(`📦 Moved: ${sourceKey} → ${destKey}`)
+}
+
+/**
+ * Rename object within R2 (same as move but returns result)
+ */
+export async function renameR2Object(sourceKey: string, destKey: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const config = getR2Config()
+    const client = createR2Client()
+    
+    // Check if source exists
+    try {
+      await client.send(new HeadObjectCommand({
+        Bucket: config.bucketName,
+        Key: sourceKey,
+      }))
+    } catch {
+      return { success: false, error: 'Source file not found in R2' }
+    }
+    
+    // Check if destination already exists
+    try {
+      await client.send(new HeadObjectCommand({
+        Bucket: config.bucketName,
+        Key: destKey,
+      }))
+      // Destination exists, delete it first
+      await client.send(new DeleteObjectCommand({
+        Bucket: config.bucketName,
+        Key: destKey,
+      }))
+    } catch {
+      // Destination doesn't exist, which is fine
+    }
+    
+    // Copy to new location
+    const copyCommand = new CopyObjectCommand({
+      Bucket: config.bucketName,
+      CopySource: `${config.bucketName}/${sourceKey}`,
+      Key: destKey,
+    })
+    
+    await client.send(copyCommand)
+    
+    // Delete from old location
+    const deleteCommand = new DeleteObjectCommand({
+      Bucket: config.bucketName,
+      Key: sourceKey,
+    })
+    
+    await client.send(deleteCommand)
+    console.log(`📝 Renamed: ${sourceKey} → ${destKey}`)
+    
+    return { success: true }
+  } catch (error) {
+    console.error(`❌ Rename failed: ${sourceKey}`, error)
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    }
+  }
+}
+
+/**
  * Ensure bucket exists
  */
 export async function ensureR2Bucket(): Promise<boolean> {

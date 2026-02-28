@@ -207,7 +207,7 @@ export async function GET() {
         },
         orderBy: { previewCount: 'desc' },
         take: 5,
-        select: { id: true, nomorSop: true, judul: true, previewCount: true }
+        select: { id: true, judul: true, previewCount: true }
       })
       stats.topViewed = topViewed
     } catch {
@@ -223,7 +223,7 @@ export async function GET() {
         },
         orderBy: { downloadCount: 'desc' },
         take: 5,
-        select: { id: true, nomorSop: true, judul: true, downloadCount: true }
+        select: { id: true, judul: true, downloadCount: true }
       })
       stats.topDownloaded = topDownloaded
     } catch {

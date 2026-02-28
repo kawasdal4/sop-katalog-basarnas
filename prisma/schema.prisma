@@ -1,13 +1,12 @@
-// Production Schema - PostgreSQL (Supabase/Vercel)
+// Development Schema - SQLite
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_DATABASE_URL")
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 // User model with role-based access
@@ -29,7 +28,7 @@ model User {
 // SOP/IK File model
 model SopFile {
   id           String   @id @default(cuid())
-  nomorSop     String   @unique // SOP-0001, IK-0001, etc
+  nomorSop     String?  @unique // SOP-0001, IK-0001, etc (optional for backward compatibility)
   judul        String
   tahun        Int
   kategori     String   // SIAGA, LATIHAN, LAINNYA

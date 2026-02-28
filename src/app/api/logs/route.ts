@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         user: { select: { name: true, email: true } },
-        sopFile: { select: { nomorSop: true, judul: true } }
+        sopFile: { select: { judul: true } }
       },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,

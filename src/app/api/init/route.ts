@@ -26,13 +26,6 @@ export async function GET() {
       }
     })
     
-    // Initialize counter
-    await db.counter.upsert({
-      where: { id: 'counter' },
-      update: {},
-      create: { id: 'counter', sopCount: 0, ikCount: 0 }
-    })
-    
     return NextResponse.json({ 
       message: 'Admin berhasil dibuat',
       admin: { email: admin.email, name: admin.name }

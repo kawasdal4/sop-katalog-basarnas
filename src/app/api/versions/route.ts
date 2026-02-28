@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
       data: {
         userId,
         aktivitas: 'VERSION_CREATE',
-        deskripsi: `Membuat versi ${newVersion.versionNumber} dari ${document.nomorSop}`,
+        deskripsi: `Membuat versi ${newVersion.versionNumber} dari ${document.judul}`,
         fileId: documentId,
         metadata: JSON.stringify({ versionNumber: newVersion.versionNumber })
       }

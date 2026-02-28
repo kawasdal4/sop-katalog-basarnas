@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import { downloadFromR2, isR2Configured } from '@/lib/r2-storage'
+import { db } from '@/lib/db'
 
 const CLOUDCONVERT_API = 'https://api.cloudconvert.com/v2'
 
@@ -16,21 +18,35 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const fileId = searchParams.get('fileId')
+    const sopId = searchParams.get('sopId') // Changed from fileId to sopId
     const fileName = searchParams.get('fileName') || 'file'
 
-    if (!fileId) {
-      return NextResponse.json({ error: 'File ID diperlukan' }, { status: 400 })
+    if (!sopId) {
+      return NextResponse.json({ error: 'SOP ID diperlukan' }, { status: 400 })
     }
 
-    const fileExtension = fileName.toLowerCase().split('.').pop() || ''
+    // Check R2 configuration
+    if (!isR2Configured()) {
+      return NextResponse.json({ error: 'R2 storage tidak terkonfigurasi' }, { status: 500 })
+    }
 
-    // If not convertible type, return Google Drive view URL
+    // Get SOP file from database
+    const sopFile = await db.sopFile.findUnique({
+      where: { id: sopId }
+    })
+
+    if (!sopFile || !sopFile.filePath) {
+      return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 404 })
+    }
+
+    const fileExtension = sopFile.fileName.toLowerCase().split('.').pop() || ''
+
+    // If not convertible type, return Office Online viewer URL
     if (!CONVERTIBLE_TYPES.includes(fileExtension)) {
       return NextResponse.json({
         success: true,
-        previewUrl: `https://drive.google.com/file/d/${fileId}/view`,
-        method: 'google-drive'
+        previewUrl: `/api/file?action=preview&id=${sopId}`,
+        method: 'r2-direct'
       })
     }
 
@@ -38,34 +54,32 @@ export async function GET(request: NextRequest) {
     console.log(`🔑 API Key exists: ${!!apiKey}, length: ${apiKey?.length || 0}`)
 
     if (!apiKey) {
-      console.log('⚠️ No API Key, using Google Drive preview')
+      console.log('⚠️ No CloudConvert API Key, using Office Online viewer')
+      // Return Office Online viewer URL for Excel/Word files
+      const publicUrl = process.env.R2_PUBLIC_URL || ''
+      const encodedUrl = encodeURIComponent(`${publicUrl}/${sopFile.filePath}`)
       return NextResponse.json({
         success: true,
-        previewUrl: `https://drive.google.com/file/d/${fileId}/preview`,
-        method: 'google-drive-nokey'
+        previewUrl: `https://view.officeapps.live.com/op/view.aspx?src=${encodedUrl}`,
+        method: 'office-online'
       })
     }
 
-    console.log(`🔄 Converting ${fileName} to PDF using CloudConvert...`)
-    console.log(`📁 File ID: ${fileId}`)
+    console.log(`🔄 Converting ${sopFile.judul} to PDF using CloudConvert...`)
 
-    // Import Google Drive module to download file
-    const gd = await import('@/lib/google-drive')
-
-    // Step 1: Download file from Google Drive
-    console.log('📥 Downloading file from Google Drive...')
+    // Step 1: Download file from R2
+    console.log('📥 Downloading file from R2...')
     let fileBuffer: Buffer
     try {
-      const { buffer } = await gd.downloadFileFromDrive(fileId)
-      fileBuffer = buffer
+      const result = await downloadFromR2(sopFile.filePath)
+      fileBuffer = result.buffer
       console.log(`✅ File downloaded: ${fileBuffer.length} bytes`)
     } catch (downloadError) {
-      console.error('❌ Failed to download from Google Drive:', downloadError)
+      console.error('❌ Failed to download from R2:', downloadError)
       return NextResponse.json({
-        success: true,
-        previewUrl: `https://drive.google.com/file/d/${fileId}/preview`,
-        method: 'google-drive-download-error'
-      })
+        error: 'Gagal mengunduh file dari storage',
+        details: downloadError instanceof Error ? downloadError.message : 'Unknown error'
+      }, { status: 500 })
     }
 
     // Step 2: Create a job with all tasks in one request (import/upload + convert + export/url)
@@ -91,7 +105,7 @@ export async function GET(request: NextRequest) {
             input: 'convert-my-file',
           },
         },
-        tag: `preview-${fileId}`,
+        tag: `preview-${sopId}`,
       }),
     })
 
@@ -99,10 +113,9 @@ export async function GET(request: NextRequest) {
       const errText = await jobRes.text()
       console.error('❌ CloudConvert job error:', errText)
       return NextResponse.json({
-        success: true,
-        previewUrl: `https://drive.google.com/file/d/${fileId}/preview`,
-        method: 'google-drive-job-error'
-      })
+        error: 'Gagal membuat job konversi',
+        details: errText
+      }, { status: 500 })
     }
 
     const jobData = await jobRes.json()
@@ -113,11 +126,7 @@ export async function GET(request: NextRequest) {
     const importTask = tasks.find((t: { name: string }) => t.name === 'import-my-file')
     if (!importTask) {
       console.error('❌ Import task not found')
-      return NextResponse.json({
-        success: true,
-        previewUrl: `https://drive.google.com/file/d/${fileId}/preview`,
-        method: 'google-drive-no-import-task'
-      })
+      return NextResponse.json({ error: 'Import task tidak ditemukan' }, { status: 500 })
     }
 
     const uploadUrl = importTask.result.form.url
@@ -133,7 +142,7 @@ export async function GET(request: NextRequest) {
       formData.append(key, String(value))
     }
     const blob = new Blob([fileBuffer])
-    formData.append('file', blob, fileName)
+    formData.append('file', blob, sopFile.fileName)
 
     const uploadRes = await fetch(uploadUrl, {
       method: 'POST',
@@ -144,10 +153,9 @@ export async function GET(request: NextRequest) {
       const errText = await uploadRes.text()
       console.error('❌ CloudConvert upload error:', errText)
       return NextResponse.json({
-        success: true,
-        previewUrl: `https://drive.google.com/file/d/${fileId}/preview`,
-        method: 'google-drive-upload-error'
-      })
+        error: 'Gagal upload ke CloudConvert',
+        details: errText
+      }, { status: 500 })
     }
 
     console.log('✅ File uploaded to CloudConvert, waiting for conversion...')
@@ -198,23 +206,18 @@ export async function GET(request: NextRequest) {
         method: 'cloudconvert-pdf'
       })
     } else {
-      console.log('⚠️ CloudConvert timeout, using Google Drive preview')
+      console.log('⚠️ CloudConvert timeout')
       return NextResponse.json({
-        success: true,
-        previewUrl: `https://drive.google.com/file/d/${fileId}/preview`,
-        method: 'google-drive-timeout'
-      })
+        error: 'Konversi timeout',
+        method: 'cloudconvert-timeout'
+      }, { status: 500 })
     }
 
   } catch (error) {
     console.error('❌ Preview convert error:', error)
-    const { searchParams } = new URL(request.url)
-    const fileId = searchParams.get('fileId')
     return NextResponse.json({
-      success: true,
-      previewUrl: `https://drive.google.com/file/d/${fileId}/preview`,
-      method: 'google-drive-exception',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    })
+      error: 'Terjadi kesalahan saat konversi',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
 }
