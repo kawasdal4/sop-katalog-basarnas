@@ -221,13 +221,28 @@ export async function POST(request: NextRequest) {
 
     const prefix = getPrefix(jenis)
 
-    // Get count of existing SOPs of the same jenis
-    const existingCount = await db.sopFile.count({
-      where: { jenis }
+    // Get the latest SOP of the same jenis to determine the next number
+    const lastSop = await db.sopFile.findFirst({
+      where: { jenis },
+      orderBy: { nomorSop: 'desc' },
+      select: { nomorSop: true }
     })
 
+    let nextNumber = 1
+    if (lastSop && lastSop.nomorSop) {
+      // Extract the numeric part (e.g., from "SOP-0012" extract "0012")
+      const matches = lastSop.nomorSop.match(/\d+$/)
+      if (matches) {
+        nextNumber = parseInt(matches[0], 10) + 1
+      } else {
+        // Fallback if parsing fails
+        const existingCount = await db.sopFile.count({ where: { jenis } })
+        nextNumber = existingCount + 1
+      }
+    }
+
     // Generate new nomorSop (incremental)
-    const nomorSop = `${prefix}${String(existingCount + 1).padStart(4, '0')}`
+    const nomorSop = `${prefix}${String(nextNumber).padStart(4, '0')}`
     console.log(`📝 Generated nomor: ${nomorSop}`)
 
     const bytes = await file.arrayBuffer()

@@ -6601,11 +6601,25 @@ export default function ESOPApp() {
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex items-center justify-center gap-1">
-                                    <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} title="Preview" className="hover:bg-cyan-100">
-                                      <Eye className="w-4 h-4 text-cyan-600" />
+                                    <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} title="Preview" className="hover:bg-cyan-100" disabled={previewLoading === sop.id}>
+                                      {previewLoading === sop.id ? (
+                                        <div className="relative">
+                                          <motion.div className="w-4 h-4 border-2 border-cyan-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
+                                          <motion.div className="absolute inset-0 w-4 h-4 border-2 border-blue-400 border-b-transparent rounded-full" animate={{ rotate: -360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
+                                        </div>
+                                      ) : (
+                                        <Eye className="w-4 h-4 text-cyan-600" />
+                                      )}
                                     </Button>
-                                    <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-100">
-                                      <Download className="w-4 h-4 text-green-600" />
+                                    <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-100" disabled={downloadLoading === sop.id}>
+                                      {downloadLoading === sop.id ? (
+                                        <div className="relative">
+                                          <motion.div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
+                                          <motion.div className="absolute inset-0 w-4 h-4 border-2 border-emerald-400 border-b-transparent rounded-full" animate={{ rotate: -360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
+                                        </div>
+                                      ) : (
+                                        <Download className="w-4 h-4 text-green-600" />
+                                      )}
                                     </Button>
                                     {sop.verificationStatus === 'MENUNGGU' && (
                                       <>
@@ -6903,11 +6917,25 @@ export default function ESOPApp() {
                                   </TableCell>
                                   <TableCell>
                                     <div className="flex items-center justify-center gap-1">
-                                      <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} title="Preview" className="hover:bg-cyan-100">
-                                        <Eye className="w-4 h-4 text-cyan-600" />
+                                      <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} title="Preview" className="hover:bg-cyan-100" disabled={previewLoading === sop.id}>
+                                        {previewLoading === sop.id ? (
+                                          <div className="relative">
+                                            <motion.div className="w-4 h-4 border-2 border-cyan-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
+                                            <motion.div className="absolute inset-0 w-4 h-4 border-2 border-blue-400 border-b-transparent rounded-full" animate={{ rotate: -360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
+                                          </div>
+                                        ) : (
+                                          <Eye className="w-4 h-4 text-cyan-600" />
+                                        )}
                                       </Button>
-                                      <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-100">
-                                        <Download className="w-4 h-4 text-green-600" />
+                                      <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-100" disabled={downloadLoading === sop.id}>
+                                        {downloadLoading === sop.id ? (
+                                          <div className="relative">
+                                            <motion.div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
+                                            <motion.div className="absolute inset-0 w-4 h-4 border-2 border-emerald-400 border-b-transparent rounded-full" animate={{ rotate: -360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
+                                          </div>
+                                        ) : (
+                                          <Download className="w-4 h-4 text-green-600" />
+                                        )}
                                       </Button>
                                       {user?.role === 'DEVELOPER' && (
                                         <Button size="icon" variant="ghost" onClick={() => handleDeleteSop(sop.id, sop.judul)} title="Hapus Permanen (Dev)" className="hover:bg-red-100">
