@@ -40,7 +40,7 @@ const getInitialSteps = (fileType: string): PrintStep[] => {
       { id: 'user', label: 'Mengambil Info User', description: 'Mengambil informasi pengguna...', status: 'pending' },
       { id: 'download', label: 'Mengunduh dari R2', description: 'Mengunduh file dari Cloudflare R2...', status: 'pending' },
       { id: 'footer', label: 'Menambahkan Footer', description: 'Menambahkan footer dinamis ke PDF...', status: 'pending' },
-      { id: 'ready', label: 'Membuka PDF', description: 'Membuka PDF di tab baru...', status: 'pending' },
+      { id: 'ready', label: 'Mengunduh PDF', description: 'Mengunduh PDF ke perangkat Anda...', status: 'pending' },
     ]
   }
 
@@ -51,7 +51,7 @@ const getInitialSteps = (fileType: string): PrintStep[] => {
     { id: 'upload', label: 'Upload ke OneDrive', description: 'Mengunggah ke Microsoft OneDrive...', status: 'pending' },
     { id: 'convert', label: 'Konversi ke PDF', description: 'Mengkonversi file ke format PDF...', status: 'pending' },
     { id: 'footer', label: 'Menambahkan Footer', description: 'Menambahkan footer dinamis ke PDF...', status: 'pending' },
-    { id: 'ready', label: 'Membuka PDF', description: 'Membuka PDF di tab baru...', status: 'pending' },
+    { id: 'ready', label: 'Mengunduh PDF', description: 'Mengunduh PDF ke perangkat Anda...', status: 'pending' },
   ]
 }
 
@@ -90,9 +90,8 @@ const StepIcon = ({ step, isActive }: { step: PrintStep; isActive: boolean }) =>
   }
 
   return (
-    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-300 ${
-      isActive ? 'bg-orange-500/30 border-2 border-orange-500' : 'bg-gray-700 border-2 border-gray-600'
-    }`}>
+    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-300 ${isActive ? 'bg-orange-500/30 border-2 border-orange-500' : 'bg-gray-700 border-2 border-gray-600'
+      }`}>
       <Circle className={`w-3 h-3 ${isActive ? 'text-orange-400' : 'text-gray-500'}`} />
     </div>
   )
@@ -156,15 +155,15 @@ export default function PrintLoadingDialog({
     // Step 1: Initialize
     setCurrentStepIndex(0)
     setSteps(prev => prev.map((s, i) => i === 0 ? { ...s, status: 'processing' } : s))
-    await new Promise(r => setTimeout(r, 500))
+    await new Promise(r => setTimeout(r, 400))
     setSteps(prev => prev.map((s, i) => i === 0 ? { ...s, status: 'completed' } : s))
 
     try {
-      // Step 2: Get user info (part of API call)
+      // Step 2: User info & Generate Token
       setCurrentStepIndex(1)
       setSteps(prev => prev.map((s, i) => i === 1 ? { ...s, status: 'processing' } : s))
 
-      // Generate print token
+      // We need a print token to open the PDF directly
       const tokenRes = await fetch('/api/print', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -172,7 +171,7 @@ export default function PrintLoadingDialog({
       })
 
       if (!tokenRes.ok) {
-        throw new Error('Gagal membuat token print')
+        throw new Error('Gagal membuat akses print')
       }
 
       const tokenData = await tokenRes.json()
@@ -180,82 +179,63 @@ export default function PrintLoadingDialog({
 
       setSteps(prev => prev.map((s, i) => i === 1 ? { ...s, status: 'completed' } : s))
 
-      // Step 3: Download from R2
+      // Step 3: Download (visual only)
       setCurrentStepIndex(2)
       setSteps(prev => prev.map((s, i) => i === 2 ? { ...s, status: 'processing' } : s))
+      await new Promise(r => setTimeout(r, 400))
+      setSteps(prev => prev.map((s, i) => i === 2 ? { ...s, status: 'completed' } : s))
 
-      // Start fetching PDF
-      const pdfFetchUrl = `/api/print?token=${printToken}`
-
-      // For Office files, show additional steps during the long wait
       const isOfficeFile = !['pdf'].includes(fileType)
 
       if (isOfficeFile) {
-        // Simulate upload step during fetch
-        await new Promise(r => setTimeout(r, 800))
-        setSteps(prev => prev.map((s, i) => i === 2 ? { ...s, status: 'completed' } : s))
-
-        // Step 4: Upload to OneDrive
+        // Step 4: Upload (visual)
         setCurrentStepIndex(3)
         setSteps(prev => prev.map((s, i) => i === 3 ? { ...s, status: 'processing' } : s))
-        await new Promise(r => setTimeout(r, 1000))
-
-        // Step 5: Convert to PDF
-        setCurrentStepIndex(4)
+        await new Promise(r => setTimeout(r, 400))
         setSteps(prev => prev.map((s, i) => i === 3 ? { ...s, status: 'completed' } : s))
+
+        // Step 5: Convert (visual)
+        setCurrentStepIndex(4)
         setSteps(prev => prev.map((s, i) => i === 4 ? { ...s, status: 'processing' } : s))
-      }
-
-      // Fetch the PDF (this is the actual processing time)
-      const pdfResponse = await fetch(pdfFetchUrl)
-
-      if (!pdfResponse.ok) {
-        const errorData = await pdfResponse.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Gagal memproses file')
-      }
-
-      // Mark download/upload/convert as complete
-      if (isOfficeFile) {
+        await new Promise(r => setTimeout(r, 400))
         setSteps(prev => prev.map((s, i) => i === 4 ? { ...s, status: 'completed' } : s))
-
-        // Step 6: Add footer
-        setCurrentStepIndex(5)
-        setSteps(prev => prev.map((s, i) => i === 5 ? { ...s, status: 'processing' } : s))
-        await new Promise(r => setTimeout(r, 300))
-      } else {
-        setSteps(prev => prev.map((s, i) => i === 2 ? { ...s, status: 'completed' } : s))
-
-        // Step 4: Add footer (for PDF)
-        setCurrentStepIndex(3)
-        setSteps(prev => prev.map((s, i) => i === 3 ? { ...s, status: 'processing' } : s))
-        await new Promise(r => setTimeout(r, 300))
       }
 
-      // Mark footer as complete
+      // Footer step
       const footerIndex = isOfficeFile ? 5 : 3
+      setCurrentStepIndex(footerIndex)
+      setSteps(prev => prev.map((s, i) => i === footerIndex ? { ...s, status: 'processing' } : s))
+      await new Promise(r => setTimeout(r, 300))
       setSteps(prev => prev.map((s, i) => i === footerIndex ? { ...s, status: 'completed' } : s))
 
-      // Step final: Ready - Open PDF in new tab
+      // Final: Open PDF native viewer in new tab
       const readyIndex = isOfficeFile ? 6 : 4
       setCurrentStepIndex(readyIndex)
       setSteps(prev => prev.map((s, i) => i === readyIndex ? { ...s, status: 'processing' } : s))
 
-      // Open PDF directly in new tab
-      window.open(pdfFetchUrl, '_blank')
+      const pdfFetchUrl = `/api/print?token=${printToken}`
+      // Fetch PDF sebagai blob — tunggu sampai server selesai generate PDF
+      const pdfRes = await fetch(pdfFetchUrl)
+      if (!pdfRes.ok) throw new Error('Gagal mengunduh PDF dari server')
 
-      // Small delay to show "Opening" status
+      const blob = await pdfRes.blob()
+      const blobUrl = URL.createObjectURL(blob)
+
+      // Download langsung tanpa buka tab baru
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = fileName.replace(/\.[^.]+$/, '') + '.pdf'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      // Bersihkan blob URL setelah download
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
+
       await new Promise(r => setTimeout(r, 500))
       setSteps(prev => prev.map((s, i) => i === readyIndex ? { ...s, status: 'completed' } : s))
 
-      // Close dialog and trigger callback
-      if (onComplete) {
-        onComplete()
-      }
-
-      // Auto close after success
-      setTimeout(() => {
-        onClose()
-      }, 800)
+      if (onComplete) onComplete()
+      setTimeout(() => { onClose() }, 800)
 
     } catch (err) {
       console.error('Print error:', err)
@@ -400,18 +380,16 @@ export default function PrintLoadingDialog({
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${
-                    currentStepIndex === index ? 'bg-orange-500/10' : ''
-                  }`}
+                  className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${currentStepIndex === index ? 'bg-orange-500/10' : ''
+                    }`}
                 >
                   <StepIcon step={step} isActive={currentStepIndex === index} />
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium ${
-                      step.status === 'completed' ? 'text-green-400' :
+                    <p className={`text-sm font-medium ${step.status === 'completed' ? 'text-green-400' :
                       step.status === 'processing' ? 'text-orange-400' :
-                      step.status === 'error' ? 'text-red-400' :
-                      'text-gray-400'
-                    }`}>
+                        step.status === 'error' ? 'text-red-400' :
+                          'text-gray-400'
+                      }`}>
                       {step.label}
                     </p>
                   </div>

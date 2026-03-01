@@ -59,6 +59,7 @@ import {
   LogIn,
   FileSpreadsheet,
   FileIcon,
+  Globe,
   Trash2,
   Check,
   RefreshCw,
@@ -84,6 +85,7 @@ import { useToast } from '@/hooks/use-toast'
 import { StorageStatus } from '@/components/storage'
 import PrintLoadingDialog from '@/components/PrintLoadingDialog'
 import CopyrightPopup from '@/components/CopyrightPopup'
+import LogoutAnimation from '@/components/LogoutAnimation'
 
 // Types
 type UserRole = 'ADMIN' | 'STAF' | 'DEVELOPER' | null
@@ -104,6 +106,7 @@ interface SopFile {
   tahun: number
   kategori: string
   jenis: string
+  lingkup?: string
   status: string
   fileName: string
   filePath: string
@@ -144,11 +147,13 @@ interface Stats {
   totalKadaluarsa: number
   totalPublikMenunggu: number
   totalPublikDitolak: number
+  totalPublikDitolakBaru?: number
   totalPreviews: number
   totalDownloads: number
   byTahun: { tahun: number; count: number }[]
   byKategori: { kategori: string; count: number }[]
   byJenis: { jenis: string; count: number }[]
+  byLingkup: { lingkup: string; count: number }[]
   byStatus: { status: string; count: number }[]
   recentUploads: SopFile[]
   recentLogs: LogEntry[]
@@ -171,51 +176,52 @@ const STATUS_COLORS: Record<string, string> = {
 // File Type Icon Component
 function FileTypeIcon({ fileName, className = "w-4 h-4" }: { fileName: string; className?: string }) {
   const ext = fileName?.split('.').pop()?.toLowerCase() || ''
-  
+
   // PDF Icon - Red
   if (ext === 'pdf') {
     return (
       <svg className={className} viewBox="0 0 24 24" fill="none">
-        <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" fill="#DC2626" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M14 2V8H20" fill="#EF4444" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" fill="#DC2626" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M14 2V8H20" fill="#EF4444" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         <text x="7" y="17" fontSize="5" fontWeight="bold" fill="white">PDF</text>
       </svg>
     )
   }
-  
+
   // Excel Icon - Green
   if (['xlsx', 'xls', 'xlsm'].includes(ext)) {
     return (
       <svg className={className} viewBox="0 0 24 24" fill="none">
-        <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" fill="#16A34A" stroke="#16A34A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M14 2V8H20" fill="#22C55E" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" fill="#16A34A" stroke="#16A34A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M14 2V8H20" fill="#22C55E" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         <text x="6" y="17" fontSize="5" fontWeight="bold" fill="white">XLS</text>
       </svg>
     )
   }
-  
+
   // Word Icon - Blue
   if (['docx', 'doc'].includes(ext)) {
     return (
       <svg className={className} viewBox="0 0 24 24" fill="none">
-        <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" fill="#2563EB" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M14 2V8H20" fill="#3B82F6" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" fill="#2563EB" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M14 2V8H20" fill="#3B82F6" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         <text x="6" y="17" fontSize="5" fontWeight="bold" fill="white">DOC</text>
       </svg>
     )
   }
-  
+
   // Default file icon
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z"/>
-      <path d="M14 2V8H20"/>
+      <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" />
+      <path d="M14 2V8H20" />
     </svg>
   )
 }
 
 const KATEGORI_OPTIONS = ['SIAGA', 'LATIHAN', 'LAINNYA']
 const JENIS_OPTIONS = ['SOP', 'IK', 'LAINNYA']
+const LINGKUP_OPTIONS = ['BCC', 'Dit. Siaga', 'Basarnas', 'Kantor SAR', 'Antar Instansi', 'Internasional']
 const STATUS_OPTIONS = ['AKTIF', 'REVIEW', 'KADALUARSA']
 
 // Animation variants - optimized for performance
@@ -270,12 +276,12 @@ function ShimmerTitle({ children, subtitle }: { children: React.ReactNode; subti
             ease: 'easeInOut'
           }}
         />
-        
+
         {/* Main text with shimmer */}
         <span className="relative bg-gradient-to-r from-yellow-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">
           {children}
         </span>
-        
+
         {/* Shimmer overlay */}
         <motion.span
           className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent bg-clip-text text-transparent"
@@ -306,7 +312,7 @@ function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
     md: 'w-12 h-12',
     lg: 'w-16 h-16'
   }
-  
+
   const iconSizes = {
     sm: 'w-5 h-5',
     md: 'w-8 h-8',
@@ -314,7 +320,7 @@ function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
   }
 
   return (
-    <motion.div 
+    <motion.div
       className={`relative ${sizeClasses[size]} rounded-xl bg-gradient-to-br from-orange-500 via-orange-600 to-red-600 flex items-center justify-center overflow-hidden shadow-lg`}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
@@ -331,9 +337,9 @@ function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
           ease: 'linear'
         }}
       />
-      
+
       {/* Sparkle particles */}
-      <motion.div 
+      <motion.div
         className="absolute inset-0"
         animate={{
           background: [
@@ -349,7 +355,7 @@ function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
           ease: 'easeInOut'
         }}
       />
-      
+
       {/* Rescue beacon pulse */}
       <motion.div
         className="absolute inset-0 rounded-xl"
@@ -366,7 +372,7 @@ function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
           ease: 'easeOut'
         }}
       />
-      
+
       {/* Logo icon */}
       <Shield className={`${iconSizes[size]} text-white relative z-10`} />
     </motion.div>
@@ -374,14 +380,14 @@ function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
 }
 
 // Animated Stat Card Component
-function StatCard({ 
-  title, 
-  value, 
-  icon: Icon, 
-  color, 
+function StatCard({
+  title,
+  value,
+  icon: Icon,
+  color,
   delay = 0,
   trend
-}: { 
+}: {
   title: string
   value: number | string
   icon: React.ElementType
@@ -390,50 +396,50 @@ function StatCard({
   trend?: 'up' | 'down'
 }) {
   const colorClasses: Record<string, { bg: string; icon: string; text: string; border: string; titleText: string }> = {
-    orange: { 
-      bg: 'from-white to-orange-50', 
-      icon: 'bg-gradient-to-br from-orange-400 to-orange-600 text-white', 
-      text: 'text-orange-700', 
+    orange: {
+      bg: 'from-white to-orange-50',
+      icon: 'bg-gradient-to-br from-orange-400 to-orange-600 text-white',
+      text: 'text-orange-700',
       border: 'border-orange-200',
       titleText: 'text-gray-800'
     },
-    yellow: { 
-      bg: 'from-white to-yellow-50', 
-      icon: 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-white', 
-      text: 'text-yellow-700', 
+    yellow: {
+      bg: 'from-white to-yellow-50',
+      icon: 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-white',
+      text: 'text-yellow-700',
       border: 'border-yellow-200',
       titleText: 'text-gray-800'
     },
-    green: { 
-      bg: 'from-white to-green-50', 
-      icon: 'bg-gradient-to-br from-green-400 to-green-600 text-white', 
-      text: 'text-green-700', 
+    green: {
+      bg: 'from-white to-green-50',
+      icon: 'bg-gradient-to-br from-green-400 to-green-600 text-white',
+      text: 'text-green-700',
       border: 'border-green-200',
       titleText: 'text-gray-800'
     },
-    red: { 
-      bg: 'from-white to-red-50', 
-      icon: 'bg-gradient-to-br from-red-400 to-red-600 text-white', 
-      text: 'text-red-700', 
+    red: {
+      bg: 'from-white to-red-50',
+      icon: 'bg-gradient-to-br from-red-400 to-red-600 text-white',
+      text: 'text-red-700',
       border: 'border-red-200',
       titleText: 'text-gray-800'
     },
-    cyan: { 
-      bg: 'from-white to-cyan-50', 
-      icon: 'bg-gradient-to-br from-cyan-400 to-cyan-600 text-white', 
-      text: 'text-cyan-700', 
+    cyan: {
+      bg: 'from-white to-cyan-50',
+      icon: 'bg-gradient-to-br from-cyan-400 to-cyan-600 text-white',
+      text: 'text-cyan-700',
       border: 'border-cyan-200',
       titleText: 'text-gray-800'
     },
-    purple: { 
-      bg: 'from-white to-purple-50', 
-      icon: 'bg-gradient-to-br from-purple-400 to-purple-600 text-white', 
-      text: 'text-purple-700', 
+    purple: {
+      bg: 'from-white to-purple-50',
+      icon: 'bg-gradient-to-br from-purple-400 to-purple-600 text-white',
+      text: 'text-purple-700',
       border: 'border-purple-200',
       titleText: 'text-gray-800'
     },
   }
-  
+
   const c = colorClasses[color] || colorClasses.orange
 
   return (
@@ -449,7 +455,7 @@ function StatCard({
           <div className="flex items-center justify-between">
             <div>
               <p className={`text-xl font-bold ${c.titleText}`}>{title}</p>
-              <motion.p 
+              <motion.p
                 className={`text-3xl font-bold ${c.text} mt-2`}
                 initial={{ opacity: 0, scale: 0.5 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -464,7 +470,7 @@ function StatCard({
                 </div>
               )}
             </div>
-            <motion.div 
+            <motion.div
               className={`w-14 h-14 ${c.icon} rounded-xl flex items-center justify-center shadow-lg`}
               whileHover={{ rotate: 5, scale: 1.1 }}
             >
@@ -507,10 +513,10 @@ function SARBackground() {
     <div className="fixed inset-0 overflow-hidden pointer-events-none">
       {/* Gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />
-      
+
       {/* Animated grid pattern */}
       <div className="absolute inset-0 sar-grid-pattern opacity-30" />
-      
+
       {/* Floating particles - using pre-computed positions for SSR safety */}
       {PARTICLE_POSITIONS.map((particle, i) => (
         <motion.div
@@ -532,7 +538,7 @@ function SARBackground() {
           }}
         />
       ))}
-      
+
       {/* Search light effect */}
       <motion.div
         className="absolute top-0 left-0 w-full h-full"
@@ -548,7 +554,7 @@ function SARBackground() {
           ease: 'linear'
         }}
       />
-      
+
       {/* Radar sweep effect */}
       <motion.div
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px]"
@@ -571,17 +577,17 @@ function SARBackground() {
 // Main App Component
 export default function ESOPApp() {
   const { toast } = useToast()
-  
+
   // Auth state
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loginForm, setLoginForm] = useState({ email: '', password: '' })
   const [showLogin, setShowLogin] = useState(false)
-  
+
   // Navigation
   const [currentPage, setCurrentPage] = useState<PageView>('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  
+
   // Data
   const [sopFiles, setSopFiles] = useState<SopFile[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
@@ -589,35 +595,38 @@ export default function ESOPApp() {
   const [users, setUsers] = useState<User[]>([])
   const [verificationList, setVerificationList] = useState<SopFile[]>([])
   const [arsipList, setArsipList] = useState<SopFile[]>([])
-  
+
   // Pagination
   const [sopPagination, setSopPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 })
   const [logsPagination, setLogsPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 })
   const [arsipPagination, setArsipPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 })
-  
+
   // Filters
   const [sopFilters, setSopFilters] = useState({
     search: '',
     kategori: 'SEMUA',
     jenis: 'SEMUA',
+    lingkup: 'SEMUA',
     status: 'SEMUA',
     tahun: ''
   })
-  
+
   // Sorting
   const [sortBy, setSortBy] = useState<'tahun-asc' | 'tahun-desc' | 'uploadedAt-desc' | 'uploadedAt-asc' | 'judul-asc' | 'judul-desc'>('uploadedAt-desc')
-  
+
   // Debounced search for live search
   const [searchInput, setSearchInput] = useState('')
   const [isSearching, setIsSearching] = useState(false)
-  
+
   // Verification filter
   const [verificationFilter, setVerificationFilter] = useState('SEMUA')
+  const [verificationLingkupFilter, setVerificationLingkupFilter] = useState('SEMUA')
   const [verificationSearch, setVerificationSearch] = useState('')
   const [verificationSortBy, setVerificationSortBy] = useState<'uploadedAt-desc' | 'uploadedAt-asc'>('uploadedAt-desc')
-  
+
   // Arsip filter and search
   const [arsipSearch, setArsipSearch] = useState('')
+  const [arsipLingkupFilter, setArsipLingkupFilter] = useState('SEMUA')
   const [arsipSortBy, setArsipSortBy] = useState<'uploadedAt-desc' | 'uploadedAt-asc'>('uploadedAt-desc')
   const [arsipSeenCount, setArsipSeenCount] = useState(0) // Track count of rejected files user has seen
 
@@ -625,52 +634,59 @@ export default function ESOPApp() {
   const [katalogLoading, setKatalogLoading] = useState(false)
   const [verifikasiLoading, setVerifikasiLoading] = useState(false)
   const [arsipLoading, setArsipLoading] = useState(false)
-  
+
   // Pagination debounce - prevents rapid clicks and double-fetching
   const isPaginationLoadingRef = useRef(false)
   const paginationDebounceRef = useRef<NodeJS.Timeout | null>(null)
-  
+
   // Forms
   const [uploadForm, setUploadForm] = useState({
     judul: '',
     kategori: 'SIAGA',
     jenis: 'SOP',
+    lingkup: 'BCC',
     tahun: new Date().getFullYear(),
     status: 'AKTIF',
     file: null as File | null
   })
-  
+
   const [publicForm, setPublicForm] = useState({
     nama: '',
     email: '',
     judul: '',
     kategori: 'SIAGA',
     jenis: 'SOP',
+    lingkup: 'BCC',
     tahun: new Date().getFullYear(),
     keterangan: '',
     file: null as File | null
   })
-  
+
   const [newUserForm, setNewUserForm] = useState({
     name: '',
     email: '',
     password: '',
     role: 'STAF'
   })
-  
+
   // Dialogs
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
   const [showUserDialog, setShowUserDialog] = useState(false)
   const [previewData, setPreviewData] = useState<{ type: string; data: string; fileName: string } | null>(null)
   const [loading, setLoading] = useState(false)
-  
+  const [exportingXlsx, setExportingXlsx] = useState(false)
+  const [exportingPdf, setExportingPdf] = useState(false)
+
   // PDF Edit Warning Dialog
   const [showPdfWarningDialog, setShowPdfWarningDialog] = useState(false)
-  
+
   // Copyright Popup
   const [showCopyrightPopup, setShowCopyrightPopup] = useState(false)
-  
+
+  // Logout animation
+  const [showLogoutAnimation, setShowLogoutAnimation] = useState(false)
+
   // Edit Dialog
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [editData, setEditData] = useState<SopFile | null>(null)
@@ -679,6 +695,7 @@ export default function ESOPApp() {
     judul: '',
     kategori: 'SIAGA',
     jenis: 'SOP',
+    lingkup: 'BCC',
     tahun: new Date().getFullYear(),
     status: 'AKTIF'
   })
@@ -691,14 +708,14 @@ export default function ESOPApp() {
   const [excelEditDriveItemId, setExcelEditDriveItemId] = useState<string | null>(null)
   const [excelEditSessionId, setExcelEditSessionId] = useState<string | null>(null)
   const [excelEditSyncing, setExcelEditSyncing] = useState(false)
-  
+
   // Desktop Excel Edit Session
   const [desktopEditSessionToken, setDesktopEditSessionToken] = useState<string | null>(null)
   const [desktopEditOriginalHash, setDesktopEditOriginalHash] = useState<string | null>(null)
   const [showDesktopSyncDialog, setShowDesktopSyncDialog] = useState(false)
   const [desktopSyncFile, setDesktopSyncFile] = useState<File | null>(null)
   const [desktopSyncing, setDesktopSyncing] = useState(false)
-  
+
   // Conflict handling for Desktop Sync
   const [showConflictDialog, setShowConflictDialog] = useState(false)
   const [conflictData, setConflictData] = useState<{
@@ -713,17 +730,17 @@ export default function ESOPApp() {
     currentHash: string
   } | null>(null)
   const [forceSyncing, setForceSyncing] = useState(false)
-  
+
   // Rejection dialog for verification
   const [showRejectDialog, setShowRejectDialog] = useState(false)
   const [rejectTargetId, setRejectTargetId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
-  
+
   // Login success animation
   const [showLoginSuccess, setShowLoginSuccess] = useState(false)
   const [loginSuccessName, setLoginSuccessName] = useState('')
   const [loginSuccessRole, setLoginSuccessRole] = useState<'ADMIN' | 'STAF' | 'DEVELOPER' | null>(null)
-  
+
   // Loading states for operations with Basarnas animation
   const [previewLoading, setPreviewLoading] = useState<string | null>(null)
   const [downloadLoading, setDownloadLoading] = useState<string | null>(null)
@@ -739,7 +756,7 @@ export default function ESOPApp() {
   const [showEditUserDialog, setShowEditUserDialog] = useState(false)
   const [editUserData, setEditUserData] = useState<User & { lastLoginAt?: string; _count?: { logs: number } } | null>(null)
   const [editUserForm, setEditUserForm] = useState({ name: '', email: '', role: 'STAF' })
-  
+
   // User activity history dialog
   const [showUserActivityDialog, setShowUserActivityDialog] = useState(false)
   const [userActivityLogs, setUserActivityLogs] = useState<LogEntry[]>([])
@@ -809,10 +826,10 @@ export default function ESOPApp() {
 
   // Last sync result for UI display
   const [lastSyncResult, setLastSyncResult] = useState<{
-    r2: 'synced' | 'pending' | 'error'
-    googleDrive: 'synced' | 'pending' | 'error'
+    r2: 'synced' | 'pending' | 'error',
+    googleDrive: 'synced' | 'pending' | 'error',
     timestamp?: Date
-  } | null>(null)
+  } | undefined>(undefined)
 
   // Auto-backup state
   const [autoBackupStatus, setAutoBackupStatus] = useState<{
@@ -841,6 +858,23 @@ export default function ESOPApp() {
     currentStep: '',
   })
 
+  // Restore Desktop Edit Session from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedToken = localStorage.getItem('desktopEditSessionToken')
+      const savedHash = localStorage.getItem('desktopEditOriginalHash')
+      const savedData = localStorage.getItem('excelEditData')
+
+      if (savedToken) setDesktopEditSessionToken(savedToken)
+      if (savedHash) setDesktopEditOriginalHash(savedHash)
+      if (savedData) {
+        setExcelEditData(JSON.parse(savedData))
+      }
+    } catch (e) {
+      console.warn('Failed to restore desktop edit session from localStorage', e)
+    }
+  }, [])
+
   // Excel Edit Diagnostic state
   const [showDiagnosticDialog, setShowDiagnosticDialog] = useState(false)
   const [diagnosticLoading, setDiagnosticLoading] = useState(false)
@@ -862,7 +896,7 @@ export default function ESOPApp() {
     }
     nextSteps: string[]
   } | null>(null)
-  
+
   const checkAuth = useCallback(async () => {
     try {
       const res = await fetch('/api/auth')
@@ -875,7 +909,7 @@ export default function ESOPApp() {
       console.error('Auth check error:', error)
     }
   }, [])
-  
+
   const initSystem = useCallback(async () => {
     try {
       await fetch('/api/init')
@@ -883,7 +917,7 @@ export default function ESOPApp() {
       console.error('Init error:', error)
     }
   }, [])
-  
+
   const fetchStats = useCallback(async () => {
     try {
       const res = await fetch('/api/stats')
@@ -893,7 +927,7 @@ export default function ESOPApp() {
       console.error('Stats error:', error)
     }
   }, [])
-  
+
   const fetchDriveStatus = useCallback(async () => {
     try {
       const res = await fetch('/api/drive/status')
@@ -981,11 +1015,11 @@ export default function ESOPApp() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'sync', direction })
       })
-      
+
       const data = await res.json()
-      
+
       clearInterval(progressInterval)
-      
+
       if (data.success) {
         setSyncStatus(prev => ({
           ...prev,
@@ -1011,7 +1045,7 @@ export default function ESOPApp() {
       }
     } catch (error) {
       clearInterval(progressInterval)
-      
+
       setSyncStatus(prev => ({
         ...prev,
         isSyncing: false,
@@ -1086,11 +1120,11 @@ export default function ESOPApp() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'migrate', dryRun })
       })
-      
+
       const data = await res.json()
-      
+
       clearInterval(progressInterval)
-      
+
       if (data.success) {
         setSyncStatus(prev => ({
           ...prev,
@@ -1109,7 +1143,7 @@ export default function ESOPApp() {
 
         toast({
           title: dryRun ? '📋 Simulasi Selesai' : '✅ Migrasi Berhasil!',
-          description: dryRun 
+          description: dryRun
             ? `${data.result?.totalFiles || 0} file siap untuk dimigrasi`
             : `${data.result?.migratedFiles || 0} file berhasil dimigrasi, ${data.result?.skippedFiles || 0} dilewati`,
           duration: 5000
@@ -1119,7 +1153,7 @@ export default function ESOPApp() {
       }
     } catch (error) {
       clearInterval(progressInterval)
-      
+
       setSyncStatus(prev => ({
         ...prev,
         isSyncing: false,
@@ -1207,14 +1241,14 @@ export default function ESOPApp() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'backup' })
       })
-      
+
       const data = await res.json()
-      
+
       clearInterval(progressInterval)
-      
+
       if (data.success) {
         const result = data.result
-        
+
         setLastSyncResult({
           r2: 'synced',
           googleDrive: 'synced',
@@ -1271,14 +1305,14 @@ export default function ESOPApp() {
       }
     } catch (error) {
       clearInterval(progressInterval)
-      
+
       setSyncStatus(prev => ({
         ...prev,
         isSyncing: false,
         progress: 0,
         currentStep: ''
       }))
-      
+
       setAutoBackupStatus(prev => ({
         ...prev,
         isBackingUp: false,
@@ -1344,12 +1378,12 @@ export default function ESOPApp() {
     }
     setDiagnosticLoading(false)
   }, [toast])
-  
+
   const fetchSopFiles = useCallback(async (resetPage = false) => {
     // Prevent concurrent fetches
     if (isPaginationLoadingRef.current) return
     isPaginationLoadingRef.current = true
-    
+
     setKatalogLoading(true)
     try {
       const page = resetPage ? 1 : sopPagination.page
@@ -1358,33 +1392,34 @@ export default function ESOPApp() {
       if (searchInput) params.append('search', searchInput)
       if (sopFilters.kategori && sopFilters.kategori !== 'SEMUA') params.append('kategori', sopFilters.kategori)
       if (sopFilters.jenis && sopFilters.jenis !== 'SEMUA') params.append('jenis', sopFilters.jenis)
+      if (sopFilters.lingkup && sopFilters.lingkup !== 'SEMUA') params.append('lingkup', sopFilters.lingkup)
       if (sopFilters.status && sopFilters.status !== 'SEMUA') params.append('status', sopFilters.status)
       if (sopFilters.tahun) params.append('tahun', sopFilters.tahun)
       params.append('page', page.toString())
       params.append('limit', sopPagination.limit.toString())
       params.append('sortBy', sortBy)
-      
+
       const res = await fetch(`/api/sop?${params}`)
-      
+
       // Check for HTTP errors
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`)
       }
-      
+
       const data = await res.json()
       if (data.error) {
         throw new Error(data.error)
       }
-      
+
       setSopFiles(data.data)
       setSopPagination(p => ({ ...p, total: data.pagination.total, totalPages: data.pagination.totalPages, page }))
     } catch (error) {
       console.error('Fetch SOP error:', error)
       // Show error toast for user feedback
-      toast({ 
-        title: 'Error', 
-        description: 'Gagal memuat data. Silakan coba lagi.', 
-        variant: 'destructive' 
+      toast({
+        title: 'Error',
+        description: 'Gagal memuat data. Silakan coba lagi.',
+        variant: 'destructive'
       })
     } finally {
       setKatalogLoading(false)
@@ -1393,9 +1428,9 @@ export default function ESOPApp() {
         isPaginationLoadingRef.current = false
       }, 100)
     }
-  }, [searchInput, sopFilters.kategori, sopFilters.jenis, sopFilters.status, sopFilters.tahun, sopPagination.page, sopPagination.limit, sortBy, toast])
-  
-  const fetchVerificationList = useCallback(async (filter = 'SEMUA', search = '', sortByParam = 'uploadedAt-desc') => {
+  }, [searchInput, sopFilters.kategori, sopFilters.jenis, sopFilters.lingkup, sopFilters.status, sopFilters.tahun, sopPagination.page, sopPagination.limit, sortBy, toast])
+
+  const fetchVerificationList = useCallback(async (filter = 'SEMUA', lingkupFilter = 'SEMUA', search = '', sortByParam = 'uploadedAt-desc') => {
     setVerifikasiLoading(true)
     try {
       const params = new URLSearchParams()
@@ -1403,11 +1438,14 @@ export default function ESOPApp() {
       if (filter !== 'SEMUA') {
         params.append('verificationStatus', filter)
       }
+      if (lingkupFilter !== 'SEMUA') {
+        params.append('lingkup', lingkupFilter)
+      }
       if (search) {
         params.append('search', search)
       }
       params.append('sortBy', sortByParam)
-      
+
       const res = await fetch(`/api/sop?${params}`)
       const data = await res.json()
       if (!data.error) {
@@ -1419,18 +1457,21 @@ export default function ESOPApp() {
       setVerifikasiLoading(false)
     }
   }, [])
-  
-  const fetchArsipList = useCallback(async (search = '', sortByParam = 'uploadedAt-desc') => {
+
+  const fetchArsipList = useCallback(async (lingkupFilter = 'SEMUA', search = '', sortByParam = 'uploadedAt-desc') => {
     setArsipLoading(true)
     try {
       const params = new URLSearchParams()
       params.append('publicOnly', 'true')
       params.append('verificationStatus', 'DITOLAK')
+      if (lingkupFilter !== 'SEMUA') {
+        params.append('lingkup', lingkupFilter)
+      }
       if (search) {
         params.append('search', search)
       }
       params.append('sortBy', sortByParam)
-      
+
       const res = await fetch(`/api/sop?${params}`)
       const data = await res.json()
       if (!data.error) {
@@ -1443,14 +1484,14 @@ export default function ESOPApp() {
       setArsipLoading(false)
     }
   }, [])
-  
+
   const fetchLogs = useCallback(async () => {
     try {
       const params = new URLSearchParams({
         page: logsPagination.page.toString(),
         limit: logsPagination.limit.toString()
       })
-      
+
       const res = await fetch(`/api/logs?${params}`)
       const data = await res.json()
       if (!data.error) {
@@ -1461,7 +1502,7 @@ export default function ESOPApp() {
       console.error('Fetch logs error:', error)
     }
   }, [logsPagination.page, logsPagination.limit])
-  
+
   const fetchUsers = useCallback(async () => {
     try {
       console.log('🔄 Fetching users...')
@@ -1489,7 +1530,7 @@ export default function ESOPApp() {
       })
     }
   }, [toast])
-  
+
   // Check auth on mount
   useEffect(() => {
     checkAuth()
@@ -1497,7 +1538,7 @@ export default function ESOPApp() {
     // Fetch R2 status on mount for public page display
     fetchR2Status()
   }, [checkAuth, initSystem, fetchR2Status])
-  
+
   // Load user-specific arsipSeenCount when user logs in
   useEffect(() => {
     if (user?.id) {
@@ -1513,7 +1554,7 @@ export default function ESOPApp() {
       }
     }
   }, [user?.id])
-  
+
   // Fetch data when authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -1537,11 +1578,11 @@ export default function ESOPApp() {
       }
     }
   }, [isAuthenticated, user, currentPage, logsPagination.page, fetchStats, fetchDriveStatus, fetchR2Status, fetchSyncStatus, fetchLogs, fetchUsers])
-  
+
   // Single useEffect for katalog - handles all fetching including pagination
   useEffect(() => {
     if (!isAuthenticated || currentPage !== 'katalog') return
-    
+
     // Debounce timer for live search - only apply debounce when user is typing
     // No debounce for initial load or filter changes
     const debounceTimer = setTimeout(async () => {
@@ -1551,21 +1592,22 @@ export default function ESOPApp() {
         if (searchInput) params.append('search', searchInput)
         if (sopFilters.kategori && sopFilters.kategori !== 'SEMUA') params.append('kategori', sopFilters.kategori)
         if (sopFilters.jenis && sopFilters.jenis !== 'SEMUA') params.append('jenis', sopFilters.jenis)
+        if (sopFilters.lingkup && sopFilters.lingkup !== 'SEMUA') params.append('lingkup', sopFilters.lingkup)
         if (sopFilters.status && sopFilters.status !== 'SEMUA') params.append('status', sopFilters.status)
         if (sopFilters.tahun) params.append('tahun', sopFilters.tahun)
         params.append('sortBy', sortBy)
         params.append('page', sopPagination.page.toString())
         params.append('limit', sopPagination.limit.toString())
-        
+
         const res = await fetch(`/api/sop?${params}`)
         const data = await res.json()
         if (!data.error) {
           setSopFiles(data.data)
-          setSopPagination(p => ({ 
-            ...p, 
-            total: data.pagination.total, 
+          setSopPagination(p => ({
+            ...p,
+            total: data.pagination.total,
             totalPages: data.pagination.totalPages,
-            page: sopPagination.page 
+            page: sopPagination.page
           }))
         }
       } catch (error) {
@@ -1575,59 +1617,59 @@ export default function ESOPApp() {
         setKatalogLoading(false) // Clear loading state after fetch
       }
     }, searchInput ? 300 : 0) // No debounce for initial load
-    
+
     return () => clearTimeout(debounceTimer)
-  }, [isAuthenticated, currentPage, searchInput, sopFilters.kategori, sopFilters.jenis, sopFilters.status, sopFilters.tahun, sortBy, sopPagination.page, sopPagination.limit])
-  
+  }, [isAuthenticated, currentPage, searchInput, sopFilters.kategori, sopFilters.jenis, sopFilters.lingkup, sopFilters.status, sopFilters.tahun, sortBy, sopPagination.page, sopPagination.limit])
+
   // Separate useEffect for fetching users - ensures it's called when navigating to users page
   useEffect(() => {
     // Log all values to debug
-    console.log('🔍 Users useEffect triggered:', { 
-      isAuthenticated, 
-      userRole: user?.role, 
+    console.log('🔍 Users useEffect triggered:', {
+      isAuthenticated,
+      userRole: user?.role,
       currentPage,
       shouldFetch: isAuthenticated && (user?.role === 'DEVELOPER' || user?.role === 'ADMIN') && currentPage === 'users'
     })
-    
+
     if (isAuthenticated && (user?.role === 'DEVELOPER' || user?.role === 'ADMIN') && currentPage === 'users') {
       console.log('✅ Calling fetchUsers...')
       fetchUsers()
     }
   }, [isAuthenticated, user?.role, currentPage]) // Removed fetchUsers from deps to prevent infinite loops
-  
+
   // Reset page when search or filters change (not when page changes)
   useEffect(() => {
     if (isAuthenticated && currentPage === 'katalog') {
       setSopPagination(p => ({ ...p, page: 1 }))
     }
-  }, [searchInput, sopFilters.kategori, sopFilters.jenis, sopFilters.status, sopFilters.tahun, sortBy, isAuthenticated, currentPage])
-  
+  }, [searchInput, sopFilters.kategori, sopFilters.jenis, sopFilters.lingkup, sopFilters.status, sopFilters.tahun, sortBy, isAuthenticated, currentPage])
+
   // Live search for verification page with debounce
   useEffect(() => {
     if (!isAuthenticated || currentPage !== 'verifikasi') return
-    
+
     // Immediate fetch on page load or filter change (no debounce for initial load)
     // Only debounce when user is typing in search
     const debounceTimer = setTimeout(() => {
-      fetchVerificationList(verificationFilter, verificationSearch, verificationSortBy)
+      fetchVerificationList(verificationFilter, verificationLingkupFilter, verificationSearch, verificationSortBy)
     }, verificationSearch ? 300 : 0) // No debounce for initial load or filter changes
-    
+
     return () => clearTimeout(debounceTimer)
-  }, [verificationSearch, verificationFilter, verificationSortBy, isAuthenticated, currentPage, fetchVerificationList])
-  
+  }, [verificationSearch, verificationFilter, verificationLingkupFilter, verificationSortBy, isAuthenticated, currentPage, fetchVerificationList])
+
   // Live search for arsip page with debounce
   useEffect(() => {
     if (!isAuthenticated || currentPage !== 'arsip') return
-    
+
     // Immediate fetch on page load (no debounce for initial load)
     // Only debounce when user is typing in search
     const debounceTimer = setTimeout(() => {
-      fetchArsipList(arsipSearch, arsipSortBy)
+      fetchArsipList(arsipLingkupFilter, arsipSearch, arsipSortBy)
     }, arsipSearch ? 300 : 0) // No debounce for initial load
-    
+
     return () => clearTimeout(debounceTimer)
-  }, [arsipSearch, arsipSortBy, isAuthenticated, currentPage, fetchArsipList])
-  
+  }, [arsipSearch, arsipLingkupFilter, arsipSortBy, isAuthenticated, currentPage, fetchArsipList])
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -1645,17 +1687,17 @@ export default function ESOPApp() {
         setIsAuthenticated(true)
         setShowLogin(false)
         setLoginForm({ email: '', password: '' })
-        
+
         // Show beautiful login success animation
         setLoginSuccessName(data.user?.name || 'User')
         setLoginSuccessRole(data.user?.role || null)
         setShowLoginSuccess(true)
-        
+
         // Hide animation after 3 seconds
         setTimeout(() => {
           setShowLoginSuccess(false)
         }, 3000)
-        
+
         // Run auto-rename in background (check and rename files that don't match titles)
         if (data.user?.role === 'ADMIN' || data.user?.role === 'DEVELOPER') {
           fetch('/api/auto-rename', { method: 'POST' })
@@ -1667,7 +1709,7 @@ export default function ESOPApp() {
             })
             .catch(err => console.warn('[Auto-Rename] Error:', err))
         }
-        
+
         // Fetch data immediately after login
         fetchStats()
         fetchDriveStatus()
@@ -1679,19 +1721,23 @@ export default function ESOPApp() {
     }
     setLoading(false)
   }
-  
+
   const handleLogout = async () => {
+    // Tampilkan animasi goodbye dahulu
+    setShowLogoutAnimation(true)
+    // Proses logout di background
     try {
       await fetch('/api/auth', { method: 'DELETE' })
+    } catch (_) { /* ignore */ }
+    // Tunggu animasi selesai (3 detik), lalu reset state
+    setTimeout(() => {
+      setShowLogoutAnimation(false)
       setUser(null)
       setIsAuthenticated(false)
       setCurrentPage('dashboard')
-      toast({ title: 'Berhasil', description: 'Logout berhasil!' })
-    } catch (error) {
-      toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
-    }
+    }, 3200)
   }
-  
+
   const handleUpload = async (e: React.FormEvent, isPublic = false) => {
     e.preventDefault()
     const form = isPublic ? publicForm : uploadForm
@@ -1699,25 +1745,25 @@ export default function ESOPApp() {
       toast({ title: 'Error', description: 'File diperlukan', variant: 'destructive' })
       return
     }
-    
+
     setLoading(true)
-    
+
     const LARGE_FILE_THRESHOLD = 10 * 1024 * 1024
     const VERCEL_MAX_LIMIT = 50 * 1024 * 1024
     const isLargeFile = form.file.size > LARGE_FILE_THRESHOLD
-    
+
     try {
       if (form.file.size > VERCEL_MAX_LIMIT) {
-        toast({ 
-          title: '⚠️ File Terlalu Besar', 
-          description: `File (${(form.file.size / 1024 / 1024).toFixed(2)} MB) melebihi batas upload (50 MB). Silakan upload file ke Google Drive secara manual, lalu hubungi admin untuk menambahkan file ke katalog.`, 
+        toast({
+          title: '⚠️ File Terlalu Besar',
+          description: `File (${(form.file.size / 1024 / 1024).toFixed(2)} MB) melebihi batas upload (50 MB). Silakan upload file ke Google Drive secara manual, lalu hubungi admin untuk menambahkan file ke katalog.`,
           variant: 'destructive',
           duration: 8000
         })
         setLoading(false)
         return
       }
-      
+
       if (isLargeFile) {
         toast({ title: '📤 Upload File', description: `Mengupload file (${(form.file.size / 1024 / 1024).toFixed(2)} MB)...`, duration: 5000 })
         await handleProxyUpload(form, isPublic)
@@ -1730,10 +1776,10 @@ export default function ESOPApp() {
     }
     setLoading(false)
   }
-  
+
   const handleSmallFileUpload = async (form: typeof uploadForm | typeof publicForm, isPublic: boolean) => {
-    const uploadingToast = toast({ 
-      title: '📤 Mengupload File...', 
+    const uploadingToast = toast({
+      title: '📤 Mengupload File...',
       description: 'Mengupload ke Cloudflare R2 (Primary Storage)',
       duration: 60000
     })
@@ -1754,7 +1800,7 @@ export default function ESOPApp() {
     // For public submissions, use default 'AKTIF' status since publicForm doesn't have status field
     formData.append('status', isPublic ? 'AKTIF' : (form as typeof uploadForm).status)
     formData.append('file', form.file!)
-    
+
     if (isPublic) {
       formData.append('isPublicSubmission', 'true')
       formData.append('submitterName', publicForm.nama)
@@ -1767,13 +1813,13 @@ export default function ESOPApp() {
       progress: 50,
       currentStep: 'Memproses...'
     }))
-    
+
     const res = await fetch('/api/sop', {
       method: 'POST',
       body: formData
     })
     const data = await res.json()
-    
+
     if (data.error) {
       setSyncStatus(prev => ({
         ...prev,
@@ -1792,7 +1838,7 @@ export default function ESOPApp() {
         googleDrive: syncResult?.googleDrive || 'pending',
         timestamp: new Date()
       })
-      
+
       setSyncStatus(prev => ({
         ...prev,
         isSyncing: false,
@@ -1808,8 +1854,8 @@ export default function ESOPApp() {
         }))
       }, 2000)
 
-      toast({ 
-        title: '✅ Upload Berhasil!', 
+      toast({
+        title: '✅ Upload Berhasil!',
         description: `${r2StatusText} | ${driveStatus}`,
         duration: 5000
       })
@@ -1819,11 +1865,11 @@ export default function ESOPApp() {
       fetchSyncStatus()
     }
   }
-  
+
   const handleProxyUpload = async (form: typeof uploadForm | typeof publicForm, isPublic: boolean) => {
     const file = form.file!
     const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'pdf'
-    
+
     const mimeTypes: Record<string, string> = {
       'pdf': 'application/pdf',
       'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -1840,9 +1886,9 @@ export default function ESOPApp() {
       currentStep: 'Mempersiapkan upload ke R2...',
       direction: 'r2-to-drive'
     }))
-    
+
     toast({ title: '📤 Step 1/4', description: `Mempersiapkan upload file (${(file.size / 1024 / 1024).toFixed(2)} MB)...`, duration: 5000 })
-    
+
     // Step 1: Get presigned upload URL from R2
     const urlRes = await fetch('/api/upload-url', {
       method: 'POST',
@@ -1854,9 +1900,9 @@ export default function ESOPApp() {
         isPublicSubmission: isPublic
       })
     })
-    
+
     const urlData = await urlRes.json()
-    
+
     if (!urlData.success) {
       setSyncStatus(prev => ({
         ...prev,
@@ -1866,17 +1912,17 @@ export default function ESOPApp() {
       }))
       throw new Error(urlData.error || 'Failed to get upload URL')
     }
-    
+
     const { uploadUrl, uploadKey } = urlData
-    
+
     setSyncStatus(prev => ({
       ...prev,
       progress: 20,
       currentStep: 'Mengupload ke R2...'
     }))
-    
+
     toast({ title: '📤 Step 2/4', description: 'Mengupload langsung ke Cloudflare R2...', duration: 5000 })
-    
+
     // Step 2: Upload directly to R2 using presigned URL
     const uploadRes = await fetch(uploadUrl, {
       method: 'PUT',
@@ -1885,7 +1931,7 @@ export default function ESOPApp() {
       },
       body: file
     })
-    
+
     if (!uploadRes.ok) {
       setSyncStatus(prev => ({
         ...prev,
@@ -1895,15 +1941,15 @@ export default function ESOPApp() {
       }))
       throw new Error('Failed to upload file to R2')
     }
-    
+
     setSyncStatus(prev => ({
       ...prev,
       progress: 60,
       currentStep: 'Menyimpan data...'
     }))
-    
+
     toast({ title: '📝 Step 3/4', description: 'Menyimpan data ke database...', duration: 3000 })
-    
+
     // Step 3: Confirm upload and create SOP record
     const sopRes = await fetch('/api/upload-url', {
       method: 'PUT',
@@ -1915,16 +1961,17 @@ export default function ESOPApp() {
         kategori: form.kategori,
         jenis: form.jenis,
         tahun: form.tahun,
-        status: form.status,
+        lingkup: form.lingkup,
+        status: isPublic ? 'AKTIF' : (form as any).status,
         isPublicSubmission: isPublic,
         submitterName: isPublic ? publicForm.nama : null,
         submitterEmail: isPublic ? publicForm.email : null,
         keterangan: isPublic ? publicForm.keterangan : null
       })
     })
-    
+
     const sopData = await sopRes.json()
-    
+
     if (sopData.error) {
       setSyncStatus(prev => ({
         ...prev,
@@ -1940,7 +1987,7 @@ export default function ESOPApp() {
       progress: 80,
       currentStep: 'Membackup ke Google Drive...'
     }))
-    
+
     toast({ title: '☁️ Step 4/4', description: 'Membackup ke Google Drive (background)...', duration: 3000 })
 
     const syncResult = sopData.syncStatus
@@ -1967,38 +2014,38 @@ export default function ESOPApp() {
         currentStep: ''
       }))
     }, 2000)
-    
-    toast({ 
-      title: '✅ Upload Berhasil!', 
+
+    toast({
+      title: '✅ Upload Berhasil!',
       description: `${r2StatusText} | ${driveStatusText}`,
-      duration: 5000 
+      duration: 5000
     })
     resetUploadForm(isPublic)
     fetchSopFiles()
     fetchStats()
     fetchSyncStatus()
   }
-  
+
   const resetUploadForm = (isPublic: boolean) => {
     setShowUploadDialog(false)
     if (isPublic) {
       setPublicForm({
-        nama: '', email: '', judul: '', kategori: 'SIAGA', jenis: 'SOP',
+        nama: '', email: '', judul: '', kategori: 'SIAGA', jenis: 'SOP', lingkup: 'BCC',
         tahun: new Date().getFullYear(), keterangan: '', file: null
       })
     } else {
       setUploadForm({
-        judul: '', kategori: 'SIAGA', jenis: 'SOP',
+        judul: '', kategori: 'SIAGA', jenis: 'SOP', lingkup: 'BCC',
         tahun: new Date().getFullYear(), status: 'AKTIF', file: null
       })
     }
   }
-  
+
   // Download file dari Cloudflare R2
   const handleDownload = async (id: string) => {
     // Find file from all available lists
     const sop = sopFiles.find(s => s.id === id) || verificationList.find(s => s.id === id) || arsipList.find(s => s.id === id)
-    
+
     if (!sop?.filePath && !sop?.driveFileId) {
       toast({
         title: '⚠️ File Tidak Tersedia',
@@ -2019,22 +2066,22 @@ export default function ESOPApp() {
 
       // Fetch file from our download API (avoids CORS issues)
       const res = await fetch(`/api/download?id=${id}`)
-      
+
       if (!res.ok) {
         const errorData = await res.json()
         throw new Error(errorData.error || 'Gagal mengunduh file')
       }
-      
+
       // Increment download counter
       await fetch('/api/sop', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, incrementDownload: true })
       })
-      
+
       // Get file blob
       const blob = await res.blob()
-      
+
       // Create download link with custom filename
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -2044,7 +2091,7 @@ export default function ESOPApp() {
       a.click()
       document.body.removeChild(a)
       window.URL.revokeObjectURL(url)
-      
+
       setDownloadLoading(null)
       toast({ title: '✅ Download Selesai', description: `File: ${customFileName}` })
       fetchStats()
@@ -2054,7 +2101,7 @@ export default function ESOPApp() {
       toast({ title: '❌ Error', description: error instanceof Error ? error.message : 'Gagal mengunduh file', variant: 'destructive' })
     }
   }
-  
+
   // Preview file dari Cloudflare R2 - Upload ke OneDrive untuk Office Online
   const handlePreview = async (id: string) => {
     // Find file from all available lists
@@ -2079,7 +2126,7 @@ export default function ESOPApp() {
       if (fileExtension === 'pdf') {
         const res = await fetch(`/api/file?action=preview&id=${id}`)
         const contentType = res.headers.get('content-type') || ''
-        
+
         if (contentType.includes('application/pdf')) {
           const blob = await res.blob()
           const url = window.URL.createObjectURL(blob)
@@ -2088,7 +2135,7 @@ export default function ESOPApp() {
           fetchStats()
           return
         }
-        
+
         const data = await res.json()
         if (data.downloadUrl) {
           window.open(data.downloadUrl, '_blank')
@@ -2097,7 +2144,7 @@ export default function ESOPApp() {
         fetchStats()
         return
       }
-      
+
       // For Excel/Word files - upload to OneDrive temp and open in Office Online
       if (['xlsx', 'xls', 'xlsm', 'docx', 'doc'].includes(fileExtension || '')) {
         toast({
@@ -2105,27 +2152,27 @@ export default function ESOPApp() {
           description: 'Mengupload file ke OneDrive untuk preview di Office Online',
           duration: 10000
         })
-        
+
         const res = await fetch('/api/preview-office', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fileId: id })
         })
-        
+
         const data = await res.json()
-        
+
         console.log('📋 [Preview] Response:', { success: data.success, viewerUrl: data.viewerUrl?.substring(0, 100) })
-        
+
         if (!data.success) {
           throw new Error(data.error || 'Gagal mempersiapkan preview')
         }
-        
+
         // Open in Office Online viewer
         if (data.viewerUrl) {
           console.log('🔗 [Preview] Opening URL:', data.viewerUrl.substring(0, 150))
-          
+
           const previewWindow = window.open(data.viewerUrl, '_blank')
-          
+
           // Handle popup blocker
           if (!previewWindow || previewWindow.closed) {
             toast({
@@ -2139,7 +2186,7 @@ export default function ESOPApp() {
               description: 'File dibuka di Microsoft Office Online. File temp akan dihapus setelah ditutup.',
               duration: 5000
             })
-            
+
             // Track the window and clean up when closed
             if (data.driveItemId) {
               const checkClosed = setInterval(() => {
@@ -2156,12 +2203,12 @@ export default function ESOPApp() {
             }
           }
         }
-        
+
         setPreviewLoading(null)
         fetchStats()
         return
       }
-      
+
       // For other file types - fallback to download
       toast({
         title: '⚠️ Preview Tidak Tersedia',
@@ -2170,7 +2217,7 @@ export default function ESOPApp() {
         duration: 5000
       })
       setPreviewLoading(null)
-      
+
     } catch (error) {
       console.error('Preview error:', error)
       setPreviewLoading(null)
@@ -2182,7 +2229,7 @@ export default function ESOPApp() {
       })
     }
   }
-  
+
   // Print file - Open loading dialog with progress
   const handlePrint = useCallback(async (id: string) => {
     // Find file from all available lists
@@ -2251,19 +2298,19 @@ export default function ESOPApp() {
       toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
     }
   }
-  
+
   // Handle Excel Edit - Start editing session with Microsoft 365
   const handleOpenExcelEdit = async (id: string) => {
     const sop = sopFiles.find(s => s.id === id)
     if (!sop) return
-    
+
     setExcelEditData(sop)
     setExcelEditUrl(null)
     setExcelEditDriveItemId(null)
     setExcelEditSessionId(null)
     setShowExcelEditDialog(true)
     setExcelEditLoading(true)
-    
+
     try {
       // Start editing session - this will:
       // 1. Download from R2
@@ -2277,9 +2324,9 @@ export default function ESOPApp() {
           fileId: sop.id
         })
       })
-      
+
       const data = await res.json()
-      
+
       if (data.success) {
         setExcelEditUrl(data.editUrl)
         setExcelEditDriveItemId(data.driveItemId)
@@ -2290,28 +2337,28 @@ export default function ESOPApp() {
           duration: 6000
         })
       } else {
-        toast({ 
-          title: '❌ Gagal Memulai Edit', 
-          description: data.error || 'Terjadi kesalahan', 
-          variant: 'destructive' 
+        toast({
+          title: '❌ Gagal Memulai Edit',
+          description: data.error || 'Terjadi kesalahan',
+          variant: 'destructive'
         })
       }
     } catch (error) {
       console.error('Failed to start edit:', error)
-      toast({ 
-        title: '❌ Error', 
-        description: 'Gagal menghubungi server', 
-        variant: 'destructive' 
+      toast({
+        title: '❌ Error',
+        description: 'Gagal menghubungi server',
+        variant: 'destructive'
       })
     }
     setExcelEditLoading(false)
   }
-  
+
   // Handle Desktop Excel/Word Edit - Download file for local editing
   const handleDesktopEdit = async (id: string) => {
     const sop = sopFiles.find(s => s.id === id)
     if (!sop) return
-    
+
     if (!sop.filePath) {
       toast({
         title: '⚠️ File Tidak Tersedia',
@@ -2321,33 +2368,33 @@ export default function ESOPApp() {
       })
       return
     }
-    
+
     // Check if file is PDF - PDF cannot be edited, show warning dialog
     const fileExtension = sop.fileName.toLowerCase().split('.').pop()
     if (fileExtension === 'pdf') {
       setShowPdfWarningDialog(true)
       return
     }
-    
+
     try {
       toast({
         title: '📥 Mengunduh File...',
         description: 'Mempersiapkan file untuk diedit di Desktop',
         duration: 30000
       })
-      
+
       // Generate custom filename from title
       const fileExt = sop.fileName.split('.').pop()?.toLowerCase() || 'xlsx'
       const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
       const customFileName = `${sanitizeFileName(sop.judul)}.${fileExt}`
-      
+
       console.log('🔍 [Desktop Edit] SOP Data:', {
         id: sop.id,
         judul: sop.judul,
         fileName: sop.fileName,
         customFileName
       })
-      
+
       // Download file with session
       const res = await fetch('/api/excel-edit/download', {
         method: 'POST',
@@ -2358,7 +2405,7 @@ export default function ESOPApp() {
           sopTitle: sop.judul
         })
       })
-      
+
       // Handle file locked response (status 423)
       if (res.status === 423) {
         const lockData = await res.json()
@@ -2370,11 +2417,11 @@ export default function ESOPApp() {
         })
         return
       }
-      
+
       if (!res.ok) {
         let errorMessage = 'Gagal mengunduh file'
         let errorDetails = ''
-        
+
         try {
           const contentType = res.headers.get('content-type')
           if (contentType && contentType.includes('application/json')) {
@@ -2391,17 +2438,17 @@ export default function ESOPApp() {
           console.error('Error parsing response:', parseError)
           errorMessage = `Gagal mengunduh file (${res.status})`
         }
-        
+
         console.error('❌ [Desktop Edit] Download error:', {
           status: res.status,
           statusText: res.statusText,
           errorMessage,
           errorDetails
         })
-        
+
         throw new Error(errorDetails ? `${errorMessage}: ${errorDetails}` : errorMessage)
       }
-      
+
       // Get session info from headers
       const sessionId = res.headers.get('X-Edit-Session-Id')
       const sessionExpires = res.headers.get('X-Edit-Session-Expires')
@@ -2410,7 +2457,7 @@ export default function ESOPApp() {
       const lastEditorEmail = res.headers.get('X-Last-Editor-Email')
       const lastEditorName = res.headers.get('X-Last-Editor-Name')
       const lastEditorTime = res.headers.get('X-Last-Editor-Time')
-      
+
       console.log('📥 [Desktop Edit] Response headers:', {
         sessionId: sessionId ? 'received' : 'missing',
         sessionExpires,
@@ -2418,23 +2465,28 @@ export default function ESOPApp() {
         serverFilename,
         lastEditorEmail
       })
-      
+
       if (!sessionId) {
         throw new Error('Session ID tidak diterima')
       }
-      
+
       // Use server filename as primary, fallback to local customFileName
       const finalFileName = serverFilename || customFileName
       console.log(`📁 [Desktop Edit] Final filename: "${finalFileName}"`)
-      
+
       // Store session
       setDesktopEditSessionToken(sessionId)
       setDesktopEditOriginalHash(originalHash)
       setExcelEditData(sop)
-      
+
+      // Persist to localStorage to survive page reloads
+      localStorage.setItem('desktopEditSessionToken', sessionId)
+      localStorage.setItem('desktopEditOriginalHash', originalHash)
+      localStorage.setItem('excelEditData', JSON.stringify(sop))
+
       // Get file blob
       const blob = await res.blob()
-      
+
       // Create download link with custom filename
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -2444,20 +2496,20 @@ export default function ESOPApp() {
       a.click()
       document.body.removeChild(a)
       window.URL.revokeObjectURL(url)
-      
+
       // Show session info
       const fileTypeLabel = sop.fileType === 'docx' || sop.fileType === 'doc' ? 'Word' : 'Excel'
       let description = `Edit file di ${fileTypeLabel} Desktop, lalu klik "Selesai Edit & Sync" untuk upload. Sesi tidak ada batas waktu.`
       if (lastEditorEmail) {
         description += ` Terakhir diedit oleh ${lastEditorName || lastEditorEmail}.`
       }
-      
+
       toast({
         title: '✅ File Diunduh',
         description,
         duration: 8000
       })
-      
+
     } catch (error) {
       console.error('Desktop edit error:', error)
       toast({
@@ -2468,29 +2520,29 @@ export default function ESOPApp() {
       })
     }
   }
-  
+
   // Handle Desktop Sync - Upload edited file
   const handleDesktopSync = async () => {
     if (!desktopSyncFile || !desktopEditSessionToken || !excelEditData) return
-    
+
     setDesktopSyncing(true)
-    
+
     try {
       const formData = new FormData()
       formData.append('file', desktopSyncFile)
       formData.append('sessionId', desktopEditSessionToken)
-      
+
       const res = await fetch('/api/excel-edit/desktop-sync', {
         method: 'POST',
         body: formData
       })
-      
+
       const data = await res.json()
-      
+
       // Handle conflict detected (status 409)
       if (res.status === 409 && data.error === 'CONFLICT_DETECTED') {
         console.log('⚠️ [Sync] Conflict detected:', data)
-        
+
         setConflictData({
           sessionId: desktopEditSessionToken,
           message: data.message,
@@ -2502,7 +2554,7 @@ export default function ESOPApp() {
         setDesktopSyncing(false)
         return
       }
-      
+
       if (data.success) {
         if (data.unchanged) {
           toast({
@@ -2519,12 +2571,17 @@ export default function ESOPApp() {
           fetchSopFiles()
           fetchStats()
         }
-        
+
         // Reset state
         setShowDesktopSyncDialog(false)
         setDesktopSyncFile(null)
         setDesktopEditSessionToken(null)
         setDesktopEditOriginalHash(null)
+
+        // Clear persistence
+        localStorage.removeItem('desktopEditSessionToken')
+        localStorage.removeItem('desktopEditOriginalHash')
+        localStorage.removeItem('excelEditData')
       } else {
         toast({
           title: '❌ Sync Gagal',
@@ -2542,29 +2599,29 @@ export default function ESOPApp() {
         duration: 5000
       })
     }
-    
+
     setDesktopSyncing(false)
   }
-  
+
   // Handle Force Sync - Overwrite even with conflict
   const handleForceSync = async () => {
     if (!desktopSyncFile || !conflictData?.sessionId) return
-    
+
     setForceSyncing(true)
-    
+
     try {
       const formData = new FormData()
       formData.append('file', desktopSyncFile)
       formData.append('sessionId', conflictData.sessionId)
       formData.append('confirmed', 'true')
-      
+
       const res = await fetch('/api/excel-edit/force-sync', {
         method: 'POST',
         body: formData
       })
-      
+
       const data = await res.json()
-      
+
       if (data.success) {
         toast({
           title: '⚠️ Force Sync Berhasil!',
@@ -2573,7 +2630,7 @@ export default function ESOPApp() {
         })
         fetchSopFiles()
         fetchStats()
-        
+
         // Reset all state
         setShowConflictDialog(false)
         setShowDesktopSyncDialog(false)
@@ -2581,6 +2638,11 @@ export default function ESOPApp() {
         setDesktopSyncFile(null)
         setDesktopEditSessionToken(null)
         setDesktopEditOriginalHash(null)
+
+        // Clear persistence
+        localStorage.removeItem('desktopEditSessionToken')
+        localStorage.removeItem('desktopEditOriginalHash')
+        localStorage.removeItem('excelEditData')
       } else {
         toast({
           title: '❌ Force Sync Gagal',
@@ -2598,16 +2660,16 @@ export default function ESOPApp() {
         duration: 5000
       })
     }
-    
+
     setForceSyncing(false)
   }
-  
+
   // Handle Cancel Conflict - User chooses to cancel
   const handleCancelConflict = () => {
     setShowConflictDialog(false)
     // Keep the sync dialog open so user can choose different file or cancel entirely
   }
-  
+
   // Handle Cancel Session - User cancels the entire edit session
   const handleCancelSession = () => {
     setShowConflictDialog(false)
@@ -2616,14 +2678,19 @@ export default function ESOPApp() {
     setDesktopSyncFile(null)
     setDesktopEditSessionToken(null)
     setDesktopEditOriginalHash(null)
-    
+
+    // Clear persistence
+    localStorage.removeItem('desktopEditSessionToken')
+    localStorage.removeItem('desktopEditOriginalHash')
+    localStorage.removeItem('excelEditData')
+
     toast({
       title: '🚫 Sesi Dibatalkan',
       description: 'Anda dapat memulai edit ulang kapan saja',
       duration: 3000
     })
   }
-  
+
   // Open Desktop Sync Dialog
   const handleOpenDesktopSync = () => {
     if (!desktopEditSessionToken) {
@@ -2638,7 +2705,7 @@ export default function ESOPApp() {
     setDesktopSyncFile(null)
     setShowDesktopSyncDialog(true)
   }
-  
+
   // Open Excel Online in new tab
   const handleOpenExcelOnline = () => {
     if (!excelEditUrl) return
@@ -2649,11 +2716,11 @@ export default function ESOPApp() {
       duration: 5000
     })
   }
-  
+
   // Sync file from OneDrive back to R2
   const handleSyncToR2 = async () => {
     if (!excelEditDriveItemId) return
-    
+
     setExcelEditSyncing(true)
     try {
       const res = await fetch('/api/excel-edit/sync', {
@@ -2663,7 +2730,7 @@ export default function ESOPApp() {
           driveItemId: excelEditDriveItemId
         })
       })
-      
+
       // Check content-type before parsing
       const contentType = res.headers.get('content-type')
       if (!contentType || !contentType.includes('application/json')) {
@@ -2672,9 +2739,9 @@ export default function ESOPApp() {
         console.error('Non-JSON response:', textResponse.slice(0, 500))
         throw new Error(`Server error (${res.status}): Response is not valid JSON`)
       }
-      
+
       const data = await res.json()
-      
+
       if (res.ok && data.success) {
         toast({
           title: '✅ Sync Berhasil!',
@@ -2685,23 +2752,23 @@ export default function ESOPApp() {
         fetchStats()
         setShowExcelEditDialog(false)
       } else {
-        toast({ 
-          title: '❌ Sync Gagal', 
-          description: data.error || data.details || 'Terjadi kesalahan saat sync', 
-          variant: 'destructive' 
+        toast({
+          title: '❌ Sync Gagal',
+          description: data.error || data.details || 'Terjadi kesalahan saat sync',
+          variant: 'destructive'
         })
       }
     } catch (error) {
       console.error('Sync error:', error)
-      toast({ 
-        title: '❌ Error', 
-        description: error instanceof Error ? error.message : 'Gagal menghubungi server', 
-        variant: 'destructive' 
+      toast({
+        title: '❌ Error',
+        description: error instanceof Error ? error.message : 'Gagal menghubungi server',
+        variant: 'destructive'
       })
     }
     setExcelEditSyncing(false)
   }
-  
+
   // Cancel edit and delete file from OneDrive
   const handleCancelEdit = async () => {
     if (!excelEditDriveItemId) {
@@ -2710,10 +2777,10 @@ export default function ESOPApp() {
       resetExcelEditState()
       return
     }
-    
+
     const confirmCancel = confirm('Yakin ingin membatalkan edit? File di OneDrive akan dihapus dan perubahan tidak akan disimpan.')
     if (!confirmCancel) return
-    
+
     try {
       const res = await fetch('/api/excel-edit/cancel', {
         method: 'POST',
@@ -2722,9 +2789,9 @@ export default function ESOPApp() {
           driveItemId: excelEditDriveItemId
         })
       })
-      
+
       const data = await res.json()
-      
+
       if (data.success) {
         toast({
           title: '✅ Edit Dibatalkan',
@@ -2745,11 +2812,11 @@ export default function ESOPApp() {
         duration: 3000
       })
     }
-    
+
     setShowExcelEditDialog(false)
     resetExcelEditState()
   }
-  
+
   // Reset edit state
   const resetExcelEditState = () => {
     setExcelEditData(null)
@@ -2759,15 +2826,15 @@ export default function ESOPApp() {
     setExcelEditLoading(false)
     setExcelEditSyncing(false)
   }
-  
+
   // Check edit status
   const handleCheckEditStatus = async () => {
     if (!excelEditDriveItemId) return
-    
+
     try {
       const res = await fetch(`/api/excel-edit/status?driveItemId=${excelEditDriveItemId}`)
       const data = await res.json()
-      
+
       if (data.status === 'synced') {
         toast({
           title: '✅ File Sudah Disync',
@@ -2787,14 +2854,14 @@ export default function ESOPApp() {
       console.error('Failed to check status:', error)
     }
   }
-  
+
   const handleVerification = async (id: string, status: string, reason?: string) => {
     try {
       const res = await fetch('/api/sop', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          id, 
+        body: JSON.stringify({
+          id,
           verificationStatus: status,
           rejectionReason: status === 'DITOLAK' ? reason : undefined
         })
@@ -2804,22 +2871,22 @@ export default function ESOPApp() {
         toast({ title: 'Error', description: data.error, variant: 'destructive' })
       } else {
         toast({ title: 'Berhasil', description: `SOP berhasil ${status === 'DISETUJUI' ? 'disetujui' : 'ditolak'}!` })
-        fetchVerificationList(verificationFilter, verificationSearch, verificationSortBy)
-        fetchArsipList(arsipSearch, arsipSortBy)
+        fetchVerificationList(verificationFilter, verificationLingkupFilter, verificationSearch, verificationSortBy)
+        fetchArsipList(arsipLingkupFilter, arsipSearch, arsipSortBy)
         fetchStats()
       }
     } catch (error) {
       toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
     }
   }
-  
+
   // Open rejection dialog
   const handleOpenRejectDialog = (id: string) => {
     setRejectTargetId(id)
     setRejectReason('')
     setShowRejectDialog(true)
   }
-  
+
   // Confirm rejection
   const handleConfirmReject = async () => {
     if (!rejectTargetId) return
@@ -2832,28 +2899,29 @@ export default function ESOPApp() {
     setRejectTargetId(null)
     setRejectReason('')
   }
-  
+
   // Buka dialog edit
   const handleOpenEdit = (id: string) => {
     const sop = sopFiles.find(s => s.id === id)
     if (!sop) return
-    
+
     setEditData(sop)
     setEditForm({
       nomorSop: sop.nomorSop || '',
       judul: sop.judul,
       kategori: sop.kategori,
       jenis: sop.jenis,
+      lingkup: sop.lingkup || 'BCC',
       tahun: sop.tahun,
       status: sop.status
     })
     setShowEditDialog(true)
   }
-  
+
   // Simpan perubahan edit
   const handleSaveEdit = async () => {
     if (!editData) return
-    
+
     try {
       const res = await fetch('/api/sop', {
         method: 'PUT',
@@ -2864,6 +2932,7 @@ export default function ESOPApp() {
           judul: editForm.judul,
           kategori: editForm.kategori,
           jenis: editForm.jenis,
+          lingkup: editForm.lingkup,
           tahun: editForm.tahun,
           status: editForm.status
         })
@@ -2874,8 +2943,8 @@ export default function ESOPApp() {
       } else {
         // Show toast with rename info if file was renamed
         if (data.renamed) {
-          toast({ 
-            title: '✅ Berhasil Diperbarui', 
+          toast({
+            title: '✅ Berhasil Diperbarui',
             description: `Data SOP diperbarui. File di-rename: "${data.renamed.oldName}" → "${data.renamed.newName}"`,
             duration: 5000
           })
@@ -2883,7 +2952,7 @@ export default function ESOPApp() {
           toast({ title: '✅ Berhasil', description: 'Data SOP berhasil diperbarui!' })
         }
         setShowEditDialog(false)
-        
+
         // Update local state immediately for instant UI update
         setSopFiles(prev => prev.map(file => {
           if (file.id === editData.id) {
@@ -2900,7 +2969,7 @@ export default function ESOPApp() {
           }
           return file
         }))
-        
+
         setEditData(null)
         fetchSopFiles() // Refresh SOP list to show updated timestamp
         fetchStats() // Refresh stats for filters
@@ -2909,7 +2978,7 @@ export default function ESOPApp() {
       toast({ title: 'Error', description: 'Terjadi kesalahan saat menyimpan', variant: 'destructive' })
     }
   }
-  
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -2921,15 +2990,15 @@ export default function ESOPApp() {
       })
       const data = await res.json()
       if (data.error) {
-        toast({ 
-          title: '❌ Gagal', 
-          description: data.error, 
+        toast({
+          title: '❌ Gagal',
+          description: data.error,
           variant: 'destructive',
           duration: 5000
         })
       } else {
-        toast({ 
-          title: '✅ Berhasil', 
+        toast({
+          title: '✅ Berhasil',
           description: data.message || 'User berhasil dibuat!',
           duration: 3000
         })
@@ -2939,16 +3008,16 @@ export default function ESOPApp() {
       }
     } catch (error) {
       console.error('Create user error:', error)
-      toast({ 
-        title: '❌ Error', 
-        description: 'Terjadi kesalahan jaringan. Periksa koneksi internet Anda.', 
+      toast({
+        title: '❌ Error',
+        description: 'Terjadi kesalahan jaringan. Periksa koneksi internet Anda.',
         variant: 'destructive',
         duration: 5000
       })
     }
     setLoading(false)
   }
-  
+
   const handleDeleteUser = async (id: string) => {
     if (!confirm('Yakin ingin menghapus user ini?')) return
     try {
@@ -2968,16 +3037,16 @@ export default function ESOPApp() {
   // Handle delete SOP file
   const handleDeleteSop = async (id: string, fileName: string) => {
     if (!confirm(`Yakin ingin menghapus file "${fileName}"?\n\nFile akan dihapus permanen dari sistem dan storage.`)) return
-    
+
     try {
       const res = await fetch(`/api/sop?id=${id}`, { method: 'DELETE' })
       const data = await res.json()
-      
+
       if (data.error) {
         toast({ title: '❌ Gagal', description: data.error, variant: 'destructive' })
       } else {
-        toast({ 
-          title: '✅ Berhasil', 
+        toast({
+          title: '✅ Berhasil',
           description: `File "${fileName}" berhasil dihapus!`,
           duration: 3000
         })
@@ -2988,453 +3057,47 @@ export default function ESOPApp() {
       toast({ title: '❌ Error', description: 'Terjadi kesalahan saat menghapus file', variant: 'destructive' })
     }
   }
-  
+
   const handleExport = async (format: 'xlsx' | 'pdf') => {
+    if (format === 'xlsx') setExportingXlsx(true)
+    else setExportingPdf(true)
+
     try {
       if (format === 'xlsx') {
-        // Server-side Excel export with charts and styling
-        toast({ title: '📤 Mengunduh Excel...', description: 'Membuat laporan dengan visualisasi data' })
-        
-        const res = await fetch(`/api/export?format=xlsx`)
-        
-        if (!res.ok) {
-          const errorData = await res.json()
-          toast({ title: 'Error', description: errorData.error || 'Gagal mengekspor data', variant: 'destructive' })
-          return
-        }
-        
-        // Download the file directly
-        const blob = await res.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `laporan-sop-ik-basarnas-${new Date().toISOString().split('T')[0]}.xlsx`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        window.URL.revokeObjectURL(url)
-        
-        toast({ title: '✅ Export Berhasil', description: 'File Excel telah diunduh' })
+        // Open the export URL directly in a new tab.
+        // The API returns Content-Disposition: attachment so the browser will download it natively.
+        toast({ title: '📤 Mengunduh Excel...', description: 'File laporan sedang diunduh di tab baru' })
+        window.open('/api/export?format=xlsx', '_blank')
+        toast({ title: '✅ Export Berhasil', description: 'File Excel sedang diunduh' })
+        setExportingXlsx(false)
         return
       }
-      
-      // PDF Export
-      const res = await fetch(`/api/export?format=pdf`)
-      const response = await res.json()
-      if (response.error) {
-        toast({ title: 'Error', description: response.error, variant: 'destructive' })
-        return
+
+      // PDF Export — open the dedicated HTML report page in a new tab
+      // The /api/report endpoint returns Content-Type: text/html with Content-Disposition: inline
+      // so the browser ALWAYS renders it as a page, never downloads it.
+      const tab = window.open('/api/report', '_blank')
+      if (!tab) {
+        toast({ title: 'Error', description: 'Pop-up diblokir browser. Izinkan pop-up untuk situs ini.', variant: 'destructive' })
+      } else {
+        toast({ title: '📄 Laporan Terbuka', description: 'Laporan analitik dibuka di tab baru. Gunakan Ctrl+P untuk simpan sebagai PDF.' })
       }
-      
-      const { data, stats } = response
-      const currentDate = new Date().toLocaleDateString('id-ID', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      })
-      const timestamp = new Date().toISOString()
-      
-      // PDF Export with full stats
-      const printWindow = window.open('', '_blank')
-      if (!printWindow) {
-        toast({ title: 'Error', description: 'Tidak dapat membuka jendela baru', variant: 'destructive' })
-        return
-      }
-      
-      // Format status color
-      const getStatusColor = (status: string) => {
-        switch (status) {
-          case 'AKTIF': return '#22c55e'
-          case 'REVIEW': return '#eab308'
-          case 'KADALUARSA': return '#ef4444'
-          default: return '#6b7280'
-        }
-      }
-      
-      // Generate stats card HTML
-      const statsCardsHtml = `
-          <div class="stats-grid">
-            <div class="stat-card orange">
-              <div class="stat-icon">📋</div>
-              <div class="stat-content">
-                <div class="stat-value">${stats.totalSop}</div>
-                <div class="stat-label">Total SOP</div>
-              </div>
-            </div>
-            <div class="stat-card yellow">
-              <div class="stat-icon">📝</div>
-              <div class="stat-content">
-                <div class="stat-value">${stats.totalIk}</div>
-                <div class="stat-label">Total IK</div>
-              </div>
-            </div>
-            <div class="stat-card green">
-              <div class="stat-icon">✅</div>
-              <div class="stat-content">
-                <div class="stat-value">${stats.totalAktif}</div>
-                <div class="stat-label">Aktif</div>
-              </div>
-            </div>
-            <div class="stat-card cyan">
-              <div class="stat-icon">⏳</div>
-              <div class="stat-content">
-                <div class="stat-value">${stats.totalReview}</div>
-                <div class="stat-label">Review</div>
-              </div>
-            </div>
-            <div class="stat-card red">
-              <div class="stat-icon">❌</div>
-              <div class="stat-content">
-                <div class="stat-value">${stats.totalKadaluarsa}</div>
-                <div class="stat-label">Kadaluarsa</div>
-              </div>
-            </div>
-            <div class="stat-card purple">
-              <div class="stat-icon">👁️</div>
-              <div class="stat-content">
-                <div class="stat-value">${stats.totalPreviews}</div>
-                <div class="stat-label">Total Preview</div>
-              </div>
-            </div>
-            <div class="stat-card orange">
-              <div class="stat-icon">⬇️</div>
-              <div class="stat-content">
-                <div class="stat-value">${stats.totalDownloads}</div>
-                <div class="stat-label">Total Download</div>
-              </div>
-            </div>
-            <div class="stat-card yellow">
-              <div class="stat-icon">📨</div>
-              <div class="stat-content">
-                <div class="stat-value">${stats.totalPublikMenunggu}</div>
-                <div class="stat-label">Pengajuan Menunggu</div>
-              </div>
-            </div>
-          </div>
-        `
-      
-      // Generate distribution tables
-      const distributionHtml = `
-          <div class="distribution-section">
-            <h3>Distribusi Data</h3>
-            <div class="distribution-grid">
-              <div class="dist-table">
-                <h4>Per Tahun</h4>
-                <table>
-                  <thead><tr><th>Tahun</th><th>Jumlah</th></tr></thead>
-                  <tbody>
-                    ${stats.byTahun.map((item: { tahun: number; count: number }) => `<tr><td>${item.tahun}</td><td>${item.count}</td></tr>`).join('')}
-                  </tbody>
-                </table>
-              </div>
-              <div class="dist-table">
-                <h4>Per Kategori</h4>
-                <table>
-                  <thead><tr><th>Kategori</th><th>Jumlah</th></tr></thead>
-                  <tbody>
-                    ${stats.byKategori.map((item: { kategori: string; count: number }) => `<tr><td>${item.kategori}</td><td>${item.count}</td></tr>`).join('')}
-                  </tbody>
-                </table>
-              </div>
-              <div class="dist-table">
-                <h4>Per Jenis</h4>
-                <table>
-                  <thead><tr><th>Jenis</th><th>Jumlah</th></tr></thead>
-                  <tbody>
-                    ${stats.byJenis.map((item: { jenis: string; count: number }) => `<tr><td>${item.jenis}</td><td>${item.count}</td></tr>`).join('')}
-                  </tbody>
-                </table>
-              </div>
-              <div class="dist-table">
-                <h4>Per Status</h4>
-                <table>
-                  <thead><tr><th>Status</th><th>Jumlah</th></tr></thead>
-                  <tbody>
-                    ${stats.byStatus.map((item: { status: string; count: number }) => `<tr><td><span class="status-badge" style="background-color: ${getStatusColor(item.status)}">${item.status}</span></td><td>${item.count}</td></tr>`).join('')}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        `
-      
-      printWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>Laporan SOP dan IK - BASARNAS</title>
-            <style>
-              * { margin: 0; padding: 0; box-sizing: border-box; }
-              body { 
-                font-family: 'Segoe UI', Arial, sans-serif; 
-                padding: 30px;
-                background: #f8fafc;
-                color: #1e293b;
-              }
-              .header {
-                text-align: center;
-                margin-bottom: 30px;
-                padding-bottom: 20px;
-                border-bottom: 3px solid #f97316;
-              }
-              .logo-section {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 15px;
-                margin-bottom: 15px;
-              }
-              .logo-icon {
-                width: 60px;
-                height: 60px;
-                background: linear-gradient(135deg, #f97316, #ea580c);
-                border-radius: 12px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 30px;
-              }
-              h1 { 
-                color: #1e293b; 
-                font-size: 28px;
-                font-weight: 700;
-              }
-              .subtitle {
-                color: #f97316;
-                font-size: 14px;
-                font-weight: 600;
-                margin-top: 5px;
-              }
-              .date-info {
-                color: #64748b;
-                font-size: 12px;
-                margin-top: 10px;
-              }
-              
-              /* Stats Grid */
-              .stats-grid {
-                display: grid;
-                grid-template-columns: repeat(4, 1fr);
-                gap: 15px;
-                margin-bottom: 30px;
-              }
-              .stat-card {
-                background: white;
-                border-radius: 12px;
-                padding: 20px;
-                display: flex;
-                align-items: center;
-                gap: 15px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-                border-left: 4px solid;
-              }
-              .stat-card.orange { border-left-color: #f97316; }
-              .stat-card.yellow { border-left-color: #eab308; }
-              .stat-card.green { border-left-color: #22c55e; }
-              .stat-card.red { border-left-color: #ef4444; }
-              .stat-card.cyan { border-left-color: #06b6d4; }
-              .stat-card.purple { border-left-color: #8b5cf6; }
-              .stat-icon { font-size: 28px; }
-              .stat-value { font-size: 28px; font-weight: 700; color: #1e293b; }
-              .stat-label { font-size: 12px; color: #64748b; font-weight: 500; }
-              
-              /* Distribution Section */
-              .distribution-section {
-                margin-bottom: 30px;
-              }
-              .distribution-section h3 {
-                color: #1e293b;
-                font-size: 18px;
-                margin-bottom: 15px;
-                padding-bottom: 10px;
-                border-bottom: 2px solid #e2e8f0;
-              }
-              .distribution-grid {
-                display: grid;
-                grid-template-columns: repeat(4, 1fr);
-                gap: 20px;
-              }
-              .dist-table h4 {
-                color: #64748b;
-                font-size: 12px;
-                text-transform: uppercase;
-                margin-bottom: 10px;
-              }
-              .dist-table table {
-                width: 100%;
-                border-collapse: collapse;
-                background: white;
-                border-radius: 8px;
-                overflow: hidden;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-              }
-              .dist-table th, .dist-table td {
-                padding: 10px 12px;
-                text-align: left;
-                font-size: 12px;
-              }
-              .dist-table th {
-                background: #f97316;
-                color: white;
-                font-weight: 600;
-              }
-              .dist-table td {
-                border-bottom: 1px solid #e2e8f0;
-              }
-              
-              /* Main Data Table */
-              .data-section h3 {
-                color: #1e293b;
-                font-size: 18px;
-                margin-bottom: 15px;
-                padding-bottom: 10px;
-                border-bottom: 2px solid #e2e8f0;
-              }
-              table.main-table { 
-                width: 100%; 
-                border-collapse: collapse; 
-                margin-top: 10px;
-                background: white;
-                border-radius: 8px;
-                overflow: hidden;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-              }
-              .main-table th, .main-table td { 
-                border: 1px solid #e2e8f0; 
-                padding: 10px 12px; 
-                text-align: left;
-                font-size: 11px;
-              }
-              .main-table th { 
-                background: linear-gradient(135deg, #f97316, #ea580c);
-                color: white;
-                font-weight: 600;
-                text-transform: uppercase;
-                font-size: 10px;
-                letter-spacing: 0.5px;
-              }
-              .main-table tr:nth-child(even) { background-color: #f8fafc; }
-              .main-table tr:hover { background-color: #fff7ed; }
-              
-              .status-badge {
-                display: inline-block;
-                padding: 3px 8px;
-                border-radius: 4px;
-                color: white;
-                font-size: 10px;
-                font-weight: 600;
-              }
-              
-              /* Footer */
-              .footer { 
-                margin-top: 40px;
-                padding-top: 20px;
-                border-top: 2px solid #e2e8f0;
-                text-align: center;
-              }
-              .footer-content {
-                background: #f8fafc;
-                padding: 15px;
-                border-radius: 8px;
-              }
-              .footer p { 
-                font-size: 11px; 
-                color: #64748b;
-                margin: 5px 0;
-              }
-              .footer .generated {
-                color: #94a3b8;
-                font-size: 10px;
-              }
-              
-              @media print {
-                body { padding: 20px; }
-                .stats-grid { grid-template-columns: repeat(4, 1fr); }
-                .distribution-grid { grid-template-columns: repeat(4, 1fr); }
-                .stat-card { box-shadow: none; border: 1px solid #e2e8f0; }
-                table { box-shadow: none; }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <div class="logo-section">
-                <div class="logo-icon">🛡️</div>
-                <div>
-                  <h1>LAPORAN SOP DAN IK</h1>
-                  <div class="subtitle">Katalog SOP dan IK - Direktorat Kesiapsiagaan - BASARNAS</div>
-                </div>
-              </div>
-              <div class="date-info">Tanggal Laporan: ${currentDate}</div>
-            </div>
-            
-            ${statsCardsHtml}
-            
-            ${distributionHtml}
-            
-            <div class="data-section">
-              <h3>Daftar Dokumen (${data.length} dokumen)</h3>
-              <table class="main-table">
-                <thead>
-                  <tr>
-                    <th>No</th>
-                    <th>Judul</th>
-                    <th>Tahun</th>
-                    <th>Kategori</th>
-                    <th>Jenis</th>
-                    <th>Status</th>
-                    <th>Preview</th>
-                    <th>Download</th>
-                    <th>Diupload Oleh</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${data.map((item: { judul: string; tahun: number; kategori: string; jenis: string; status: string; previewCount: number; downloadCount: number; uploadedBy: string }, idx: number) => `
-                    <tr>
-                      <td>${idx + 1}</td>
-                      <td>${item.judul.length > 50 ? item.judul.substring(0, 50) + '...' : item.judul}</td>
-                      <td>${item.tahun}</td>
-                      <td>${item.kategori}</td>
-                      <td>${item.jenis}</td>
-                      <td><span class="status-badge" style="background-color: ${getStatusColor(item.status)}">${item.status}</span></td>
-                      <td>${item.previewCount || 0}</td>
-                      <td>${item.downloadCount || 0}</td>
-                      <td>${item.uploadedBy}</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            </div>
-            
-            <div class="footer">
-              <div class="footer-content">
-                <p><strong>Katalog SOP dan IK - Direktorat Kesiapsiagaan - BASARNAS</strong></p>
-                <p class="generated">Dokumen ini digenerate secara otomatis pada ${currentDate}</p>
-                <p class="generated">Timestamp: ${timestamp}</p>
-              </div>
-            </div>
-          </body>
-          </html>
-        `)
-      printWindow.document.close()
-      
-      // Wait for content to load before printing
-      setTimeout(() => {
-        printWindow.print()
-      }, 500)
-      
-      toast({ title: 'Berhasil', description: 'Data berhasil diekspor ke PDF!' })
+      setExportingPdf(false)
     } catch (error) {
       console.error('Export error:', error)
-      toast({ title: 'Error', description: 'Gagal mengekspor data', variant: 'destructive' })
+      toast({ title: 'Error', description: 'Gagal membuka laporan', variant: 'destructive' })
+    } finally {
+      setExportingPdf(false)
     }
   }
-  
   // Handle navigation with notification clearing and loading state
   const handleNavigation = useCallback((page: PageView) => {
     setCurrentPage(page)
-    
+
+    if (window.innerWidth < 1024) {
+      setSidebarOpen(false)
+    }
+
     // Set loading states immediately when navigating to show loading indicator
     if (page === 'verifikasi') {
       setVerifikasiLoading(true)
@@ -3445,41 +3108,43 @@ export default function ESOPApp() {
     if (page === 'katalog') {
       setKatalogLoading(true)
     }
-    
-    // When navigating to arsip page, mark all rejected files as seen
-    if (page === 'arsip' && user?.id && stats?.totalPublikDitolak !== undefined) {
-      const newSeenCount = stats.totalPublikDitolak
-      setArsipSeenCount(newSeenCount)
-      localStorage.setItem(`arsipSeenCount_${user.id}`, newSeenCount.toString())
+
+    // When navigating to arsip page, mark all newly rejected files as seen
+    if (page === 'arsip' && stats?.totalPublikDitolakBaru && stats.totalPublikDitolakBaru > 0) {
+      // Clear badge immediately for smooth UI
+      setStats(prev => prev ? { ...prev, totalPublikDitolakBaru: 0 } : null)
+
+      // Tell server we visited arsip
+      fetch('/api/users/visit-arsip', { method: 'POST' })
+        .catch(err => console.error('Failed to update arsip visit time:', err))
     }
-  }, [user?.id, stats?.totalPublikDitolak])
-  
+  }, [stats?.totalPublikDitolakBaru])
+
   const menuItems = [
     { id: 'dashboard' as PageView, label: 'Laporan Analitik', icon: LayoutDashboard, roles: ['ADMIN', 'STAF', 'DEVELOPER'] },
     { id: 'katalog' as PageView, label: 'Katalog SOP', icon: FileText, roles: ['ADMIN', 'STAF', 'DEVELOPER'] },
-    { id: 'upload' as PageView, label: 'Upload SOP', icon: Upload, roles: ['ADMIN', 'DEVELOPER'] },
     { id: 'verifikasi' as PageView, label: 'Verifikasi SOP', icon: CheckCircle, roles: ['ADMIN', 'DEVELOPER'] },
     { id: 'arsip' as PageView, label: 'Arsip', icon: FolderOpen, roles: ['ADMIN', 'DEVELOPER'] },
     { id: 'logs' as PageView, label: 'Log Aktivitas', icon: History, roles: ['ADMIN', 'DEVELOPER'] },
     { id: 'users' as PageView, label: 'Manajemen User', icon: Users, roles: ['DEVELOPER'] },
   ]
-  
+
   // Login Screen
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex flex-col relative overflow-hidden bg-cover bg-center bg-no-repeat" style={{ backgroundImage: 'url(/background.jpg)' }}>
         {/* Dark overlay for better readability */}
         <div className="absolute inset-0 bg-black/60" />
-        
+
         {/* Header */}
-        <motion.header 
+        <motion.header
           className="relative z-10 bg-gradient-to-r from-gray-900/95 via-gray-800/95 to-gray-900/95 backdrop-blur-md text-white p-4 shadow-xl border-b border-orange-500/20"
           initial={{ y: -100 }}
           animate={{ y: 0 }}
           transition={{ type: 'spring', stiffness: 100 }}
         >
           <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <motion.div 
+            <motion.div
               className="flex items-center gap-4"
               initial={{ opacity: 0, x: -50 }}
               animate={{ opacity: 1, x: 0 }}
@@ -3502,12 +3167,12 @@ export default function ESOPApp() {
             >
               {/* Simple Storage Status for Public Page */}
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${r2Status?.connected ? 'bg-green-500' : 'bg-red-500'}`} />
-                <span className={`text-sm font-medium ${r2Status?.connected ? 'text-green-400' : 'text-red-400'}`}>
+                <div className={`w - 2 h - 2 rounded - full ${r2Status?.connected ? 'bg-green-500' : 'bg-red-500'} `} />
+                <span className={`text - sm font - medium ${r2Status?.connected ? 'text-green-400' : 'text-red-400'} `}>
                   Storage {r2Status?.connected ? 'OK' : 'Tidak Tersedia'}
                 </span>
               </div>
-              <Button 
+              <Button
                 onClick={() => setShowLogin(true)}
                 className="btn-sar bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-500/30"
               >
@@ -3517,219 +3182,251 @@ export default function ESOPApp() {
             </motion.div>
           </div>
         </motion.header>
-        
-        {/* Public Content */}
-        <main className="relative z-10 flex-1 flex items-center justify-center p-4 sm:p-6">
-          <motion.div 
-            className="w-full max-w-[400px]"
-            initial={{ opacity: 0, y: 30 }}
+
+        {/* Public Content - Optimized Premium Layout (Zero Scrolling) */}
+        <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-2 sm:p-4 lg:p-6 max-h-screen overflow-hidden">
+          {/* Animated Hero Section - Compressed */}
+          <motion.div
+            className="w-full max-w-4xl mb-4 text-center"
+            initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.6 }}
+            transition={{ duration: 0.6 }}
           >
-            <Card className="bg-white/95 backdrop-blur-xl shadow-2xl border-0 overflow-hidden rounded-2xl">
-              {/* Compact Header */}
-              <div className="relative bg-gradient-to-br from-orange-500 via-orange-600 to-red-700 p-3 text-white overflow-hidden">
-                <motion.div 
-                  className="relative z-10 flex items-center justify-center gap-3"
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4 }}
-                >
-                  <motion.div 
-                    className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg"
-                    initial={{ scale: 0, rotate: -180 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
-                  >
-                    <Shield className="w-5 h-5 text-white" />
-                  </motion.div>
-                  <div className="text-left">
-                    <h1 className="text-base font-bold tracking-wide">AJUKAN DOKUMEN SOP/IK</h1>
-                    <p className="text-orange-100/80 text-[10px] font-medium">Direktorat Kesiapsiagaan • Foe</p>
+            <motion.div
+              className="inline-block mb-2"
+              animate={{
+                scale: [1, 1.03, 1],
+                filter: ['drop-shadow(0 0 8px rgba(249, 115, 22, 0.4))', 'drop-shadow(0 0 18px rgba(249, 115, 22, 0.7))', 'drop-shadow(0 0 8px rgba(249, 115, 22, 0.4))']
+              }}
+              transition={{ duration: 3, repeat: Infinity }}
+            >
+              <SARLogo size="sm" />
+            </motion.div>
+            <h1 className="text-2xl font-black tracking-widest text-white drop-shadow-lg mb-1">E-KATALOG BASARNAS</h1>
+            <p className="text-orange-400/80 text-[10px] tracking-[0.4em] font-bold uppercase">Direktorat Kesiapsiagaan</p>
+          </motion.div>
+
+          {/* Main Form Container - Compressed Gap */}
+          <motion.div
+            className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-4 items-center"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.1, duration: 0.5 }}
+          >
+            {/* Left Side: Visual/Context - Compressed */}
+            <div className="lg:col-span-4 hidden lg:block space-y-4">
+              <Card className="bg-black/40 backdrop-blur-md border-orange-500/30 text-white overflow-hidden relative group">
+                <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-transparent pointer-events-none" />
+                <CardHeader className="py-3 px-4 relative z-10">
+                  <div className="flex items-center gap-2 text-orange-400 mb-1">
+                    <Activity className="w-4 h-4 animate-pulse" />
+                    <span className="text-[9px] font-black tracking-widest uppercase">Status Operasional</span>
                   </div>
-                </motion.div>
+                  <CardTitle className="text-lg">Standar Operasional</CardTitle>
+                </CardHeader>
+                <CardContent className="py-2 px-4 relative z-10 space-y-3">
+                  <p className="text-xs text-gray-300 leading-snug">
+                    Ajukan dokumen SOP/IK Anda secara digital untuk verifikasi real-time melalui platform E-Katalog.
+                  </p>
+                  <div className="space-y-2 pt-1">
+                    {[
+                      { icon: CheckCircle, text: "Verifikasi Cloud" },
+                      { icon: Globe, text: "Akses Terpusat" }
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-center gap-2 text-[10px] text-orange-200/80 font-medium">
+                        <item.icon className="w-3.5 h-3.5 text-orange-500" />
+                        <span>{item.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Quick Info - Compact */}
+              <div
+                className="p-3 rounded-xl bg-orange-500/10 border border-white/5 flex items-center gap-3 backdrop-blur-sm cursor-pointer hover:bg-orange-500/20 hover:border-orange-500/30 transition-all group/help"
+                onClick={() => window.open('/panduan', '_blank')}
+              >
+                <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center group-hover/help:scale-110 transition-transform">
+                  <FileText className="w-4 h-4 text-orange-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-white uppercase tracking-tight group-hover/help:text-orange-400 transition-colors">Butuh Bantuan?</p>
+                  <p className="text-[9px] text-gray-500">Klik untuk buka Panduan Sistem</p>
+                </div>
               </div>
-              
-              {/* Compact Form Content */}
-              <CardContent className="p-3 bg-gradient-to-b from-white via-orange-50/20 to-white">
-                <form onSubmit={(e) => handleUpload(e, true)} className="space-y-2.5">
-                  {/* Section: Informasi Pengirim - Compact */}
-                  <motion.div 
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                  >
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <Users className="w-3.5 h-3.5 text-orange-500" />
-                      <span className="text-[11px] font-bold text-gray-600 uppercase">Informasi Pengirim</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input 
-                        value={publicForm.nama}
-                        onChange={(e) => setPublicForm({ ...publicForm, nama: e.target.value })}
-                        placeholder="Nama Lengkap *"
-                        required
-                        className="h-8 border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 rounded-lg text-xs bg-white"
-                      />
-                      <Input 
-                        type="email"
-                        value={publicForm.email}
-                        onChange={(e) => setPublicForm({ ...publicForm, email: e.target.value })}
-                        placeholder="Email *"
-                        required
-                        className="h-8 border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 rounded-lg text-xs bg-white"
-                      />
-                    </div>
-                  </motion.div>
-                  
-                  {/* Section: Informasi Dokumen - Compact */}
-                  <motion.div 
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.15 }}
-                  >
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <FileText className="w-3.5 h-3.5 text-orange-500" />
-                      <span className="text-[11px] font-bold text-gray-600 uppercase">Informasi Dokumen</span>
-                    </div>
-                    
-                    <Input 
-                      value={publicForm.judul}
-                      onChange={(e) => setPublicForm({ ...publicForm, judul: e.target.value })}
-                      placeholder="Judul SOP/IK *"
-                      required
-                      className="h-8 border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 rounded-lg text-xs bg-white w-full mb-2"
-                    />
-                    
-                    <div className="grid grid-cols-3 gap-1.5">
-                      <Select value={publicForm.kategori} onValueChange={(v) => setPublicForm({ ...publicForm, kategori: v })}>
-                        <SelectTrigger className="h-7 border-2 border-gray-200 text-gray-900 rounded-lg text-[10px] bg-white">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-lg">
-                          {KATEGORI_OPTIONS.map(k => <SelectItem key={k} value={k} className="text-xs">{k}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <Select value={publicForm.jenis} onValueChange={(v) => setPublicForm({ ...publicForm, jenis: v })}>
-                        <SelectTrigger className="h-7 border-2 border-gray-200 text-gray-900 rounded-lg text-[10px] bg-white">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-lg">
-                          {JENIS_OPTIONS.map(j => <SelectItem key={j} value={j} className="text-xs">{j}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <Input 
-                        type="number"
-                        value={publicForm.tahun}
-                        onChange={(e) => setPublicForm({ ...publicForm, tahun: parseInt(e.target.value) })}
-                        required
-                        className="h-7 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-lg text-[10px] bg-white text-center"
-                      />
-                    </div>
-                    
-                    <Textarea
-                      value={publicForm.keterangan}
-                      onChange={(e) => setPublicForm({ ...publicForm, keterangan: e.target.value })}
-                      placeholder="Keterangan (opsional)"
-                      rows={1}
-                      className="mt-2 border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 rounded-lg text-xs bg-white resize-none w-full"
-                    />
-                  </motion.div>
-                  
-                  {/* Section: Upload File - Compact */}
-                  <motion.div 
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                  >
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <Upload className="w-3.5 h-3.5 text-orange-500" />
-                      <span className="text-[11px] font-bold text-gray-600 uppercase">Upload File</span>
-                    </div>
-                    
-                    <div className="relative flex items-center justify-center h-12 border-2 border-dashed border-orange-300 rounded-lg bg-orange-50/50 hover:border-orange-500 hover:bg-orange-50 transition-all cursor-pointer overflow-hidden">
-                      <input 
-                        type="file"
-                        accept=".xlsx,.xls,.pdf,.docx,.doc"
-                        onChange={(e) => setPublicForm({ ...publicForm, file: e.target.files?.[0] || null })}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                      />
-                      <div className="flex items-center gap-2 pointer-events-none relative z-10">
-                        <motion.div 
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center ${publicForm.file ? 'bg-green-500' : 'bg-orange-500'}`}
-                          whileHover={{ scale: 1.05 }}
-                        >
-                          {publicForm.file ? (
-                            <Check className="w-3.5 h-3.5 text-white" />
-                          ) : (
-                            <Upload className="w-3.5 h-3.5 text-white" />
-                          )}
-                        </motion.div>
-                        <div className="text-left">
-                          <p className="text-xs font-medium text-gray-700">
-                            {publicForm.file ? publicForm.file.name : 'Pilih file'}
-                          </p>
-                          <p className="text-[9px] text-gray-400">
-                            {publicForm.file ? `${(publicForm.file.size / 1024).toFixed(1)} KB` : 'XLSX, PDF, DOCX'}
-                          </p>
+            </div>
+
+            {/* Right Side: The Form - Compressed Padding/Gaps */}
+            <div className="lg:col-span-8 w-full">
+              <Card className="bg-white/5 backdrop-blur-2xl shadow-2xl border border-white/10 overflow-hidden rounded-[1.5rem]">
+                {/* Header Section - Compact */}
+                <div className="relative py-3 px-6 bg-gradient-to-r from-orange-600 to-red-600 text-white flex items-center justify-between">
+                  <div className="relative z-10">
+                    <h3 className="text-sm font-black tracking-tight uppercase">Form Pengajuan Dokumen</h3>
+                    <p className="text-orange-100/70 text-[9px] font-medium tracking-wide">Input data verifikasi sistem</p>
+                  </div>
+                  <div className="flex items-center gap-2 px-2 py-1 bg-white/10 rounded-full border border-white/20">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                    <span className="text-[8px] font-bold tracking-widest uppercase">System Online</span>
+                  </div>
+                </div>
+
+                <CardContent className="p-5 flex flex-col gap-4">
+                  <form onSubmit={(e) => handleUpload(e, true)} className="space-y-4">
+                    {/* Grid for Inputs - Compressed Gaps */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+                      {/* Submitter Info */}
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 pb-1 border-b border-white/5">
+                          <Users className="w-3 h-3 text-orange-500" />
+                          <h4 className="text-[9px] font-black text-white/30 tracking-[0.2em] uppercase">Identitas</h4>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2.5">
+                          <div className="space-y-1">
+                            <Label className="text-white/50 text-[9px] font-bold uppercase tracking-widest pl-1">Nama Lengkap</Label>
+                            <Input
+                              value={publicForm.nama}
+                              onChange={(e) => setPublicForm({ ...publicForm, nama: e.target.value })}
+                              placeholder="Input nama..."
+                              required
+                              className="bg-white/5 border-white/10 text-white placeholder:text-gray-700 focus:border-orange-500 h-9 text-xs"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-white/50 text-[9px] font-bold uppercase tracking-widest pl-1">Email</Label>
+                            <Input
+                              type="email"
+                              value={publicForm.email}
+                              onChange={(e) => setPublicForm({ ...publicForm, email: e.target.value })}
+                              placeholder="Input email..."
+                              required
+                              className="bg-white/5 border-white/10 text-white placeholder:text-gray-700 focus:border-orange-500 h-9 text-xs"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Document Info */}
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 pb-1 border-b border-white/5">
+                          <FileText className="w-3 h-3 text-orange-500" />
+                          <h4 className="text-[9px] font-black text-white/30 tracking-[0.2em] uppercase">Dokumen</h4>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2.5">
+                          <div className="space-y-1">
+                            <Label className="text-white/50 text-[9px] font-bold uppercase tracking-widest pl-1">Judul SOP/IK</Label>
+                            <Input
+                              value={publicForm.judul}
+                              onChange={(e) => setPublicForm({ ...publicForm, judul: e.target.value })}
+                              placeholder="Input judul..."
+                              required
+                              className="bg-white/5 border-white/10 text-white placeholder:text-gray-700 focus:border-orange-500 h-9 text-xs"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-white/50 text-[9px] font-bold uppercase tracking-widest pl-1">Lingkup</Label>
+                              <Select value={publicForm.lingkup} onValueChange={(v) => setPublicForm({ ...publicForm, lingkup: v })}>
+                                <SelectTrigger className="bg-white/5 border-white/10 text-white h-9 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-slate-900 border-white/10 text-white">
+                                  {LINGKUP_OPTIONS.map(l => <SelectItem key={l} value={l} className="text-xs">{l}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-white/50 text-[9px] font-bold uppercase tracking-widest pl-1">Jenis</Label>
+                              <Select value={publicForm.jenis} onValueChange={(v) => setPublicForm({ ...publicForm, jenis: v })}>
+                                <SelectTrigger className="bg-white/5 border-white/10 text-white h-9 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-slate-900 border-white/10 text-white">
+                                  {JENIS_OPTIONS.map(j => <SelectItem key={j} value={j} className="text-xs">{j}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </motion.div>
-                  
-                  {/* Submit Button - Compact */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.25 }}
-                  >
-                    <Button 
-                      type="submit" 
-                      className="w-full h-9 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-lg shadow-orange-500/20 text-xs font-bold rounded-lg relative overflow-hidden"
-                      disabled={loading}
-                    >
-                      <motion.div 
-                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                        animate={{ x: ['-100%', '100%'] }}
-                        transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
-                      />
-                      <span className="relative z-10 flex items-center justify-center gap-2">
-                        {loading ? (
-                          <>
-                            <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
-                              <RefreshCw className="w-3.5 h-3.5" />
+
+                    {/* Compact Section: File & Keterangan */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-1">
+                      <div className="md:col-span-4 space-y-1.5">
+                        <Label className="text-white/40 text-[9px] font-black uppercase tracking-[0.2em]">File Lampiran</Label>
+                        <div className="relative h-20 border-2 border-dashed border-white/10 rounded-xl group hover:border-orange-500/50 hover:bg-orange-500/5 transition-all">
+                          <input
+                            type="file"
+                            accept=".xlsx,.xls,.pdf,.docx,.doc"
+                            onChange={(e) => setPublicForm({ ...publicForm, file: e.target.files?.[0] || null })}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                          />
+                          <div className="absolute inset-0 flex flex-col items-center justify-center p-2">
+                            <motion.div animate={publicForm.file ? { scale: [1, 1.1, 1], color: '#22c55e' } : {}}>
+                              {publicForm.file ? <CheckCircle className="w-5 h-5" /> : <Upload className="w-4 h-4 text-white/30 group-hover:text-orange-500" />}
                             </motion.div>
-                            <span>Mengirim...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-3.5 h-3.5" />
-                            <span>KIRIM DOKUMEN</span>
-                          </>
-                        )}
-                      </span>
-                    </Button>
-                  </motion.div>
-                </form>
-              </CardContent>
-            </Card>
-            
-            {/* Footer branding */}
-            <motion.div 
-              className="text-center mt-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.6 }}
-            >
-              <p className="text-[10px] text-gray-400">
-                © 2026 Foe • Direktorat Kesiapsiagaan
-              </p>
-            </motion.div>
+                            <p className="text-[9px] text-white/70 font-bold truncate max-w-full mt-1">
+                              {publicForm.file ? publicForm.file.name : 'PDF / EXCEL'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="md:col-span-8 space-y-1.5">
+                        <Label className="text-white/40 text-[9px] font-black uppercase tracking-[0.2em]">Keterangan</Label>
+                        <Textarea
+                          value={publicForm.keterangan}
+                          onChange={(e) => setPublicForm({ ...publicForm, keterangan: e.target.value })}
+                          placeholder="Catatan singkat (opsional)..."
+                          className="bg-white/5 border-white/10 text-white placeholder:text-gray-700 focus:border-orange-500 h-20 text-xs resize-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Submit Button Section - Compact */}
+                    <div className="pt-2">
+                      <Button
+                        type="submit"
+                        className="w-full h-11 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-xl shadow-orange-500/10 text-xs font-black tracking-widest uppercase rounded-xl relative overflow-hidden group"
+                        disabled={loading}
+                      >
+                        <motion.div
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+                          animate={{ x: ['-100%', '200%'] }}
+                          transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                        />
+                        <span className="relative z-10 flex items-center justify-center gap-2">
+                          {loading ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>PROSES...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-4 h-4" />
+                              <span>KIRIM DOKUMEN SEKARANG</span>
+                            </>
+                          )}
+                        </span>
+                      </Button>
+                      <div className="flex justify-center mt-3 gap-4 opacity-30 font-mono text-[8px] text-white tracking-widest">
+                        <span>SYSTEM ID: BCC-2026</span>
+                        <span>|</span>
+                        <span>LOC: 06°07'12"S 106°51'34"E</span>
+                      </div>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            </div>
           </motion.div>
         </main>
-        
+
+
+
         {/* Glowing Footer - Bottom Left */}
-        <motion.div 
+        <motion.div
           className="fixed bottom-4 left-4 z-50"
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
@@ -3738,12 +3435,12 @@ export default function ESOPApp() {
           <div className="relative cursor-pointer" onClick={() => setShowCopyrightPopup(true)}>
             {/* Glow effect */}
             <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-yellow-400 rounded-lg blur-md opacity-60 animate-pulse" />
-            
+
             {/* Shimmer container */}
             <div className="relative px-4 py-2 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 rounded-lg border border-orange-500/30 overflow-hidden hover:border-orange-500/60 transition-colors">
               {/* Animated shimmer */}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-400/20 to-transparent animate-shimmer" />
-              
+
               {/* Text with glow */}
               <p className="text-sm font-medium relative z-10">
                 <span className="text-gray-400">© </span>
@@ -3754,12 +3451,12 @@ export default function ESOPApp() {
             </div>
           </div>
         </motion.div>
-        
+
         {/* Login Dialog */}
         <Dialog open={showLogin} onOpenChange={setShowLogin}>
           <DialogContent className="sm:max-w-md bg-transparent border-0 overflow-visible p-0 shadow-none" aria-describedby={undefined}>
             <DialogTitle className="sr-only">Login Admin</DialogTitle>
-            
+
             {/* Animated Background Container */}
             <motion.div
               className="relative"
@@ -3779,7 +3476,7 @@ export default function ESOPApp() {
                 animate={{ rotate: 360 }}
                 transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
               />
-              
+
               {/* Radar Sweep Effect */}
               <motion.div
                 className="absolute -inset-8 rounded-full pointer-events-none"
@@ -3789,7 +3486,7 @@ export default function ESOPApp() {
                 animate={{ rotate: 360 }}
                 transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
               />
-              
+
               {/* Floating Particles */}
               {[...Array(8)].map((_, i) => (
                 <motion.div
@@ -3797,8 +3494,8 @@ export default function ESOPApp() {
                   className="absolute w-2 h-2 rounded-full"
                   style={{
                     background: i % 2 === 0 ? '#f97316' : '#fbbf24',
-                    left: `${10 + i * 12}%`,
-                    top: `${-20 + (i % 3) * 10}%`,
+                    left: `${10 + i * 12}% `,
+                    top: `${-20 + (i % 3) * 10}% `,
                     boxShadow: '0 0 10px currentColor'
                   }}
                   animate={{
@@ -3813,20 +3510,20 @@ export default function ESOPApp() {
                   }}
                 />
               ))}
-              
+
               {/* Main Card */}
               <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl border border-orange-500/30 overflow-hidden backdrop-blur-xl">
                 {/* Animated Grid Background */}
                 <div className="absolute inset-0 opacity-10">
                   <div className="absolute inset-0" style={{
                     backgroundImage: `
-                      linear-gradient(rgba(249, 115, 22, 0.3) 1px, transparent 1px),
-                      linear-gradient(90deg, rgba(249, 115, 22, 0.3) 1px, transparent 1px)
-                    `,
+  linear - gradient(rgba(249, 115, 22, 0.3) 1px, transparent 1px),
+    linear - gradient(90deg, rgba(249, 115, 22, 0.3) 1px, transparent 1px)
+      `,
                     backgroundSize: '30px 30px'
                   }} />
                 </div>
-                
+
                 {/* Header with Animated Beacon */}
                 <div className="relative p-8 text-white overflow-hidden">
                   {/* Beacon Pulse Effect */}
@@ -3850,15 +3547,15 @@ export default function ESOPApp() {
                   >
                     <div className="w-40 h-40 rounded-full border-2 border-orange-500/20" />
                   </motion.div>
-                  
-                  <motion.div 
+
+                  <motion.div
                     className="relative z-10 flex flex-col items-center"
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5 }}
                   >
                     {/* Animated SAR Logo */}
-                    <motion.div 
+                    <motion.div
                       className="relative w-20 h-20 mb-4"
                       initial={{ scale: 0, rotate: -180 }}
                       animate={{ scale: 1, rotate: 0 }}
@@ -3870,7 +3567,7 @@ export default function ESOPApp() {
                         animate={{ rotate: 360 }}
                         transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
                       />
-                      
+
                       {/* Inner Glow */}
                       <motion.div
                         className="absolute inset-1 rounded-xl bg-gradient-to-br from-orange-500 to-red-600"
@@ -3883,7 +3580,7 @@ export default function ESOPApp() {
                         }}
                         transition={{ duration: 1.5, repeat: Infinity }}
                       />
-                      
+
                       {/* Icon */}
                       <div className="absolute inset-2 rounded-lg bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center">
                         <motion.div
@@ -3894,9 +3591,9 @@ export default function ESOPApp() {
                         </motion.div>
                       </div>
                     </motion.div>
-                    
+
                     {/* Title with Glowing Effect */}
-                    <motion.h2 
+                    <motion.h2
                       className="text-3xl font-bold relative"
                       animate={{
                         textShadow: [
@@ -3911,8 +3608,8 @@ export default function ESOPApp() {
                         LOGIN ADMIN
                       </span>
                     </motion.h2>
-                    
-                    <motion.p 
+
+                    <motion.p
                       className="text-orange-200/80 text-sm mt-2 tracking-wider"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
@@ -3920,8 +3617,8 @@ export default function ESOPApp() {
                     >
                       SISTEM KATALOG SOP & IK
                     </motion.p>
-                    
-                    <motion.div 
+
+                    <motion.div
                       className="flex items-center gap-2 mt-2 text-orange-300/60 text-xs"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
@@ -3932,17 +3629,17 @@ export default function ESOPApp() {
                     </motion.div>
                   </motion.div>
                 </div>
-                
+
                 {/* Form Section */}
-                <motion.form 
-                  onSubmit={handleLogin} 
+                <motion.form
+                  onSubmit={handleLogin}
                   className="p-8 pt-4 space-y-6 relative"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
                 >
                   {/* Email Input */}
-                  <motion.div 
+                  <motion.div
                     className="space-y-2"
                     initial={{ opacity: 0, x: -30 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -3961,7 +3658,7 @@ export default function ESOPApp() {
                       <motion.div
                         className="absolute -inset-0.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 opacity-0 group-focus-within:opacity-50 blur transition-opacity"
                       />
-                      <Input 
+                      <Input
                         type="email"
                         value={loginForm.email}
                         onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
@@ -3971,9 +3668,9 @@ export default function ESOPApp() {
                       />
                     </div>
                   </motion.div>
-                  
+
                   {/* Password Input */}
-                  <motion.div 
+                  <motion.div
                     className="space-y-2"
                     initial={{ opacity: 0, x: -30 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -3992,7 +3689,7 @@ export default function ESOPApp() {
                       <motion.div
                         className="absolute -inset-0.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 opacity-0 group-focus-within:opacity-50 blur transition-opacity"
                       />
-                      <Input 
+                      <Input
                         type="password"
                         autoComplete="current-password"
                         value={loginForm.password}
@@ -4005,7 +3702,7 @@ export default function ESOPApp() {
                   </motion.div>
 
                   {/* Buttons */}
-                  <motion.div 
+                  <motion.div
                     className="flex gap-4 pt-4"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -4016,16 +3713,16 @@ export default function ESOPApp() {
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={() => setShowLogin(false)} 
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShowLogin(false)}
                         className="w-full border-2 border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white h-12 rounded-xl font-semibold transition-all duration-300"
                       >
                         Batal
                       </Button>
                     </motion.div>
-                    
+
                     <motion.div
                       className="flex-1 relative"
                       whileHover={{ scale: 1.02 }}
@@ -4042,10 +3739,10 @@ export default function ESOPApp() {
                           transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
                         />
                       </motion.div>
-                      
-                      <Button 
-                        type="submit" 
-                        className="relative w-full bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 hover:from-orange-600 hover:via-orange-700 hover:to-red-700 text-white h-12 rounded-xl font-bold shadow-xl shadow-orange-500/40 transition-all duration-300 border border-orange-400/30" 
+
+                      <Button
+                        type="submit"
+                        className="relative w-full bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 hover:from-orange-600 hover:via-orange-700 hover:to-red-700 text-white h-12 rounded-xl font-bold shadow-xl shadow-orange-500/40 transition-all duration-300 border border-orange-400/30"
                         disabled={loading}
                       >
                         <motion.span
@@ -4073,7 +3770,7 @@ export default function ESOPApp() {
                       </Button>
                     </motion.div>
                   </motion.div>
-                  
+
                   {/* Footer */}
                   <motion.div
                     className="text-center pt-2"
@@ -4081,7 +3778,7 @@ export default function ESOPApp() {
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.7 }}
                   >
-                    <button 
+                    <button
                       type="button"
                       className="text-gray-500 text-xs hover:text-orange-400 transition-colors cursor-pointer focus:outline-none focus:text-orange-400"
                       onClick={() => {
@@ -4097,18 +3794,21 @@ export default function ESOPApp() {
             </motion.div>
           </DialogContent>
         </Dialog>
-        
+
         {/* Copyright Popup */}
         <CopyrightPopup show={showCopyrightPopup} onClose={() => setShowCopyrightPopup(false)} />
-      </div>
+      </div >
     )
   }
-  
+
   // Main Application
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden">
       <SARBackground />
-      
+
+      {/* Logout Animation */}
+      <LogoutAnimation show={showLogoutAnimation} userName={user?.name} />
+
       {/* Login Success Full Screen Animation */}
       <AnimatePresence>
         {showLoginSuccess && loginSuccessRole === 'DEVELOPER' ? (
@@ -4120,22 +3820,22 @@ export default function ESOPApp() {
             className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden"
           >
             {/* Imperial Golden Background */}
-            <motion.div 
+            <motion.div
               className="absolute inset-0 bg-gradient-to-br from-amber-900 via-yellow-800 to-orange-900"
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 2, opacity: 0 }}
               transition={{ duration: 0.5 }}
             />
-            
+
             {/* Golden silk texture overlay */}
-            <div 
+            <div
               className="absolute inset-0 opacity-30"
               style={{
                 backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23FFD700' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
               }}
             />
-            
+
             {/* Flying Dragon Animation */}
             <motion.div
               className="absolute w-full h-full pointer-events-none"
@@ -4197,7 +3897,7 @@ export default function ESOPApp() {
                     <stop offset="100%" stopColor="#FF6B00" />
                   </linearGradient>
                 </defs>
-                
+
                 {/* Dragon Body */}
                 <motion.path
                   d="M100,300 
@@ -4222,7 +3922,7 @@ export default function ESOPApp() {
                   }}
                   transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
                 />
-                
+
                 {/* Dragon Head */}
                 <motion.g
                   animate={{
@@ -4269,7 +3969,7 @@ export default function ESOPApp() {
                     transition={{ duration: 0.5, repeat: Infinity }}
                   />
                 </motion.g>
-                
+
                 {/* Dragon Legs */}
                 <motion.g
                   animate={{ rotate: [0, 10, -10, 0] }}
@@ -4279,7 +3979,7 @@ export default function ESOPApp() {
                   <path d="M280,280 L260,350 L280,350 L300,280" fill="url(#dragonGold)" />
                   <path d="M350,270 L340,340 L360,340 L370,270" fill="url(#dragonGold)" />
                 </motion.g>
-                
+
                 {/* Dragon Claws */}
                 <motion.g
                   animate={{ rotate: [0, 5, -5, 0] }}
@@ -4288,7 +3988,7 @@ export default function ESOPApp() {
                 >
                   <path d="M250,350 L245,370 M260,350 L258,372 M270,350 L272,368" stroke="#FFD700" strokeWidth="3" strokeLinecap="round" />
                 </motion.g>
-                
+
                 {/* Dragon Scales pattern */}
                 {[...Array(12)].map((_, i) => (
                   <motion.ellipse
@@ -4304,18 +4004,18 @@ export default function ESOPApp() {
                     transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.1 }}
                   />
                 ))}
-                
+
                 {/* Dorsal fins */}
                 {[...Array(8)].map((_, i) => (
                   <motion.path
-                    key={`fin-${i}`}
-                    d={`M${180 + i * 55},${260 - (i % 2) * 20} L${200 + i * 55},${220 - (i % 2) * 30} L${220 + i * 55},${265 - (i % 2) * 15}`}
+                    key={`fin - ${i} `}
+                    d={`M${180 + i * 55},${260 - (i % 2) * 20} L${200 + i * 55},${220 - (i % 2) * 30} L${220 + i * 55},${265 - (i % 2) * 15} `}
                     fill="#FF6B00"
                     animate={{ opacity: [0.7, 1, 0.7] }}
                     transition={{ duration: 1, repeat: Infinity, delay: i * 0.15 }}
                   />
                 ))}
-                
+
                 {/* Dragon Tail */}
                 <motion.path
                   d="M100,300 Q60,320 40,290 Q20,260 50,240 Q80,220 70,250"
@@ -4335,18 +4035,18 @@ export default function ESOPApp() {
                 />
               </motion.svg>
             </motion.div>
-            
+
             {/* Golden sparkles */}
             {[...Array(50)].map((_, i) => (
               <motion.div
-                key={`sparkle-${i}`}
+                key={`sparkle - ${i} `}
                 className="absolute"
                 style={{
-                  left: `${Math.random() * 100}%`,
-                  top: `${Math.random() * 100}%`,
-                  width: `${4 + Math.random() * 8}px`,
-                  height: `${4 + Math.random() * 8}px`,
-                  background: `radial-gradient(circle, #FFD700 0%, #FFA500 50%, transparent 70%)`,
+                  left: `${Math.random() * 100}% `,
+                  top: `${Math.random() * 100}% `,
+                  width: `${4 + Math.random() * 8} px`,
+                  height: `${4 + Math.random() * 8} px`,
+                  background: `radial - gradient(circle, #FFD700 0 %, #FFA500 50 %, transparent 70 %)`,
                   borderRadius: '50%',
                 }}
                 initial={{ scale: 0, opacity: 0 }}
@@ -4362,15 +4062,15 @@ export default function ESOPApp() {
                 }}
               />
             ))}
-            
+
             {/* Floating golden clouds */}
             {[...Array(6)].map((_, i) => (
               <motion.div
-                key={`cloud-${i}`}
+                key={`cloud - ${i} `}
                 className="absolute opacity-40"
                 style={{
-                  left: `${-20 + i * 25}%`,
-                  top: `${20 + (i % 3) * 25}%`,
+                  left: `${-20 + i * 25}% `,
+                  top: `${20 + (i % 3) * 25}% `,
                   width: '200px',
                   height: '80px',
                   background: 'radial-gradient(ellipse, rgba(255, 215, 0, 0.5) 0%, transparent 70%)',
@@ -4388,7 +4088,7 @@ export default function ESOPApp() {
                 }}
               />
             ))}
-            
+
             {/* Imperial emblem rays */}
             <motion.div
               className="absolute inset-0"
@@ -4397,17 +4097,17 @@ export default function ESOPApp() {
             >
               {[...Array(16)].map((_, i) => (
                 <div
-                  key={`ray-${i}`}
+                  key={`ray - ${i} `}
                   className="absolute left-1/2 top-1/2 w-1 h-[50vh]"
                   style={{
                     background: 'linear-gradient(to top, transparent, rgba(255, 215, 0, 0.2), transparent)',
-                    transform: `rotate(${i * 22.5}deg) translateX(-50%)`,
+                    transform: `rotate(${i * 22.5}deg) translateX(-50 %)`,
                     transformOrigin: 'center bottom',
                   }}
                 />
               ))}
             </motion.div>
-            
+
             {/* Main content */}
             <div className="relative z-10 text-center">
               {/* Imperial Crown/Logo */}
@@ -4415,11 +4115,11 @@ export default function ESOPApp() {
                 className="w-40 h-40 mx-auto mb-6 relative"
                 initial={{ scale: 0, rotate: -180 }}
                 animate={{ scale: 1, rotate: 0 }}
-                transition={{ 
-                  type: 'spring', 
-                  stiffness: 200, 
+                transition={{
+                  type: 'spring',
+                  stiffness: 200,
                   damping: 15,
-                  delay: 0.2 
+                  delay: 0.2
                 }}
               >
                 {/* Outer golden ring */}
@@ -4432,7 +4132,7 @@ export default function ESOPApp() {
                   animate={{ rotate: 360 }}
                   transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
                 />
-                
+
                 {/* Inner circle */}
                 <div className="absolute inset-2 rounded-full bg-gradient-to-br from-amber-800 via-yellow-700 to-orange-800 flex items-center justify-center">
                   <motion.div
@@ -4443,7 +4143,7 @@ export default function ESOPApp() {
                     👑
                   </motion.div>
                 </div>
-                
+
                 {/* Pulsing glow */}
                 <motion.div
                   className="absolute inset-0 rounded-full"
@@ -4457,14 +4157,14 @@ export default function ESOPApp() {
                   transition={{ duration: 2, repeat: Infinity }}
                 />
               </motion.div>
-              
+
               {/* Imperial Title */}
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5 }}
               >
-                <motion.h2 
+                <motion.h2
                   className="text-5xl font-black mb-2"
                   style={{
                     background: 'linear-gradient(135deg, #FFD700, #FFA500, #FF6B00, #FFD700)',
@@ -4489,7 +4189,7 @@ export default function ESOPApp() {
                   DRAGON EMPEROR HAS ARRIVED
                 </motion.p>
               </motion.div>
-              
+
               {/* User name with imperial styling */}
               <motion.div
                 className="inline-block px-10 py-4 mt-4 relative"
@@ -4500,8 +4200,8 @@ export default function ESOPApp() {
                 {/* Decorative frame */}
                 <div className="absolute inset-0 border-2 border-amber-400/50 rounded-lg" />
                 <div className="absolute inset-1 border border-amber-500/30 rounded-md" />
-                
-                <motion.p 
+
+                <motion.p
                   className="text-3xl font-bold text-amber-200 relative z-10"
                   animate={{ textShadow: ['0 0 10px #FFD700', '0 0 20px #FFA500', '0 0 10px #FFD700'] }}
                   transition={{ duration: 2, repeat: Infinity }}
@@ -4510,7 +4210,7 @@ export default function ESOPApp() {
                 </motion.p>
                 <p className="text-amber-400/80 text-sm mt-1 relative z-10">DEVELOPER ACCESS</p>
               </motion.div>
-              
+
               {/* Status indicator */}
               <motion.div
                 initial={{ opacity: 0 }}
@@ -4531,7 +4231,7 @@ export default function ESOPApp() {
                 />
               </motion.div>
             </div>
-            
+
             {/* Corner decorations - Imperial style */}
             {[
               { top: 'top-8', left: 'left-8', borders: 'border-t-4 border-l-4', rounded: 'rounded-tl-3xl' },
@@ -4541,7 +4241,7 @@ export default function ESOPApp() {
             ].map((corner, i) => (
               <motion.div
                 key={i}
-                className={`absolute ${corner.top} ${corner.left} w-24 h-24 ${corner.borders} ${corner.rounded} border-amber-400/60`}
+                className={`absolute ${corner.top} ${corner.left} w - 24 h - 24 ${corner.borders} ${corner.rounded} border - amber - 400 / 60`}
                 initial={{ opacity: 0, x: i % 2 === 0 ? -50 : 50, y: i < 2 ? -50 : 50 }}
                 animate={{ opacity: 1, x: 0, y: 0 }}
                 transition={{ delay: 0.3 }}
@@ -4549,302 +4249,150 @@ export default function ESOPApp() {
             ))}
           </motion.div>
         ) : showLoginSuccess ? (
-          /* ==================== REGULAR ANIMATION FOR STAF AND ADMIN ==================== */
+          /* ==================== PREMIUM FULL-SCREEN ANIMATION FOR ADMIN, STAF, & OTHERS ==================== */
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[9999] flex items-center justify-center"
+            className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden"
           >
-            {/* Animated gradient background - Green for STAF, Orange for ADMIN */}
-            <motion.div 
-              className={`absolute inset-0 ${
-                loginSuccessRole === 'STAF' 
-                  ? 'bg-gradient-to-br from-green-600 via-emerald-600 to-green-700' 
-                  : 'bg-gradient-to-br from-orange-600 via-red-600 to-orange-700'
-              }`}
-              initial={{ scale: 0, opacity: 0 }}
+            {/* 1. Full Screen Background Layer */}
+            <motion.div
+              className={`absolute inset-0 transition-colors duration-700 ${loginSuccessRole === 'ADMIN'
+                ? 'bg-gradient-to-br from-red-900 via-red-800 to-red-950'
+                : loginSuccessRole === 'STAF'
+                  ? 'bg-gradient-to-br from-green-900 via-emerald-900 to-emerald-950'
+                  : 'bg-gradient-to-br from-purple-900 via-indigo-900 to-purple-950'
+                }`}
+              initial={{ scale: 1.2, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 2, opacity: 0 }}
-              transition={{ duration: 0.5 }}
-            />
-            
-            {/* Animated circles */}
-            <div className="absolute inset-0 overflow-hidden">
-              {[...Array(12)].map((_, i) => (
-                <motion.div
-                  key={i}
-                  className="absolute rounded-full bg-white/10"
-                  style={{
-                    width: `${100 + i * 50}px`,
-                    height: `${100 + i * 50}px`,
-                    left: '50%',
-                    top: '50%',
-                  }}
-                  initial={{ 
-                    x: '-50%', 
-                    y: '-50%', 
-                    scale: 0,
-                    opacity: 0 
-                  }}
-                  animate={{ 
-                    x: '-50%', 
-                    y: '-50%', 
-                    scale: 1,
-                    opacity: 0.3 - i * 0.02 
-                  }}
-                  transition={{ 
-                    delay: i * 0.05,
-                    duration: 0.6,
-                    ease: 'easeOut'
-                  }}
-                />
-              ))}
-            </div>
-            
-            {/* Floating particles - pre-computed for SSR safety */}
-            {[
-              { left: 5, top: 10, delay: 0.35 }, { left: 15, top: 25, delay: 0.52 },
-              { left: 25, top: 5, delay: 0.41 }, { left: 35, top: 40, delay: 0.68 },
-              { left: 45, top: 15, delay: 0.33 }, { left: 55, top: 60, delay: 0.57 },
-              { left: 65, top: 30, delay: 0.44 }, { left: 75, top: 75, delay: 0.71 },
-              { left: 85, top: 20, delay: 0.38 }, { left: 95, top: 55, delay: 0.62 },
-              { left: 10, top: 85, delay: 0.48 }, { left: 20, top: 45, delay: 0.55 },
-              { left: 30, top: 70, delay: 0.42 }, { left: 40, top: 35, delay: 0.67 },
-              { left: 50, top: 90, delay: 0.39 }, { left: 60, top: 10, delay: 0.58 },
-              { left: 70, top: 65, delay: 0.45 }, { left: 80, top: 40, delay: 0.72 },
-              { left: 90, top: 80, delay: 0.36 }, { left: 12, top: 55, delay: 0.53 },
-              { left: 22, top: 8, delay: 0.46 }, { left: 32, top: 62, delay: 0.69 },
-              { left: 42, top: 28, delay: 0.37 }, { left: 52, top: 78, delay: 0.56 },
-              { left: 62, top: 42, delay: 0.43 }, { left: 72, top: 92, delay: 0.66 },
-              { left: 82, top: 18, delay: 0.49 }, { left: 92, top: 48, delay: 0.64 },
-              { left: 8, top: 32, delay: 0.51 }, { left: 18, top: 72, delay: 0.47 }
-            ].map((particle, i) => (
-              <motion.div
-                key={`particle-${i}`}
-                className="absolute w-2 h-2 rounded-full bg-yellow-400/60"
+              transition={{ duration: 0.8 }}
+            >
+              {/* 2. SAR Grid/Coordinate Overlay */}
+              <div
+                className="absolute inset-0 opacity-20"
                 style={{
-                  left: `${particle.left}%`,
-                  top: `${particle.top}%`,
-                }}
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ 
-                  scale: [0, 1, 0],
-                  opacity: [0, 1, 0],
-                  y: [0, -100]
-                }}
-                transition={{ 
-                  delay: particle.delay,
-                  duration: 2,
-                  ease: 'easeOut'
+                  backgroundImage: `radial-gradient(circle at 1px 1px, white 1px, transparent 0)`,
+                  backgroundSize: '40px 40px'
                 }}
               />
-            ))}
-            
-            {/* Radar sweep effect */}
-            <motion.div
-              className="absolute inset-0"
-              style={{
-                background: 'conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.1) 30deg, transparent 60deg)'
-              }}
-              animate={{ rotate: 360 }}
-              transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-            />
-            
-            {/* Main content */}
-            <div className="relative z-10 text-center">
-              {/* Logo with pulse effect */}
               <motion.div
-                className="w-32 h-32 mx-auto mb-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-2xl"
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ 
-                  type: 'spring', 
-                  stiffness: 200, 
-                  damping: 15,
-                  delay: 0.2 
-                }}
+                className="absolute inset-0 border-[1px] border-white/5"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0.1, 0.2, 0.1] }}
+                transition={{ duration: 4, repeat: Infinity }}
+              />
+
+              {/* 3. Radar Sweep Effect */}
+              <motion.div
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150vmax] h-[150vmax]"
                 style={{
-                  boxShadow: loginSuccessRole === 'STAF' 
-                    ? '0 0 60px rgba(34, 197, 94, 0.8), 0 0 100px rgba(34, 197, 94, 0.4)'
-                    : '0 0 60px rgba(249, 115, 22, 0.8), 0 0 100px rgba(249, 115, 22, 0.4)'
+                  background: 'conic-gradient(from 0deg, rgba(255,255,255,0.15) 0deg, transparent 60deg, transparent 360deg)'
                 }}
-              >
+                animate={{ rotate: 360 }}
+                transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+              />
+
+              {/* 4. Scanning Line */}
+              <motion.div
+                className="absolute inset-x-0 h-[2px] bg-white/30 z-10 shadow-[0_0_15px_rgba(255,255,255,0.5)]"
+                animate={{ top: ['-10%', '110%'] }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+              />
+            </motion.div>
+
+            {/* Main Content Card */}
+            <motion.div
+              className="relative z-20 flex flex-col items-center justify-center p-12 rounded-[2.5rem] bg-white/5 backdrop-blur-xl border border-white/20 shadow-2xl max-w-lg w-full mx-4"
+              initial={{ scale: 0.8, opacity: 0, y: 50 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 100 }}
+            >
+              {/* Identity Shield with Role-Based Glowing ring */}
+              <div className="relative mb-8">
                 <motion.div
-                  animate={{
-                    boxShadow: loginSuccessRole === 'STAF' 
-                      ? [
-                          '0 0 30px rgba(34, 197, 94, 0.5)',
-                          '0 0 60px rgba(34, 197, 94, 0.8)',
-                          '0 0 30px rgba(34, 197, 94, 0.5)'
-                        ]
-                      : [
-                          '0 0 30px rgba(249, 115, 22, 0.5)',
-                          '0 0 60px rgba(249, 115, 22, 0.8)',
-                          '0 0 30px rgba(249, 115, 22, 0.5)'
-                        ]
-                  }}
-                  transition={{ duration: 1, repeat: Infinity }}
-                  className={`w-full h-full rounded-full flex items-center justify-center ${
-                    loginSuccessRole === 'STAF' 
-                      ? 'bg-gradient-to-br from-green-500 to-emerald-600' 
-                      : 'bg-gradient-to-br from-orange-500 to-red-600'
-                  }`}
+                  className={`absolute -inset-6 rounded-full blur-2xl opacity-50 ${loginSuccessRole === 'ADMIN' ? 'bg-red-500' : loginSuccessRole === 'STAF' ? 'bg-green-500' : 'bg-purple-500'}`}
+                  animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
+                <motion.div
+                  className={`w-28 h-28 rounded-full flex items-center justify-center border-4 border-white/30 ${loginSuccessRole === 'ADMIN' ? 'bg-red-600' : loginSuccessRole === 'STAF' ? 'bg-green-600' : 'bg-purple-600'}`}
+                  initial={{ rotate: -90 }}
+                  animate={{ rotate: 0 }}
+                  transition={{ duration: 0.8, type: 'spring' }}
                 >
-                  <Shield className="w-16 h-16 text-white" />
+                  <Shield className="w-14 h-14 text-white drop-shadow-lg" />
                 </motion.div>
-              </motion.div>
-              
-              {/* Success icon */}
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ 
-                  type: 'spring', 
-                  stiffness: 300, 
-                  delay: 0.4 
-                }}
-                className="mb-6"
-              >
-                <div className="w-20 h-20 mx-auto rounded-full bg-green-500 flex items-center justify-center shadow-lg shadow-green-500/50">
-                  <motion.div
-                    initial={{ scale: 0, rotate: -45 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={{ delay: 0.6, type: 'spring' }}
-                  >
-                    <CheckCircle className="w-12 h-12 text-white" />
-                  </motion.div>
-                </div>
-              </motion.div>
-              
-              {/* Welcome text */}
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-              >
-                <motion.h2 
-                  className="text-4xl font-bold text-white mb-2"
-                  animate={{ 
-                    textShadow: [
-                      '0 0 10px rgba(255,255,255,0.5)',
-                      '0 0 30px rgba(255,255,255,0.8)',
-                      '0 0 10px rgba(255,255,255,0.5)'
-                    ]
-                  }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                >
-                  LOGIN BERHASIL!
-                </motion.h2>
-                
-                <motion.p 
-                  className={`text-xl mb-4 ${
-                    loginSuccessRole === 'STAF' ? 'text-green-100' : 'text-orange-100'
-                  }`}
+              </div>
+
+              {/* Animated Text Section */}
+              <div className="text-center space-y-4">
+                <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: 0.7 }}
+                  transition={{ delay: 0.4 }}
                 >
-                  Selamat Datang,
-                </motion.p>
-                
+                  <span className={`px-4 py-1 rounded-full text-xs font-bold tracking-widest uppercase mb-4 inline-block ${loginSuccessRole === 'ADMIN' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : loginSuccessRole === 'STAF' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-purple-500/20 text-purple-400 border border-purple-500/30'}`}>
+                    {loginSuccessRole || 'USER'} ACCESS GRANTED
+                  </span>
+                  <h2 className="text-5xl font-black text-white tracking-tighter mb-2">
+                    LOGIN <span className={loginSuccessRole === 'ADMIN' ? 'text-red-500' : loginSuccessRole === 'STAF' ? 'text-green-500' : 'text-purple-500'}>SUKSES!</span>
+                  </h2>
+                </motion.div>
+
                 <motion.div
-                  className="inline-block px-8 py-3 bg-white/20 backdrop-blur-sm rounded-xl border border-white/30"
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ 
-                    type: 'spring', 
-                    stiffness: 200, 
-                    delay: 0.8 
-                  }}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 }}
+                  className="space-y-1"
                 >
-                  <p className="text-2xl font-bold text-yellow-300">
+                  <p className="text-white/60 text-lg">Selamat Datang,</p>
+                  <p className="text-3xl font-bold text-white tracking-tight">
                     {loginSuccessName}
                   </p>
                 </motion.div>
-              </motion.div>
-              
-              {/* BASARNAS branding */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1 }}
-                className="mt-8"
-              >
-                <p className={`text-sm font-medium ${
-                  loginSuccessRole === 'STAF' ? 'text-green-200' : 'text-orange-200'
-                }`}>
-                  DIREKTORAT KESIAPSIAGAAN
-                </p>
-                <p className="text-white/80 text-xs mt-1">
-                  BADAN SAR NASIONAL
-                </p>
-              </motion.div>
-              
-              {/* Loading dots */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1.2 }}
-                className="mt-8 flex items-center justify-center gap-2"
-              >
-                <motion.span
-                  className="w-2 h-2 rounded-full bg-white"
-                  animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
-                  transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
-                />
-                <motion.span
-                  className="w-2 h-2 rounded-full bg-white"
-                  animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
-                  transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
-                />
-                <motion.span
-                  className="w-2 h-2 rounded-full bg-white"
-                  animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
-                  transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }}
-                />
-              </motion.div>
+
+                {/* BASARNAS Indicator */}
+                <motion.div
+                  className="pt-6 border-t border-white/10 mt-6"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 1 }}
+                >
+                  <div className="flex items-center justify-center gap-3">
+                    <motion.div
+                      animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
+                      transition={{ repeat: Infinity, duration: 2 }}
+                      className={`w-2 h-2 rounded-full ${loginSuccessRole === 'ADMIN' ? 'bg-red-500' : loginSuccessRole === 'STAF' ? 'bg-green-500' : 'bg-purple-500'}`}
+                    />
+                    <p className="text-xs font-semibold tracking-[0.2em] text-white/50 uppercase">
+                      DIREKTORAT KESIAPSIAGAAN
+                    </p>
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+
+            {/* Side Coordinates Decoration */}
+            <div className="absolute left-8 top-1/2 -translate-y-1/2 hidden lg:flex flex-col gap-12">
+              {[0, 1, 2].map(i => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 0.3, x: 0 }}
+                  transition={{ delay: 1.2 + i * 0.1 }}
+                  className="text-[10px] font-mono text-white/40 rotate-90 whitespace-nowrap"
+                >
+                  LAT: 06° 07' {12 + i * 5}" S / LONG: 106° 51' {34 + i * 8}" E
+                </motion.div>
+              ))}
             </div>
-            
-            {/* Corner decorations */}
-            <motion.div
-              className={`absolute top-8 left-8 w-24 h-24 border-l-4 border-t-4 rounded-tl-3xl ${
-                loginSuccessRole === 'STAF' ? 'border-green-400/50' : 'border-orange-400/50'
-              }`}
-              initial={{ opacity: 0, x: -50, y: -50 }}
-              animate={{ opacity: 1, x: 0, y: 0 }}
-              transition={{ delay: 0.3 }}
-            />
-            <motion.div
-              className={`absolute top-8 right-8 w-24 h-24 border-r-4 border-t-4 rounded-tr-3xl ${
-                loginSuccessRole === 'STAF' ? 'border-green-400/50' : 'border-orange-400/50'
-              }`}
-              initial={{ opacity: 0, x: 50, y: -50 }}
-              animate={{ opacity: 1, x: 0, y: 0 }}
-              transition={{ delay: 0.3 }}
-            />
-            <motion.div
-              className={`absolute bottom-8 left-8 w-24 h-24 border-l-4 border-b-4 rounded-bl-3xl ${
-                loginSuccessRole === 'STAF' ? 'border-green-400/50' : 'border-orange-400/50'
-              }`}
-              initial={{ opacity: 0, x: -50, y: 50 }}
-              animate={{ opacity: 1, x: 0, y: 0 }}
-              transition={{ delay: 0.3 }}
-            />
-            <motion.div
-              className={`absolute bottom-8 right-8 w-24 h-24 border-r-4 border-b-4 rounded-br-3xl ${
-                loginSuccessRole === 'STAF' ? 'border-green-400/50' : 'border-orange-400/50'
-              }`}
-              initial={{ opacity: 0, x: 50, y: 50 }}
-              animate={{ opacity: 1, x: 0, y: 0 }}
-              transition={{ delay: 0.3 }}
-            />
           </motion.div>
         ) : null}
       </AnimatePresence>
-      
+
       {/* Header */}
-      <motion.header 
+      <motion.header
         className="relative z-20 glass-dark text-white shadow-2xl sticky top-0 no-print"
         initial={{ y: -100 }}
         animate={{ y: 0 }}
@@ -4852,15 +4400,15 @@ export default function ESOPApp() {
       >
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="icon"
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="text-white hover:bg-white/10"
             >
               {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </Button>
-            <motion.div 
+            <motion.div
               className="flex items-center gap-4"
               initial={{ opacity: 0, x: -50 }}
               animate={{ opacity: 1, x: 0 }}
@@ -4876,8 +4424,8 @@ export default function ESOPApp() {
             </motion.div>
           </div>
           <div className="flex items-center gap-4">
-            <StorageStatus 
-              compact 
+            <StorageStatus
+              compact
               syncStatus={syncStatus}
               lastSyncResult={lastSyncResult}
               onBackup={handleAutoBackup}
@@ -4886,7 +4434,7 @@ export default function ESOPApp() {
               isDiagnosing={diagnosticLoading}
               userRole={user?.role}
             />
-            
+
             {/* Active Edit Session Indicator */}
             {desktopEditSessionToken && excelEditData && (
               <motion.div
@@ -4909,7 +4457,7 @@ export default function ESOPApp() {
                 </Button>
               </motion.div>
             )}
-            
+
             {/* User Menu Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -4945,14 +4493,14 @@ export default function ESOPApp() {
           </div>
         </div>
       </motion.header>
-      
+
       <div className="flex flex-1 overflow-hidden relative z-10">
         {/* Sidebar */}
-        <motion.aside 
+        <motion.aside
           className={`relative ${sidebarOpen ? 'w-64' : 'w-0'} text-white transition-all duration-300 overflow-hidden no-print flex flex-col shrink-0 ${syncStatus.isSyncing ? 'syncing-sidebar' : ''}`}
-          style={{ 
-            position: 'sticky', 
-            top: 0, 
+          style={{
+            position: 'sticky',
+            top: 0,
             height: 'calc(100vh - 60px)',
             backgroundImage: 'url(/sidebar-bg.jpg)',
             backgroundSize: 'cover',
@@ -4963,9 +4511,9 @@ export default function ESOPApp() {
         >
           {/* Dark overlay with opacity for background visibility */}
           <div className="absolute inset-0 bg-gray-900/70" />
-          
+
           {/* Navigation */}
-          <nav className="relative z-10 p-4 space-y-2 flex-1">
+          <nav className="relative z-10 py-4 space-y-1 flex-1">
             {menuItems.filter(item => item.roles.includes(user?.role || '')).map((item, index) => (
               <motion.div
                 key={item.id}
@@ -4975,7 +4523,7 @@ export default function ESOPApp() {
               >
                 <Button
                   variant={currentPage === item.id ? 'default' : 'ghost'}
-                  className={`w-full justify-start gap-3 btn-sar ${currentPage === item.id ? 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-500/30' : 'text-gray-300 hover:bg-white/10 hover:text-white'}`}
+                  className={`w-full justify-start gap-4 px-6 py-6 rounded-none border-l-4 transition-all duration-200 ${currentPage === item.id ? 'border-orange-500 bg-gradient-to-r from-orange-500/20 to-transparent text-white' : 'border-transparent text-gray-300 hover:border-gray-400 hover:bg-white/10 hover:text-white'}`}
                   onClick={() => handleNavigation(item.id)}
                 >
                   <item.icon className={`w-5 h-5 ${syncStatus.isSyncing ? 'animate-spin-slow' : ''}`} />
@@ -4990,14 +4538,14 @@ export default function ESOPApp() {
                       {stats.totalPublikMenunggu}
                     </motion.span>
                   )}
-                  {/* Notification badge for Arsip - show if rejected count > seen count */}
-                  {item.id === 'arsip' && stats?.totalPublikDitolak !== undefined && stats.totalPublikDitolak > arsipSeenCount && (
+                  {/* Notification badge for Arsip - show if there are newly rejected files */}
+                  {item.id === 'arsip' && stats?.totalPublikDitolakBaru !== undefined && stats.totalPublikDitolakBaru > 0 && (
                     <motion.span
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
-                      className="ml-auto min-w-[20px] h-5 px-1.5 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg"
+                      className="ml-auto min-w-[20px] h-5 px-1.5 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg animate-pulse"
                     >
-                      {stats.totalPublikDitolak - arsipSeenCount}
+                      {stats.totalPublikDitolakBaru}
                     </motion.span>
                   )}
                 </Button>
@@ -5030,7 +4578,7 @@ export default function ESOPApp() {
             )}
           </AnimatePresence>
         </motion.aside>
-        
+
         {/* Main Content */}
         <main className="flex-1 p-6 overflow-y-auto" style={{ height: 'calc(100vh - 60px)' }}>
           <AnimatePresence mode="popLayout">
@@ -5047,7 +4595,7 @@ export default function ESOPApp() {
                 {!stats ? (
                   <div className="flex items-center justify-center h-64">
                     <div className="text-center">
-                      <motion.div 
+                      <motion.div
                         className="sar-loading mx-auto mb-4"
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
@@ -5057,23 +4605,41 @@ export default function ESOPApp() {
                   </div>
                 ) : (
                   <>
-                    <motion.div 
-                      className="flex items-center justify-between"
+                    <motion.div
+                      className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
                       variants={fadeInUp}
                     >
                       <ShimmerTitle subtitle="Overview sistem katalog SOP dan IK">Laporan Analitik</ShimmerTitle>
-                      <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => handleExport('xlsx')} className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10">
-                          <FileSpreadsheet className="w-4 h-4 mr-2" />
-                          Export Excel
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => handleExport('xlsx')}
+                          disabled={exportingXlsx}
+                          className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10 shadow-lg shadow-orange-500/5"
+                        >
+                          {exportingXlsx ? (
+                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <FileSpreadsheet className="w-4 h-4 mr-2" />
+                          )}
+                          {exportingXlsx ? 'Memproses...' : 'Export Excel'}
                         </Button>
-                        <Button variant="outline" onClick={() => handleExport('pdf')} className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10">
-                          <FileIcon className="w-4 h-4 mr-2" />
-                          Export PDF
+                        <Button
+                          variant="outline"
+                          onClick={() => handleExport('pdf')}
+                          disabled={exportingPdf}
+                          className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10 shadow-lg shadow-orange-500/5"
+                        >
+                          {exportingPdf ? (
+                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <FileIcon className="w-4 h-4 mr-2" />
+                          )}
+                          {exportingPdf ? 'Memproses...' : 'Export PDF'}
                         </Button>
                       </div>
                     </motion.div>
-                    
+
                     {/* R2 Setup Guide */}
                     {r2Status && r2Status.status === 'bucket_not_found' && r2Status.setupInstructions && (
                       <motion.div variants={fadeInUp}>
@@ -5102,9 +4668,9 @@ export default function ESOPApp() {
                         </Card>
                       </motion.div>
                     )}
-                    
+
                     {/* Stats Cards */}
-                    <motion.div 
+                    <motion.div
                       className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
                       variants={staggerContainer}
                     >
@@ -5113,19 +4679,20 @@ export default function ESOPApp() {
                       <StatCard title="Total Preview" value={stats.totalPreviews || 0} icon={Eye} color="cyan" delay={0.2} />
                       <StatCard title="Total Download" value={stats.totalDownloads || 0} icon={Download} color="purple" delay={0.3} />
                     </motion.div>
-                    
+
                     {/* Status Cards */}
-                    <motion.div 
-                      className="grid grid-cols-1 md:grid-cols-3 gap-4"
+                    <motion.div
+                      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
                       variants={staggerContainer}
                     >
                       <StatCard title="Aktif" value={stats.totalAktif} icon={CheckCircle} color="green" delay={0.4} />
                       <StatCard title="Review" value={stats.totalReview} icon={Clock} color="yellow" delay={0.5} />
                       <StatCard title="Kadaluarsa" value={stats.totalKadaluarsa} icon={XCircle} color="red" delay={0.6} />
+                      <StatCard title="Total Lingkup" value={stats.byLingkup?.length || 0} icon={Globe} color="blue" delay={0.7} />
                     </motion.div>
-                    
+
                     {/* Charts */}
-                    <motion.div 
+                    <motion.div
                       className="grid grid-cols-1 lg:grid-cols-2 gap-6"
                       variants={fadeInUp}
                     >
@@ -5139,9 +4706,9 @@ export default function ESOPApp() {
                               <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" strokeOpacity={0.3} />
                               <XAxis dataKey="tahun" stroke="#1e3a5f" tick={{ fill: '#1e3a5f', fontWeight: 600 }} />
                               <YAxis stroke="#1e3a5f" tick={{ fill: '#1e3a5f', fontWeight: 600 }} />
-                              <Tooltip 
-                                contentStyle={{ 
-                                  backgroundColor: 'rgba(255, 255, 255, 0.98)', 
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: 'rgba(255, 255, 255, 0.98)',
                                   border: '2px solid #f97316',
                                   borderRadius: '12px',
                                   boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
@@ -5160,7 +4727,7 @@ export default function ESOPApp() {
                           </ResponsiveContainer>
                         </CardContent>
                       </Card>
-                      
+
                       <Card className="glass-card border-0 shadow-xl">
                         <CardHeader>
                           <CardTitle className="text-lg text-blue-900 font-bold">Distribusi per Kategori</CardTitle>
@@ -5180,12 +4747,12 @@ export default function ESOPApp() {
                                 strokeWidth={2}
                               >
                                 {stats.byKategori.map((_, index) => (
-                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                  <Cell key={`cell - ${index} `} fill={COLORS[index % COLORS.length]} />
                                 ))}
                               </Pie>
-                              <Tooltip 
-                                contentStyle={{ 
-                                  backgroundColor: 'rgba(255, 255, 255, 0.98)', 
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: 'rgba(255, 255, 255, 0.98)',
                                   border: '2px solid #f97316',
                                   borderRadius: '12px',
                                   boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
@@ -5193,9 +4760,9 @@ export default function ESOPApp() {
                                 itemStyle={{ color: '#1e3a5f', fontWeight: 600 }}
                                 labelStyle={{ color: '#f97316', fontWeight: 700 }}
                               />
-                              <Legend 
-                                layout="vertical" 
-                                align="right" 
+                              <Legend
+                                layout="vertical"
+                                align="right"
                                 verticalAlign="middle"
                                 formatter={(value, entry) => <span className="text-blue-900 font-semibold">{value} ({entry.payload?.count || 0})</span>}
                               />
@@ -5203,7 +4770,52 @@ export default function ESOPApp() {
                           </ResponsiveContainer>
                         </CardContent>
                       </Card>
-                      
+
+
+
+                      <Card className="glass-card border-0 shadow-xl">
+                        <CardHeader>
+                          <CardTitle className="text-lg text-blue-900 font-bold">Distribusi per Lingkup</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                              <Pie
+                                data={stats.byLingkup || []}
+                                dataKey="count"
+                                nameKey="lingkup"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={80}
+                                labelLine={false}
+                                stroke="#1e3a5f"
+                                strokeWidth={2}
+                              >
+                                {(stats.byLingkup || []).map((_, index) => (
+                                  <Cell key={`cell - ${index} `} fill={COLORS[(index + 3) % COLORS.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                                  border: '2px solid #f97316',
+                                  borderRadius: '12px',
+                                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+                                }}
+                                itemStyle={{ color: '#1e3a5f', fontWeight: 600 }}
+                                labelStyle={{ color: '#f97316', fontWeight: 700 }}
+                              />
+                              <Legend
+                                layout="vertical"
+                                align="right"
+                                verticalAlign="middle"
+                                formatter={(value, entry) => <span className="text-blue-900 font-semibold">{value} ({entry.payload?.count || 0})</span>}
+                              />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+
                       <Card className="bg-white border-2 border-orange-200 shadow-xl">
                         <CardHeader>
                           <CardTitle className="text-lg text-blue-900 font-bold">Distribusi per Jenis</CardTitle>
@@ -5225,9 +4837,9 @@ export default function ESOPApp() {
                                 <Cell fill="#f97316" />
                                 <Cell fill="#eab308" />
                               </Pie>
-                              <Tooltip 
-                                contentStyle={{ 
-                                  backgroundColor: 'rgba(255, 255, 255, 0.98)', 
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: 'rgba(255, 255, 255, 0.98)',
                                   border: '2px solid #f97316',
                                   borderRadius: '12px',
                                   boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
@@ -5235,9 +4847,9 @@ export default function ESOPApp() {
                                 itemStyle={{ color: '#1e3a5f', fontWeight: 600 }}
                                 labelStyle={{ color: '#f97316', fontWeight: 700 }}
                               />
-                              <Legend 
-                                layout="vertical" 
-                                align="right" 
+                              <Legend
+                                layout="vertical"
+                                align="right"
                                 verticalAlign="middle"
                                 formatter={(value, entry) => <span className="text-blue-900 font-semibold">{value} ({entry.payload?.count || 0})</span>}
                               />
@@ -5245,7 +4857,7 @@ export default function ESOPApp() {
                           </ResponsiveContainer>
                         </CardContent>
                       </Card>
-                      
+
                       <Card className="bg-white border-2 border-orange-200 shadow-xl">
                         <CardHeader>
                           <CardTitle className="text-lg text-blue-900 font-bold">Distribusi per Status</CardTitle>
@@ -5256,9 +4868,9 @@ export default function ESOPApp() {
                               <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" strokeOpacity={0.3} />
                               <XAxis dataKey="status" stroke="#1e3a5f" tick={{ fill: '#1e3a5f', fontWeight: 600 }} />
                               <YAxis stroke="#1e3a5f" tick={{ fill: '#1e3a5f', fontWeight: 600 }} />
-                              <Tooltip 
-                                contentStyle={{ 
-                                  backgroundColor: 'rgba(255, 255, 255, 0.98)', 
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: 'rgba(255, 255, 255, 0.98)',
                                   border: '2px solid #eab308',
                                   borderRadius: '12px',
                                   boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
@@ -5278,9 +4890,9 @@ export default function ESOPApp() {
                         </CardContent>
                       </Card>
                     </motion.div>
-                    
+
                     {/* Recent Activity */}
-                    <motion.div 
+                    <motion.div
                       className="grid grid-cols-1 lg:grid-cols-2 gap-6"
                       variants={fadeInUp}
                     >
@@ -5295,8 +4907,8 @@ export default function ESOPApp() {
                           <ScrollArea className="h-64">
                             <div className="space-y-3">
                               {stats.recentUploads.map((sop, index) => (
-                                <motion.div 
-                                  key={sop.id} 
+                                <motion.div
+                                  key={sop.id}
                                   className="flex items-center justify-between p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
                                   initial={{ opacity: 0, x: -20 }}
                                   animate={{ opacity: 1, x: 0 }}
@@ -5317,7 +4929,7 @@ export default function ESOPApp() {
                           </ScrollArea>
                         </CardContent>
                       </Card>
-                      
+
                       <Card className="bg-white border-2 border-orange-200 shadow-xl">
                         <CardHeader>
                           <CardTitle className="text-lg text-blue-900 font-bold flex items-center gap-2">
@@ -5329,8 +4941,8 @@ export default function ESOPApp() {
                           <ScrollArea className="h-64">
                             <div className="space-y-3">
                               {stats.recentLogs.map((log, index) => (
-                                <motion.div 
-                                  key={log.id} 
+                                <motion.div
+                                  key={log.id}
                                   className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg"
                                   initial={{ opacity: 0, x: -20 }}
                                   animate={{ opacity: 1, x: 0 }}
@@ -5349,9 +4961,9 @@ export default function ESOPApp() {
                         </CardContent>
                       </Card>
                     </motion.div>
-                    
+
                     {/* Top Documents */}
-                    <motion.div 
+                    <motion.div
                       className="grid grid-cols-1 lg:grid-cols-2 gap-6"
                       variants={fadeInUp}
                     >
@@ -5366,8 +4978,8 @@ export default function ESOPApp() {
                           {stats.topViewed && stats.topViewed.length > 0 ? (
                             <div className="space-y-3">
                               {stats.topViewed.map((sop, index) => (
-                                <motion.div 
-                                  key={sop.id} 
+                                <motion.div
+                                  key={sop.id}
                                   className="flex items-center gap-3 p-3 bg-cyan-50 rounded-lg"
                                   initial={{ opacity: 0, y: 10 }}
                                   animate={{ opacity: 1, y: 0 }}
@@ -5394,7 +5006,7 @@ export default function ESOPApp() {
                           )}
                         </CardContent>
                       </Card>
-                      
+
                       <Card className="bg-white border-2 border-orange-200 shadow-xl">
                         <CardHeader>
                           <CardTitle className="text-lg text-blue-900 font-bold flex items-center gap-2">
@@ -5406,8 +5018,8 @@ export default function ESOPApp() {
                           {stats.topDownloaded && stats.topDownloaded.length > 0 ? (
                             <div className="space-y-3">
                               {stats.topDownloaded.map((sop, index) => (
-                                <motion.div 
-                                  key={sop.id} 
+                                <motion.div
+                                  key={sop.id}
                                   className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg"
                                   initial={{ opacity: 0, y: 10 }}
                                   animate={{ opacity: 1, y: 0 }}
@@ -5439,7 +5051,7 @@ export default function ESOPApp() {
                 )}
               </motion.div>
             )}
-            
+
             {/* Katalog SOP */}
             {currentPage === 'katalog' && (
               <motion.div
@@ -5467,7 +5079,7 @@ export default function ESOPApp() {
                         <div className="relative bg-gradient-to-br from-orange-500 via-orange-600 to-red-700 p-5 text-white overflow-hidden">
                           {/* Animated background */}
                           <div className="absolute inset-0 overflow-hidden">
-                            <motion.div 
+                            <motion.div
                               className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[250px] h-[250px] rounded-full opacity-20"
                               style={{
                                 background: 'conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.2) 30deg, transparent 60deg)'
@@ -5476,9 +5088,9 @@ export default function ESOPApp() {
                               transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
                             />
                           </div>
-                          
+
                           <div className="relative z-10 flex items-center gap-4">
-                            <motion.div 
+                            <motion.div
                               className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-xl border border-white/20"
                               initial={{ scale: 0, rotate: -180 }}
                               animate={{ scale: 1, rotate: 0 }}
@@ -5498,7 +5110,7 @@ export default function ESOPApp() {
                             </div>
                           </div>
                         </div>
-                        
+
                         {/* Form Content */}
                         <form onSubmit={(e) => handleUpload(e)} className="p-5 space-y-4 bg-gradient-to-b from-white via-orange-50/10 to-white">
                           {/* Section: Informasi Dokumen */}
@@ -5509,12 +5121,12 @@ export default function ESOPApp() {
                               </div>
                               <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Informasi Dokumen</span>
                             </div>
-                            
+
                             <div className="space-y-1.5">
                               <Label className="text-xs font-semibold text-gray-600 flex items-center gap-1">
                                 Judul SOP/IK <span className="text-red-500">*</span>
                               </Label>
-                              <Input 
+                              <Input
                                 value={uploadForm.judul}
                                 onChange={(e) => setUploadForm({ ...uploadForm, judul: e.target.value })}
                                 placeholder="Masukkan judul dokumen"
@@ -5522,7 +5134,7 @@ export default function ESOPApp() {
                                 className="h-10 border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 placeholder:text-gray-400 rounded-xl text-sm bg-white shadow-sm"
                               />
                             </div>
-                            
+
                             <div className="grid grid-cols-2 gap-3">
                               <div className="space-y-1.5">
                                 <Label className="text-xs font-semibold text-gray-600">Kategori</Label>
@@ -5532,6 +5144,17 @@ export default function ESOPApp() {
                                   </SelectTrigger>
                                   <SelectContent className="rounded-xl">
                                     {KATEGORI_OPTIONS.map(k => <SelectItem key={k} value={k} className="text-xs">{k}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label className="text-xs font-semibold text-gray-600">Lingkup</Label>
+                                <Select value={uploadForm.lingkup} onValueChange={(v) => setUploadForm({ ...uploadForm, lingkup: v })}>
+                                  <SelectTrigger className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-xs bg-white shadow-sm">
+                                    <SelectValue placeholder="Pilih lingkup" />
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-xl">
+                                    {LINGKUP_OPTIONS.map(l => <SelectItem key={l} value={l} className="text-xs">{l}</SelectItem>)}
                                   </SelectContent>
                                 </Select>
                               </div>
@@ -5547,13 +5170,13 @@ export default function ESOPApp() {
                                 </Select>
                               </div>
                             </div>
-                            
+
                             <div className="grid grid-cols-2 gap-3">
                               <div className="space-y-1.5">
                                 <Label className="text-xs font-semibold text-gray-600">Tahun</Label>
-                                <Input 
+                                <Input
                                   type="number"
-                                  value={uploadForm.tahun}
+                                  value={uploadForm.tahun || ''}
                                   onChange={(e) => setUploadForm({ ...uploadForm, tahun: parseInt(e.target.value) })}
                                   required
                                   className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-xs bg-white shadow-sm text-center"
@@ -5572,7 +5195,7 @@ export default function ESOPApp() {
                               </div>
                             </div>
                           </div>
-                          
+
                           {/* Section: Upload File */}
                           <div className="space-y-3">
                             <div className="flex items-center gap-2 pb-2 border-b border-orange-100">
@@ -5581,14 +5204,13 @@ export default function ESOPApp() {
                               </div>
                               <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Upload File</span>
                             </div>
-                            
+
                             {/* Custom File Upload Dropzone */}
-                            <div 
-                              className={`relative border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all duration-200 overflow-hidden ${
-                                uploadForm.file 
-                                  ? 'border-green-400 bg-green-50' 
-                                  : 'border-orange-300 bg-orange-50/50 hover:border-orange-500 hover:bg-orange-50'
-                              }`}
+                            <div
+                              className={`relative border - 2 border - dashed rounded - xl p - 5 text - center cursor - pointer transition - all duration - 200 overflow - hidden ${uploadForm.file
+                                ? 'border-green-400 bg-green-50'
+                                : 'border-orange-300 bg-orange-50/50 hover:border-orange-500 hover:bg-orange-50'
+                                } `}
                               onClick={() => document.getElementById('file-input')?.click()}
                               onDragOver={(e) => {
                                 e.preventDefault()
@@ -5603,24 +5225,24 @@ export default function ESOPApp() {
                                 }
                               }}
                             >
-                              <input 
+                              <input
                                 id="file-input"
                                 type="file"
                                 accept=".xlsx,.xls,.pdf,.docx,.doc"
                                 className="hidden"
                                 onChange={(e) => setUploadForm({ ...uploadForm, file: e.target.files?.[0] || null })}
                               />
-                              
+
                               {/* Animated background on hover */}
                               {!uploadForm.file && (
-                                <motion.div 
+                                <motion.div
                                   className="absolute inset-0 bg-gradient-to-r from-orange-500/0 via-orange-500/5 to-orange-500/0"
                                   initial={{ x: '-100%' }}
                                   whileHover={{ x: '100%' }}
                                   transition={{ duration: 0.6 }}
                                 />
                               )}
-                              
+
                               {uploadForm.file ? (
                                 <div className="flex items-center justify-center gap-3 relative z-10">
                                   <div className="flex-shrink-0">
@@ -5656,7 +5278,7 @@ export default function ESOPApp() {
                               ) : (
                                 <div className="space-y-3 relative z-10">
                                   <div className="flex justify-center">
-                                    <motion.div 
+                                    <motion.div
                                       className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg"
                                       whileHover={{ scale: 1.05 }}
                                     >
@@ -5675,23 +5297,23 @@ export default function ESOPApp() {
                               )}
                             </div>
                           </div>
-                          
+
                           {/* Action Buttons */}
                           <div className="flex gap-3 pt-2">
-                            <Button 
-                              type="button" 
-                              variant="outline" 
-                              onClick={() => setShowUploadDialog(false)} 
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setShowUploadDialog(false)}
                               className="flex-1 h-10 border-2 border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl font-medium"
                             >
                               Batal
                             </Button>
-                            <Button 
-                              type="submit" 
-                              className="flex-1 h-10 bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 hover:from-orange-600 hover:via-orange-700 hover:to-red-700 text-white shadow-lg shadow-orange-500/30 rounded-xl font-bold relative overflow-hidden" 
+                            <Button
+                              type="submit"
+                              className="flex-1 h-10 bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 hover:from-orange-600 hover:via-orange-700 hover:to-red-700 text-white shadow-lg shadow-orange-500/30 rounded-xl font-bold relative overflow-hidden"
                               disabled={loading}
                             >
-                              <motion.div 
+                              <motion.div
                                 className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
                                 animate={loading ? {} : { x: ['-100%', '100%'] }}
                                 transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
@@ -5720,7 +5342,7 @@ export default function ESOPApp() {
                       </DialogContent>
                     </Dialog>
                   )}
-                  
+
                   {/* Edit SOP Dialog */}
                   <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
                     <DialogContent className="sm:max-w-md bg-white border-0 shadow-2xl overflow-hidden p-0 rounded-2xl" aria-describedby={undefined}>
@@ -5728,7 +5350,7 @@ export default function ESOPApp() {
                       <div className="relative bg-gradient-to-br from-orange-500 via-orange-600 to-red-700 p-5 text-white overflow-hidden">
                         {/* Animated background */}
                         <div className="absolute inset-0 overflow-hidden">
-                          <motion.div 
+                          <motion.div
                             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] h-[200px] rounded-full opacity-20"
                             style={{
                               background: 'conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.2) 30deg, transparent 60deg)'
@@ -5737,9 +5359,9 @@ export default function ESOPApp() {
                             transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
                           />
                         </div>
-                        
+
                         <div className="relative z-10 flex items-center gap-4">
-                          <motion.div 
+                          <motion.div
                             className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-xl border border-white/20"
                             initial={{ scale: 0, rotate: -180 }}
                             animate={{ scale: 1, rotate: 0 }}
@@ -5759,7 +5381,7 @@ export default function ESOPApp() {
                           </div>
                         </div>
                       </div>
-                      
+
                       {/* Form Content */}
                       <form onSubmit={(e) => { e.preventDefault(); handleSaveEdit(); }} className="p-5 space-y-4 bg-gradient-to-b from-white via-orange-50/10 to-white">
                         <div className="space-y-3">
@@ -5769,7 +5391,7 @@ export default function ESOPApp() {
                             </div>
                             <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Informasi Dokumen</span>
                           </div>
-                          
+
                           <div className="space-y-1.5">
                             <Label htmlFor="edit-nomor-sop" className="text-xs font-semibold text-gray-600">No. SOP</Label>
                             <Input
@@ -5780,7 +5402,7 @@ export default function ESOPApp() {
                               className="h-9 border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 rounded-xl text-sm bg-white shadow-sm"
                             />
                           </div>
-                          
+
                           <div className="space-y-1.5">
                             <Label htmlFor="edit-judul" className="text-xs font-semibold text-gray-600">Judul <span className="text-red-500">*</span></Label>
                             <Input
@@ -5790,7 +5412,7 @@ export default function ESOPApp() {
                               className="h-9 border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 rounded-xl text-sm bg-white shadow-sm"
                             />
                           </div>
-                          
+
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1.5">
                               <Label className="text-xs font-semibold text-gray-600">Kategori</Label>
@@ -5801,6 +5423,19 @@ export default function ESOPApp() {
                                 <SelectContent className="rounded-xl">
                                   {KATEGORI_OPTIONS.map(k => (
                                     <SelectItem key={k} value={k} className="text-xs">{k}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs font-semibold text-gray-600">Lingkup</Label>
+                              <Select value={editForm.lingkup} onValueChange={(v) => setEditForm({ ...editForm, lingkup: v })}>
+                                <SelectTrigger className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-xs bg-white shadow-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-xl">
+                                  {LINGKUP_OPTIONS.map(l => (
+                                    <SelectItem key={l} value={l} className="text-xs">{l}</SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
@@ -5819,14 +5454,15 @@ export default function ESOPApp() {
                               </Select>
                             </div>
                           </div>
-                          
+
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1.5">
                               <Label className="text-xs font-semibold text-gray-600">Tahun</Label>
                               <Input
                                 type="number"
-                                value={editForm.tahun}
-                                onChange={(e) => setEditForm({ ...editForm, tahun: parseInt(e.target.value) || new Date().getFullYear() })}
+                                value={editForm.tahun || ''}
+                                onChange={(e) => setEditForm({ ...editForm, tahun: parseInt(e.target.value) })}
+                                required
                                 className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-sm bg-white shadow-sm text-center"
                               />
                             </div>
@@ -5845,22 +5481,22 @@ export default function ESOPApp() {
                             </div>
                           </div>
                         </div>
-                        
+
                         {/* Action Buttons */}
                         <div className="flex gap-3 pt-2">
-                          <Button 
-                            type="button" 
-                            variant="outline" 
-                            onClick={() => setShowEditDialog(false)} 
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setShowEditDialog(false)}
                             className="flex-1 h-10 border-2 border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl font-medium"
                           >
                             Batal
                           </Button>
-                          <Button 
-                            type="submit" 
+                          <Button
+                            type="submit"
                             className="flex-1 h-10 bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 hover:from-orange-600 hover:via-orange-700 hover:to-red-700 text-white shadow-lg shadow-orange-500/30 rounded-xl font-bold relative overflow-hidden"
                           >
-                            <motion.div 
+                            <motion.div
                               className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
                               animate={{ x: ['-100%', '100%'] }}
                               transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
@@ -5874,262 +5510,229 @@ export default function ESOPApp() {
                       </form>
                     </DialogContent>
                   </Dialog>
-                  
+
                   {/* Excel Edit Dialog - Microsoft 365 (No User Login Required) */}
                   <Dialog open={showExcelEditDialog} onOpenChange={setShowExcelEditDialog}>
-                    <DialogContent className="sm:max-w-lg bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
-                      <DialogHeader>
-                        <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                          <FileSpreadsheet className="w-5 h-5 text-green-600" />
-                          Edit File Excel Online
-                        </DialogTitle>
-                        <DialogDescription className="text-gray-600">
-                          Edit langsung di Excel Online - tidak perlu login Microsoft
-                        </DialogDescription>
-                      </DialogHeader>
-                      
-                      {excelEditData && (
-                        <div className="space-y-4">
-                          {/* File Info */}
-                          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                            <div className="flex items-start gap-3">
-                              <FileSpreadsheet className="w-10 h-10 text-green-600 mt-1" />
-                              <div>
-                                <p className="font-bold text-gray-900">{excelEditData.fileName}</p>
-                                <p className="text-sm text-gray-600">{excelEditData.judul}</p>
-                                <div className="flex gap-2 mt-2">
-                                  <Badge variant="outline" className="text-xs">{excelEditData.jenis}</Badge>
-                                  <Badge variant="outline" className="text-xs">{excelEditData.kategori}</Badge>
-                                </div>
-                              </div>
-                            </div>
+                    <DialogContent className="sm:max-w-lg p-0 overflow-hidden border-0 shadow-2xl bg-gray-950" style={{ borderRadius: '1.25rem' }} aria-describedby={undefined}>
+                      {/* Gradient Header */}
+                      <div className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #1a2744 0%, #0f172a 50%, #1a1a2e 100%)', padding: '28px 28px 24px' }}>
+                        {/* Animated background orbs */}
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                          <motion.div className="absolute -top-6 -right-6 w-32 h-32 rounded-full" style={{ background: 'radial-gradient(circle, rgba(34,197,94,0.2) 0%, transparent 70%)' }} animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 3, repeat: Infinity }} />
+                          <motion.div className="absolute -bottom-4 -left-4 w-24 h-24 rounded-full" style={{ background: 'radial-gradient(circle, rgba(249,115,22,0.15) 0%, transparent 70%)' }} animate={{ scale: [1.2, 1, 1.2] }} transition={{ duration: 4, repeat: Infinity }} />
+                          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+                        </div>
+                        <div className="relative z-10 flex items-center gap-4">
+                          <motion.div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl" style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)', boxShadow: '0 0 30px rgba(34,197,94,0.4)' }} initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}>
+                            <FileSpreadsheet className="w-7 h-7 text-white" />
+                          </motion.div>
+                          <div>
+                            <DialogTitle className="text-xl font-black text-white tracking-tight">Edit Excel Online</DialogTitle>
+                            <DialogDescription className="text-green-400/80 text-sm mt-0.5 font-medium">Microsoft 365 — Tanpa Login</DialogDescription>
                           </div>
-                          
-                          {/* Loading State */}
-                          {excelEditLoading && (
-                            <div className="flex flex-col items-center justify-center py-8">
-                              <Loader2 className="w-8 h-8 text-orange-500 animate-spin mb-3" />
-                              <p className="text-gray-600">Memproses file...</p>
-                              <p className="text-xs text-gray-400 mt-1">Download dari R2, upload ke OneDrive</p>
-                            </div>
-                          )}
-                          
-                          {/* Ready State */}
-                          {!excelEditLoading && excelEditUrl && (
-                            <>
-                              {/* Success Message */}
-                              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                                <div className="flex items-center gap-2 text-green-800">
-                                  <CheckCircle className="w-5 h-5" />
-                                  <span className="font-medium">File siap diedit!</span>
-                                </div>
-                                <p className="text-sm text-green-700 mt-2">
-                                  Klik tombol di bawah untuk membuka Excel Online. Edit file, simpan, lalu kembali ke sini untuk sync ke R2.
-                                </p>
+                        </div>
+                      </div>
+
+                      {/* Body */}
+                      <div className="p-6 space-y-4" style={{ background: 'linear-gradient(180deg, #0f172a 0%, #111827 100%)' }}>
+                        {excelEditData && (
+                          <>
+                            {/* File Info Card */}
+                            <motion.div className="rounded-2xl p-4 flex items-center gap-4" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+                              <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #16a34a, #15803d)' }}>
+                                <FileSpreadsheet className="w-6 h-6 text-white" />
                               </div>
-                              
-                              {/* Instructions */}
-                              <Alert className="bg-blue-50 border-blue-200">
-                                <AlertTriangle className="w-4 h-4 text-blue-600" />
-                                <AlertDescription className="text-blue-800 text-sm">
-                                  <strong>Cara Edit:</strong><br/>
-                                  1. Klik "Buka Excel Online" untuk mulai edit<br/>
-                                  2. Edit file di browser (Excel Online)<br/>
-                                  3. Simpan perubahan (Ctrl+S atau File → Save)<br/>
-                                  4. Kembali ke sini dan klik "Sync ke R2"
-                                </AlertDescription>
-                              </Alert>
-                              
-                              {/* Session Info */}
-                              {excelEditSessionId && (
-                                <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                                  Session: {excelEditSessionId}
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-white truncate text-sm">{excelEditData.fileName}</p>
+                                <p className="text-xs text-gray-400 truncate mt-0.5">{excelEditData.judul}</p>
+                                <div className="flex gap-1.5 mt-2">
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(249,115,22,0.15)', color: '#fb923c', border: '1px solid rgba(249,115,22,0.25)' }}>{excelEditData.jenis}</span>
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.25)' }}>{excelEditData.kategori}</span>
                                 </div>
-                              )}
-                              
-                              {/* Action Buttons */}
-                              <div className="space-y-3">
-                                <Button
-                                  onClick={handleOpenExcelOnline}
-                                  className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
-                                >
-                                  <FileSpreadsheet className="w-4 h-4 mr-2" />
-                                  Buka Excel Online
+                              </div>
+                            </motion.div>
+
+                            {/* Loading State */}
+                            {excelEditLoading && (
+                              <motion.div className="flex flex-col items-center justify-center py-10 rounded-2xl" style={{ background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.15)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                                <motion.div className="w-14 h-14 rounded-full flex items-center justify-center mb-4" style={{ background: 'linear-gradient(135deg, #f97316, #ef4444)', boxShadow: '0 0 30px rgba(249,115,22,0.4)' }} animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}>
+                                  <RefreshCw className="w-6 h-6 text-white" />
+                                </motion.div>
+                                <p className="text-white font-semibold">Memproses file...</p>
+                                <p className="text-xs text-gray-500 mt-1">Download dari R2 → Upload ke OneDrive</p>
+                              </motion.div>
+                            )}
+
+                            {/* Ready State */}
+                            {!excelEditLoading && excelEditUrl && (
+                              <motion.div className="space-y-4" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+                                {/* Ready badge */}
+                                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl" style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                                  <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" style={{ boxShadow: '0 0 8px rgba(34,197,94,0.8)' }} />
+                                  <span className="text-green-300 font-semibold text-sm">File siap diedit via Excel Online</span>
+                                </div>
+
+                                {/* Step guide */}
+                                <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                                  <p className="text-xs font-bold text-indigo-400 uppercase tracking-widest">Cara Edit</p>
+                                  {[
+                                    { step: '1', text: 'Klik "Buka Excel Online" untuk mulai edit', icon: '🚀' },
+                                    { step: '2', text: 'Edit file di browser (Excel Online)', icon: '✏️' },
+                                    { step: '3', text: 'Simpan perubahan (Ctrl+S atau File → Save)', icon: '💾' },
+                                    { step: '4', text: 'Kembali ke sini lalu klik "Sync ke R2"', icon: '☁️' },
+                                  ].map((item) => (
+                                    <div key={item.step} className="flex items-center gap-3">
+                                      <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold" style={{ background: 'rgba(99,102,241,0.3)', color: '#a5b4fc' }}>{item.step}</div>
+                                      <span className="text-sm text-gray-300">{item.icon} {item.text}</span>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {excelEditSessionId && (
+                                  <p className="text-[10px] text-gray-600 font-mono px-2">Session: {excelEditSessionId?.slice(0, 24)}...</p>
+                                )}
+
+                                {/* Action Buttons */}
+                                <Button onClick={handleOpenExcelOnline} className="w-full h-11 font-bold text-sm relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)', boxShadow: '0 4px 20px rgba(34,197,94,0.35)' }}>
+                                  <motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" animate={{ x: ['-100%', '100%'] }} transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }} />
+                                  <span className="relative flex items-center justify-center gap-2">
+                                    <FileSpreadsheet className="w-4 h-4" />
+                                    Buka Excel Online
+                                  </span>
                                 </Button>
-                                
-                                <div className="flex gap-3">
-                                  <Button
-                                    onClick={handleCancelEdit}
-                                    variant="outline"
-                                    className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
-                                  >
-                                    <X className="w-4 h-4 mr-2" />
+
+                                <div className="grid grid-cols-2 gap-3">
+                                  <Button onClick={handleCancelEdit} className="h-10 text-sm font-semibold" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5' }}>
+                                    <X className="w-4 h-4 mr-1.5" />
                                     Batalkan
                                   </Button>
-                                  <Button
-                                    onClick={handleCheckEditStatus}
-                                    variant="outline"
-                                    className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-100"
-                                  >
-                                    <RefreshCw className="w-4 h-4 mr-2" />
+                                  <Button onClick={handleCheckEditStatus} className="h-10 text-sm font-semibold" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#d1d5db' }}>
+                                    <RefreshCw className="w-4 h-4 mr-1.5" />
                                     Cek Status
                                   </Button>
                                 </div>
-                                
-                                <Button
-                                  onClick={handleSyncToR2}
-                                  disabled={excelEditSyncing}
-                                  className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
-                                >
-                                  {excelEditSyncing ? (
-                                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Syncing...</>
-                                  ) : (
-                                    <><Cloud className="w-4 h-4 mr-2" /> Sync ke R2</>
-                                  )}
+
+                                <Button onClick={handleSyncToR2} disabled={excelEditSyncing} className="w-full h-11 font-bold text-sm relative overflow-hidden" style={{ background: excelEditSyncing ? 'rgba(249,115,22,0.3)' : 'linear-gradient(135deg, #f97316, #ef4444)', boxShadow: excelEditSyncing ? 'none' : '0 4px 20px rgba(249,115,22,0.35)' }}>
+                                  {!excelEditSyncing && (<motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" animate={{ x: ['-100%', '100%'] }} transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 0.5 }} />)}
+                                  <span className="relative flex items-center justify-center gap-2">
+                                    {excelEditSyncing ? <><Loader2 className="w-4 h-4 animate-spin" /> Menyinkronkan...</> : <><Cloud className="w-4 h-4" /> Sync ke R2</>}
+                                  </span>
                                 </Button>
-                              </div>
-                            </>
-                          )}
-                          
-                          {/* Error State */}
-                          {!excelEditLoading && !excelEditUrl && (
-                            <div className="text-center py-4">
-                              <AlertTriangle className="w-10 h-10 text-yellow-500 mx-auto mb-3" />
-                              <p className="text-gray-600">Gagal mempersiapkan file untuk editing</p>
-                              <Button
-                                onClick={() => handleOpenExcelEdit(excelEditData.id)}
-                                variant="outline"
-                                className="mt-3"
-                              >
-                                Coba Lagi
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                              </motion.div>
+                            )}
+
+                            {/* Error State */}
+                            {!excelEditLoading && !excelEditUrl && (
+                              <motion.div className="flex flex-col items-center justify-center py-8 rounded-2xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                                <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3" style={{ background: 'rgba(239,68,68,0.2)' }}>
+                                  <AlertTriangle className="w-6 h-6 text-red-400" />
+                                </div>
+                                <p className="text-gray-300 font-medium">Gagal mempersiapkan file</p>
+                                <Button onClick={() => handleOpenExcelEdit(excelEditData.id)} className="mt-4 h-9 text-sm px-6" style={{ background: 'rgba(249,115,22,0.15)', border: '1px solid rgba(249,115,22,0.3)', color: '#fb923c' }}>
+                                  <RefreshCw className="w-4 h-4 mr-2" />
+                                  Coba Lagi
+                                </Button>
+                              </motion.div>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </DialogContent>
                   </Dialog>
 
                   {/* Desktop Sync Dialog - Upload edited file */}
                   <Dialog open={showDesktopSyncDialog} onOpenChange={setShowDesktopSyncDialog}>
-                    <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
-                      <DialogHeader>
-                        <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                          <RefreshCw className="w-5 h-5 text-orange-600" />
-                          Selesai Edit & Sync
-                        </DialogTitle>
-                        <DialogDescription className="text-gray-600">
-                          Upload file hasil edit untuk disinkronkan ke storage
-                        </DialogDescription>
-                      </DialogHeader>
-                      
-                      {excelEditData && (
-                        <div className="space-y-4">
-                          {/* File Info */}
-                          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                            <div className="flex items-start gap-3">
-                              {['docx', 'doc'].includes(excelEditData.fileType || '') ? (
-                                <FileText className="w-10 h-10 text-blue-600 mt-1" />
-                              ) : (
-                                <FileSpreadsheet className="w-10 h-10 text-green-600 mt-1" />
-                              )}
-                              <div>
-                                <p className="font-bold text-gray-900">{excelEditData.fileName}</p>
-                                <p className="text-sm text-gray-600">{excelEditData.judul}</p>
+                    <DialogContent className="sm:max-w-md p-0 overflow-hidden border-0 shadow-2xl bg-gray-950" style={{ borderRadius: '1.25rem' }} aria-describedby={undefined}>
+                      {/* Gradient Header */}
+                      <div className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #1c1f3a 0%, #0f172a 50%, #1a1a2e 100%)', padding: '28px 28px 24px' }}>
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                          <motion.div className="absolute -top-6 -right-6 w-32 h-32 rounded-full" style={{ background: 'radial-gradient(circle, rgba(249,115,22,0.2) 0%, transparent 70%)' }} animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 3, repeat: Infinity }} />
+                          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+                        </div>
+                        <div className="relative z-10 flex items-center gap-4">
+                          <motion.div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ef4444)', boxShadow: '0 0 30px rgba(249,115,22,0.4)' }} initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}>
+                            <RefreshCw className="w-7 h-7 text-white" />
+                          </motion.div>
+                          <div>
+                            <DialogTitle className="text-xl font-black text-white tracking-tight">Selesai Edit &amp; Sync</DialogTitle>
+                            <DialogDescription className="text-orange-400/80 text-sm mt-0.5 font-medium">Upload file hasil edit ke storage</DialogDescription>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Body */}
+                      <div className="p-6 space-y-4" style={{ background: 'linear-gradient(180deg, #0f172a 0%, #111827 100%)' }}>
+                        {excelEditData && (
+                          <motion.div className="space-y-4" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+                            {/* File Info */}
+                            <div className="rounded-2xl p-4 flex items-center gap-4" style={{ background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)' }}>
+                              <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: ['docx', 'doc'].includes(excelEditData.fileType || '') ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'linear-gradient(135deg, #22c55e, #16a34a)' }}>
+                                {['docx', 'doc'].includes(excelEditData.fileType || '') ? <FileText className="w-6 h-6 text-white" /> : <FileSpreadsheet className="w-6 h-6 text-white" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-white truncate text-sm">{excelEditData.fileName}</p>
+                                <p className="text-xs text-gray-400 truncate mt-0.5">{excelEditData.judul}</p>
+                                {desktopEditSessionToken && (
+                                  <p className="text-[10px] text-indigo-400 mt-1 font-mono">🔐 Session aktif • Hash: {desktopEditOriginalHash?.slice(0, 12)}...</p>
+                                )}
                               </div>
                             </div>
-                          </div>
-                          
-                          {/* Session Info */}
-                          {desktopEditSessionToken && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                              <p className="text-sm text-blue-800">
-                                <strong>Session aktif:</strong> Tanpa batas waktu
-                              </p>
-                              <p className="text-xs text-blue-600 mt-1">
-                                Original hash: {desktopEditOriginalHash?.slice(0, 16)}...
-                              </p>
-                            </div>
-                          )}
-                          
-                          {/* File Picker */}
-                          <div className="space-y-3">
-                            <Label className="text-sm font-semibold text-gray-700">
-                              Pilih File Hasil Edit
-                            </Label>
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
-                              <input
-                                type="file"
-                                accept=".xlsx,.xls,.xlsm,.docx,.doc"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0]
-                                  if (file) {
-                                    setDesktopSyncFile(file)
-                                  }
-                                }}
-                                className="hidden"
-                                id="desktop-sync-file"
-                              />
-                              <label
-                                htmlFor="desktop-sync-file"
-                                className="cursor-pointer"
-                              >
-                                {desktopSyncFile ? (
-                                  <div className="flex items-center justify-center gap-2">
-                                    <CheckCircle className="w-5 h-5 text-green-600" />
-                                    <span className="text-sm text-gray-700">{desktopSyncFile.name}</span>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <Upload className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                                    <p className="text-sm text-gray-600">
-                                      Klik untuk memilih file
-                                    </p>
-                                    <p className="text-xs text-gray-400 mt-1">
-                                      Format: .xlsx, .xls, .xlsm, .docx, .doc
-                                    </p>
-                                  </>
-                                )}
+
+                            {/* Drag & Drop File Picker */}
+                            <div>
+                              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Upload File Hasil Edit</p>
+                              <input type="file" accept=".xlsx,.xls,.xlsm,.docx,.doc" onChange={(e) => { const f = e.target.files?.[0]; if (f) setDesktopSyncFile(f) }} className="hidden" id="desktop-sync-file" />
+                              <label htmlFor="desktop-sync-file" className="group cursor-pointer block">
+                                <div className="rounded-2xl p-6 text-center transition-all duration-200" style={{ border: desktopSyncFile ? '2px solid rgba(34,197,94,0.5)' : '2px dashed rgba(249,115,22,0.3)', background: desktopSyncFile ? 'rgba(34,197,94,0.07)' : 'rgba(249,115,22,0.04)' }}>
+                                  {desktopSyncFile ? (
+                                    <motion.div className="flex flex-col items-center gap-2" initial={{ scale: 0.8 }} animate={{ scale: 1 }}>
+                                      <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}><CheckCircle className="w-6 h-6 text-white" /></div>
+                                      <p className="text-green-300 font-semibold text-sm">{desktopSyncFile.name}</p>
+                                      <p className="text-xs text-gray-500">{(desktopSyncFile.size / 1024).toFixed(1)} KB — Klik untuk ganti</p>
+                                    </motion.div>
+                                  ) : (
+                                    <div className="flex flex-col items-center gap-2">
+                                      <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-1" style={{ background: 'rgba(249,115,22,0.15)' }}>
+                                        <Upload className="w-6 h-6 text-orange-400" />
+                                      </div>
+                                      <p className="text-sm text-gray-300 font-medium">Klik untuk pilih file</p>
+                                      <p className="text-xs text-gray-600">.xlsx · .xls · .xlsm · .docx · .doc</p>
+                                    </div>
+                                  )}
+                                </div>
                               </label>
                             </div>
-                          </div>
-                          
-                          {/* Info */}
-                          <Alert className="bg-amber-50 border-amber-200">
-                            <AlertTriangle className="w-4 h-4 text-amber-600" />
-                            <AlertDescription className="text-amber-800 text-sm">
-                              <strong>Penting:</strong> File akan di-checksum dan dibandingkan dengan file asli.
-                              Jika tidak ada perubahan, file tidak akan di-upload.
-                            </AlertDescription>
-                          </Alert>
-                        </div>
-                      )}
-                      
-                      <DialogFooter className="gap-2">
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          onClick={() => setShowDesktopSyncDialog(false)}
-                          className="border-gray-300 text-gray-700 hover:bg-gray-100"
-                        >
-                          Batal
-                        </Button>
-                        <Button 
-                          type="button" 
-                          onClick={handleDesktopSync}
-                          disabled={!desktopSyncFile || desktopSyncing}
-                          className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
-                        >
-                          {desktopSyncing ? (
-                            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Syncing...</>
-                          ) : (
-                            <><RefreshCw className="w-4 h-4 mr-2" /> Sync ke R2</>
-                          )}
-                        </Button>
-                      </DialogFooter>
+
+                            {/* Warning */}
+                            <div className="flex items-start gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)' }}>
+                              <AlertTriangle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+                              <p className="text-xs text-yellow-200/80"><span className="font-bold text-yellow-300">Catatan:</span> File akan di-checksum. Jika tidak ada perubahan dari file asli, upload akan dibatalkan otomatis.</p>
+                            </div>
+
+                            {/* Buttons */}
+                            <div className="flex gap-3 pt-1">
+                              <Button type="button" onClick={() => setShowDesktopSyncDialog(false)} className="flex-1 h-11 text-sm font-semibold" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#9ca3af' }}>
+                                Batal
+                              </Button>
+                              <Button
+                                type="button"
+                                onClick={handleDesktopSync}
+                                disabled={!desktopSyncFile || desktopSyncing}
+                                className="flex-1 h-11 text-sm font-bold relative overflow-hidden"
+                                style={{ background: (!desktopSyncFile || desktopSyncing) ? 'rgba(249,115,22,0.25)' : 'linear-gradient(135deg, #f97316, #ef4444)', boxShadow: (!desktopSyncFile || desktopSyncing) ? 'none' : '0 4px 20px rgba(249,115,22,0.35)', color: 'white' }}
+                              >
+                                {!desktopSyncing && desktopSyncFile && (<motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" animate={{ x: ['-100%', '100%'] }} transition={{ duration: 2, repeat: Infinity, repeatDelay: 0.8 }} />)}
+                                <span className="relative flex items-center justify-center gap-2">
+                                  {desktopSyncing ? <><Loader2 className="w-4 h-4 animate-spin" /> Syncing...</> : <><RefreshCw className="w-4 h-4" /> Sync ke R2</>}
+                                </span>
+                              </Button>
+                            </div>
+                          </motion.div>
+                        )}
+                      </div>
                     </DialogContent>
                   </Dialog>
-                  
+
                   {/* Conflict Dialog - When file changed during edit session */}
                   <Dialog open={showConflictDialog} onOpenChange={setShowConflictDialog}>
                     <DialogContent className="sm:max-w-lg bg-white border-2 border-red-300 shadow-xl" aria-describedby={undefined}>
@@ -6142,7 +5745,7 @@ export default function ESOPApp() {
                           File telah diperbarui oleh user lain sejak Anda mulai edit.
                         </DialogDescription>
                       </DialogHeader>
-                      
+
                       {conflictData && (
                         <div className="space-y-4">
                           {/* Warning Message */}
@@ -6151,12 +5754,12 @@ export default function ESOPApp() {
                               {conflictData.message}
                             </p>
                           </div>
-                          
+
                           {/* Last Editor Info */}
                           {conflictData.lastEditor && (
                             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                               <p className="text-sm text-amber-800">
-                                <strong>Terakhir diedit oleh:</strong><br/>
+                                <strong>Terakhir diedit oleh:</strong><br />
                                 {conflictData.lastEditor.name || conflictData.lastEditor.email}
                               </p>
                               <p className="text-xs text-amber-600 mt-1">
@@ -6164,7 +5767,7 @@ export default function ESOPApp() {
                               </p>
                             </div>
                           )}
-                          
+
                           {/* Hash Info */}
                           <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -6182,31 +5785,31 @@ export default function ESOPApp() {
                               </div>
                             </div>
                           </div>
-                          
+
                           {/* Options */}
                           <Alert className="bg-blue-50 border-blue-200">
                             <AlertTriangle className="w-4 h-4 text-blue-600" />
                             <AlertDescription className="text-blue-800 text-sm">
-                              <strong>Pilihan Anda:</strong><br/>
-                              • <strong>Force Overwrite:</strong> Timpa file dengan perubahan Anda (perubahan user lain akan hilang)<br/>
+                              <strong>Pilihan Anda:</strong><br />
+                              • <strong>Force Overwrite:</strong> Timpa file dengan perubahan Anda (perubahan user lain akan hilang)<br />
                               • <strong>Batalkan:</strong> Simpan file hasil edit Anda secara lokal dan download ulang file terbaru
                             </AlertDescription>
                           </Alert>
                         </div>
                       )}
-                      
+
                       <DialogFooter className="flex-col sm:flex-row gap-2">
-                        <Button 
-                          type="button" 
-                          variant="outline" 
+                        <Button
+                          type="button"
+                          variant="outline"
                           onClick={handleCancelSession}
                           className="w-full sm:w-auto border-gray-300 text-gray-700 hover:bg-gray-100"
                         >
                           <X className="w-4 h-4 mr-2" />
                           Batalkan Sesi
                         </Button>
-                        <Button 
-                          type="button" 
+                        <Button
+                          type="button"
                           onClick={handleForceSync}
                           disabled={forceSyncing}
                           className="w-full sm:w-auto bg-gradient-to-r from-red-500 to-red-700 hover:from-red-600 hover:to-red-800 text-white"
@@ -6220,7 +5823,7 @@ export default function ESOPApp() {
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
-                  
+
                   {/* Excel Edit Diagnostic Dialog */}
                   <Dialog open={showDiagnosticDialog} onOpenChange={setShowDiagnosticDialog}>
                     <DialogContent className="sm:max-w-2xl bg-white border-2 border-orange-200 shadow-xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
@@ -6233,7 +5836,7 @@ export default function ESOPApp() {
                           Memeriksa semua komponen untuk fitur edit Excel dengan Microsoft 365
                         </DialogDescription>
                       </DialogHeader>
-                      
+
                       <div className="space-y-4">
                         {diagnosticLoading && (
                           <div className="flex flex-col items-center justify-center py-8">
@@ -6241,15 +5844,14 @@ export default function ESOPApp() {
                             <p className="text-gray-600">Menjalankan diagnostik...</p>
                           </div>
                         )}
-                        
+
                         {diagnosticResult && !diagnosticLoading && (
                           <>
                             {/* Summary */}
-                            <div className={`p-4 rounded-lg ${
-                              diagnosticResult.success 
-                                ? 'bg-green-50 border border-green-200' 
-                                : 'bg-red-50 border border-red-200'
-                            }`}>
+                            <div className={`p - 4 rounded - lg ${diagnosticResult.success
+                              ? 'bg-green-50 border border-green-200'
+                              : 'bg-red-50 border border-red-200'
+                              } `}>
                               <div className="flex items-center gap-3">
                                 {diagnosticResult.success ? (
                                   <CheckCircle className="w-8 h-8 text-green-500" />
@@ -6257,15 +5859,15 @@ export default function ESOPApp() {
                                   <XCircle className="w-8 h-8 text-red-500" />
                                 )}
                                 <div>
-                                  <p className={`font-bold ${diagnosticResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                                  <p className={`font - bold ${diagnosticResult.success ? 'text-green-800' : 'text-red-800'} `}>
                                     {diagnosticResult.success ? 'Semua Sistem Berfungsi!' : 'Terdapat Masalah'}
                                   </p>
-                                  <p className={`text-sm ${diagnosticResult.success ? 'text-green-600' : 'text-red-600'}`}>
+                                  <p className={`text - sm ${diagnosticResult.success ? 'text-green-600' : 'text-red-600'} `}>
                                     {diagnosticResult.message}
                                   </p>
                                 </div>
                               </div>
-                              
+
                               {/* Stats */}
                               <div className="flex gap-4 mt-3 text-sm">
                                 <span className="text-gray-600">
@@ -6279,18 +5881,17 @@ export default function ESOPApp() {
                                 </span>
                               </div>
                             </div>
-                            
+
                             {/* Results List */}
                             <div className="space-y-3">
                               <h4 className="font-semibold text-gray-700">Detail Hasil:</h4>
                               {diagnosticResult.results.map((result, index) => (
-                                <div 
+                                <div
                                   key={index}
-                                  className={`p-3 rounded-lg border ${
-                                    result.success 
-                                      ? 'bg-green-50 border-green-200' 
-                                      : 'bg-red-50 border-red-200'
-                                  }`}
+                                  className={`p - 3 rounded - lg border ${result.success
+                                    ? 'bg-green-50 border-green-200'
+                                    : 'bg-red-50 border-red-200'
+                                    } `}
                                 >
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
@@ -6305,7 +5906,7 @@ export default function ESOPApp() {
                                       <span className="text-xs text-gray-500">{result.duration}ms</span>
                                     )}
                                   </div>
-                                  <p className={`text-sm mt-1 ${result.success ? 'text-green-700' : 'text-red-700'}`}>
+                                  <p className={`text - sm mt - 1 ${result.success ? 'text-green-700' : 'text-red-700'} `}>
                                     {result.message}
                                   </p>
                                   {result.error && (
@@ -6328,7 +5929,7 @@ export default function ESOPApp() {
                                 </div>
                               ))}
                             </div>
-                            
+
                             {/* Next Steps */}
                             {!diagnosticResult.success && diagnosticResult.nextSteps.length > 0 && (
                               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
@@ -6343,18 +5944,18 @@ export default function ESOPApp() {
                           </>
                         )}
                       </div>
-                      
+
                       <DialogFooter className="gap-2">
-                        <Button 
-                          type="button" 
-                          variant="outline" 
+                        <Button
+                          type="button"
+                          variant="outline"
                           onClick={() => setShowDiagnosticDialog(false)}
                           className="border-gray-300 text-gray-700 hover:bg-gray-100"
                         >
                           Tutup
                         </Button>
-                        <Button 
-                          type="button" 
+                        <Button
+                          type="button"
                           onClick={handleRunDiagnostic}
                           disabled={diagnosticLoading}
                           className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
@@ -6369,47 +5970,53 @@ export default function ESOPApp() {
                     </DialogContent>
                   </Dialog>
                 </div>
-                
+
                 {/* Filters */}
-                <Card className="bg-white border-2 border-orange-200 shadow-xl">
-                  <CardContent className="p-5">
-                    {/* Row 1: Search and Sort */}
-                    <div className="flex flex-col md:flex-row gap-4 mb-4">
-                      <div className="flex-1 relative">
-                        <Label className="text-sm font-semibold text-gray-700 mb-1.5 block">Pencarian</Label>
+                <div className="rounded-2xl overflow-hidden shadow-2xl" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)', border: '1px solid rgba(249,115,22,0.25)' }}>
+                  {/* Header bar */}
+                  <div className="flex items-center justify-between px-5 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ef4444)' }}><Search className="w-3.5 h-3.5 text-white" /></div>
+                      <span className="text-sm font-bold text-white">Filter &amp; Pencarian</span>
+                      {(sopFilters.kategori !== 'SEMUA' || sopFilters.jenis !== 'SEMUA' || sopFilters.lingkup !== 'SEMUA' || sopFilters.status !== 'SEMUA' || sopFilters.tahun || searchInput) && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: 'linear-gradient(135deg, #f97316, #ef4444)', color: 'white' }}>
+                          {[sopFilters.kategori !== 'SEMUA', sopFilters.jenis !== 'SEMUA', sopFilters.lingkup !== 'SEMUA', sopFilters.status !== 'SEMUA', !!sopFilters.tahun, !!searchInput].filter(Boolean).length} aktif
+                        </span>
+                      )}
+                    </div>
+                    {(sopFilters.kategori !== 'SEMUA' || sopFilters.jenis !== 'SEMUA' || sopFilters.lingkup !== 'SEMUA' || sopFilters.status !== 'SEMUA' || sopFilters.tahun || searchInput) && (
+                      <button onClick={() => { setSearchInput(''); setSopFilters({ kategori: 'SEMUA', jenis: 'SEMUA', lingkup: 'SEMUA', status: 'SEMUA', tahun: '', search: '' }); setSopPagination(p => ({ ...p, page: 1 })) }} className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all" style={{ background: 'rgba(239,68,68,0.15)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.25)' }}>
+                        <X className="w-3 h-3" /> Reset Semua
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="p-5 space-y-4">
+                    {/* Row 1: Search + Sort */}
+                    <div className="flex flex-col md:flex-row gap-3">
+                      {/* Search */}
+                      <div className="flex-1">
+                        <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Pencarian</p>
                         <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                          <Input 
+                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#f97316' }} />
+                          <Input
                             placeholder="Cari judul dokumen..."
                             value={searchInput}
-                            onChange={(e) => {
-                              setSearchInput(e.target.value)
-                              // Reset to page 1 when searching
-                              setSopPagination(p => ({ ...p, page: 1 }))
-                            }}
-                            className="pl-10 pr-10 h-11 border-2 border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 focus:border-orange-500 focus:ring-orange-500 rounded-lg"
+                            onChange={(e) => { setSearchInput(e.target.value); setSopPagination(p => ({ ...p, page: 1 })) }}
+                            className="pl-10 pr-10 h-11 text-white placeholder:text-gray-500 text-sm font-medium rounded-xl"
+                            style={{ background: 'rgba(255,255,255,0.06)', border: searchInput ? '1.5px solid rgba(249,115,22,0.6)' : '1.5px solid rgba(255,255,255,0.1)', boxShadow: searchInput ? '0 0 12px rgba(249,115,22,0.2)' : 'none', outline: 'none' }}
                           />
-                          {isSearching && (
-                            <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-orange-500 animate-spin" />
-                          )}
+                          {isSearching && <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-400 animate-spin" />}
                           {searchInput && !isSearching && (
-                            <button
-                              onClick={() => {
-                                setSearchInput('')
-                                setSopFilters(prev => ({ ...prev, search: '' }))
-                                setSopPagination(p => ({ ...p, page: 1 }))
-                              }}
-                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
+                            <button onClick={() => { setSearchInput(''); setSopFilters(prev => ({ ...prev, search: '' })); setSopPagination(p => ({ ...p, page: 1 })) }} className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 hover:text-gray-300 transition-colors"><X className="w-4 h-4" /></button>
                           )}
                         </div>
                       </div>
+                      {/* Sort */}
                       <div className="w-full md:w-56">
-                        <Label className="text-sm font-semibold text-gray-700 mb-1.5 block">Urutkan</Label>
+                        <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Urutkan</p>
                         <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
-                          <SelectTrigger className="h-11 border-2 border-gray-200 bg-white text-gray-900 focus:ring-orange-500 rounded-lg">
+                          <SelectTrigger className="h-11 text-white rounded-xl text-sm" style={{ background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.1)' }}>
                             <SelectValue placeholder="Pilih urutan" />
                           </SelectTrigger>
                           <SelectContent>
@@ -6423,99 +6030,53 @@ export default function ESOPApp() {
                         </Select>
                       </div>
                     </div>
-                    
-                    {/* Row 2: Filters */}
-                    <div className="flex flex-wrap items-end gap-3">
-                      <div className="flex-1 min-w-[140px]">
-                        <Label className="text-xs font-medium text-gray-600 mb-1 block">Kategori</Label>
-                        <Select value={sopFilters.kategori} onValueChange={(v) => setSopFilters({ ...sopFilters, kategori: v })}>
-                          <SelectTrigger className="h-10 border-gray-200 bg-white text-gray-900 text-sm rounded-lg">
-                            <SelectValue placeholder="Kategori" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="SEMUA">Semua Kategori</SelectItem>
-                            {KATEGORI_OPTIONS.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
+
+                    {/* Row 2: Filter chips */}
+                    <div>
+                      <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-2">Filter</p>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { label: 'Kategori', value: sopFilters.kategori, key: 'kategori', options: ['SEMUA', ...KATEGORI_OPTIONS], onChange: (v: string) => setSopFilters({ ...sopFilters, kategori: v }) },
+                          { label: 'Lingkup', value: sopFilters.lingkup, key: 'lingkup', options: ['SEMUA', ...LINGKUP_OPTIONS], onChange: (v: string) => setSopFilters({ ...sopFilters, lingkup: v }) },
+                          { label: 'Jenis', value: sopFilters.jenis, key: 'jenis', options: ['SEMUA', ...JENIS_OPTIONS], onChange: (v: string) => setSopFilters({ ...sopFilters, jenis: v }) },
+                          { label: 'Status', value: sopFilters.status, key: 'status', options: ['SEMUA', ...STATUS_OPTIONS], onChange: (v: string) => setSopFilters({ ...sopFilters, status: v }) },
+                        ].map((f) => (
+                          <div key={f.key} className="flex-1 min-w-[130px]">
+                            <Select value={f.value} onValueChange={(v) => { f.onChange(v); setSopPagination(p => ({ ...p, page: 1 })) }}>
+                              <SelectTrigger className="h-9 rounded-xl text-xs font-medium" style={{ background: f.value !== 'SEMUA' ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.05)', border: f.value !== 'SEMUA' ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.08)', color: f.value !== 'SEMUA' ? '#fb923c' : '#9ca3af' }}>
+                                <SelectValue placeholder={f.label} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {f.options.map(o => <SelectItem key={o} value={o}>{o === 'SEMUA' ? `Semua ${f.label}` : o}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ))}
+                        {/* Tahun */}
+                        <div className="flex-1 min-w-[110px]">
+                          <Select value={sopFilters.tahun || 'SEMUA'} onValueChange={(v) => { setSopFilters({ ...sopFilters, tahun: v === 'SEMUA' ? '' : v }); setSopPagination(p => ({ ...p, page: 1 })) }}>
+                            <SelectTrigger className="h-9 rounded-xl text-xs font-medium" style={{ background: sopFilters.tahun ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.05)', border: sopFilters.tahun ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.08)', color: sopFilters.tahun ? '#fb923c' : '#9ca3af' }}>
+                              <SelectValue placeholder="Tahun" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="SEMUA">Semua Tahun</SelectItem>
+                              {stats?.byTahun?.map(t => <SelectItem key={t.tahun} value={t.tahun.toString()}>{t.tahun}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-[120px]">
-                        <Label className="text-xs font-medium text-gray-600 mb-1 block">Jenis</Label>
-                        <Select value={sopFilters.jenis} onValueChange={(v) => setSopFilters({ ...sopFilters, jenis: v })}>
-                          <SelectTrigger className="h-10 border-gray-200 bg-white text-gray-900 text-sm rounded-lg">
-                            <SelectValue placeholder="Jenis" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="SEMUA">Semua Jenis</SelectItem>
-                            {JENIS_OPTIONS.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex-1 min-w-[120px]">
-                        <Label className="text-xs font-medium text-gray-600 mb-1 block">Status</Label>
-                        <Select value={sopFilters.status} onValueChange={(v) => setSopFilters({ ...sopFilters, status: v })}>
-                          <SelectTrigger className="h-10 border-gray-200 bg-white text-gray-900 text-sm rounded-lg">
-                            <SelectValue placeholder="Status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="SEMUA">Semua Status</SelectItem>
-                            {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex-1 min-w-[120px]">
-                        <Label className="text-xs font-medium text-gray-600 mb-1 block">Tahun</Label>
-                        <Select value={sopFilters.tahun || 'SEMUA'} onValueChange={(v) => setSopFilters({ ...sopFilters, tahun: v === 'SEMUA' ? '' : v })}>
-                          <SelectTrigger className="h-10 border-gray-200 bg-white text-gray-900 text-sm rounded-lg">
-                            <SelectValue placeholder="Tahun" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="SEMUA">Semua Tahun</SelectItem>
-                            {stats?.byTahun?.map(t => (
-                              <SelectItem key={t.tahun} value={t.tahun.toString()}>{t.tahun}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {(sopFilters.kategori !== 'SEMUA' || sopFilters.jenis !== 'SEMUA' || sopFilters.status !== 'SEMUA' || sopFilters.tahun || searchInput) && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            setSearchInput('')
-                            setSopFilters({ kategori: 'SEMUA', jenis: 'SEMUA', status: 'SEMUA', tahun: '', search: '' })
-                            setSopPagination(p => ({ ...p, page: 1 }))
-                          }}
-                          className="h-10 px-4 border-gray-300 text-gray-600 hover:bg-gray-100 rounded-lg"
-                        >
-                          <X className="w-4 h-4 mr-1" />
-                          Reset
-                        </Button>
-                      )}
                     </div>
-                  </CardContent>
-                </Card>
-                
+                  </div>
+                </div>
+
+
                 {/* Table */}
                 <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
                   <CardContent className="p-0 relative">
                     {/* Loading Overlay */}
                     {katalogLoading && (
-                      <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center">
-                        <div className="flex flex-col items-center gap-3">
-                          <div className="relative">
-                            <motion.div
-                              className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full"
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
-                            />
-                            <motion.div
-                              className="absolute inset-0 w-10 h-10 border-4 border-yellow-400 border-b-transparent rounded-full"
-                              animate={{ rotate: -360 }}
-                              transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
-                            />
-                          </div>
-                          <span className="text-sm text-gray-600 font-medium">Memuat data...</span>
-                        </div>
+                      <div className="absolute top-0 inset-x-0 h-1 z-10 overflow-hidden">
+                        <div className="w-full h-full bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-400 animate-sync-progress" />
                       </div>
                     )}
                     <div className="overflow-x-auto">
@@ -6525,6 +6086,7 @@ export default function ESOPApp() {
                             <TableHead className="font-bold text-white">Judul</TableHead>
                             <TableHead className="font-bold text-white">Tahun</TableHead>
                             <TableHead className="font-bold text-white">Kategori</TableHead>
+                            <TableHead className="font-bold text-white">Lingkup</TableHead>
                             <TableHead className="font-bold text-white">Jenis</TableHead>
                             <TableHead className="font-bold text-white">Status</TableHead>
                             <TableHead className="font-bold text-white text-center">Aksi</TableHead>
@@ -6539,8 +6101,8 @@ export default function ESOPApp() {
                             </TableRow>
                           ) : (
                             sopFiles.map((sop) => (
-                              <TableRow 
-                                key={sop.id} 
+                              <TableRow
+                                key={sop.id}
                                 className="hover:bg-orange-50 border-b border-gray-200"
                               >
                                 <TableCell>
@@ -6550,9 +6112,9 @@ export default function ESOPApp() {
                                       <div className="text-xs text-orange-500 font-medium">No. SOP : {sop.nomorSop || '...'}</div>
                                       <div className="text-gray-800">{sop.judul}</div>
                                       <div className="text-xs text-gray-500 mt-0.5">
-                                        <span className="text-gray-400">Upload:</span> {new Date(sop.uploadedAt).toLocaleString('id-ID', { 
-                                          day: 'numeric', 
-                                          month: 'short', 
+                                        <span className="text-gray-400">Upload:</span> {new Date(sop.uploadedAt).toLocaleString('id-ID', {
+                                          day: 'numeric',
+                                          month: 'short',
                                           year: 'numeric',
                                           hour: '2-digit',
                                           minute: '2-digit'
@@ -6560,9 +6122,9 @@ export default function ESOPApp() {
                                       </div>
                                       {sop.updatedAt && new Date(sop.updatedAt).getTime() !== new Date(sop.uploadedAt).getTime() && (
                                         <div className="text-xs text-amber-600 mt-0.5">
-                                          <span className="text-amber-500">Terakhir diubah:</span> {new Date(sop.updatedAt).toLocaleString('id-ID', { 
-                                            day: 'numeric', 
-                                            month: 'short', 
+                                          <span className="text-amber-500">Terakhir diubah:</span> {new Date(sop.updatedAt).toLocaleString('id-ID', {
+                                            day: 'numeric',
+                                            month: 'short',
                                             year: 'numeric',
                                             hour: '2-digit',
                                             minute: '2-digit'
@@ -6575,6 +6137,9 @@ export default function ESOPApp() {
                                 <TableCell className="text-gray-600">{sop.tahun}</TableCell>
                                 <TableCell>
                                   <Badge variant="outline" className="border-orange-500 bg-orange-50 text-orange-700">{sop.kategori}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="border-blue-500 bg-blue-50 text-blue-700">{sop.lingkup || '-'}</Badge>
                                 </TableCell>
                                 <TableCell>
                                   <Badge className={sop.jenis === 'SOP' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white'}>
@@ -6648,12 +6213,12 @@ export default function ESOPApp() {
                                       )}
                                     </Button>
                                     {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && ['xlsx', 'xls', 'xlsm', 'docx', 'doc', 'pdf'].includes(sop.fileType || '') && (
-                                      <Button 
-                                        size="icon" 
-                                        variant="ghost" 
-                                        className={`hover:${sop.fileType === 'pdf' ? 'bg-red-100' : 'bg-green-100'}`}
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className={`hover:${sop.fileType === 'pdf' ? 'bg-red-100' : 'bg-green-100'} `}
                                         onClick={() => handleDesktopEdit(sop.id)}
-                                        title={sop.fileType === 'pdf' ? 'Edit Desktop (PDF tidak bisa di-edit)' : `Edit di Desktop (${sop.fileType?.toUpperCase() || 'File'})`}
+                                        title={sop.fileType === 'pdf' ? 'Edit Desktop (PDF tidak bisa di-edit)' : `Edit di Desktop(${sop.fileType?.toUpperCase() || 'File'})`}
                                       >
                                         {sop.fileType === 'pdf' ? (
                                           <FileIcon className="w-4 h-4 text-red-500" />
@@ -6665,9 +6230,9 @@ export default function ESOPApp() {
                                       </Button>
                                     )}
                                     {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && desktopEditSessionToken && (
-                                      <Button 
-                                        size="icon" 
-                                        variant="ghost" 
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
                                         className="hover:bg-orange-100"
                                         onClick={handleOpenDesktopSync}
                                         title="Selesai Edit & Sync"
@@ -6676,9 +6241,9 @@ export default function ESOPApp() {
                                       </Button>
                                     )}
                                     {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && (
-                                      <Button 
-                                        size="icon" 
-                                        variant="ghost" 
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
                                         className="hover:bg-red-100"
                                         onClick={() => handleDeleteSop(sop.id, sop.fileName)}
                                         title="Hapus File"
@@ -6696,15 +6261,15 @@ export default function ESOPApp() {
                     </div>
                   </CardContent>
                 </Card>
-                
+
                 {/* Pagination */}
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-gray-400">
                     Menampilkan {sopFiles.length} dari {sopPagination.total} data
                   </p>
                   <div className="flex items-center gap-2">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       disabled={sopPagination.page <= 1 || katalogLoading}
                       onClick={() => setSopPagination(p => ({ ...p, page: p.page - 1 }))}
@@ -6713,8 +6278,8 @@ export default function ESOPApp() {
                       <ChevronLeft className="w-4 h-4" />
                     </Button>
                     <span className="text-sm text-gray-400">Halaman {sopPagination.page} dari {sopPagination.totalPages || 1}</span>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       disabled={sopPagination.page >= sopPagination.totalPages || katalogLoading}
                       onClick={() => setSopPagination(p => ({ ...p, page: p.page + 1 }))}
@@ -6726,7 +6291,7 @@ export default function ESOPApp() {
                 </div>
               </motion.div>
             )}
-            
+
             {/* Other pages - Verifikasi, Arsip, Logs, Users */}
             {currentPage === 'verifikasi' && (
               <motion.div
@@ -6740,27 +6305,36 @@ export default function ESOPApp() {
                 <div className="flex items-center justify-between">
                   <ShimmerTitle subtitle="Kelola pengajuan SOP dan IK dari publik">Verifikasi SOP Publik</ShimmerTitle>
                 </div>
-                
+
                 {/* Search and Filter Bar */}
-                <Card className="bg-white border-2 border-orange-200 shadow-lg">
-                  <CardContent className="p-4">
-                    <div className="flex flex-wrap items-center gap-3">
+                <div className="rounded-2xl overflow-hidden shadow-2xl" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)', border: '1px solid rgba(249,115,22,0.25)' }}>
+                  <div className="flex items-center justify-between px-5 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ef4444)' }}><Search className="w-3.5 h-3.5 text-white" /></div>
+                      <span className="text-sm font-bold text-white">Filter &amp; Pencarian</span>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex flex-wrap items-end gap-3">
+                      {/* Search */}
                       <div className="flex-1 min-w-[200px]">
-                        <Label className="text-xs font-medium text-gray-600 mb-1 block">Cari</Label>
+                        <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Cari</p>
                         <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#f97316' }} />
                           <Input
                             placeholder="Cari judul, nama, email..."
                             value={verificationSearch}
                             onChange={(e) => setVerificationSearch(e.target.value)}
-                            className="pl-10 h-10 border-gray-200 bg-white text-gray-900 text-sm rounded-lg"
+                            className="pl-10 h-10 text-white placeholder:text-gray-500 text-sm rounded-xl"
+                            style={{ background: 'rgba(255,255,255,0.06)', border: verificationSearch ? '1.5px solid rgba(249,115,22,0.6)' : '1.5px solid rgba(255,255,255,0.1)', boxShadow: verificationSearch ? '0 0 10px rgba(249,115,22,0.2)' : 'none' }}
                           />
                         </div>
                       </div>
+                      {/* Status */}
                       <div className="min-w-[140px]">
-                        <Label className="text-xs font-medium text-gray-600 mb-1 block">Status</Label>
+                        <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Status</p>
                         <Select value={verificationFilter} onValueChange={(v) => setVerificationFilter(v)}>
-                          <SelectTrigger className="h-10 border-gray-200 bg-white text-gray-900 text-sm rounded-lg">
+                          <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: verificationFilter !== 'SEMUA' ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.06)', border: verificationFilter !== 'SEMUA' ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.1)', color: verificationFilter !== 'SEMUA' ? '#fb923c' : '#9ca3af' }}>
                             <SelectValue placeholder="Filter Status" />
                           </SelectTrigger>
                           <SelectContent>
@@ -6771,10 +6345,24 @@ export default function ESOPApp() {
                           </SelectContent>
                         </Select>
                       </div>
+                      {/* Lingkup */}
                       <div className="min-w-[140px]">
-                        <Label className="text-xs font-medium text-gray-600 mb-1 block">Urutkan</Label>
+                        <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Lingkup</p>
+                        <Select value={verificationLingkupFilter} onValueChange={(v) => setVerificationLingkupFilter(v)}>
+                          <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: verificationLingkupFilter !== 'SEMUA' ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.06)', border: verificationLingkupFilter !== 'SEMUA' ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.1)', color: verificationLingkupFilter !== 'SEMUA' ? '#fb923c' : '#9ca3af' }}>
+                            <SelectValue placeholder="Filter Lingkup" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="SEMUA">Semua Lingkup</SelectItem>
+                            {LINGKUP_OPTIONS.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {/* Sort */}
+                      <div className="min-w-[140px]">
+                        <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Urutkan</p>
                         <Select value={verificationSortBy} onValueChange={(v) => setVerificationSortBy(v as 'uploadedAt-desc' | 'uploadedAt-asc')}>
-                          <SelectTrigger className="h-10 border-gray-200 bg-white text-gray-900 text-sm rounded-lg">
+                          <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.1)', color: '#9ca3af' }}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -6784,227 +6372,219 @@ export default function ESOPApp() {
                         </Select>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-                
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <StatCard title="Total SOP Aktif" value={stats?.totalAktif || 0} icon={CheckCircle} color="orange" delay={0} />
-                  <StatCard title="Menunggu Verifikasi" value={stats?.totalPublikMenunggu || 0} icon={Clock} color="yellow" delay={0.1} />
-                  <StatCard title="Total Ditolak" value={stats?.totalPublikDitolak || 0} icon={XCircle} color="red" delay={0.2} />
+                  </div>
                 </div>
-                
-                {/* Verification Table */}
-                <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
-                  <CardHeader className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white">
-                    <CardTitle className="text-lg">Daftar Pengajuan Publik</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0 relative">
-                    {/* Loading Overlay */}
-                    {verifikasiLoading && (
-                      <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center">
-                        <div className="flex flex-col items-center gap-3">
-                          <div className="relative">
-                            <motion.div
-                              className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full"
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
-                            />
-                            <motion.div
-                              className="absolute inset-0 w-10 h-10 border-4 border-yellow-400 border-b-transparent rounded-full"
-                              animate={{ rotate: -360 }}
-                              transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
-                            />
-                          </div>
-                          <span className="text-sm text-gray-600 font-medium">Memuat data...</span>
-                        </div>
-                      </div>
-                    )}
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-gradient-to-r from-orange-400 to-yellow-400">
-                            <TableHead className="font-bold text-white">Pengirim</TableHead>
-                            <TableHead className="font-bold text-white">Judul</TableHead>
-                            <TableHead className="font-bold text-white">Jenis</TableHead>
-                            <TableHead className="font-bold text-white">Kategori</TableHead>
-                            <TableHead className="font-bold text-white">Status</TableHead>
-                            <TableHead className="font-bold text-white">Keterangan</TableHead>
-                            <TableHead className="font-bold text-white text-center">Aksi</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {verificationList.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={7} className="text-center text-gray-500 py-12">
-                                <div className="flex flex-col items-center gap-2">
-                                  <FileText className="w-12 h-12 text-gray-400" />
-                                  <p>Tidak ada pengajuan</p>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            verificationList.map((sop) => (
-                              <TableRow key={sop.id} className="hover:bg-orange-50 border-b border-gray-200">
-                                <TableCell>
-                                  <div>
-                                    <p className="font-semibold text-blue-900">{sop.submitterName}</p>
-                                    <p className="text-sm text-gray-600">{sop.submitterEmail}</p>
+
+
+                {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <StatCard title="Total SOP Aktif" value={stats?.totalAktif || 0} icon={CheckCircle} color="orange" delay={0} />
+              <StatCard title="Menunggu Verifikasi" value={stats?.totalPublikMenunggu || 0} icon={Clock} color="yellow" delay={0.1} />
+              <StatCard title="Total Ditolak" value={stats?.totalPublikDitolak || 0} icon={XCircle} color="red" delay={0.2} />
+            </div>
+
+            {/* Verification Table */}
+            <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white">
+                <CardTitle className="text-lg">Daftar Pengajuan Publik</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 relative">
+                {/* Loading Overlay */}
+                {verifikasiLoading && (
+                  <div className="absolute top-0 inset-x-0 h-1 z-10 overflow-hidden">
+                    <div className="w-full h-full bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-400 animate-sync-progress" />
+                  </div>
+                )}
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gradient-to-r from-orange-400 to-yellow-400">
+                        <TableHead className="font-bold text-white">Pengirim</TableHead>
+                        <TableHead className="font-bold text-white">Judul</TableHead>
+                        <TableHead className="font-bold text-white">Jenis</TableHead>
+                        <TableHead className="font-bold text-white">Kategori</TableHead>
+                        <TableHead className="font-bold text-white">Lingkup</TableHead>
+                        <TableHead className="font-bold text-white">Status</TableHead>
+                        <TableHead className="font-bold text-white">Keterangan</TableHead>
+                        <TableHead className="font-bold text-white text-center">Aksi</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {verificationList.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-gray-500 py-12">
+                            <div className="flex flex-col items-center gap-2">
+                              <FileText className="w-12 h-12 text-gray-400" />
+                              <p>Tidak ada pengajuan</p>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        verificationList.map((sop) => (
+                          <TableRow key={sop.id} className="hover:bg-orange-50 border-b border-gray-200">
+                            <TableCell>
+                              <div>
+                                <p className="font-semibold text-blue-900">{sop.submitterName}</p>
+                                <p className="text-sm text-gray-600">{sop.submitterEmail}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <FileTypeIcon fileName={sop.fileName} className="w-5 h-5 flex-shrink-0" />
+                                <div>
+                                  <span className="font-semibold text-blue-900">{sop.judul}</span>
+                                  <div className="text-xs text-gray-500 mt-0.5">
+                                    <span className="text-gray-400">Upload:</span> {new Date(sop.uploadedAt).toLocaleString('id-ID', {
+                                      day: 'numeric',
+                                      month: 'short',
+                                      year: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
                                   </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    <FileTypeIcon fileName={sop.fileName} className="w-5 h-5 flex-shrink-0" />
-                                    <div>
-                                      <span className="font-semibold text-blue-900">{sop.judul}</span>
-                                      <div className="text-xs text-gray-500 mt-0.5">
-                                        <span className="text-gray-400">Upload:</span> {new Date(sop.uploadedAt).toLocaleString('id-ID', { 
-                                          day: 'numeric', 
-                                          month: 'short', 
-                                          year: 'numeric',
-                                          hour: '2-digit',
-                                          minute: '2-digit'
-                                        })}
-                                      </div>
-                                      {sop.verifiedAt && (
-                                        <div className={`text-xs mt-0.5 ${
-                                          sop.verificationStatus === 'DISETUJUI' ? 'text-green-600' : 'text-red-600'
-                                        }`}>
-                                          <span className={sop.verificationStatus === 'DISETUJUI' ? 'text-green-500' : 'text-red-500'}>
-                                            {sop.verificationStatus === 'DISETUJUI' ? 'Disetujui:' : 'Ditolak:'}
-                                          </span> {new Date(sop.verifiedAt).toLocaleString('id-ID', { 
-                                            day: 'numeric', 
-                                            month: 'short', 
-                                            year: 'numeric',
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                          })}
-                                        </div>
-                                      )}
+                                  {sop.verifiedAt && (
+                                    <div className={`text - xs mt - 0.5 ${sop.verificationStatus === 'DISETUJUI' ? 'text-green-600' : 'text-red-600'
+                                      } `}>
+                                      <span className={sop.verificationStatus === 'DISETUJUI' ? 'text-green-500' : 'text-red-500'}>
+                                        {sop.verificationStatus === 'DISETUJUI' ? 'Disetujui:' : 'Ditolak:'}
+                                      </span> {new Date(sop.verifiedAt).toLocaleString('id-ID', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
                                     </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge className={sop.jenis === 'SOP' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white'}>
-                                    {sop.jenis}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className="border-orange-500 bg-orange-50 text-orange-700">{sop.kategori}</Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge className={
-                                    sop.verificationStatus === 'MENUNGGU' ? 'bg-blue-500 text-white' :
-                                    sop.verificationStatus === 'DISETUJUI' ? 'bg-green-500 text-white' :
+                                  )}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={sop.jenis === 'SOP' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white'}>
+                                {sop.jenis}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="border-orange-500 bg-orange-50 text-orange-700">{sop.kategori}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="border-blue-500 bg-blue-50 text-blue-700">{sop.lingkup || '-'}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={
+                                sop.verificationStatus === 'MENUNGGU' ? 'bg-blue-500 text-white' :
+                                  sop.verificationStatus === 'DISETUJUI' ? 'bg-green-500 text-white' :
                                     'bg-red-500 text-white'
-                                  }>
-                                    {sop.verificationStatus}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-gray-600 text-sm max-w-[200px]">
-                                  {sop.keterangan && (
-                                    <span className="text-gray-700 block">Catatan: {sop.keterangan}</span>
-                                  )}
-                                  {sop.rejectionReason && (
-                                    <span className="text-red-600 block">Alasan: {sop.rejectionReason}</span>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center justify-center gap-1">
-                                    <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} title="Preview" className="hover:bg-cyan-100">
-                                      <Eye className="w-4 h-4 text-cyan-600" />
+                              }>
+                                {sop.verificationStatus}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-gray-600 text-sm max-w-[200px]">
+                              {sop.keterangan && (
+                                <span className="text-gray-700 block">Catatan: {sop.keterangan}</span>
+                              )}
+                              {sop.rejectionReason && (
+                                <span className="text-red-600 block">Alasan: {sop.rejectionReason}</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center justify-center gap-1">
+                                <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} title="Preview" className="hover:bg-cyan-100">
+                                  <Eye className="w-4 h-4 text-cyan-600" />
+                                </Button>
+                                <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-100">
+                                  <Download className="w-4 h-4 text-green-600" />
+                                </Button>
+                                {sop.verificationStatus === 'MENUNGGU' && (
+                                  <>
+                                    <Button size="icon" variant="ghost" onClick={() => handleVerification(sop.id, 'DISETUJUI')} title="Setujui" className="hover:bg-green-100">
+                                      <Check className="w-4 h-4 text-green-600" />
                                     </Button>
-                                    <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-100">
-                                      <Download className="w-4 h-4 text-green-600" />
+                                    <Button size="icon" variant="ghost" onClick={() => handleOpenRejectDialog(sop.id)} title="Tolak" className="hover:bg-red-100">
+                                      <X className="w-4 h-4 text-red-600" />
                                     </Button>
-                                    {sop.verificationStatus === 'MENUNGGU' && (
-                                      <>
-                                        <Button size="icon" variant="ghost" onClick={() => handleVerification(sop.id, 'DISETUJUI')} title="Setujui" className="hover:bg-green-100">
-                                          <Check className="w-4 h-4 text-green-600" />
-                                        </Button>
-                                        <Button size="icon" variant="ghost" onClick={() => handleOpenRejectDialog(sop.id)} title="Tolak" className="hover:bg-red-100">
-                                          <X className="w-4 h-4 text-red-600" />
-                                        </Button>
-                                        {/* Rejection Dialog - Moved inside Verifikasi page */}
-                                        <Dialog open={showRejectDialog && rejectTargetId === sop.id} onOpenChange={(open) => {
-                                          if (!open) {
-                                            setShowRejectDialog(false)
-                                            setRejectTargetId(null)
-                                            setRejectReason('')
-                                          }
-                                        }}>
-                                          <DialogContent className="sm:max-w-md bg-gradient-to-b from-slate-900 to-slate-800 border-2 border-orange-500 shadow-2xl" aria-describedby={undefined}>
-                                            <DialogHeader>
-                                              <DialogTitle className="text-xl font-bold text-white flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg">
-                                                  <XCircle className="w-6 h-6 text-white" />
-                                                </div>
-                                                <div>
-                                                  <span className="bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-400 bg-clip-text text-transparent">
-                                                    Tolak Pengajuan
-                                                  </span>
-                                                  <p className="text-xs text-gray-400 font-normal mt-0.5">BCC - SOP Katalog</p>
-                                                </div>
-                                              </DialogTitle>
-                                              <DialogDescription className="text-gray-300 pt-2">
-                                                Masukkan alasan penolakan untuk pengajuan ini. Alasan akan ditampilkan kepada pengaju.
-                                              </DialogDescription>
-                                            </DialogHeader>
-                                            <div className="py-4">
-                                              <Label className="font-medium text-orange-400 mb-2 block flex items-center gap-2">
-                                                <AlertTriangle className="w-4 h-4" />
-                                                Alasan Penolakan
-                                              </Label>
-                                              <Textarea
-                                                value={rejectReason}
-                                                onChange={(e) => setRejectReason(e.target.value)}
-                                                placeholder="Contoh: Dokumen tidak lengkap, format tidak sesuai, dll..."
-                                                rows={4}
-                                                className="border-2 border-orange-500/30 bg-slate-800/50 text-white placeholder:text-gray-500 focus:border-orange-500 focus:ring-orange-500/20 rounded-lg"
-                                              />
+                                    {/* Rejection Dialog - Moved inside Verifikasi page */}
+                                    <Dialog open={showRejectDialog && rejectTargetId === sop.id} onOpenChange={(open) => {
+                                      if (!open) {
+                                        setShowRejectDialog(false)
+                                        setRejectTargetId(null)
+                                        setRejectReason('')
+                                      }
+                                    }}>
+                                      <DialogContent className="sm:max-w-md bg-gradient-to-b from-slate-900 to-slate-800 border-2 border-orange-500 shadow-2xl" aria-describedby={undefined}>
+                                        <DialogHeader>
+                                          <DialogTitle className="text-xl font-bold text-white flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg">
+                                              <XCircle className="w-6 h-6 text-white" />
                                             </div>
-                                            <DialogFooter className="gap-2">
-                                              <Button 
-                                                type="button" 
-                                                variant="outline" 
-                                                onClick={() => {
-                                                  setShowRejectDialog(false)
-                                                  setRejectTargetId(null)
-                                                  setRejectReason('')
-                                                }}
-                                                className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
-                                              >
-                                                Batal
-                                              </Button>
-                                              <Button 
-                                                type="button" 
-                                                onClick={handleConfirmReject}
-                                                disabled={!rejectReason.trim()}
-                                                className="bg-gradient-to-r from-orange-500 via-red-500 to-orange-600 hover:from-orange-600 hover:via-red-600 hover:to-orange-700 text-white shadow-lg shadow-orange-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
-                                              >
-                                                <X className="w-4 h-4 mr-2" />
+                                            <div>
+                                              <span className="bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-400 bg-clip-text text-transparent">
                                                 Tolak Pengajuan
-                                              </Button>
-                                            </DialogFooter>
-                                          </DialogContent>
-                                        </Dialog>
-                                      </>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
-            
-            {/* Arsip Page */}
-            {currentPage === 'arsip' && (
+                                              </span>
+                                              <p className="text-xs text-gray-400 font-normal mt-0.5">BCC - SOP Katalog</p>
+                                            </div>
+                                          </DialogTitle>
+                                          <DialogDescription className="text-gray-300 pt-2">
+                                            Masukkan alasan penolakan untuk pengajuan ini. Alasan akan ditampilkan kepada pengaju.
+                                          </DialogDescription>
+                                        </DialogHeader>
+                                        <div className="py-4">
+                                          <Label className="font-medium text-orange-400 mb-2 block flex items-center gap-2">
+                                            <AlertTriangle className="w-4 h-4" />
+                                            Alasan Penolakan
+                                          </Label>
+                                          <Textarea
+                                            value={rejectReason}
+                                            onChange={(e) => setRejectReason(e.target.value)}
+                                            placeholder="Contoh: Dokumen tidak lengkap, format tidak sesuai, dll..."
+                                            rows={4}
+                                            className="border-2 border-orange-500/30 bg-slate-800/50 text-white placeholder:text-gray-500 focus:border-orange-500 focus:ring-orange-500/20 rounded-lg"
+                                          />
+                                        </div>
+                                        <DialogFooter className="gap-2">
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => {
+                                              setShowRejectDialog(false)
+                                              setRejectTargetId(null)
+                                              setRejectReason('')
+                                            }}
+                                            className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
+                                          >
+                                            Batal
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            onClick={handleConfirmReject}
+                                            disabled={!rejectReason.trim()}
+                                            className="bg-gradient-to-r from-orange-500 via-red-500 to-orange-600 hover:from-orange-600 hover:via-red-600 hover:to-orange-700 text-white shadow-lg shadow-orange-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                                          >
+                                            <X className="w-4 h-4 mr-2" />
+                                            Tolak Pengajuan
+                                          </Button>
+                                        </DialogFooter>
+                                      </DialogContent>
+                                    </Dialog>
+                                  </>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div >
+          )
+}
+
+          {/* Arsip Page */}
+          {
+            currentPage === 'arsip' && (
               <motion.div
                 key="arsip"
                 variants={fadeInUp}
@@ -7016,27 +6596,47 @@ export default function ESOPApp() {
                 <div className="flex items-center justify-between">
                   <ShimmerTitle subtitle="File yang ditolak dari pengajuan publik">Arsip File Ditolak</ShimmerTitle>
                 </div>
-                
+
                 {/* Search Bar */}
-                <Card className="bg-white border-2 border-orange-200 shadow-lg">
-                  <CardContent className="p-4">
-                    <div className="flex flex-wrap items-center gap-3">
+                <div className="rounded-2xl overflow-hidden shadow-2xl" style={{ background: 'linear-gradient(135deg, #1a0a0a 0%, #1e1015 50%, #1a0a0a 100%)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                  <div className="flex items-center gap-2 px-5 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #b91c1c)' }}><Search className="w-3.5 h-3.5 text-white" /></div>
+                    <span className="text-sm font-bold text-white">Filter &amp; Pencarian</span>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex flex-wrap items-end gap-3">
+                      {/* Search */}
                       <div className="flex-1 min-w-[200px]">
-                        <Label className="text-xs font-medium text-gray-600 mb-1 block">Cari</Label>
+                        <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1.5">Cari</p>
                         <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#f87171' }} />
                           <Input
                             placeholder="Cari judul, nama, email..."
                             value={arsipSearch}
                             onChange={(e) => setArsipSearch(e.target.value)}
-                            className="pl-10 h-10 border-gray-200 bg-white text-gray-900 text-sm rounded-lg"
+                            className="pl-10 h-10 text-white placeholder:text-gray-500 text-sm rounded-xl"
+                            style={{ background: 'rgba(255,255,255,0.06)', border: arsipSearch ? '1.5px solid rgba(239,68,68,0.6)' : '1.5px solid rgba(255,255,255,0.1)', boxShadow: arsipSearch ? '0 0 10px rgba(239,68,68,0.2)' : 'none' }}
                           />
                         </div>
                       </div>
+                      {/* Lingkup */}
                       <div className="min-w-[140px]">
-                        <Label className="text-xs font-medium text-gray-600 mb-1 block">Urutkan</Label>
+                        <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1.5">Lingkup</p>
+                        <Select value={arsipLingkupFilter} onValueChange={(v) => setArsipLingkupFilter(v)}>
+                          <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: arsipLingkupFilter !== 'SEMUA' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.06)', border: arsipLingkupFilter !== 'SEMUA' ? '1.5px solid rgba(239,68,68,0.4)' : '1.5px solid rgba(255,255,255,0.1)', color: arsipLingkupFilter !== 'SEMUA' ? '#fca5a5' : '#9ca3af' }}>
+                            <SelectValue placeholder="Filter Lingkup" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="SEMUA">Semua Lingkup</SelectItem>
+                            {LINGKUP_OPTIONS.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {/* Sort */}
+                      <div className="min-w-[140px]">
+                        <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1.5">Urutkan</p>
                         <Select value={arsipSortBy} onValueChange={(v) => setArsipSortBy(v as 'uploadedAt-desc' | 'uploadedAt-asc')}>
-                          <SelectTrigger className="h-10 border-gray-200 bg-white text-gray-900 text-sm rounded-lg">
+                          <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.1)', color: '#9ca3af' }}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -7046,1158 +6646,1151 @@ export default function ESOPApp() {
                         </Select>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-                
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <StatCard title="Total File Ditolak" value={arsipList.length} icon={XCircle} color="red" delay={0} />
-                  <StatCard title="Folder Arsip" value="Publik-Ditolak" icon={FolderOpen} color="orange" delay={0.1} />
-                </div>
-                
-                {/* Arsip Table */}
-                <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
-                  <CardHeader className="bg-gradient-to-r from-red-500 to-orange-500 text-white">
-                    <CardTitle className="text-lg">Daftar File Ditolak</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0 relative">
-                    {/* Loading Overlay */}
-                    {arsipLoading && (
-                      <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center">
-                        <div className="flex flex-col items-center gap-3">
-                          <div className="relative">
-                            <motion.div
-                              className="w-10 h-10 border-4 border-red-500 border-t-transparent rounded-full"
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
-                            />
-                            <motion.div
-                              className="absolute inset-0 w-10 h-10 border-4 border-orange-400 border-b-transparent rounded-full"
-                              animate={{ rotate: -360 }}
-                              transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
-                            />
-                          </div>
-                          <span className="text-sm text-gray-600 font-medium">Memuat data...</span>
-                        </div>
-                      </div>
-                    )}
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-gradient-to-r from-red-400 to-orange-400">
-                            <TableHead className="font-bold text-white">Pengirim</TableHead>
-                            <TableHead className="font-bold text-white">Judul</TableHead>
-                            <TableHead className="font-bold text-white">Jenis</TableHead>
-                            <TableHead className="font-bold text-white">Kategori</TableHead>
-                            <TableHead className="font-bold text-white">Alasan Penolakan</TableHead>
-                            <TableHead className="font-bold text-white text-center">Aksi</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {arsipList.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={6} className="text-center text-gray-500 py-12">
-                                <div className="flex flex-col items-center gap-2">
-                                  <FolderOpen className="w-12 h-12 text-gray-400" />
-                                  <p>Tidak ada file di arsip</p>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            arsipList.map((sop) => (
-                              <TableRow key={sop.id} className="hover:bg-red-50 border-b border-gray-200">
-                                <TableCell>
-                                  <div>
-                                    <p className="font-semibold text-blue-900">{sop.submitterName}</p>
-                                    <p className="text-sm text-gray-600">{sop.submitterEmail}</p>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    <FileTypeIcon fileName={sop.fileName} className="w-5 h-5 flex-shrink-0" />
-                                    <div>
-                                      <span className="font-semibold text-blue-900">{sop.judul}</span>
-                                      {sop.verifiedAt && (
-                                        <div className="text-xs text-red-600 mt-0.5">
-                                          <span className="text-red-500">Ditolak:</span> {new Date(sop.verifiedAt).toLocaleString('id-ID', { 
-                                            day: 'numeric', 
-                                            month: 'short', 
-                                            year: 'numeric',
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                          })}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge className={sop.jenis === 'SOP' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white'}>
-                                    {sop.jenis}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className="border-orange-500 bg-orange-50 text-orange-700">{sop.kategori}</Badge>
-                                </TableCell>
-                                <TableCell className="text-gray-600 text-sm max-w-[200px]">
-                                  {sop.keterangan && (
-                                    <span className="text-gray-700 block">Catatan: {sop.keterangan}</span>
-                                  )}
-                                  <span className="text-red-600 block">Alasan: {sop.rejectionReason || 'Tidak ada alasan'}</span>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center justify-center gap-1">
-                                    <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} title="Preview" className="hover:bg-cyan-100">
-                                      <Eye className="w-4 h-4 text-cyan-600" />
-                                    </Button>
-                                    <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-100">
-                                      <Download className="w-4 h-4 text-green-600" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
-            
-            {currentPage === 'logs' && (
-              <motion.div
-                key="logs"
-                variants={fadeInUp}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                className="space-y-6"
-              >
-                <ShimmerTitle subtitle="Riwayat semua aktivitas sistem">Log Aktivitas</ShimmerTitle>
-                
-                <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
-                  <CardContent className="p-0">
-                    <ScrollArea className="h-[600px]">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-gradient-to-r from-orange-500 to-yellow-500 sticky top-0">
-                            <TableHead className="font-bold text-white">Waktu</TableHead>
-                            <TableHead className="font-bold text-white">User</TableHead>
-                            <TableHead className="font-bold text-white">Aktivitas</TableHead>
-                            <TableHead className="font-bold text-white">Deskripsi</TableHead>
-                            <TableHead className="font-bold text-white">File</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {logs.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={5} className="text-center text-gray-500 py-8">
-                                Tidak ada log
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            logs.map((log) => (
-                              <TableRow key={log.id} className="hover:bg-orange-50 border-b border-gray-200">
-                                <TableCell className="text-sm text-gray-700">
-                                  {new Date(log.createdAt).toLocaleString('id-ID')}
-                                </TableCell>
-                                <TableCell>
-                                  <div>
-                                    <p className="font-semibold text-blue-900">{log.user?.name}</p>
-                                    <p className="text-xs text-gray-500">{log.user?.email}</p>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className={
-                                    log.aktivitas === 'LOGIN' ? 'bg-blue-100 text-blue-700 border-blue-300' :
-                                    log.aktivitas === 'UPLOAD' ? 'bg-green-100 text-green-700 border-green-300' :
-                                    log.aktivitas === 'DOWNLOAD' ? 'bg-purple-100 text-purple-700 border-purple-300' :
-                                    log.aktivitas === 'PREVIEW' ? 'bg-cyan-100 text-cyan-700 border-cyan-300' :
-                                    log.aktivitas === 'VERIFIKASI' ? 'bg-orange-100 text-orange-700 border-orange-300' :
-                                    'bg-gray-100 text-gray-700 border-gray-300'
-                                  }>
-                                    {log.aktivitas}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-gray-700">{log.deskripsi}</TableCell>
-                                <TableCell>
-                                  {log.sopFile && (
-                                    <span className="text-sm text-orange-600 font-medium truncate max-w-[200px] block">{log.sopFile.judul}</span>
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
-                    </ScrollArea>
-                  </CardContent>
-                </Card>
-                
-                {/* Pagination */}
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-600">
-                    Menampilkan {logs.length} log
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      disabled={logsPagination.page === 1}
-                      onClick={() => setLogsPagination(p => ({ ...p, page: p.page - 1 }))}
-                      className="border-orange-300 text-orange-600 hover:bg-orange-50"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                    <span className="text-sm text-gray-600 font-medium">Halaman {logsPagination.page}</span>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      disabled={logsPagination.page >= logsPagination.totalPages}
-                      onClick={() => setLogsPagination(p => ({ ...p, page: p.page + 1 }))}
-                      className="border-orange-300 text-orange-600 hover:bg-orange-50"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
                   </div>
                 </div>
-              </motion.div>
-            )}
-            
-            {currentPage === 'users' && (user?.role === 'DEVELOPER' || user?.role === 'ADMIN') && (
-              <motion.div
-                key="users"
-                variants={fadeInUp}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                className="space-y-6"
-              >
-                <div className="flex items-center justify-between">
-                  <ShimmerTitle subtitle="Kelola pengguna sistem">Manajemen User</ShimmerTitle>
-                  <Dialog open={showUserDialog} onOpenChange={setShowUserDialog}>
-                    <DialogTrigger asChild>
-                      <Button className="btn-sar bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-lg shadow-orange-500/30">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Tambah User
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl p-0 overflow-hidden" aria-describedby={undefined}>
-                      {/* Header with gradient */}
-                      <DialogHeader className="bg-gradient-to-r from-orange-500 to-yellow-500 p-5 text-white">
-                        <DialogTitle className="text-lg font-bold flex items-center gap-2 text-white">
-                          <Users className="w-5 h-5" />
-                          Tambah User Baru
-                        </DialogTitle>
-                      </DialogHeader>
-                      <form onSubmit={handleCreateUser} className="p-5 space-y-5">
-                        <div className="space-y-2">
-                          <Label className="font-semibold text-blue-900">Nama Lengkap</Label>
-                          <Input 
-                            value={newUserForm.name}
-                            onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
-                            placeholder="Masukkan nama lengkap"
-                            required
-                            className="border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 h-11"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="font-semibold text-blue-900">Email</Label>
-                          <Input 
-                            type="email"
-                            value={newUserForm.email}
-                            onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
-                            placeholder="Masukkan email"
-                            required
-                            className="border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 h-11"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="font-semibold text-blue-900">Password</Label>
-                          <Input 
-                            type="password"
-                            autoComplete="new-password"
-                            value={newUserForm.password}
-                            onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
-                            placeholder="Masukkan password"
-                            required
-                            className="border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 h-11"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="font-semibold text-blue-900">Role</Label>
-                          <Select value={newUserForm.role} onValueChange={(v) => setNewUserForm({ ...newUserForm, role: v })}>
-                            <SelectTrigger className="border-2 border-gray-200 focus:border-orange-500 text-gray-900 h-11">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="ADMIN">Admin</SelectItem>
-                              <SelectItem value="STAF">Staf</SelectItem>
-                              <SelectItem value="DEVELOPER">Developer</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <DialogFooter className="pt-2 gap-2">
-                          <Button type="button" variant="outline" onClick={() => setShowUserDialog(false)} className="border-gray-300 text-gray-700 hover:bg-gray-100">Batal</Button>
-                          <Button type="submit" className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white" disabled={loading}>
-                            Simpan
-                          </Button>
-                        </DialogFooter>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
 
-                  {/* Desktop Sync Dialog - Upload edited file */}
-                  <Dialog open={showDesktopSyncDialog} onOpenChange={setShowDesktopSyncDialog}>
-                    <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
-                      <DialogHeader>
-                        <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                          <RefreshCw className="w-5 h-5 text-orange-600" />
-                          Selesai Edit & Sync
-                        </DialogTitle>
-                        <DialogDescription className="text-gray-600">
-                          Upload file hasil edit untuk disinkronkan ke storage
-                        </DialogDescription>
-                      </DialogHeader>
-                      
-                      {excelEditData && (
-                        <div className="space-y-4">
-                          {/* File Info */}
-                          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                            <div className="flex items-start gap-3">
-                              {['docx', 'doc'].includes(excelEditData.fileType || '') ? (
-                                <FileText className="w-10 h-10 text-blue-600 mt-1" />
-                              ) : (
-                                <FileSpreadsheet className="w-10 h-10 text-green-600 mt-1" />
-                              )}
-                              <div>
-                                <p className="font-bold text-gray-900">{excelEditData.fileName}</p>
-                                <p className="text-sm text-gray-600">{excelEditData.judul}</p>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* Session Info */}
-                          {desktopEditSessionToken && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                              <p className="text-sm text-blue-800">
-                                <strong>Session aktif:</strong> Tanpa batas waktu
-                              </p>
-                              <p className="text-xs text-blue-600 mt-1">
-                                Original hash: {desktopEditOriginalHash?.slice(0, 16)}...
-                              </p>
-                            </div>
-                          )}
-                          
-                          {/* File Picker */}
-                          <div className="space-y-3">
-                            <Label className="text-sm font-semibold text-gray-700">
-                              Pilih File Hasil Edit
-                            </Label>
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
-                              <input
-                                type="file"
-                                accept=".xlsx,.xls,.xlsm,.docx,.doc"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0]
-                                  if (file) {
-                                    setDesktopSyncFile(file)
-                                  }
-                                }}
-                                className="hidden"
-                                id="desktop-sync-file"
-                              />
-                              <label
-                                htmlFor="desktop-sync-file"
-                                className="cursor-pointer"
-                              >
-                                {desktopSyncFile ? (
-                                  <div className="flex items-center justify-center gap-2">
-                                    <CheckCircle className="w-5 h-5 text-green-600" />
-                                    <span className="text-sm text-gray-700">{desktopSyncFile.name}</span>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <Upload className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                                    <p className="text-sm text-gray-600">
-                                      Klik untuk memilih file
-                                    </p>
-                                    <p className="text-xs text-gray-400 mt-1">
-                                      Format: .xlsx, .xls, .xlsm, .docx, .doc
-                                    </p>
-                                  </>
-                                )}
-                              </label>
-                            </div>
-                          </div>
-                          
-                          {/* Info */}
-                          <Alert className="bg-amber-50 border-amber-200">
-                            <AlertTriangle className="w-4 h-4 text-amber-600" />
-                            <AlertDescription className="text-amber-800 text-sm">
-                              <strong>Penting:</strong> File akan di-checksum dan dibandingkan dengan file asli.
-                              Jika tidak ada perubahan, file tidak akan di-upload.
-                            </AlertDescription>
-                          </Alert>
+      {/* Stats Cards */}
+      < div className="grid grid-cols-1 md:grid-cols-2 gap-4" >
+        <StatCard title="Total File Ditolak" value={arsipList.length} icon={XCircle} color="red" delay={0} />
+        <StatCard title="Folder Arsip" value="Publik-Ditolak" icon={FolderOpen} color="orange" delay={0.1} />
+      </div >
+
+      {/* Arsip Table */}
+      < Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden" >
+        <CardHeader className="bg-gradient-to-r from-red-500 to-orange-500 text-white">
+          <CardTitle className="text-lg">Daftar File Ditolak</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0 relative">
+          {/* Loading Overlay */}
+          {arsipLoading && (
+            <div className="absolute top-0 inset-x-0 h-1 z-10 overflow-hidden">
+              <div className="w-full h-full bg-gradient-to-r from-red-400 via-orange-400 to-red-400 animate-sync-progress" />
+            </div>
+          )}
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gradient-to-r from-red-400 to-orange-400">
+                  <TableHead className="font-bold text-white">Pengirim</TableHead>
+                  <TableHead className="font-bold text-white">Judul</TableHead>
+                  <TableHead className="font-bold text-white">Jenis</TableHead>
+                  <TableHead className="font-bold text-white">Kategori</TableHead>
+                  <TableHead className="font-bold text-white">Lingkup</TableHead>
+                  <TableHead className="font-bold text-white">Alasan Penolakan</TableHead>
+                  <TableHead className="font-bold text-white text-center">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {arsipList.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-gray-500 py-12">
+                      <div className="flex flex-col items-center gap-2">
+                        <FolderOpen className="w-12 h-12 text-gray-400" />
+                        <p>Tidak ada file di arsip</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  arsipList.map((sop) => (
+                    <TableRow key={sop.id} className="hover:bg-red-50 border-b border-gray-200">
+                      <TableCell>
+                        <div>
+                          <p className="font-semibold text-blue-900">{sop.submitterName}</p>
+                          <p className="text-sm text-gray-600">{sop.submitterEmail}</p>
                         </div>
-                      )}
-                      
-                      <DialogFooter className="gap-2">
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          onClick={() => setShowDesktopSyncDialog(false)}
-                          className="border-gray-300 text-gray-700 hover:bg-gray-100"
-                        >
-                          Batal
-                        </Button>
-                        <Button 
-                          type="button" 
-                          onClick={handleDesktopSync}
-                          disabled={!desktopSyncFile || desktopSyncing}
-                          className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
-                        >
-                          {desktopSyncing ? (
-                            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Syncing...</>
-                          ) : (
-                            <><RefreshCw className="w-4 h-4 mr-2" /> Sync ke R2</>
-                          )}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                  
-                  {/* Excel Edit Diagnostic Dialog */}
-                  <Dialog open={showDiagnosticDialog} onOpenChange={setShowDiagnosticDialog}>
-                    <DialogContent className="sm:max-w-2xl bg-white border-2 border-orange-200 shadow-xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
-                      <DialogHeader>
-                        <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                          <Activity className="w-5 h-5 text-orange-600" />
-                          Diagnostik Excel Edit System
-                        </DialogTitle>
-                        <DialogDescription className="text-gray-600">
-                          Memeriksa semua komponen untuk fitur edit Excel dengan Microsoft 365
-                        </DialogDescription>
-                      </DialogHeader>
-                      
-                      <div className="space-y-4">
-                        {diagnosticLoading && (
-                          <div className="flex flex-col items-center justify-center py-8">
-                            <Loader2 className="w-10 h-10 text-orange-500 animate-spin mb-4" />
-                            <p className="text-gray-600">Menjalankan diagnostik...</p>
-                          </div>
-                        )}
-                        
-                        {diagnosticResult && !diagnosticLoading && (
-                          <>
-                            {/* Summary */}
-                            <div className={`p-4 rounded-lg ${
-                              diagnosticResult.success 
-                                ? 'bg-green-50 border border-green-200' 
-                                : 'bg-red-50 border border-red-200'
-                            }`}>
-                              <div className="flex items-center gap-3">
-                                {diagnosticResult.success ? (
-                                  <CheckCircle className="w-8 h-8 text-green-500" />
-                                ) : (
-                                  <XCircle className="w-8 h-8 text-red-500" />
-                                )}
-                                <div>
-                                  <p className={`font-bold ${diagnosticResult.success ? 'text-green-800' : 'text-red-800'}`}>
-                                    {diagnosticResult.success ? 'Semua Sistem Berfungsi!' : 'Terdapat Masalah'}
-                                  </p>
-                                  <p className={`text-sm ${diagnosticResult.success ? 'text-green-600' : 'text-red-600'}`}>
-                                    {diagnosticResult.message}
-                                  </p>
-                                </div>
-                              </div>
-                              
-                              {/* Stats */}
-                              <div className="flex gap-4 mt-3 text-sm">
-                                <span className="text-gray-600">
-                                  Total: <strong>{diagnosticResult.summary.totalSteps}</strong>
-                                </span>
-                                <span className="text-green-600">
-                                  Pass: <strong>{diagnosticResult.summary.passed}</strong>
-                                </span>
-                                <span className="text-red-600">
-                                  Fail: <strong>{diagnosticResult.summary.failed}</strong>
-                                </span>
-                              </div>
-                            </div>
-                            
-                            {/* Results List */}
-                            <div className="space-y-3">
-                              <h4 className="font-semibold text-gray-700">Detail Hasil:</h4>
-                              {diagnosticResult.results.map((result, index) => (
-                                <div 
-                                  key={index}
-                                  className={`p-3 rounded-lg border ${
-                                    result.success 
-                                      ? 'bg-green-50 border-green-200' 
-                                      : 'bg-red-50 border-red-200'
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      {result.success ? (
-                                        <CheckCircle className="w-5 h-5 text-green-500" />
-                                      ) : (
-                                        <XCircle className="w-5 h-5 text-red-500" />
-                                      )}
-                                      <span className="font-medium text-gray-900">{result.step}</span>
-                                    </div>
-                                    {result.duration && (
-                                      <span className="text-xs text-gray-500">{result.duration}ms</span>
-                                    )}
-                                  </div>
-                                  <p className={`text-sm mt-1 ${result.success ? 'text-green-700' : 'text-red-700'}`}>
-                                    {result.message}
-                                  </p>
-                                  {result.error && (
-                                    <p className="text-xs text-red-600 mt-1 font-mono bg-red-100 p-2 rounded">
-                                      {result.error}
-                                    </p>
-                                  )}
-                                  {result.details && (
-                                    <div className="mt-2 text-xs bg-gray-100 p-2 rounded font-mono overflow-x-auto">
-                                      {Object.entries(result.details).map(([key, value]) => (
-                                        <div key={key} className="flex gap-2">
-                                          <span className="text-gray-500">{key}:</span>
-                                          <span className={typeof value === 'string' && value.includes('✅') ? 'text-green-600' : typeof value === 'string' && value.includes('❌') ? 'text-red-600' : 'text-gray-700'}>
-                                            {String(value)}
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                            
-                            {/* Next Steps */}
-                            {!diagnosticResult.success && diagnosticResult.nextSteps.length > 0 && (
-                              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                                <h4 className="font-semibold text-amber-800 mb-2">Langkah Selanjutnya:</h4>
-                                <ul className="list-disc list-inside space-y-1 text-sm text-amber-700">
-                                  {diagnosticResult.nextSteps.map((step, index) => (
-                                    <li key={index}>{step}</li>
-                                  ))}
-                                </ul>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <FileTypeIcon fileName={sop.fileName} className="w-5 h-5 flex-shrink-0" />
+                          <div>
+                            <span className="font-semibold text-blue-900">{sop.judul}</span>
+                            {sop.verifiedAt && (
+                              <div className="text-xs text-red-600 mt-0.5">
+                                <span className="text-red-500">Ditolak:</span> {new Date(sop.verifiedAt).toLocaleString('id-ID', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
                               </div>
                             )}
-                          </>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={sop.jenis === 'SOP' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white'}>
+                          {sop.jenis}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="border-orange-500 bg-orange-50 text-orange-700">{sop.kategori}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="border-blue-500 bg-blue-50 text-blue-700">{sop.lingkup || '-'}</Badge>
+                      </TableCell>
+                      <TableCell className="text-gray-600 text-sm max-w-[200px]">
+                        {sop.keterangan && (
+                          <span className="text-gray-700 block">Catatan: {sop.keterangan}</span>
                         )}
-                      </div>
-                      
-                      <DialogFooter className="gap-2">
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          onClick={() => setShowDiagnosticDialog(false)}
-                          className="border-gray-300 text-gray-700 hover:bg-gray-100"
-                        >
-                          Tutup
-                        </Button>
-                        <Button 
-                          type="button" 
-                          onClick={handleRunDiagnostic}
-                          disabled={diagnosticLoading}
-                          className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
-                        >
-                          {diagnosticLoading ? (
-                            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menjalankan...</>
-                          ) : (
-                            <><RefreshCw className="w-4 h-4 mr-2" /> Jalankan Ulang</>
-                          )}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-                
-                <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
-                  <CardContent className="p-0">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-gradient-to-r from-orange-500 to-yellow-500">
-                          <TableHead className="font-bold text-white">Nama</TableHead>
-                          <TableHead className="font-bold text-white">Email</TableHead>
-                          {usersIncludePassword && (
-                            <TableHead className="font-bold text-white">Password</TableHead>
-                          )}
-                          <TableHead className="font-bold text-white">Role</TableHead>
-                          <TableHead className="font-bold text-white">Terakhir Login</TableHead>
-                          <TableHead className="font-bold text-white">Aktivitas</TableHead>
-                          <TableHead className="font-bold text-white text-center">Aksi</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {users.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={usersIncludePassword ? 7 : 6} className="text-center text-gray-500 py-8">
-                              Tidak ada user
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          users.map((u) => {
-                            const userWithExtra = u as User & { lastLoginAt?: string; _count?: { logs: number }; password?: string }
-                            // Only DEVELOPER can delete ADMIN and DEVELOPER users
-                            const canDelete = user?.role === 'DEVELOPER' || (user?.role === 'ADMIN' && u.role === 'STAF')
-                            return (
-                              <TableRow key={u.id} className="hover:bg-orange-50 border-b border-gray-200">
-                                <TableCell className="font-semibold text-blue-900">{u.name}</TableCell>
-                                <TableCell className="text-gray-700">{u.email}</TableCell>
-                                {usersIncludePassword && (
-                                  <TableCell className="text-gray-600 font-mono text-sm bg-gray-50">
-                                    {userWithExtra.password || '-'}
-                                  </TableCell>
-                                )}
-                                <TableCell>
-                                  <Badge className={u.role === 'ADMIN' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : u.role === 'DEVELOPER' ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white' : 'bg-gradient-to-r from-cyan-500 to-cyan-600 text-white'}>
-                                    {u.role}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-gray-600">
-                                  {userWithExtra.lastLoginAt ? new Date(userWithExtra.lastLoginAt).toLocaleString('id-ID') : 'Belum pernah login'}
-                                </TableCell>
-                                <TableCell className="text-gray-600">
-                                  {userWithExtra._count?.logs || 0} aktivitas
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  <div className="flex items-center justify-center gap-1">
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      onClick={() => {
-                                        setEditUserData(userWithExtra)
-                                        setEditUserForm({ name: u.name, email: u.email, role: u.role || 'STAF' })
-                                        setShowEditUserDialog(true)
-                                      }}
-                                      className="hover:bg-orange-100"
-                                      title="Edit User"
-                                    >
-                                      <Edit className="w-4 h-4 text-orange-500" />
-                                    </Button>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      onClick={async () => {
-                                        setSelectedUserForActivity(u)
-                                        try {
-                                          const res = await fetch(`/api/logs?userId=${u.id}`)
-                                          const data = await res.json()
-                                          setUserActivityLogs(data.data || [])
-                                          setShowUserActivityDialog(true)
-                                        } catch (error) {
-                                          console.error('Error fetching user activity:', error)
-                                        }
-                                      }}
-                                      className="hover:bg-cyan-100"
-                                      title="Lihat Riwayat"
-                                    >
-                                      <History className="w-4 h-4 text-cyan-500" />
-                                    </Button>
-                                    {canDelete && (
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        onClick={() => handleDeleteUser(u.id)}
-                                        className="hover:bg-red-100"
-                                        title="Hapus User"
-                                      >
-                                        <Trash2 className="w-4 h-4 text-red-500" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            )
-                          })
-                        )}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </main>
-      </div>
-      
-      {/* Edit User Dialog */}
-      <Dialog open={showEditUserDialog} onOpenChange={setShowEditUserDialog}>
-        <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Edit className="w-5 h-5 text-orange-600" />
-              Edit User
-            </DialogTitle>
-            <DialogDescription className="text-gray-600">
-              Perbarui informasi user
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label className="font-medium text-gray-700">Nama</Label>
-              <Input
-                value={editUserForm.name}
-                onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })}
-                className="border-gray-300 bg-white text-gray-900"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="font-medium text-gray-700">Email</Label>
-              <Input
-                value={editUserForm.email}
-                onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
-                className="border-gray-300 bg-white text-gray-900"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="font-medium text-gray-700">Role</Label>
-              <Select value={editUserForm.role} onValueChange={(v) => setEditUserForm({ ...editUserForm, role: v })}>
-                <SelectTrigger className="border-gray-300 bg-white text-gray-900">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ADMIN">Admin</SelectItem>
-                  <SelectItem value="STAF">Staf</SelectItem>
-                  <SelectItem value="DEVELOPER">Developer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+                        <span className="text-red-600 block">Alasan: {sop.rejectionReason || 'Tidak ada alasan'}</span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-center gap-1">
+                          <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} title="Preview" className="hover:bg-cyan-100">
+                            <Eye className="w-4 h-4 text-cyan-600" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-100">
+                            <Download className="w-4 h-4 text-green-600" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </div>
-          <DialogFooter className="gap-2">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => setShowEditUserDialog(false)}
-              className="border-gray-300 text-gray-700 hover:bg-gray-100"
-            >
-              Batal
-            </Button>
-            <Button 
-              type="button" 
-              onClick={async () => {
-                if (!editUserData) return
-                try {
-                  const res = await fetch('/api/users', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      id: editUserData.id,
-                      name: editUserForm.name,
-                      email: editUserForm.email,
-                      role: editUserForm.role
-                    })
-                  })
-                  const data = await res.json()
-                  if (data.error) {
-                    toast({ title: 'Error', description: data.error, variant: 'destructive' })
-                  } else {
-                    toast({ title: '✅ Berhasil', description: 'User berhasil diperbarui!' })
-                    setShowEditUserDialog(false)
-                    fetchUsers()
-                  }
-                } catch (error) {
-                  toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
-                }
-              }}
-              className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
-            >
-              Simpan Perubahan
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </CardContent>
+      </Card >
+    </motion.div >
+  )
+}
 
-      {/* Password Change Dialog */}
-      <Dialog open={showPasswordChangeDialog} onOpenChange={setShowPasswordChangeDialog}>
-        <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Shield className="w-5 h-5 text-orange-600" />
-              Ganti Password
-            </DialogTitle>
-            <DialogDescription className="text-gray-600">
-              Ubah password akun Anda
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label className="font-medium text-gray-700">Password Lama</Label>
-              <Input
-                type="password"
-                value={passwordChangeForm.currentPassword}
-                onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, currentPassword: e.target.value })}
-                className="border-gray-300 bg-white text-gray-900"
-                placeholder="Masukkan password lama"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="font-medium text-gray-700">Password Baru</Label>
-              <Input
-                type="password"
-                value={passwordChangeForm.newPassword}
-                onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, newPassword: e.target.value })}
-                className="border-gray-300 bg-white text-gray-900"
-                placeholder="Masukkan password baru (min. 4 karakter)"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="font-medium text-gray-700">Konfirmasi Password Baru</Label>
-              <Input
-                type="password"
-                value={passwordChangeForm.confirmPassword}
-                onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, confirmPassword: e.target.value })}
-                className="border-gray-300 bg-white text-gray-900"
-                placeholder="Konfirmasi password baru"
-              />
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowPasswordChangeDialog(false)}
-              className="border-gray-300 text-gray-700 hover:bg-gray-100"
-            >
-              Batal
-            </Button>
-            <Button
-              type="button"
-              disabled={passwordChangeLoading}
-              onClick={async () => {
-                // Validation
-                if (!passwordChangeForm.currentPassword || !passwordChangeForm.newPassword || !passwordChangeForm.confirmPassword) {
-                  toast({ title: 'Error', description: 'Semua field harus diisi', variant: 'destructive' })
-                  return
-                }
-                if (passwordChangeForm.newPassword.length < 4) {
-                  toast({ title: 'Error', description: 'Password baru minimal 4 karakter', variant: 'destructive' })
-                  return
-                }
-                if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
-                  toast({ title: 'Error', description: 'Konfirmasi password tidak cocok', variant: 'destructive' })
-                  return
-                }
+{
+  currentPage === 'logs' && (
+    <motion.div
+      key="logs"
+      variants={fadeInUp}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="space-y-6"
+    >
+      <ShimmerTitle subtitle="Riwayat semua aktivitas sistem">Log Aktivitas</ShimmerTitle>
 
-                setPasswordChangeLoading(true)
-                try {
-                  const res = await fetch('/api/users/password', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      currentPassword: passwordChangeForm.currentPassword,
-                      newPassword: passwordChangeForm.newPassword
-                    })
-                  })
-                  const data = await res.json()
-                  if (data.error) {
-                    toast({ title: 'Error', description: data.error, variant: 'destructive' })
-                  } else {
-                    toast({ title: '✅ Berhasil', description: 'Password berhasil diubah!' })
-                    setShowPasswordChangeDialog(false)
-                  }
-                } catch (error) {
-                  toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
-                } finally {
-                  setPasswordChangeLoading(false)
-                }
-              }}
-              className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
-            >
-              {passwordChangeLoading ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</>
-              ) : (
-                'Simpan Password'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* User Activity Dialog */}
-      <Dialog open={showUserActivityDialog} onOpenChange={setShowUserActivityDialog}>
-        <DialogContent className="sm:max-w-2xl bg-white border-2 border-cyan-200 shadow-xl max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <History className="w-5 h-5 text-cyan-600" />
-              Riwayat Aktivitas: {selectedUserForActivity?.name}
-            </DialogTitle>
-            <DialogDescription className="text-gray-600">
-              {selectedUserForActivity?.email}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            {userActivityLogs.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                <History className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                <p>Belum ada aktivitas</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {userActivityLogs.map((log) => (
-                  <div key={log.id} className="flex items-start gap-3 p-3 bg-cyan-50 rounded-lg">
-                    <div className="w-2 h-2 mt-2 rounded-full bg-cyan-500" />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
+      <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
+        <CardContent className="p-0">
+          <ScrollArea className="h-[600px]">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gradient-to-r from-orange-500 to-yellow-500 sticky top-0">
+                  <TableHead className="font-bold text-white">Waktu</TableHead>
+                  <TableHead className="font-bold text-white">User</TableHead>
+                  <TableHead className="font-bold text-white">Aktivitas</TableHead>
+                  <TableHead className="font-bold text-white">Deskripsi</TableHead>
+                  <TableHead className="font-bold text-white">File</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {logs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-gray-500 py-8">
+                      Tidak ada log
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  logs.map((log) => (
+                    <TableRow key={log.id} className="hover:bg-orange-50 border-b border-gray-200">
+                      <TableCell className="text-sm text-gray-700">
+                        {new Date(log.createdAt).toLocaleString('id-ID')}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-semibold text-blue-900">{log.user?.name}</p>
+                          <p className="text-xs text-gray-500">{log.user?.email}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <Badge variant="outline" className={
                           log.aktivitas === 'LOGIN' ? 'bg-blue-100 text-blue-700 border-blue-300' :
-                          log.aktivitas === 'UPLOAD' ? 'bg-green-100 text-green-700 border-green-300' :
-                          log.aktivitas === 'DOWNLOAD' ? 'bg-purple-100 text-purple-700 border-purple-300' :
-                          log.aktivitas === 'PREVIEW' ? 'bg-cyan-100 text-cyan-700 border-cyan-300' :
-                          log.aktivitas === 'VERIFIKASI' ? 'bg-orange-100 text-orange-700 border-orange-300' :
-                          'bg-gray-100 text-gray-700 border-gray-300'
+                            log.aktivitas === 'UPLOAD' ? 'bg-green-100 text-green-700 border-green-300' :
+                              log.aktivitas === 'DOWNLOAD' ? 'bg-purple-100 text-purple-700 border-purple-300' :
+                                log.aktivitas === 'PREVIEW' ? 'bg-cyan-100 text-cyan-700 border-cyan-300' :
+                                  log.aktivitas === 'VERIFIKASI' ? 'bg-orange-100 text-orange-700 border-orange-300' :
+                                    'bg-gray-100 text-gray-700 border-gray-300'
                         }>
                           {log.aktivitas}
                         </Badge>
-                        <span className="text-xs text-gray-500">
-                          {new Date(log.createdAt).toLocaleString('id-ID')}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-700 mt-1">{log.deskripsi}</p>
-                      {log.sopFile && (
-                        <p className="text-xs text-orange-600 mt-1">{log.sopFile.judul}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => setShowUserActivityDialog(false)}
-              className="border-gray-300 text-gray-700 hover:bg-gray-100"
-            >
-              Tutup
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Glowing Footer - Bottom Left - Visible on all pages */}
-      <motion.div 
-        className="fixed bottom-4 left-4 z-50"
-        initial={{ opacity: 0, y: 50 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.8 }}
-      >
-        <div className="relative cursor-pointer" onClick={() => setShowCopyrightPopup(true)}>
-          {/* Glow effect */}
-          <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-yellow-400 rounded-lg blur-md opacity-60 animate-pulse" />
-          
-          {/* Shimmer container */}
-          <div className="relative px-4 py-2 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 rounded-lg border border-orange-500/30 overflow-hidden hover:border-orange-500/60 transition-colors">
-            {/* Animated shimmer */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-400/20 to-transparent animate-shimmer" />
-            
-            {/* Text with glow */}
-            <p className="text-sm font-medium relative z-10">
-              <span className="text-gray-400">© </span>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-yellow-300 to-orange-400 animate-pulse font-bold hover:from-yellow-300 hover:via-orange-400 hover:to-yellow-300 transition-all">
-                FOE - 2026
-              </span>
-            </p>
-          </div>
+                      </TableCell>
+                      <TableCell className="text-gray-700">{log.deskripsi}</TableCell>
+                      <TableCell>
+                        {log.sopFile && (
+                          <span className="text-sm text-orange-600 font-medium truncate max-w-[200px] block">{log.sopFile.judul}</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-600">
+          Menampilkan {logs.length} log
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={logsPagination.page === 1}
+            onClick={() => setLogsPagination(p => ({ ...p, page: p.page - 1 }))}
+            className="border-orange-300 text-orange-600 hover:bg-orange-50"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <span className="text-sm text-gray-600 font-medium">Halaman {logsPagination.page}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={logsPagination.page >= logsPagination.totalPages}
+            onClick={() => setLogsPagination(p => ({ ...p, page: p.page + 1 }))}
+            className="border-orange-300 text-orange-600 hover:bg-orange-50"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
         </div>
-      </motion.div>
-      
-      {/* PDF Edit Warning Dialog - Aesthetic Design */}
-      <Dialog open={showPdfWarningDialog} onOpenChange={setShowPdfWarningDialog}>
-        <DialogContent className="sm:max-w-lg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-red-500/50 shadow-2xl overflow-hidden" aria-describedby={undefined}>
-          {/* Animated background effects */}
-          <div className="absolute inset-0 overflow-hidden">
-            {/* Radar sweep */}
-            <motion.div
-              className="absolute -top-20 -right-20 w-60 h-60 rounded-full"
-              style={{
-                background: 'conic-gradient(from 0deg, transparent 0deg, rgba(239, 68, 68, 0.15) 30deg, transparent 60deg)'
-              }}
-              animate={{ rotate: 360 }}
-              transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
-            />
-            
-            {/* Floating particles */}
-            {[...Array(6)].map((_, i) => (
-              <motion.div
-                key={i}
-                className="absolute w-1 h-1 rounded-full bg-red-400/50"
-                style={{
-                  left: `${10 + i * 15}%`,
-                  top: `${20 + (i % 3) * 25}%`,
-                }}
-                animate={{
-                  y: [-10, 10, -10],
-                  opacity: [0.3, 0.7, 0.3]
-                }}
-                transition={{
-                  duration: 2 + i * 0.3,
-                  repeat: Infinity,
-                  delay: i * 0.2
-                }}
-              />
-            ))}
-          </div>
-          
-          <div className="relative z-10">
-            <DialogHeader className="text-center pb-4">
-              {/* Animated warning icon */}
-              <motion.div
-                className="mx-auto mb-4"
-                animate={{
-                  scale: [1, 1.1, 1],
-                  rotate: [0, 5, -5, 0]
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: 'easeInOut'
-                }}
-              >
-                <div className="relative">
-                  {/* Glow ring */}
-                  <motion.div
-                    className="absolute inset-0 rounded-full bg-red-500/30 blur-xl"
-                    animate={{
-                      scale: [1, 1.3, 1],
-                      opacity: [0.5, 0.8, 0.5]
-                    }}
-                    transition={{
-                      duration: 1.5,
-                      repeat: Infinity
-                    }}
-                  />
-                  
-                  {/* Icon container */}
-                  <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-lg shadow-red-500/50">
-                    <FileIcon className="w-10 h-10 text-white" />
-                  </div>
-                  
-                  {/* X mark overlay */}
-                  <motion.div
-                    className="absolute inset-0 flex items-center justify-center"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    <div className="w-24 h-24 rounded-full border-4 border-red-400 flex items-center justify-center">
-                      <XCircle className="w-12 h-12 text-red-400" />
-                    </div>
-                  </motion.div>
-                </div>
-              </motion.div>
-              
-              <DialogTitle className="text-2xl font-bold">
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-300 to-red-400">
-                  PDF Tidak Bisa Di-edit
-                </span>
+      </div>
+    </motion.div>
+  )
+}
+
+{
+  currentPage === 'users' && (user?.role === 'DEVELOPER' || user?.role === 'ADMIN') && (
+    <motion.div
+      key="users"
+      variants={fadeInUp}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="space-y-6"
+    >
+      <div className="flex items-center justify-between">
+        <ShimmerTitle subtitle="Kelola pengguna sistem">Manajemen User</ShimmerTitle>
+        <Dialog open={showUserDialog} onOpenChange={setShowUserDialog}>
+          <DialogTrigger asChild>
+            <Button className="btn-sar bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-lg shadow-orange-500/30">
+              <Plus className="w-4 h-4 mr-2" />
+              Tambah User
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl p-0 overflow-hidden" aria-describedby={undefined}>
+            {/* Header with gradient */}
+            <DialogHeader className="bg-gradient-to-r from-orange-500 to-yellow-500 p-5 text-white">
+              <DialogTitle className="text-lg font-bold flex items-center gap-2 text-white">
+                <Users className="w-5 h-5" />
+                Tambah User Baru
               </DialogTitle>
-              
-              <DialogDescription className="text-gray-400 text-sm mt-2">
-                File PDF tidak mendukung fitur edit langsung
+            </DialogHeader>
+            <form onSubmit={handleCreateUser} className="p-5 space-y-5">
+              <div className="space-y-2">
+                <Label className="font-semibold text-blue-900">Nama Lengkap</Label>
+                <Input
+                  value={newUserForm.name}
+                  onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
+                  placeholder="Masukkan nama lengkap"
+                  required
+                  className="border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 h-11"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="font-semibold text-blue-900">Email</Label>
+                <Input
+                  type="email"
+                  value={newUserForm.email}
+                  onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
+                  placeholder="Masukkan email"
+                  required
+                  className="border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 h-11"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="font-semibold text-blue-900">Password</Label>
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  value={newUserForm.password}
+                  onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
+                  placeholder="Masukkan password"
+                  required
+                  className="border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 h-11"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="font-semibold text-blue-900">Role</Label>
+                <Select value={newUserForm.role} onValueChange={(v) => setNewUserForm({ ...newUserForm, role: v })}>
+                  <SelectTrigger className="border-2 border-gray-200 focus:border-orange-500 text-gray-900 h-11">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                    <SelectItem value="STAF">Staf</SelectItem>
+                    <SelectItem value="DEVELOPER">Developer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter className="pt-2 gap-2">
+                <Button type="button" variant="outline" onClick={() => setShowUserDialog(false)} className="border-gray-300 text-gray-700 hover:bg-gray-100">Batal</Button>
+                <Button type="submit" className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white" disabled={loading}>
+                  Simpan
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Desktop Sync Dialog - Upload edited file */}
+        <Dialog open={showDesktopSyncDialog} onOpenChange={setShowDesktopSyncDialog}>
+          <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-orange-600" />
+                Selesai Edit & Sync
+              </DialogTitle>
+              <DialogDescription className="text-gray-600">
+                Upload file hasil edit untuk disinkronkan ke storage
               </DialogDescription>
             </DialogHeader>
-            
-            <div className="space-y-4 py-4">
-              {/* Main message */}
-              <motion.div
-                className="bg-red-500/10 border border-red-500/30 rounded-xl p-4"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-              >
-                <p className="text-gray-300 text-sm leading-relaxed">
-                  Format <span className="text-red-400 font-semibold">PDF (Portable Document Format)</span> didesain untuk distribusi dokumen yang sudah final, bukan untuk editing. Berbeda dengan file Excel atau Word, PDF tidak dapat dimodifikasi secara langsung.
-                </p>
-              </motion.div>
-              
-              {/* Solution cards */}
-              <motion.div
-                className="grid grid-cols-2 gap-3"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-              >
-                <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <FileSpreadsheet className="w-4 h-4 text-green-400" />
-                    <span className="text-green-400 text-xs font-semibold">EXCEL</span>
+
+            {excelEditData && (
+              <div className="space-y-4">
+                {/* File Info */}
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    {['docx', 'doc'].includes(excelEditData.fileType || '') ? (
+                      <FileText className="w-10 h-10 text-blue-600 mt-1" />
+                    ) : (
+                      <FileSpreadsheet className="w-10 h-10 text-green-600 mt-1" />
+                    )}
+                    <div>
+                      <p className="font-bold text-gray-900">{excelEditData.fileName}</p>
+                      <p className="text-sm text-gray-600">{excelEditData.judul}</p>
+                    </div>
                   </div>
-                  <p className="text-gray-400 text-xs">
-                    Upload ulang dalam format <span className="text-green-400">.xlsx</span> atau <span className="text-green-400">.xls</span>
-                  </p>
                 </div>
-                
-                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <FileText className="w-4 h-4 text-blue-400" />
-                    <span className="text-blue-400 text-xs font-semibold">WORD</span>
-                  </div>
-                  <p className="text-gray-400 text-xs">
-                    Upload ulang dalam format <span className="text-blue-400">.docx</span> atau <span className="text-blue-400">.doc</span>
-                  </p>
-                </div>
-              </motion.div>
-              
-              {/* Tip section */}
-              <motion.div
-                className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-              >
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-amber-400 text-xs font-semibold mb-1">TIP</p>
-                    <p className="text-gray-400 text-xs">
-                      Jika Anda memiliki file asli sebelum dikonversi ke PDF, upload file tersebut untuk mengaktifkan fitur edit.
+
+                {/* Session Info */}
+                {desktopEditSessionToken && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-sm text-blue-800">
+                      <strong>Session aktif:</strong> Tanpa batas waktu
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      Original hash: {desktopEditOriginalHash?.slice(0, 16)}...
                     </p>
                   </div>
+                )}
+
+                {/* File Picker */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold text-gray-700">
+                    Pilih File Hasil Edit
+                  </Label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls,.xlsm,.docx,.doc"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          setDesktopSyncFile(file)
+                        }
+                      }}
+                      className="hidden"
+                      id="desktop-sync-file"
+                    />
+                    <label
+                      htmlFor="desktop-sync-file"
+                      className="cursor-pointer"
+                    >
+                      {desktopSyncFile ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <CheckCircle className="w-5 h-5 text-green-600" />
+                          <span className="text-sm text-gray-700">{desktopSyncFile.name}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <Upload className="w-10 h-10 text-gray-400 mx-auto mb-2" />
+                          <p className="text-sm text-gray-600">
+                            Klik untuk memilih file
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Format: .xlsx, .xls, .xlsm, .docx, .doc
+                          </p>
+                        </>
+                      )}
+                    </label>
+                  </div>
+                </div>
+
+                {/* Info */}
+                <Alert className="bg-amber-50 border-amber-200">
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                  <AlertDescription className="text-amber-800 text-sm">
+                    <strong>Penting:</strong> File akan di-checksum dan dibandingkan dengan file asli.
+                    Jika tidak ada perubahan, file tidak akan di-upload.
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
+
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowDesktopSyncDialog(false)}
+                className="border-gray-300 text-gray-700 hover:bg-gray-100"
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                onClick={handleDesktopSync}
+                disabled={!desktopSyncFile || desktopSyncing}
+                className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
+              >
+                {desktopSyncing ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Syncing...</>
+                ) : (
+                  <><RefreshCw className="w-4 h-4 mr-2" /> Sync ke R2</>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Excel Edit Diagnostic Dialog */}
+        <Dialog open={showDiagnosticDialog} onOpenChange={setShowDiagnosticDialog}>
+          <DialogContent className="sm:max-w-2xl bg-white border-2 border-orange-200 shadow-xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <Activity className="w-5 h-5 text-orange-600" />
+                Diagnostik Excel Edit System
+              </DialogTitle>
+              <DialogDescription className="text-gray-600">
+                Memeriksa semua komponen untuk fitur edit Excel dengan Microsoft 365
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {diagnosticLoading && (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <Loader2 className="w-10 h-10 text-orange-500 animate-spin mb-4" />
+                  <p className="text-gray-600">Menjalankan diagnostik...</p>
+                </div>
+              )}
+
+              {diagnosticResult && !diagnosticLoading && (
+                <>
+                  {/* Summary */}
+                  <div className={`p - 4 rounded - lg ${diagnosticResult.success
+                    ? 'bg-green-50 border border-green-200'
+                    : 'bg-red-50 border border-red-200'
+                    } `}>
+                    <div className="flex items-center gap-3">
+                      {diagnosticResult.success ? (
+                        <CheckCircle className="w-8 h-8 text-green-500" />
+                      ) : (
+                        <XCircle className="w-8 h-8 text-red-500" />
+                      )}
+                      <div>
+                        <p className={`font - bold ${diagnosticResult.success ? 'text-green-800' : 'text-red-800'} `}>
+                          {diagnosticResult.success ? 'Semua Sistem Berfungsi!' : 'Terdapat Masalah'}
+                        </p>
+                        <p className={`text - sm ${diagnosticResult.success ? 'text-green-600' : 'text-red-600'} `}>
+                          {diagnosticResult.message}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="flex gap-4 mt-3 text-sm">
+                      <span className="text-gray-600">
+                        Total: <strong>{diagnosticResult.summary.totalSteps}</strong>
+                      </span>
+                      <span className="text-green-600">
+                        Pass: <strong>{diagnosticResult.summary.passed}</strong>
+                      </span>
+                      <span className="text-red-600">
+                        Fail: <strong>{diagnosticResult.summary.failed}</strong>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Results List */}
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-gray-700">Detail Hasil:</h4>
+                    {diagnosticResult.results.map((result, index) => (
+                      <div
+                        key={index}
+                        className={`p - 3 rounded - lg border ${result.success
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-red-50 border-red-200'
+                          } `}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {result.success ? (
+                              <CheckCircle className="w-5 h-5 text-green-500" />
+                            ) : (
+                              <XCircle className="w-5 h-5 text-red-500" />
+                            )}
+                            <span className="font-medium text-gray-900">{result.step}</span>
+                          </div>
+                          {result.duration && (
+                            <span className="text-xs text-gray-500">{result.duration}ms</span>
+                          )}
+                        </div>
+                        <p className={`text - sm mt - 1 ${result.success ? 'text-green-700' : 'text-red-700'} `}>
+                          {result.message}
+                        </p>
+                        {result.error && (
+                          <p className="text-xs text-red-600 mt-1 font-mono bg-red-100 p-2 rounded">
+                            {result.error}
+                          </p>
+                        )}
+                        {result.details && (
+                          <div className="mt-2 text-xs bg-gray-100 p-2 rounded font-mono overflow-x-auto">
+                            {Object.entries(result.details).map(([key, value]) => (
+                              <div key={key} className="flex gap-2">
+                                <span className="text-gray-500">{key}:</span>
+                                <span className={typeof value === 'string' && value.includes('✅') ? 'text-green-600' : typeof value === 'string' && value.includes('❌') ? 'text-red-600' : 'text-gray-700'}>
+                                  {String(value)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Next Steps */}
+                  {!diagnosticResult.success && diagnosticResult.nextSteps.length > 0 && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-amber-800 mb-2">Langkah Selanjutnya:</h4>
+                      <ul className="list-disc list-inside space-y-1 text-sm text-amber-700">
+                        {diagnosticResult.nextSteps.map((step, index) => (
+                          <li key={index}>{step}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowDiagnosticDialog(false)}
+                className="border-gray-300 text-gray-700 hover:bg-gray-100"
+              >
+                Tutup
+              </Button>
+              <Button
+                type="button"
+                onClick={handleRunDiagnostic}
+                disabled={diagnosticLoading}
+                className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
+              >
+                {diagnosticLoading ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menjalankan...</>
+                ) : (
+                  <><RefreshCw className="w-4 h-4 mr-2" /> Jalankan Ulang</>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gradient-to-r from-orange-500 to-yellow-500">
+                <TableHead className="font-bold text-white">Nama</TableHead>
+                <TableHead className="font-bold text-white">Email</TableHead>
+                {usersIncludePassword && (
+                  <TableHead className="font-bold text-white">Password</TableHead>
+                )}
+                <TableHead className="font-bold text-white">Role</TableHead>
+                <TableHead className="font-bold text-white">Terakhir Login</TableHead>
+                <TableHead className="font-bold text-white">Aktivitas</TableHead>
+                <TableHead className="font-bold text-white text-center">Aksi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={usersIncludePassword ? 7 : 6} className="text-center text-gray-500 py-8">
+                    Tidak ada user
+                  </TableCell>
+                </TableRow>
+              ) : (
+                users.map((u) => {
+                  const userWithExtra = u as User & { lastLoginAt?: string; _count?: { logs: number }; password?: string }
+                  // Only DEVELOPER can delete ADMIN and DEVELOPER users
+                  const canDelete = user?.role === 'DEVELOPER' || (user?.role === 'ADMIN' && u.role === 'STAF')
+                  return (
+                    <TableRow key={u.id} className="hover:bg-orange-50 border-b border-gray-200">
+                      <TableCell className="font-semibold text-blue-900">{u.name}</TableCell>
+                      <TableCell className="text-gray-700">{u.email}</TableCell>
+                      {usersIncludePassword && (
+                        <TableCell className="text-gray-600 font-mono text-sm bg-gray-50">
+                          {userWithExtra.password || '-'}
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <Badge className={u.role === 'ADMIN' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : u.role === 'DEVELOPER' ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white' : 'bg-gradient-to-r from-cyan-500 to-cyan-600 text-white'}>
+                          {u.role}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-gray-600">
+                        {userWithExtra.lastLoginAt ? new Date(userWithExtra.lastLoginAt).toLocaleString('id-ID') : 'Belum pernah login'}
+                      </TableCell>
+                      <TableCell className="text-gray-600">
+                        {userWithExtra._count?.logs || 0} aktivitas
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditUserData(userWithExtra)
+                              setEditUserForm({ name: u.name, email: u.email, role: u.role || 'STAF' })
+                              setShowEditUserDialog(true)
+                            }}
+                            className="hover:bg-orange-100"
+                            title="Edit User"
+                          >
+                            <Edit className="w-4 h-4 text-orange-500" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={async () => {
+                              setSelectedUserForActivity(u)
+                              try {
+                                const res = await fetch(`/ api / logs ? userId = ${u.id} `)
+                                const data = await res.json()
+                                setUserActivityLogs(data.data || [])
+                                setShowUserActivityDialog(true)
+                              } catch (error) {
+                                console.error('Error fetching user activity:', error)
+                              }
+                            }}
+                            className="hover:bg-cyan-100"
+                            title="Lihat Riwayat"
+                          >
+                            <History className="w-4 h-4 text-cyan-500" />
+                          </Button>
+                          {canDelete && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleDeleteUser(u.id)}
+                              className="hover:bg-red-100"
+                              title="Hapus User"
+                            >
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </motion.div>
+  )
+}
+          </AnimatePresence >
+        </main >
+      </div >
+
+  {/* Edit User Dialog */ }
+  < Dialog open = { showEditUserDialog } onOpenChange = { setShowEditUserDialog } >
+    <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
+      <DialogHeader>
+        <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+          <Edit className="w-5 h-5 text-orange-600" />
+          Edit User
+        </DialogTitle>
+        <DialogDescription className="text-gray-600">
+          Perbarui informasi user
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4 py-4">
+        <div className="space-y-2">
+          <Label className="font-medium text-gray-700">Nama</Label>
+          <Input
+            value={editUserForm.name}
+            onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })}
+            className="border-gray-300 bg-white text-gray-900"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="font-medium text-gray-700">Email</Label>
+          <Input
+            value={editUserForm.email}
+            onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
+            className="border-gray-300 bg-white text-gray-900"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="font-medium text-gray-700">Role</Label>
+          <Select value={editUserForm.role} onValueChange={(v) => setEditUserForm({ ...editUserForm, role: v })}>
+            <SelectTrigger className="border-gray-300 bg-white text-gray-900">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ADMIN">Admin</SelectItem>
+              <SelectItem value="STAF">Staf</SelectItem>
+              <SelectItem value="DEVELOPER">Developer</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <DialogFooter className="gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setShowEditUserDialog(false)}
+          className="border-gray-300 text-gray-700 hover:bg-gray-100"
+        >
+          Batal
+        </Button>
+        <Button
+          type="button"
+          onClick={async () => {
+            if (!editUserData) return
+            try {
+              const res = await fetch('/api/users', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  id: editUserData.id,
+                  name: editUserForm.name,
+                  email: editUserForm.email,
+                  role: editUserForm.role
+                })
+              })
+              const data = await res.json()
+              if (data.error) {
+                toast({ title: 'Error', description: data.error, variant: 'destructive' })
+              } else {
+                toast({ title: '✅ Berhasil', description: 'User berhasil diperbarui!' })
+                setShowEditUserDialog(false)
+                fetchUsers()
+              }
+            } catch (error) {
+              toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
+            }
+          }}
+          className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
+        >
+          Simpan Perubahan
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+      </Dialog >
+
+  {/* Password Change Dialog */ }
+  < Dialog open = { showPasswordChangeDialog } onOpenChange = { setShowPasswordChangeDialog } >
+    <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
+      <DialogHeader>
+        <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+          <Shield className="w-5 h-5 text-orange-600" />
+          Ganti Password
+        </DialogTitle>
+        <DialogDescription className="text-gray-600">
+          Ubah password akun Anda
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4 py-4">
+        <div className="space-y-2">
+          <Label className="font-medium text-gray-700">Password Lama</Label>
+          <Input
+            type="password"
+            value={passwordChangeForm.currentPassword}
+            onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, currentPassword: e.target.value })}
+            className="border-gray-300 bg-white text-gray-900"
+            placeholder="Masukkan password lama"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="font-medium text-gray-700">Password Baru</Label>
+          <Input
+            type="password"
+            value={passwordChangeForm.newPassword}
+            onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, newPassword: e.target.value })}
+            className="border-gray-300 bg-white text-gray-900"
+            placeholder="Masukkan password baru (min. 4 karakter)"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="font-medium text-gray-700">Konfirmasi Password Baru</Label>
+          <Input
+            type="password"
+            value={passwordChangeForm.confirmPassword}
+            onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, confirmPassword: e.target.value })}
+            className="border-gray-300 bg-white text-gray-900"
+            placeholder="Konfirmasi password baru"
+          />
+        </div>
+      </div>
+      <DialogFooter className="gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setShowPasswordChangeDialog(false)}
+          className="border-gray-300 text-gray-700 hover:bg-gray-100"
+        >
+          Batal
+        </Button>
+        <Button
+          type="button"
+          disabled={passwordChangeLoading}
+          onClick={async () => {
+            // Validation
+            if (!passwordChangeForm.currentPassword || !passwordChangeForm.newPassword || !passwordChangeForm.confirmPassword) {
+              toast({ title: 'Error', description: 'Semua field harus diisi', variant: 'destructive' })
+              return
+            }
+            if (passwordChangeForm.newPassword.length < 4) {
+              toast({ title: 'Error', description: 'Password baru minimal 4 karakter', variant: 'destructive' })
+              return
+            }
+            if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
+              toast({ title: 'Error', description: 'Konfirmasi password tidak cocok', variant: 'destructive' })
+              return
+            }
+
+            setPasswordChangeLoading(true)
+            try {
+              const res = await fetch('/api/users/password', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  currentPassword: passwordChangeForm.currentPassword,
+                  newPassword: passwordChangeForm.newPassword
+                })
+              })
+              const data = await res.json()
+              if (data.error) {
+                toast({ title: 'Error', description: data.error, variant: 'destructive' })
+              } else {
+                toast({ title: '✅ Berhasil', description: 'Password berhasil diubah!' })
+                setShowPasswordChangeDialog(false)
+              }
+            } catch (error) {
+              toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
+            } finally {
+              setPasswordChangeLoading(false)
+            }
+          }}
+          className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
+        >
+          {passwordChangeLoading ? (
+            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</>
+          ) : (
+            'Simpan Password'
+          )}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+      </Dialog >
+
+  {/* User Activity Dialog */ }
+  < Dialog open = { showUserActivityDialog } onOpenChange = { setShowUserActivityDialog } >
+    <DialogContent className="sm:max-w-2xl bg-white border-2 border-cyan-200 shadow-xl max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
+      <DialogHeader>
+        <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+          <History className="w-5 h-5 text-cyan-600" />
+          Riwayat Aktivitas: {selectedUserForActivity?.name}
+        </DialogTitle>
+        <DialogDescription className="text-gray-600">
+          {selectedUserForActivity?.email}
+        </DialogDescription>
+      </DialogHeader>
+      <div className="py-4">
+        {userActivityLogs.length === 0 ? (
+          <div className="text-center text-gray-500 py-8">
+            <History className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+            <p>Belum ada aktivitas</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {userActivityLogs.map((log) => (
+              <div key={log.id} className="flex items-start gap-3 p-3 bg-cyan-50 rounded-lg">
+                <div className="w-2 h-2 mt-2 rounded-full bg-cyan-500" />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className={
+                      log.aktivitas === 'LOGIN' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                        log.aktivitas === 'UPLOAD' ? 'bg-green-100 text-green-700 border-green-300' :
+                          log.aktivitas === 'DOWNLOAD' ? 'bg-purple-100 text-purple-700 border-purple-300' :
+                            log.aktivitas === 'PREVIEW' ? 'bg-cyan-100 text-cyan-700 border-cyan-300' :
+                              log.aktivitas === 'VERIFIKASI' ? 'bg-orange-100 text-orange-700 border-orange-300' :
+                                'bg-gray-100 text-gray-700 border-gray-300'
+                    }>
+                      {log.aktivitas}
+                    </Badge>
+                    <span className="text-xs text-gray-500">
+                      {new Date(log.createdAt).toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-700 mt-1">{log.deskripsi}</p>
+                  {log.sopFile && (
+                    <p className="text-xs text-orange-600 mt-1">{log.sopFile.judul}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <DialogFooter>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setShowUserActivityDialog(false)}
+          className="border-gray-300 text-gray-700 hover:bg-gray-100"
+        >
+          Tutup
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+      </Dialog >
+
+  {/* Glowing Footer - Bottom Left - Visible on all pages */ }
+  < motion.div
+className = "fixed bottom-4 left-4 z-50"
+initial = {{ opacity: 0, y: 50 }}
+animate = {{ opacity: 1, y: 0 }}
+transition = {{ delay: 0.8 }}
+      >
+  <div className="relative cursor-pointer" onClick={() => setShowCopyrightPopup(true)}>
+    {/* Glow effect */}
+    <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-yellow-400 rounded-lg blur-md opacity-60 animate-pulse" />
+
+    {/* Shimmer container */}
+    <div className="relative px-4 py-2 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 rounded-lg border border-orange-500/30 overflow-hidden hover:border-orange-500/60 transition-colors">
+      {/* Animated shimmer */}
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-400/20 to-transparent animate-shimmer" />
+
+      {/* Text with glow */}
+      <p className="text-sm font-medium relative z-10">
+        <span className="text-gray-400">© </span>
+        <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-yellow-300 to-orange-400 animate-pulse font-bold hover:from-yellow-300 hover:via-orange-400 hover:to-yellow-300 transition-all">
+          FOE - 2026
+        </span>
+      </p>
+    </div>
+  </div>
+      </motion.div >
+
+  {/* PDF Edit Warning Dialog - Aesthetic Design */ }
+  < Dialog open = { showPdfWarningDialog } onOpenChange = { setShowPdfWarningDialog } >
+    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-red-500/50 shadow-2xl overflow-hidden" aria-describedby={undefined}>
+      {/* Animated background effects */}
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Radar sweep */}
+        <motion.div
+          className="absolute -top-20 -right-20 w-60 h-60 rounded-full"
+          style={{
+            background: 'conic-gradient(from 0deg, transparent 0deg, rgba(239, 68, 68, 0.15) 30deg, transparent 60deg)'
+          }}
+          animate={{ rotate: 360 }}
+          transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+        />
+
+        {/* Floating particles */}
+        {[...Array(6)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-1 h-1 rounded-full bg-red-400/50"
+            style={{
+              left: `${10 + i * 15}% `,
+              top: `${20 + (i % 3) * 25}% `,
+            }}
+            animate={{
+              y: [-10, 10, -10],
+              opacity: [0.3, 0.7, 0.3]
+            }}
+            transition={{
+              duration: 2 + i * 0.3,
+              repeat: Infinity,
+              delay: i * 0.2
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="relative z-10">
+        <DialogHeader className="text-center pb-4">
+          {/* Animated warning icon */}
+          <motion.div
+            className="mx-auto mb-4"
+            animate={{
+              scale: [1, 1.1, 1],
+              rotate: [0, 5, -5, 0]
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: 'easeInOut'
+            }}
+          >
+            <div className="relative">
+              {/* Glow ring */}
+              <motion.div
+                className="absolute inset-0 rounded-full bg-red-500/30 blur-xl"
+                animate={{
+                  scale: [1, 1.3, 1],
+                  opacity: [0.5, 0.8, 0.5]
+                }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity
+                }}
+              />
+
+              {/* Icon container */}
+              <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-lg shadow-red-500/50">
+                <FileIcon className="w-10 h-10 text-white" />
+              </div>
+
+              {/* X mark overlay */}
+              <motion.div
+                className="absolute inset-0 flex items-center justify-center"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+              >
+                <div className="w-24 h-24 rounded-full border-4 border-red-400 flex items-center justify-center">
+                  <XCircle className="w-12 h-12 text-red-400" />
                 </div>
               </motion.div>
             </div>
-            
-            <DialogFooter className="pt-4">
-              <motion.div
-                className="w-full"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <Button
-                  type="button"
-                  onClick={() => setShowPdfWarningDialog(false)}
-                  className="w-full bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-red-500/25"
-                >
-                  <X className="w-4 h-4 mr-2" />
-                  Tutup
-                </Button>
-              </motion.div>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-      
-      
-      {/* Copyright Popup */}
-      <CopyrightPopup show={showCopyrightPopup} onClose={() => setShowCopyrightPopup(false)} />
+          </motion.div>
 
-      {/* Print Loading Dialog */}
-      <PrintLoadingDialog
-        open={showPrintDialog}
-        onClose={handlePrintDialogClose}
-        fileId={printDialogFileId}
-        fileName={printDialogFileName}
-        fileType={printDialogFileType}
-        onComplete={handlePrintComplete}
-      />
-    </div>
+          <DialogTitle className="text-2xl font-bold">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-300 to-red-400">
+              PDF Tidak Bisa Di-edit
+            </span>
+          </DialogTitle>
+
+          <DialogDescription className="text-gray-400 text-sm mt-2">
+            File PDF tidak mendukung fitur edit langsung
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          {/* Main message */}
+          <motion.div
+            className="bg-red-500/10 border border-red-500/30 rounded-xl p-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <p className="text-gray-300 text-sm leading-relaxed">
+              Format <span className="text-red-400 font-semibold">PDF (Portable Document Format)</span> didesain untuk distribusi dokumen yang sudah final, bukan untuk editing. Berbeda dengan file Excel atau Word, PDF tidak dapat dimodifikasi secara langsung.
+            </p>
+          </motion.div>
+
+          {/* Solution cards */}
+          <motion.div
+            className="grid grid-cols-2 gap-3"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <FileSpreadsheet className="w-4 h-4 text-green-400" />
+                <span className="text-green-400 text-xs font-semibold">EXCEL</span>
+              </div>
+              <p className="text-gray-400 text-xs">
+                Upload ulang dalam format <span className="text-green-400">.xlsx</span> atau <span className="text-green-400">.xls</span>
+              </p>
+            </div>
+
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText className="w-4 h-4 text-blue-400" />
+                <span className="text-blue-400 text-xs font-semibold">WORD</span>
+              </div>
+              <p className="text-gray-400 text-xs">
+                Upload ulang dalam format <span className="text-blue-400">.docx</span> atau <span className="text-blue-400">.doc</span>
+              </p>
+            </div>
+          </motion.div>
+
+          {/* Tip section */}
+          <motion.div
+            className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-amber-400 text-xs font-semibold mb-1">TIP</p>
+                <p className="text-gray-400 text-xs">
+                  Jika Anda memiliki file asli sebelum dikonversi ke PDF, upload file tersebut untuk mengaktifkan fitur edit.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        <DialogFooter className="pt-4">
+          <motion.div
+            className="w-full"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <Button
+              type="button"
+              onClick={() => setShowPdfWarningDialog(false)}
+              className="w-full bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-red-500/25"
+            >
+              <X className="w-4 h-4 mr-2" />
+              Tutup
+            </Button>
+          </motion.div>
+        </DialogFooter>
+      </div>
+    </DialogContent>
+      </Dialog >
+
+
+  {/* Copyright Popup */ }
+  < CopyrightPopup show = { showCopyrightPopup } onClose = {() => setShowCopyrightPopup(false)} />
+
+{/* Print Loading Dialog */ }
+<PrintLoadingDialog
+  open={showPrintDialog}
+  onClose={handlePrintDialogClose}
+  fileId={printDialogFileId}
+  fileName={printDialogFileName}
+  fileType={printDialogFileType}
+  onComplete={handlePrintComplete}
+/>
+    </div >
   )
 }

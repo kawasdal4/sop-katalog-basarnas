@@ -30,27 +30,25 @@ export async function GET(request: NextRequest) {
     const kategori = searchParams.get('kategori') || ''
     const jenis = searchParams.get('jenis') || ''
     const status = searchParams.get('status') || ''
+    const lingkup = searchParams.get('lingkup') || ''
     const tahun = searchParams.get('tahun') || ''
     const sortBy = searchParams.get('sortBy') || 'uploadedAt-desc'
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
     const verificationStatus = searchParams.get('verificationStatus') || ''
     const publicOnly = searchParams.get('publicOnly') === 'true'
-    
+
     // Build where clause with proper AND/OR combination
-    const whereConditions: unknown[] = []
-    
-    // Search filter - Case-insensitive search in both judul (Title) and nomorSop (SOP Number)
-    // PostgreSQL supports mode: 'insensitive' for case-insensitive search
+    const whereConditions: any[] = []
+
+    // Search filter - Only match keyword with judul (Title)
+    // In SQLite, Prisma's `contains` translates to `LIKE` which is case-insensitive by default
     if (search) {
       whereConditions.push({
-        OR: [
-          { judul: { contains: search, mode: 'insensitive' } },
-          { nomorSop: { contains: search, mode: 'insensitive' } }
-        ]
+        judul: { contains: search }
       })
     }
-    
+
     // Ignore 'SEMUA' filter values
     if (kategori && kategori !== 'SEMUA') {
       whereConditions.push({ kategori })
@@ -61,10 +59,13 @@ export async function GET(request: NextRequest) {
     if (status && status !== 'SEMUA') {
       whereConditions.push({ status })
     }
+    if (lingkup && lingkup !== 'SEMUA') {
+      whereConditions.push({ lingkup })
+    }
     if (tahun) {
       whereConditions.push({ tahun: parseInt(tahun) })
     }
-    
+
     // Public submission filter
     if (publicOnly) {
       whereConditions.push({ isPublicSubmission: true })
@@ -83,12 +84,12 @@ export async function GET(request: NextRequest) {
         whereConditions.push({ verificationStatus })
       }
     }
-    
+
     // Combine all conditions with AND
     const where = whereConditions.length > 0 ? { AND: whereConditions } : {}
-    
+
     // Build orderBy based on sortBy parameter
-    let orderBy: unknown[] = [{ uploadedAt: 'desc' }]
+    let orderBy: any[] = [{ uploadedAt: 'desc' }]
     switch (sortBy) {
       case 'tahun-asc':
         orderBy = [{ tahun: 'asc' }, { uploadedAt: 'desc' }]
@@ -106,9 +107,9 @@ export async function GET(request: NextRequest) {
         orderBy = [{ judul: 'desc' }]
         break
     }
-    
+
     const total = await db.sopFile.count({ where })
-    
+
     const sopFiles = await db.sopFile.findMany({
       where,
       include: {
@@ -118,9 +119,9 @@ export async function GET(request: NextRequest) {
       skip: (page - 1) * limit,
       take: limit
     })
-    
-    return NextResponse.json({ 
-      data: sopFiles, 
+
+    return NextResponse.json({
+      data: sopFiles,
       pagination: {
         total,
         page,
@@ -140,30 +141,31 @@ export async function POST(request: NextRequest) {
   console.log('📤 UPLOAD REQUEST')
   console.log(`   Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`)
   console.log('========================================\n')
-  
+
   try {
     const formData = await request.formData()
     const judul = formData.get('judul') as string
     const kategori = formData.get('kategori') as string
     const jenis = formData.get('jenis') as string
+    const lingkup = formData.get('lingkup') as string | null
     const tahun = parseInt(formData.get('tahun') as string)
     const status = formData.get('status') as string
     const file = formData.get('file') as File | null
-    
+
     const isPublicSubmission = formData.get('isPublicSubmission') === 'true'
     const submitterName = formData.get('submitterName') as string | null
     const submitterEmail = formData.get('submitterEmail') as string | null
     const keterangan = formData.get('keterangan') as string | null
-    
-    console.log('Form data:', { judul, kategori, jenis, tahun, fileName: file?.name, fileSize: file?.size })
-    
+
+    console.log('Form data:', { judul, kategori, jenis, lingkup, tahun, fileName: file?.name, fileSize: file?.size })
+
     if (!file) {
       return NextResponse.json({ error: 'File diperlukan' }, { status: 400 })
     }
-    
+
     // Get user ID
     let userId: string
-    
+
     if (isPublicSubmission) {
       let systemUser = await db.user.findUnique({ where: { email: 'system@sop.go.id' } })
       if (!systemUser) {
@@ -203,7 +205,7 @@ export async function POST(request: NextRequest) {
     const fileName = `${sanitizeFileName(judul)}.${fileExtension}`
 
     console.log(`📄 Processing file: ${fileName} (${(file.size / 1024 / 1024).toFixed(2)} MB)`)
-    
+
     // ============================================
     // AUTO-GENERATE SOP NUMBER
     // Format: SOP-0001, IK-0001, LAINNYA-0001
@@ -213,26 +215,26 @@ export async function POST(request: NextRequest) {
       if (jenis === 'IK') return 'IK-'
       return 'LAINNYA-'
     }
-    
+
     const prefix = getPrefix(jenis)
-    
+
     // Get count of existing SOPs of the same jenis
     const existingCount = await db.sopFile.count({
       where: { jenis }
     })
-    
+
     // Generate new nomorSop (incremental)
     const nomorSop = `${prefix}${String(existingCount + 1).padStart(4, '0')}`
     console.log(`📝 Generated nomor: ${nomorSop}`)
 
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
-    
+
     const mimeType = MIME_TYPES[fileExtension] || 'application/octet-stream'
-    
+
     let r2Key: string | null = null
     let filePath = fileName
-    
+
     // ============================================
     // STEP 1: Upload to R2 (PRIMARY STORAGE)
     // ============================================
@@ -245,30 +247,30 @@ export async function POST(request: NextRequest) {
         const localPath = path.join(uploadDir, fileName)
         await writeFile(localPath, buffer)
       } else {
-        return NextResponse.json({ 
-          error: 'Cloudflare R2 tidak terkonfigurasi. Hubungi administrator.' 
+        return NextResponse.json({
+          error: 'Cloudflare R2 tidak terkonfigurasi. Hubungi administrator.'
         }, { status: 500 })
       }
     } else {
       try {
         console.log(`📤 Uploading to R2 (Primary): ${fileName}`)
-        
-        const r2Result = await uploadToR2(buffer, fileName, mimeType, { 
-          folder: 'sop-files' 
+
+        const r2Result = await uploadToR2(buffer, fileName, mimeType, {
+          folder: 'sop-files'
         })
         r2Key = r2Result.key
         filePath = r2Result.key
-        
+
         console.log(`✅ File uploaded to R2: ${r2Key}`)
       } catch (r2Error) {
         console.error('❌ R2 upload failed:', r2Error)
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: 'Gagal mengupload ke Cloudflare R2. Silakan coba lagi.',
           details: r2Error instanceof Error ? r2Error.message : 'Unknown error'
         }, { status: 500 })
       }
     }
-    
+
     // Create SOP record
     let sopFile
     try {
@@ -279,6 +281,7 @@ export async function POST(request: NextRequest) {
           tahun,
           kategori,
           jenis,
+          lingkup,
           status: status || 'AKTIF',
           fileName,
           filePath,
@@ -325,7 +328,7 @@ export async function POST(request: NextRequest) {
         console.warn('⚠️ Failed to create FileSync record:', syncError)
       }
     }
-    
+
     // Create log
     try {
       await db.log.create({
@@ -385,9 +388,9 @@ export async function POST(request: NextRequest) {
     console.log(`   R2 Key: ${r2Key || 'local'}`)
     console.log(`   GDrive Backup: Background`)
     console.log('========================================\n')
-    
-    return NextResponse.json({ 
-      success: true, 
+
+    return NextResponse.json({
+      success: true,
       data: sopFile,
       r2Key,
       syncStatus: {
@@ -397,9 +400,9 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('❌ Upload error:', error)
-    return NextResponse.json({ 
-      error: 'Terjadi kesalahan saat upload', 
-      details: error instanceof Error ? error.message : 'Unknown error' 
+    return NextResponse.json({
+      error: 'Terjadi kesalahan saat upload',
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
 }
@@ -417,7 +420,7 @@ export async function PUT(request: NextRequest) {
     const userId = userIdCookie
 
     const body = await request.json()
-    const { id, status, verificationStatus, verifiedBy, incrementPreview, incrementDownload, judul, kategori, jenis, tahun, rejectionReason, nomorSop } = body
+    const { id, status, verificationStatus, verifiedBy, incrementPreview, incrementDownload, judul, kategori, jenis, lingkup, tahun, rejectionReason, nomorSop } = body
 
     // Handle counter increments
     if (incrementPreview || incrementDownload) {
@@ -427,7 +430,7 @@ export async function PUT(request: NextRequest) {
       }
 
       const updateData: { previewCount?: number; downloadCount?: number } = {}
-      
+
       if (incrementPreview) {
         updateData.previewCount = sopFile.previewCount + 1
       }
@@ -457,8 +460,8 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: true, data: updated })
     }
 
-    // Handle metadata updates (nomorSop, judul, kategori, jenis, tahun, status)
-    if (nomorSop !== undefined || judul || kategori || jenis || tahun || status) {
+    // Handle metadata updates (nomorSop, judul, kategori, jenis, lingkup, tahun, status)
+    if (nomorSop !== undefined || judul || kategori || jenis || lingkup || tahun || status) {
       const existingSop = await db.sopFile.findUnique({ where: { id } })
       if (!existingSop) {
         return NextResponse.json({ error: 'Dokumen tidak ditemukan' }, { status: 404 })
@@ -467,17 +470,17 @@ export async function PUT(request: NextRequest) {
       const updateData: Record<string, unknown> = {}
       let newFilePath: string | null = null
       let newFileName: string | null = null
-      
+
       // Auto-rename file when judul changes
       if (judul && judul !== existingSop.judul && existingSop.filePath && isR2Configured()) {
         const fileExtension = existingSop.fileName.split('.').pop()?.toLowerCase() || 'pdf'
         const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
         newFileName = `${sanitizeFileName(judul)}.${fileExtension}`
-        
+
         // Get folder path from existing file
         const folderPath = existingSop.filePath.substring(0, existingSop.filePath.lastIndexOf('/'))
         newFilePath = folderPath ? `${folderPath}/${newFileName}` : newFileName
-        
+
         // Move file in R2 to new name
         try {
           console.log(`🔄 Auto-renaming file: ${existingSop.filePath} → ${newFilePath}`)
@@ -492,32 +495,34 @@ export async function PUT(request: NextRequest) {
           newFileName = null
         }
       }
-      
+
       if (nomorSop !== undefined) updateData.nomorSop = nomorSop || null
       if (judul) updateData.judul = judul
       if (kategori) updateData.kategori = kategori
       if (jenis) updateData.jenis = jenis
+      if (lingkup !== undefined) updateData.lingkup = lingkup
       if (tahun) updateData.tahun = tahun
       if (status) updateData.status = status
-      
+
       const sopFile = await db.sopFile.update({
         where: { id },
         data: updateData
       })
-      
+
       // Log the edit
       try {
         const user = await db.user.findUnique({ where: { id: userId } })
-        const changes = []
+        const changes: string[] = []
         if (judul && judul !== existingSop.judul) {
           changes.push(`judul: "${existingSop.judul}" → "${judul}"`)
           if (newFileName) changes.push(`file renamed: "${existingSop.fileName}" → "${newFileName}"`)
         }
         if (kategori && kategori !== existingSop.kategori) changes.push(`kategori: ${existingSop.kategori} → ${kategori}`)
         if (jenis && jenis !== existingSop.jenis) changes.push(`jenis: ${existingSop.jenis} → ${jenis}`)
+        if (lingkup !== undefined && lingkup !== existingSop.lingkup) changes.push(`lingkup: ${existingSop.lingkup || '-'} → ${lingkup || '-'}`)
         if (tahun && tahun !== existingSop.tahun) changes.push(`tahun: ${existingSop.tahun} → ${tahun}`)
         if (status && status !== existingSop.status) changes.push(`status: ${existingSop.status} → ${status}`)
-        
+
         await db.log.create({
           data: {
             userId,
@@ -529,10 +534,10 @@ export async function PUT(request: NextRequest) {
       } catch (logError) {
         console.warn('⚠️ Failed to create log:', logError)
       }
-      
-      return NextResponse.json({ 
-        success: true, 
-        data: sopFile, 
+
+      return NextResponse.json({
+        success: true,
+        data: sopFile,
         renamed: newFileName ? { oldName: existingSop.fileName, newName: newFileName } : null
       })
     }
@@ -543,28 +548,28 @@ export async function PUT(request: NextRequest) {
     if (verificationStatus) {
       // Get existing file info first
       const existingFile = await db.sopFile.findUnique({ where: { id } })
-      
+
       updateData.verificationStatus = verificationStatus
       updateData.verifiedBy = verifiedBy || userId
       updateData.verifiedAt = new Date()
-      
+
       // If DISETUJUI, change status to REVIEW so it appears in SOP catalog
       if (verificationStatus === 'DISETUJUI') {
         updateData.status = 'REVIEW'
       }
-      
+
       // If DITOLAK, store rejection reason, set arsip folder, and move file
       if (verificationStatus === 'DITOLAK') {
         try {
           updateData.rejectionReason = rejectionReason || 'Tidak ada alasan'
           updateData.arsipFolder = 'Publik-Ditolak'
-          
+
           // Move file to 'publik-ditolak' folder in R2
           if (existingFile?.filePath && isR2Configured()) {
             const oldPath = existingFile.filePath
             const fileName = oldPath.split('/').pop() || existingFile.fileName
             const newPath = `publik-ditolak/${fileName}`
-            
+
             try {
               console.log(`📦 Moving rejected file: ${oldPath} → ${newPath}`)
               await moveR2Object(oldPath, newPath)
@@ -580,12 +585,12 @@ export async function PUT(request: NextRequest) {
         }
       }
     }
-    
+
     const sopFile = await db.sopFile.update({
       where: { id },
       data: updateData
     })
-    
+
     try {
       const user = await db.user.findUnique({ where: { id: userId } })
       await db.log.create({
@@ -599,7 +604,7 @@ export async function PUT(request: NextRequest) {
     } catch (logError) {
       console.warn('⚠️ Failed to create log:', logError)
     }
-    
+
     return NextResponse.json({ success: true, data: sopFile })
   } catch (error) {
     console.error('Update SOP error:', error)
@@ -625,14 +630,14 @@ export async function DELETE(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
-    
+
     if (!id) {
       return NextResponse.json({ error: 'ID diperlukan' }, { status: 400 })
     }
-    
+
     // Get file info first
     const sopFile = await db.sopFile.findUnique({ where: { id } })
-    
+
     if (!sopFile) {
       return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 404 })
     }
@@ -646,7 +651,7 @@ export async function DELETE(request: NextRequest) {
         console.warn('⚠️ Failed to delete from R2:', r2Error)
       }
     }
-    
+
     // Delete from Google Drive (Backup) - in background
     if (sopFile.driveFileId) {
       import('@/lib/google-drive').then(async (gd) => {
@@ -674,7 +679,7 @@ export async function DELETE(request: NextRequest) {
     } catch (syncError) {
       console.warn('⚠️ Failed to delete FileSync record:', syncError)
     }
-    
+
     // Delete from database
     await db.sopFile.delete({ where: { id } })
 
@@ -691,7 +696,7 @@ export async function DELETE(request: NextRequest) {
     } catch (logError) {
       console.warn('⚠️ Failed to create log:', logError)
     }
-    
+
     return NextResponse.json({ success: true, message: `File "${sopFile.fileName}" berhasil dihapus` })
   } catch (error) {
     console.error('Delete SOP error:', error)

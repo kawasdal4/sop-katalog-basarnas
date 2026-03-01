@@ -21,6 +21,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   lastLoginAt DateTime? // Last login timestamp
+  lastArsipVisitAt DateTime? // Last time the user visited the Arsip page
   
   // Relations
   logs     Log[]
@@ -42,6 +43,7 @@ model SopFile {
   filePath     String
   fileType     String   // xlsx or pdf
   driveFileId  String?  // Google Drive file ID
+  lingkup      String?  // BCC, Dit. Siaga, Basarnas, Kantor SAR, Antar Instansi, Internasional
   
   // PDF Preview
   pdfPreviewPath       String?

@@ -27,13 +27,35 @@ export default function PrintViewerContent() {
   }, [])
 
   useEffect(() => {
+    // Intercept Ctrl+P / Cmd+P to print the PDF iframe instead of the React wrapper page
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault()
+        try {
+          if (iframeRef.current && iframeRef.current.contentWindow) {
+            iframeRef.current.contentWindow.print()
+          } else {
+            window.print()
+          }
+        } catch (err) {
+          console.error('Print blocked', err)
+          window.print() // Fallback
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  useEffect(() => {
     // Skip if no valid fileId or already triggered
     if (!fileId || hasTriggeredPrint.current) return
     hasTriggeredPrint.current = true
 
-    const loadAndPrint = async () => {
+    const loadAndDisplay = async () => {
       if (!isMounted.current) return
-      
+
       try {
         // Step 1: Get file type info
         setStatus('loading')
@@ -43,7 +65,7 @@ export default function PrintViewerContent() {
           setFileType(checkData.fileType)
           setFileTitle(checkData.title)
         }
-        
+
         // Step 2: Generate print token (authenticates the user)
         setStatus('generating-token')
         console.log('🎫 [Print] Generating print token...')
@@ -52,70 +74,38 @@ export default function PrintViewerContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fileId })
         })
-        
+
         if (!tokenRes.ok) {
           const tokenError = await tokenRes.json()
           throw new Error(tokenError.error || 'Gagal membuat token print')
         }
-        
+
         const tokenData = await tokenRes.json()
         const token = tokenData.token
-        setPrintToken(token)
-        console.log('✅ [Print] Token generated')
-        
-        // Step 3: Show converting status for non-PDF files
+
+        console.log('✅ [Print] Token generated, fetching PDF blob...')
+
+        // Fetch the actual PDF data as a Base64 string directly
+        // An <object> tag with a base64 data URI is the most resilient way to force inline PDF rendering without triggering download managers in strict environments
+        const pdfRes = await fetch(`/api/print?token=${token}&format=base64`)
+        if (!pdfRes.ok) {
+          throw new Error('Gagal mengunduh data PDF')
+        }
+
+        const pdfData = await pdfRes.json()
+        setPrintToken(pdfData.dataUri)
+        console.log('✅ [Print] PDF Data URI created')
+
+        // Show converting status for non-PDF files
         if (fileType && fileType !== 'pdf') {
           setStatus('converting')
-        }
-        
-        // Step 4: Create hidden iframe to load PDF with token
-        // The iframe will handle both loading the PDF and triggering print
-        const iframe = document.createElement('iframe')
-        iframe.style.display = 'none'
-        iframe.src = `/api/print?token=${token}`
-        iframeRef.current = iframe
-        
-        // Track if PDF is loading
-        let pdfLoaded = false
-        
-        iframe.onload = async () => {
-          if (!isMounted.current) return
-          
-          // Prevent double execution
-          if (pdfLoaded) return
-          pdfLoaded = true
-          
-          if (isMounted.current) {
-            setStatus('ready')
-            
-            // Wait for PDF to fully load then trigger print
-            setTimeout(() => {
-              if (!isMounted.current) return
-              
-              try {
-                setStatus('printing')
-                iframe.contentWindow?.print()
-              } catch (e) {
-                console.log('Auto print failed, user can use Ctrl+P')
-              }
-            }, 1500)
-          }
+          // Give a moment for the status text to show
+          await new Promise(resolve => setTimeout(resolve, 500))
         }
 
-        iframe.onerror = () => {
-          if (isMounted.current) {
-            setError('Gagal memuat file')
-            setStatus('error')
-          }
-        }
-
-        document.body.appendChild(iframe)
-
-        // Cleanup on unmount
-        return () => {
-          if (document.body.contains(iframe)) {
-            document.body.removeChild(iframe)
-          }
+        // Set to ready — the embed viewer will display the PDF
+        if (isMounted.current) {
+          setStatus('ready')
         }
       } catch (err) {
         console.error('Print load error:', err)
@@ -126,7 +116,7 @@ export default function PrintViewerContent() {
       }
     }
 
-    loadAndPrint()
+    loadAndDisplay()
   }, [fileId, fileType])
 
   // Loading/Converting screen with Basarnas theme
@@ -141,7 +131,7 @@ export default function PrintViewerContent() {
           `,
           backgroundSize: '40px 40px'
         }} />
-        
+
         {/* Radar sweep effect */}
         <motion.div
           className="absolute w-[600px] h-[600px] rounded-full"
@@ -151,7 +141,7 @@ export default function PrintViewerContent() {
           animate={{ rotate: 360 }}
           transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
         />
-        
+
         {/* Floating particles */}
         {[...Array(8)].map((_, i) => (
           <motion.div
@@ -173,7 +163,7 @@ export default function PrintViewerContent() {
             }}
           />
         ))}
-        
+
         {/* Main loading content */}
         <motion.div
           className="relative z-10 flex flex-col items-center"
@@ -200,7 +190,7 @@ export default function PrintViewerContent() {
             >
               <Shield className="w-12 h-12 text-white" />
             </motion.div>
-            
+
             {/* Rotating ring */}
             <motion.div
               className="absolute inset-0 rounded-2xl border-2 border-orange-400/50"
@@ -208,7 +198,7 @@ export default function PrintViewerContent() {
               transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
             />
           </motion.div>
-          
+
           {/* Title */}
           <motion.h1
             className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-300 via-yellow-200 to-orange-300 mb-2"
@@ -221,16 +211,16 @@ export default function PrintViewerContent() {
             }}
             transition={{ duration: 2, repeat: Infinity }}
           >
-            {status === 'generating-token' ? 'MEMPROSES...' : 
-             status === 'converting' ? 'MENGKONVERSI FILE' : 'MEMUAT DOKUMEN'}
+            {status === 'generating-token' ? 'MEMPROSES...' :
+              status === 'converting' ? 'MENGKONVERSI FILE' : 'MEMUAT DOKUMEN'}
           </motion.h1>
-          
+
           {/* Subtitle */}
           <div className="flex items-center gap-2 text-orange-400 text-sm mb-4">
             <div className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
             <span>BASARNAS - Direktorat Kesiapsiagaan</span>
           </div>
-          
+
           {/* Loading spinner */}
           <div className="relative w-16 h-16 mt-4">
             <motion.div
@@ -247,7 +237,7 @@ export default function PrintViewerContent() {
               transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
             />
           </div>
-          
+
           {/* Loading text */}
           <motion.p
             className="text-gray-400 mt-4 text-center"
@@ -256,11 +246,11 @@ export default function PrintViewerContent() {
             transition={{ delay: 0.5 }}
           >
             {status === 'generating-token' ? 'Memverifikasi akses...' :
-             status === 'converting' 
-              ? 'Mengkonversi file ke PDF via Microsoft Graph API...'
-              : 'Memuat PDF untuk print...'}
+              status === 'converting'
+                ? 'Mengkonversi file ke PDF via Microsoft Graph API...'
+                : 'Memuat PDF untuk print...'}
           </motion.p>
-          
+
           {fileType && fileType !== 'pdf' && status === 'converting' && (
             <motion.p
               className="text-orange-300 text-sm mt-2"
@@ -271,7 +261,7 @@ export default function PrintViewerContent() {
               File {fileType?.toUpperCase()} akan dikonversi dengan print settings dari Office
             </motion.p>
           )}
-          
+
           <motion.p
             className="text-gray-500 text-sm mt-1"
             animate={{ opacity: [0.5, 1, 0.5] }}
@@ -296,7 +286,7 @@ export default function PrintViewerContent() {
           `,
           backgroundSize: '40px 40px'
         }} />
-        
+
         <motion.div
           className="relative z-10 text-center bg-slate-800/80 backdrop-blur-lg p-8 rounded-2xl border border-red-500/30 shadow-2xl max-w-md"
           initial={{ opacity: 0, scale: 0.8, y: 20 }}
@@ -313,16 +303,16 @@ export default function PrintViewerContent() {
           >
             <AlertTriangle className="w-10 h-10 text-red-500" />
           </motion.div>
-          
+
           <h1 className="text-xl font-bold text-white mb-2">Gagal Memuat File</h1>
           <p className="text-gray-400 mb-4">{error}</p>
-          
+
           {fileType && (
             <p className="text-orange-400 text-sm mb-4">
               Tipe file: {fileType.toUpperCase()}
             </p>
           )}
-          
+
           <div className="flex gap-3 justify-center">
             <button
               onClick={() => window.close()}
@@ -341,7 +331,7 @@ export default function PrintViewerContent() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">
       {/* Header with Basarnas theme */}
-      <motion.div 
+      <motion.div
         className="bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 shadow-lg"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -360,10 +350,16 @@ export default function PrintViewerContent() {
                 </p>
               </div>
             </div>
-            
+
             <div className="flex gap-2">
               <motion.button
-                onClick={() => window.print()}
+                onClick={() => {
+                  if (iframeRef.current && iframeRef.current.contentWindow) {
+                    iframeRef.current.contentWindow.print()
+                  } else {
+                    window.print()
+                  }
+                }}
                 className="px-4 py-2 bg-white text-orange-600 rounded-lg hover:bg-orange-50 flex items-center gap-2 font-medium shadow-lg"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -387,27 +383,33 @@ export default function PrintViewerContent() {
 
       {/* PDF Viewer */}
       <div className="flex-1 p-4">
-        <motion.div 
+        <motion.div
           className="max-w-5xl mx-auto h-full bg-white rounded-xl shadow-xl overflow-hidden"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
+          {/* We use an <object> tag with a base64 data URI. This is the most robust way to force inline PDF display without triggering arbitrary browser downloads. */}
           {printToken && (
-            <embed 
-              src={`/api/print?token=${printToken}#toolbar=1&navpanes=0&scrollbar=1`}
+            <object
+              data={`${printToken}#toolbar=1&navpanes=0&scrollbar=1`}
               type="application/pdf"
-              width="100%"
-              height="100%"
-              className="rounded-lg"
+              className="w-full h-full rounded-lg border-0"
               style={{ minHeight: 'calc(100vh - 180px)' }}
-            />
+              title="PDF Preview"
+            >
+              <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-gray-50">
+                <AlertTriangle className="w-12 h-12 text-orange-500 mb-4" />
+                <h3 className="text-lg font-bold text-gray-800 mb-2">Browser Tidak Mendukung PDF Inline</h3>
+                <p className="text-gray-600 mb-4">Silakan gunakan tombol Print di atas atau tekan Ctrl+P.</p>
+              </div>
+            </object>
           )}
         </motion.div>
       </div>
 
       {/* Instructions footer */}
-      <motion.div 
+      <motion.div
         className="bg-gradient-to-r from-orange-50 to-amber-50 border-t border-orange-200 p-3 text-center"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

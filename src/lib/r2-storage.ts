@@ -1,10 +1,10 @@
-import { 
-  S3Client, 
-  PutObjectCommand, 
-  GetObjectCommand, 
-  DeleteObjectCommand, 
-  HeadBucketCommand, 
-  CreateBucketCommand, 
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  HeadBucketCommand,
+  CreateBucketCommand,
   ListObjectsV2Command,
   HeadObjectCommand,
   CopyObjectCommand
@@ -60,22 +60,22 @@ function extractAccountIdFromEndpoint(endpoint: string): string | null {
 // Get R2 configuration from environment
 function getR2Config(): R2Config {
   // Support multiple env var naming conventions
-  
+
   // Account ID can come from R2_ACCOUNT_ID or extracted from R2_ENDPOINT
   let accountId = process.env.R2_ACCOUNT_ID
   if (!accountId && process.env.R2_ENDPOINT) {
     accountId = extractAccountIdFromEndpoint(process.env.R2_ENDPOINT)
   }
-  
+
   // Access key can be R2_ACCESS_KEY_ID or R2_ACCESS_KEY
   const accessKeyId = process.env.R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY
-  
+
   // Secret key can be R2_SECRET_ACCESS_KEY or R2_SECRET_KEY
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_KEY
-  
+
   // Bucket name can be R2_BUCKET_NAME or R2_BUCKET
   const bucketName = process.env.R2_BUCKET_NAME || process.env.R2_BUCKET || 'sop-katalog-basarnas'
-  
+
   const publicUrl = process.env.R2_PUBLIC_URL
 
   if (!accountId || !accessKeyId || !secretAccessKey) {
@@ -105,7 +105,7 @@ export function isR2Configured(): boolean {
 // Create R2 client (new instance each time for serverless compatibility)
 function createR2Client(): S3Client {
   const config = getR2Config()
-  
+
   return new S3Client({
     region: 'auto',
     endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
@@ -131,15 +131,15 @@ export async function uploadToR2(
 ): Promise<R2UploadResult> {
   const config = getR2Config()
   const client = createR2Client()
-  
+
   // Generate or use provided key
   const key = options?.key || (options?.folder ? `${options.folder}/${fileName}` : fileName)
-  
+
   // Calculate checksum
   const checksum = calculateChecksum(fileBuffer)
-  
+
   console.log(`📤 Uploading to R2: ${key} (${fileBuffer.length} bytes)`)
-  
+
   const command = new PutObjectCommand({
     Bucket: config.bucketName,
     Key: key,
@@ -151,11 +151,11 @@ export async function uploadToR2(
       ...options?.metadata,
     },
   })
-  
+
   await client.send(command)
-  
+
   console.log(`✅ Uploaded to R2: ${key}`)
-  
+
   return {
     key,
     url: `https://${config.accountId}.r2.cloudflarestorage.com/${config.bucketName}/${key}`,
@@ -168,31 +168,31 @@ export async function uploadToR2(
 /**
  * Download file from R2
  */
-export async function downloadFromR2(key: string): Promise<{ 
+export async function downloadFromR2(key: string): Promise<{
   buffer: Buffer
   contentType: string
   metadata?: Record<string, string>
 }> {
   const config = getR2Config()
   const client = createR2Client()
-  
+
   console.log(`📥 Downloading from R2: ${key}`)
-  
+
   const command = new GetObjectCommand({
     Bucket: config.bucketName,
     Key: key,
   })
-  
+
   const response = await client.send(command)
-  
+
   if (!response.Body) {
     throw new Error('No file content')
   }
-  
+
   const buffer = Buffer.from(await response.Body.transformToByteArray())
-  
+
   console.log(`✅ Downloaded from R2: ${key} (${buffer.length} bytes)`)
-  
+
   return {
     buffer,
     contentType: response.ContentType || 'application/octet-stream',
@@ -213,15 +213,15 @@ export async function getR2ObjectMetadata(key: string): Promise<{
 }> {
   const config = getR2Config()
   const client = createR2Client()
-  
+
   try {
     const command = new HeadObjectCommand({
       Bucket: config.bucketName,
       Key: key,
     })
-    
+
     const response = await client.send(command)
-    
+
     return {
       exists: true,
       size: response.ContentLength,
@@ -241,12 +241,12 @@ export async function getR2ObjectMetadata(key: string): Promise<{
 export async function deleteFromR2(key: string): Promise<void> {
   const config = getR2Config()
   const client = createR2Client()
-  
+
   const command = new DeleteObjectCommand({
     Bucket: config.bucketName,
     Key: key,
   })
-  
+
   await client.send(command)
   console.log(`🗑️ Deleted from R2: ${key}`)
 }
@@ -257,10 +257,10 @@ export async function deleteFromR2(key: string): Promise<void> {
 export async function listR2Objects(prefix?: string, maxKeys: number = 1000): Promise<R2Object[]> {
   const config = getR2Config()
   const client = createR2Client()
-  
+
   const objects: R2Object[] = []
   let continuationToken: string | undefined
-  
+
   do {
     const command = new ListObjectsV2Command({
       Bucket: config.bucketName,
@@ -268,9 +268,9 @@ export async function listR2Objects(prefix?: string, maxKeys: number = 1000): Pr
       MaxKeys: maxKeys,
       ContinuationToken: continuationToken,
     })
-    
+
     const response = await client.send(command)
-    
+
     if (response.Contents) {
       for (const obj of response.Contents) {
         if (obj.Key) {
@@ -284,10 +284,10 @@ export async function listR2Objects(prefix?: string, maxKeys: number = 1000): Pr
         }
       }
     }
-    
+
     continuationToken = response.NextContinuationToken
   } while (continuationToken)
-  
+
   console.log(`📋 Listed ${objects.length} objects from R2`)
   return objects
 }
@@ -298,13 +298,13 @@ export async function listR2Objects(prefix?: string, maxKeys: number = 1000): Pr
 export async function copyR2Object(sourceKey: string, destKey: string): Promise<void> {
   const config = getR2Config()
   const client = createR2Client()
-  
+
   const command = new CopyObjectCommand({
     Bucket: config.bucketName,
-    CopySource: `${config.bucketName}/${sourceKey}`,
+    CopySource: encodeURI(`${config.bucketName}/${sourceKey}`),
     Key: destKey,
   })
-  
+
   await client.send(command)
   console.log(`📋 Copied: ${sourceKey} → ${destKey}`)
 }
@@ -315,22 +315,22 @@ export async function copyR2Object(sourceKey: string, destKey: string): Promise<
 export async function moveR2Object(sourceKey: string, destKey: string): Promise<void> {
   const config = getR2Config()
   const client = createR2Client()
-  
+
   // Copy to new location
   const copyCommand = new CopyObjectCommand({
     Bucket: config.bucketName,
-    CopySource: `${config.bucketName}/${sourceKey}`,
+    CopySource: encodeURI(`${config.bucketName}/${sourceKey}`),
     Key: destKey,
   })
-  
+
   await client.send(copyCommand)
-  
+
   // Delete from old location
   const deleteCommand = new DeleteObjectCommand({
     Bucket: config.bucketName,
     Key: sourceKey,
   })
-  
+
   await client.send(deleteCommand)
   console.log(`📦 Moved: ${sourceKey} → ${destKey}`)
 }
@@ -342,7 +342,7 @@ export async function renameR2Object(sourceKey: string, destKey: string): Promis
   try {
     const config = getR2Config()
     const client = createR2Client()
-    
+
     // Check if source exists
     try {
       await client.send(new HeadObjectCommand({
@@ -352,7 +352,7 @@ export async function renameR2Object(sourceKey: string, destKey: string): Promis
     } catch {
       return { success: false, error: 'Source file not found in R2' }
     }
-    
+
     // Check if destination already exists
     try {
       await client.send(new HeadObjectCommand({
@@ -367,31 +367,31 @@ export async function renameR2Object(sourceKey: string, destKey: string): Promis
     } catch {
       // Destination doesn't exist, which is fine
     }
-    
+
     // Copy to new location
     const copyCommand = new CopyObjectCommand({
       Bucket: config.bucketName,
-      CopySource: `${config.bucketName}/${sourceKey}`,
+      CopySource: encodeURI(`${config.bucketName}/${sourceKey}`),
       Key: destKey,
     })
-    
+
     await client.send(copyCommand)
-    
+
     // Delete from old location
     const deleteCommand = new DeleteObjectCommand({
       Bucket: config.bucketName,
       Key: sourceKey,
     })
-    
+
     await client.send(deleteCommand)
     console.log(`📝 Renamed: ${sourceKey} → ${destKey}`)
-    
+
     return { success: true }
   } catch (error) {
     console.error(`❌ Rename failed: ${sourceKey}`, error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
 }
@@ -402,7 +402,7 @@ export async function renameR2Object(sourceKey: string, destKey: string): Promis
 export async function ensureR2Bucket(): Promise<boolean> {
   const config = getR2Config()
   const client = createR2Client()
-  
+
   try {
     await client.send(new HeadBucketCommand({ Bucket: config.bucketName }))
     console.log(`✅ R2 bucket exists: ${config.bucketName}`)
@@ -432,14 +432,14 @@ export async function testR2Connection(): Promise<{
   try {
     const config = getR2Config()
     const client = createR2Client()
-    
+
     const command = new ListObjectsV2Command({
       Bucket: config.bucketName,
       MaxKeys: 1,
     })
-    
+
     await client.send(command)
-    
+
     return {
       success: true,
       status: 'connected',
@@ -453,7 +453,7 @@ export async function testR2Connection(): Promise<{
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     const errorCode = (error as { Code?: string; name?: string })?.Code || (error as { name?: string })?.name || ''
-    
+
     // Bucket not found - credentials are valid but bucket doesn't exist
     if (errorCode === 'NoSuchBucket' || errorMessage.includes('does not exist')) {
       return {
@@ -473,7 +473,7 @@ export async function testR2Connection(): Promise<{
         ],
       }
     }
-    
+
     // Authentication failed - wrong credentials
     if (errorCode === 'InvalidAccessKeyId' || errorCode === 'SignatureDoesNotMatch' || errorMessage.includes('Access Denied')) {
       return {
@@ -482,7 +482,7 @@ export async function testR2Connection(): Promise<{
         message: 'Kredensial R2 tidak valid. Periksa R2_ACCESS_KEY_ID dan R2_SECRET_ACCESS_KEY.',
       }
     }
-    
+
     return {
       success: false,
       status: 'error',
@@ -496,11 +496,11 @@ export async function testR2Connection(): Promise<{
  */
 export function getR2PublicUrl(key: string): string | null {
   const config = getR2Config()
-  
+
   if (config.publicUrl) {
     return `${config.publicUrl}/${key}`
   }
-  
+
   return null
 }
 
@@ -532,12 +532,12 @@ export function getR2BucketName(): string {
 export async function getR2PresignedUrl(key: string, expiresIn: number = 3600): Promise<string> {
   const config = getR2Config()
   const client = createR2Client()
-  
+
   const command = new GetObjectCommand({
     Bucket: config.bucketName,
     Key: key,
   })
-  
+
   const url = await getSignedUrl(client, command, { expiresIn })
   return url
 }
@@ -550,19 +550,19 @@ export async function getR2PresignedUrl(key: string, expiresIn: number = 3600): 
  * @param expiresIn - URL expiration time in seconds (default: 1 hour)
  */
 export async function getR2PresignedUploadUrl(
-  key: string, 
+  key: string,
   contentType: string,
   expiresIn: number = 3600
 ): Promise<string> {
   const config = getR2Config()
   const client = createR2Client()
-  
+
   const command = new PutObjectCommand({
     Bucket: config.bucketName,
     Key: key,
     ContentType: contentType,
   })
-  
+
   const url = await getSignedUrl(client, command, { expiresIn })
   return url
 }

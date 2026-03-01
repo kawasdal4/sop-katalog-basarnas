@@ -37,8 +37,8 @@ const CONTENT_TYPES: Record<string, string> = {
 // Key: token, Value: { fileId, userId, createdAt, useCount }
 const printTokens: Map<string, { fileId: string; userId: string; createdAt: number; useCount: number }> = new Map()
 
-// Maximum uses per token (allows for HEAD + GET + embed load)
-const MAX_TOKEN_USES = 5
+// Maximum uses per token (allows for HEAD + GET + partial range requests from PDF viewer)
+const MAX_TOKEN_USES = 20
 
 // Track temp files for cleanup
 const tempFilesCleanup: Map<string, { deleteAt: number; fileName: string }> = new Map()
@@ -48,17 +48,17 @@ let cleanupInterval: NodeJS.Timeout | null = null
 
 function startCleanupWorker() {
   if (cleanupInterval) return
-  
+
   cleanupInterval = setInterval(async () => {
     const now = Date.now()
-    
+
     // Clean up expired print tokens (older than 5 minutes)
     for (const [token, info] of printTokens) {
       if (now - info.createdAt > 5 * 60 * 1000) {
         printTokens.delete(token)
       }
     }
-    
+
     // Clean up expired temp files
     const toDelete: string[] = []
     for (const [id, info] of tempFilesCleanup) {
@@ -66,14 +66,14 @@ function startCleanupWorker() {
         toDelete.push(id)
       }
     }
-    
+
     if (toDelete.length > 0) {
       console.log(`🧹 [Print-Cleanup] Auto-deleting ${toDelete.length} expired print files`)
-      
+
       try {
         const token = await getAzureAccessToken()
         const serviceAccount = getServiceAccount()
-        
+
         for (const id of toDelete) {
           try {
             await fetch(
@@ -101,17 +101,17 @@ startCleanupWorker()
  */
 async function ensurePrintTempFolder(token: string): Promise<void> {
   const serviceAccount = getServiceAccount()
-  
+
   // Try to get existing folder
   const folderRes = await fetch(
     `https://graph.microsoft.com/v1.0/users/${serviceAccount}/drive/root:/${PRINT_TEMP_FOLDER}`,
     { headers: { 'Authorization': `Bearer ${token}` } }
   )
-  
+
   if (folderRes.ok) {
     return // Folder exists
   }
-  
+
   // Create folder if not exists
   const createRes = await fetch(
     `https://graph.microsoft.com/v1.0/users/${serviceAccount}/drive/root/children`,
@@ -128,7 +128,7 @@ async function ensurePrintTempFolder(token: string): Promise<void> {
       })
     }
   )
-  
+
   if (!createRes.ok && createRes.status !== 409) {
     // 409 = conflict (folder already exists), which is fine
     const error = await createRes.text()
@@ -146,13 +146,13 @@ async function uploadToTempFolder(
   contentType: string
 ): Promise<{ id: string; name: string }> {
   const serviceAccount = getServiceAccount()
-  
+
   // Generate unique filename with timestamp
   const timestamp = Date.now()
   const uniqueName = `print_${timestamp}_${fileName.replace(/[^a-zA-Z0-9.-]/g, '_')}`
-  
+
   console.log(`📤 [Print] Uploading ${uniqueName} (${content.length} bytes) to OneDrive...`)
-  
+
   // Upload file
   const uploadRes = await fetch(
     `https://graph.microsoft.com/v1.0/users/${serviceAccount}/drive/root:/${PRINT_TEMP_FOLDER}/${uniqueName}:/content`,
@@ -165,15 +165,15 @@ async function uploadToTempFolder(
       body: new Uint8Array(content)
     }
   )
-  
+
   if (!uploadRes.ok) {
     const error = await uploadRes.text()
     throw new Error(`Upload to OneDrive failed: ${uploadRes.status} ${error}`)
   }
-  
+
   const driveItem = await uploadRes.json()
   console.log(`✅ [Print] Uploaded to OneDrive: ${driveItem.id}`)
-  
+
   return {
     id: driveItem.id,
     name: uniqueName
@@ -190,12 +190,12 @@ async function convertToPdf(
   originalFileName: string
 ): Promise<ArrayBuffer> {
   const serviceAccount = getServiceAccount()
-  
+
   console.log(`📄 [Print] Converting ${originalFileName} to PDF via Graph API...`)
-  
+
   // Wait a moment for file to be processed by OneDrive
   await new Promise(resolve => setTimeout(resolve, 2000))
-  
+
   // Convert to PDF using Graph API
   // This endpoint uses Microsoft's rendering engine which preserves print settings
   const pdfRes = await fetch(
@@ -207,15 +207,15 @@ async function convertToPdf(
       }
     }
   )
-  
+
   if (!pdfRes.ok) {
     const error = await pdfRes.text()
     throw new Error(`PDF conversion failed: ${pdfRes.status} ${error}`)
   }
-  
+
   const pdfBuffer = await pdfRes.arrayBuffer()
   console.log(`✅ [Print] Converted to PDF: ${pdfBuffer.byteLength} bytes`)
-  
+
   return pdfBuffer
 }
 
@@ -224,7 +224,7 @@ async function convertToPdf(
  */
 async function deleteTempFile(token: string, driveItemId: string): Promise<void> {
   const serviceAccount = getServiceAccount()
-  
+
   try {
     await fetch(
       `https://graph.microsoft.com/v1.0/users/${serviceAccount}/drive/items/${driveItemId}`,
@@ -252,31 +252,31 @@ export async function POST(request: NextRequest) {
     // Authentication check
     const cookieStore = await cookies()
     const userId = cookieStore.get('userId')?.value
-    
+
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    
+
     const body = await request.json()
     const { fileId } = body
-    
+
     if (!fileId) {
       return NextResponse.json({ error: 'File ID diperlukan' }, { status: 400 })
     }
-    
+
     // Verify file exists
     const sopFile = await db.sopFile.findUnique({
       where: { id: fileId },
       select: { id: true, fileName: true }
     })
-    
+
     if (!sopFile) {
       return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 404 })
     }
-    
+
     // Generate a secure token
     const printToken = crypto.randomBytes(32).toString('hex')
-    
+
     // Store token with file info
     printTokens.set(printToken, {
       fileId,
@@ -284,14 +284,14 @@ export async function POST(request: NextRequest) {
       createdAt: Date.now(),
       useCount: 0
     })
-    
+
     console.log(`🎫 [Print] Generated token for file: ${sopFile.fileName}`)
-    
+
     return NextResponse.json({
       success: true,
       token: printToken
     })
-    
+
   } catch (error) {
     console.error('❌ [Print] Token generation error:', error)
     return NextResponse.json({
@@ -309,15 +309,15 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   const startTime = Date.now()
-  
+
   try {
     const { searchParams } = new URL(request.url)
     const token = searchParams.get('token')
     const fileId = searchParams.get('id')
-    
+
     let authenticatedUserId: string | null = null
     let targetFileId: string | null = null
-    
+
     // Try token authentication first (for embed/iframe)
     if (token) {
       const tokenInfo = printTokens.get(token)
@@ -339,52 +339,52 @@ export async function GET(request: NextRequest) {
       // Fallback to cookie authentication (for direct API calls)
       const cookieStore = await cookies()
       const userId = cookieStore.get('userId')?.value
-      
+
       if (!userId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
-      
+
       authenticatedUserId = userId
       targetFileId = fileId
     }
-    
+
     if (!targetFileId) {
       return NextResponse.json({ error: 'File ID diperlukan' }, { status: 400 })
     }
-    
+
     // Get file from database
     const sopFile = await db.sopFile.findUnique({
       where: { id: targetFileId }
     })
-    
+
     if (!sopFile) {
       return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 404 })
     }
-    
+
     if (!sopFile.filePath) {
       return NextResponse.json({ error: 'File tidak tersedia di storage' }, { status: 404 })
     }
-    
+
     const fileExtension = sopFile.fileName.toLowerCase().split('.').pop() || ''
-    
+
     // Check supported file types
     if (!['pdf', 'xlsx', 'xls', 'xlsm', 'docx', 'doc'].includes(fileExtension)) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Hanya file PDF, Excel (.xlsx, .xls), dan Word (.docx, .doc) yang bisa di-print',
-        fileType: fileExtension 
+        fileType: fileExtension
       }, { status: 400 })
     }
-    
+
     // Check R2 configuration
     if (!isR2Configured()) {
       return NextResponse.json({ error: 'R2 storage tidak terkonfigurasi' }, { status: 500 })
     }
-    
+
     console.log(`\n${'='.repeat(60)}`)
     console.log(`🖨️ [Print] Starting print workflow for: ${sopFile.judul}`)
     console.log(`   File: ${sopFile.fileName} (${fileExtension.toUpperCase()})`)
     console.log(`${'='.repeat(60)}\n`)
-    
+
     // Step 1: Get user info for footer
     console.log(`👤 [Print] Getting user info for footer...`)
     const user = await db.user.findUnique({
@@ -393,59 +393,60 @@ export async function GET(request: NextRequest) {
     })
     const userName = user?.name || 'Unknown User'
     console.log(`   User: ${userName}`)
-    
+
     // Step 2: Download from R2
     console.log(`📥 [Print] Step 2: Downloading from R2: ${sopFile.filePath}`)
     const result = await downloadFromR2(sopFile.filePath)
-    const fileBuffer = result.buffer
+    const fileBuffer = result.buffer // Node.js Buffer
     console.log(`✅ [Print] Downloaded ${fileBuffer.length} bytes from R2`)
-    
+
     let pdfBuffer: ArrayBuffer
     let driveItemId: string | null = null
-    
+
     // Step 3: Process based on file type
     if (fileExtension === 'pdf') {
       // PDF files don't need conversion
       console.log(`📄 [Print] File is PDF, no conversion needed`)
-      pdfBuffer = fileBuffer.buffer.slice(fileBuffer.byteOffset, fileBuffer.byteOffset + fileBuffer.byteLength)
+      // Convert Node Buffer to fresh ArrayBuffer to satisfy TS for later steps
+      pdfBuffer = new Uint8Array(fileBuffer).buffer.slice(0) as ArrayBuffer
     } else {
       // Office files need to be uploaded to OneDrive and converted
       console.log(`📤 [Print] Step 3: Getting Azure access token...`)
       const graphToken = await getAzureAccessToken()
-      
+
       // Ensure temp folder exists
       console.log(`📁 [Print] Step 4: Ensuring temp folder exists...`)
       await ensurePrintTempFolder(graphToken)
-      
+
       // Upload to OneDrive temp folder
       console.log(`📤 [Print] Step 5: Uploading to OneDrive temp folder...`)
       const contentType = CONTENT_TYPES[fileExtension] || 'application/octet-stream'
       const driveItem = await uploadToTempFolder(graphToken, sopFile.fileName, fileBuffer, contentType)
       driveItemId = driveItem.id
-      
+
       // Register for auto-cleanup (delete after 5 minutes)
       tempFilesCleanup.set(driveItemId, {
         deleteAt: Date.now() + 5 * 60 * 1000,
         fileName: sopFile.fileName
       })
-      
+
       // Convert to PDF using Graph API
       // This uses Microsoft's rendering engine which preserves Excel/Word print settings
       console.log(`📄 [Print] Step 6: Converting to PDF using Graph API...`)
       console.log(`   (PDF akan mengikuti print settings dari Office: page layout, margins, print area, dll)`)
       pdfBuffer = await convertToPdf(graphToken, driveItemId, sopFile.fileName)
-      
+
       // Cleanup - delete temp file from OneDrive
       console.log(`🧹 [Print] Step 7: Cleaning up temp file...`)
       await deleteTempFile(graphToken, driveItemId)
     }
-    
+
     // Step 4: Add footer to PDF
     console.log(`📄 [Print] Step 8: Adding footer to PDF...`)
     console.log(`   Footer: Printed by: ${userName}`)
     const pdfWithFooter = await addPdfFooter(pdfBuffer, userName)
     console.log(`✅ [Print] Footer added, new size: ${pdfWithFooter.byteLength} bytes`)
-    
+
     // Log print activity
     if (authenticatedUserId) {
       try {
@@ -461,28 +462,38 @@ export async function GET(request: NextRequest) {
         console.warn('⚠️ [Print] Failed to log activity:', logError)
       }
     }
-    
+
     // Generate filename from judul
-    const sanitizeFileName = (name: string) => 
+    const sanitizeFileName = (name: string) =>
       name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
     const printFileName = `${sanitizeFileName(sopFile.judul)}.pdf`
-    
+
     console.log(`\n✅ [Print] Complete in ${Date.now() - startTime}ms`)
     console.log(`   Output: ${printFileName} (${pdfWithFooter.byteLength} bytes)\n`)
-    
+    // Fix TypeScript error by creating a fresh ArrayBuffer from the Uint8Array
+    const finalBuffer = new ArrayBuffer(pdfWithFooter.byteLength)
+    new Uint8Array(finalBuffer).set(pdfWithFooter)
+
+    // Check if the client requested base64 format (e.g., for <object> embedding to strictly bypass download)
+    if (searchParams.get('format') === 'base64') {
+      const base64Pdf = Buffer.from(finalBuffer).toString('base64');
+      const dataUri = `data:application/pdf;base64,${base64Pdf}`;
+      return NextResponse.json({ dataUri });
+    }
+
     // Return PDF with headers for print dialog
-    return new NextResponse(pdfWithFooter, {
+    // We return it cleanly so the client PrintViewer React app can embed it in an iframe
+    // Note: We use the inline flag and explicit filename so that if accessed directly it attempts native inline view
+    return new NextResponse(finalBuffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="${encodeURIComponent(printFileName)}"; filename*=UTF-8''${encodeURIComponent(printFileName)}`,
-        'Content-Length': pdfWithFooter.byteLength.toString(),
+        'Content-Disposition': `inline; filename="${printFileName}"`,
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Access-Control-Allow-Origin': '*',
-        'X-File-Title': encodeURIComponent(sopFile.judul),
       },
     })
-    
+
   } catch (error) {
     console.error('❌ [Print] Error:', error)
     return NextResponse.json({

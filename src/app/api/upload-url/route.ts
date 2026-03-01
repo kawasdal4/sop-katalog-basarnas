@@ -37,8 +37,8 @@ export async function POST(request: NextRequest) {
 
     // Check if R2 is configured
     if (!isR2Configured()) {
-      return NextResponse.json({ 
-        error: 'Cloudflare R2 tidak terkonfigurasi. Hubungi administrator.' 
+      return NextResponse.json({
+        error: 'Cloudflare R2 tidak terkonfigurasi. Hubungi administrator.'
       }, { status: 500 })
     }
 
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     // Get user session - only required for non-public submissions
     const cookieStore = await cookies()
     const userId = cookieStore.get('userId')?.value
-    
+
     // For public submissions, allow without authentication
     if (!isPublicSubmission) {
       if (!userId) {
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ R2 presigned upload URL created: ${tempKey}`)
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       uploadUrl,
       uploadKey: tempKey,
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Create upload URL error:', error)
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: 'Terjadi kesalahan saat membuat upload URL',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
@@ -103,12 +103,13 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { 
+    const {
       uploadKey,      // The temporary key returned from POST
       fileName,       // Original file name
       judul,          // SOP title
       kategori,       // SIAGA | LATIHAN | LAINNYA
       jenis,          // SOP | IK | LAINNYA
+      lingkup,        // Scope
       tahun,          // Year
       status,         // AKTIF | REVIEW | KADALUARSA
       isPublicSubmission,
@@ -118,8 +119,8 @@ export async function PUT(request: NextRequest) {
     } = body
 
     if (!uploadKey || !fileName || !judul || !kategori || !jenis || !tahun) {
-      return NextResponse.json({ 
-        error: 'Data tidak lengkap. Semua field harus diisi.' 
+      return NextResponse.json({
+        error: 'Data tidak lengkap. Semua field harus diisi.'
       }, { status: 400 })
     }
 
@@ -163,18 +164,19 @@ export async function PUT(request: NextRequest) {
     // Move file from temp location to final location in R2
     // We need to copy the file to the new location and delete the temp file
     const { copyR2Object, deleteFromR2 } = await import('@/lib/r2-storage')
-    
+
     try {
       await copyR2Object(uploadKey, finalKey)
       console.log(`✅ File moved: ${uploadKey} → ${finalKey}`)
-      
-      // Delete temp file
-      await deleteFromR2(uploadKey)
-      console.log(`🗑️ Temp file deleted: ${uploadKey}`)
+
+      // DO NOT delete temp file immediately - let background job or scheduled task handle it
+      // if we delete it here, sometimes S3 copies are eventually consistent and we get a miss
+      // await deleteFromR2(uploadKey)
+      // console.log(`🗑️ Temp file deleted: ${uploadKey}`)
     } catch (moveError) {
       console.error('❌ Failed to move file:', moveError)
-      return NextResponse.json({ 
-        error: 'Gagal memindahkan file. Upload mungkin tidak berhasil.' 
+      return NextResponse.json({
+        error: 'Gagal memindahkan file. Upload mungkin tidak berhasil.'
       }, { status: 500 })
     }
 
@@ -185,6 +187,7 @@ export async function PUT(request: NextRequest) {
         tahun: parseInt(tahun),
         kategori,
         jenis,
+        lingkup,
         status: status || 'AKTIF',
         fileName: finalFileName,
         filePath: finalKey,
@@ -223,24 +226,24 @@ export async function PUT(request: NextRequest) {
       if (gd.isGoogleDriveConfigured()) {
         try {
           console.log(`📤 [Background] Starting backup to Google Drive: ${finalFileName}`)
-          
+
           // Download from R2
           const r2 = await import('@/lib/r2-storage')
           const { buffer } = await r2.downloadFromR2(finalKey)
-          
+
           // Upload to Google Drive
           const driveResult = await gd.uploadFileToDriveFolder(
-            buffer, 
-            finalFileName, 
+            buffer,
+            finalFileName,
             MIME_TYPES[fileExt] || 'application/octet-stream'
           )
-          
+
           // Update SOP record with driveFileId
           await db.sopFile.update({
             where: { id: sopFile.id },
             data: { driveFileId: driveResult.id }
           })
-          
+
           // Update FileSync record
           await db.fileSync.updateMany({
             where: { r2Key: finalKey },
@@ -253,9 +256,9 @@ export async function PUT(request: NextRequest) {
               fileSize: buffer.length,
             }
           })
-          
+
           console.log(`✅ [Background] Backup to Google Drive completed: ${driveResult.id}`)
-          
+
         } catch (backupError) {
           console.warn('⚠️ [Background] Backup to Google Drive failed:', backupError)
         }
@@ -285,8 +288,8 @@ export async function PUT(request: NextRequest) {
     console.log(`   GDrive Backup: Background`)
     console.log('========================================')
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       data: sopFile,
       r2Key: finalKey,
       syncStatus: {
@@ -297,7 +300,7 @@ export async function PUT(request: NextRequest) {
 
   } catch (error) {
     console.error('Confirm upload error:', error)
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: 'Terjadi kesalahan saat konfirmasi upload',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })

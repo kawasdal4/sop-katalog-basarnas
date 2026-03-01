@@ -7,14 +7,14 @@ export async function GET() {
   try {
     const cookieStore = await cookies()
     const userId = cookieStore.get('userId')?.value
-    
+
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    
+
     // Start with basic counts
     const stats: Record<string, unknown> = {}
-    
+
     // Total SOP
     try {
       stats.totalSop = await db.sopFile.count({
@@ -24,7 +24,7 @@ export async function GET() {
       stats.totalSop = 0
       stats.totalSopError = e instanceof Error ? e.message : 'Unknown'
     }
-    
+
     // Total IK
     try {
       stats.totalIk = await db.sopFile.count({
@@ -34,7 +34,7 @@ export async function GET() {
       stats.totalIk = 0
       stats.totalIkError = e instanceof Error ? e.message : 'Unknown'
     }
-    
+
     // By Status
     try {
       stats.totalAktif = await db.sopFile.count({
@@ -43,7 +43,7 @@ export async function GET() {
     } catch (e) {
       stats.totalAktif = 0
     }
-    
+
     try {
       stats.totalReview = await db.sopFile.count({
         where: { status: 'REVIEW', OR: [{ isPublicSubmission: false }, { verificationStatus: 'DISETUJUI' }] }
@@ -51,7 +51,7 @@ export async function GET() {
     } catch (e) {
       stats.totalReview = 0
     }
-    
+
     try {
       stats.totalKadaluarsa = await db.sopFile.count({
         where: { status: 'KADALUARSA', OR: [{ isPublicSubmission: false }, { verificationStatus: 'DISETUJUI' }] }
@@ -59,7 +59,7 @@ export async function GET() {
     } catch (e) {
       stats.totalKadaluarsa = 0
     }
-    
+
     // Public submissions
     try {
       stats.totalPublikMenunggu = await db.sopFile.count({
@@ -68,15 +68,36 @@ export async function GET() {
     } catch (e) {
       stats.totalPublikMenunggu = 0
     }
-    
+
     try {
+      // Get the user's last visit time to Arsip
+      const user = await db.user.findUnique({
+        where: { id: userId },
+        select: { lastArsipVisitAt: true }
+      })
+
       stats.totalPublikDitolak = await db.sopFile.count({
         where: { isPublicSubmission: true, verificationStatus: 'DITOLAK' }
       })
+
+      // Count only rejected files verified AFTER the user's last visit
+      if (user?.lastArsipVisitAt) {
+        stats.totalPublikDitolakBaru = await db.sopFile.count({
+          where: {
+            isPublicSubmission: true,
+            verificationStatus: 'DITOLAK',
+            verifiedAt: { gt: user.lastArsipVisitAt }
+          }
+        })
+      } else {
+        // If never visited, all of them are "new"
+        stats.totalPublikDitolakBaru = stats.totalPublikDitolak
+      }
     } catch (e) {
       stats.totalPublikDitolak = 0
+      stats.totalPublikDitolakBaru = 0
     }
-    
+
     // By Tahun
     try {
       const byTahun = await db.sopFile.groupBy({
@@ -90,7 +111,7 @@ export async function GET() {
       stats.byTahun = []
       stats.byTahunError = e instanceof Error ? e.message : 'Unknown'
     }
-    
+
     // By Kategori
     try {
       const byKategori = await db.sopFile.groupBy({
@@ -102,7 +123,7 @@ export async function GET() {
     } catch (e) {
       stats.byKategori = []
     }
-    
+
     // By Jenis
     try {
       const byJenis = await db.sopFile.groupBy({
@@ -114,7 +135,21 @@ export async function GET() {
     } catch (e) {
       stats.byJenis = []
     }
-    
+
+    // By Lingkup
+    try {
+      const byLingkup = await (db.sopFile.groupBy as any)({
+        by: ['lingkup'],
+        where: { OR: [{ isPublicSubmission: false }, { verificationStatus: 'DISETUJUI' }] },
+        _count: { id: true }
+      })
+      stats.byLingkup = (byLingkup as any[])
+        .filter(item => item.lingkup !== null)
+        .map(item => ({ lingkup: item.lingkup, count: item._count.id }))
+    } catch (e) {
+      stats.byLingkup = []
+    }
+
     // By Status
     try {
       const byStatus = await db.sopFile.groupBy({
@@ -126,7 +161,7 @@ export async function GET() {
     } catch (e) {
       stats.byStatus = []
     }
-    
+
     // Recent uploads
     try {
       stats.recentUploads = await db.sopFile.findMany({
@@ -141,7 +176,7 @@ export async function GET() {
       stats.recentUploads = []
       stats.recentUploadsError = e instanceof Error ? e.message : 'Unknown'
     }
-    
+
     // Recent logs - without sopFile relation first
     try {
       stats.recentLogs = await db.log.findMany({
@@ -155,12 +190,12 @@ export async function GET() {
       stats.recentLogs = []
       stats.recentLogsError = e instanceof Error ? e.message : 'Unknown'
     }
-    
+
     // Recent Activity
     try {
       const sevenDaysAgo = new Date()
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-      
+
       const recentActivity = await db.log.groupBy({
         by: ['aktivitas'],
         where: { createdAt: { gte: sevenDaysAgo } },
@@ -170,13 +205,13 @@ export async function GET() {
     } catch (e) {
       stats.recentActivity = []
     }
-    
+
     // Analytics - preview/download counts
     stats.totalPreviews = 0
     stats.totalDownloads = 0
     stats.topViewed = []
     stats.topDownloaded = []
-    
+
     // Try to get preview/download stats
     try {
       const previewAgg = await db.sopFile.aggregate({
@@ -187,7 +222,7 @@ export async function GET() {
     } catch {
       // previewCount field doesn't exist
     }
-    
+
     try {
       const downloadAgg = await db.sopFile.aggregate({
         where: { OR: [{ isPublicSubmission: false }, { verificationStatus: 'DISETUJUI' }] },
@@ -197,11 +232,11 @@ export async function GET() {
     } catch {
       // downloadCount field doesn't exist
     }
-    
+
     // Top Viewed Documents
     try {
       const topViewed = await db.sopFile.findMany({
-        where: { 
+        where: {
           OR: [{ isPublicSubmission: false }, { verificationStatus: 'DISETUJUI' }],
           previewCount: { gt: 0 }
         },
@@ -217,7 +252,7 @@ export async function GET() {
     // Top Downloaded Documents
     try {
       const topDownloaded = await db.sopFile.findMany({
-        where: { 
+        where: {
           OR: [{ isPublicSubmission: false }, { verificationStatus: 'DISETUJUI' }],
           downloadCount: { gt: 0 }
         },
@@ -229,13 +264,13 @@ export async function GET() {
     } catch {
       stats.topDownloaded = []
     }
-    
+
     return NextResponse.json(stats)
-    
+
   } catch (error) {
     console.error('Stats error:', error)
-    return NextResponse.json({ 
-      error: 'Terjadi kesalahan', 
+    return NextResponse.json({
+      error: 'Terjadi kesalahan',
       details: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined
     }, { status: 500 })
