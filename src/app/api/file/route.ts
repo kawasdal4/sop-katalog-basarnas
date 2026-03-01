@@ -51,12 +51,13 @@ export async function GET(request: NextRequest) {
 
     const fileExtension = document.fileName.toLowerCase().split('.').pop() || 'pdf'
     const fileKey = document.filePath
-    const publicUrl = getR2PublicUrl(fileKey) || `https://pub-r2.example.com/${fileKey}`
+    const publicUrl = getR2PublicUrl(fileKey)
 
     console.log(`📄 File request: ${action} - ${document.judul} (${fileExtension})`)
     console.log(`   R2 key: ${fileKey}`)
+    console.log(`   Public URL: ${publicUrl ? 'Available' : 'Not available (will serve directly)'}`)
 
-    // Log activity and increment counters
+    // Log activity increment counters
     const logActivity = async (activityType: 'PREVIEW' | 'DOWNLOAD') => {
       if (userId) {
         try {
@@ -88,17 +89,30 @@ export async function GET(request: NextRequest) {
     // Log the activity
     await logActivity(action === 'download' ? 'DOWNLOAD' : 'PREVIEW')
 
-    // For Excel/Word files - return JSON with Office Online Viewer URL
+    // For Excel/Word files - check if we should use public URL or serve via preview-office
     if (['xlsx', 'xls', 'csv', 'docx', 'doc'].includes(fileExtension)) {
-      const encodedUrl = encodeURIComponent(publicUrl)
-      const officeViewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodedUrl}`
+      // If R2 has a public URL, use Office Online viewer
+      if (publicUrl) {
+        const encodedUrl = encodeURIComponent(publicUrl)
+        const officeViewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodedUrl}`
+        
+        console.log(`📊 Office Online Viewer URL: ${officeViewerUrl.substring(0, 100)}...`)
+        
+        return NextResponse.json({
+          success: true,
+          viewerUrl: officeViewerUrl,
+          viewerType: 'microsoft-office',
+          downloadUrl: `/api/download?id=${documentId}`,
+          fileName: document.fileName
+        })
+      }
       
-      console.log(`📊 Office Online Viewer URL: ${officeViewerUrl.substring(0, 100)}...`)
-      
+      // No public R2 URL - tell frontend to use preview-office API
+      console.log('📊 R2 bucket is not public, frontend should use /api/preview-office')
       return NextResponse.json({
         success: true,
-        viewerUrl: officeViewerUrl,
-        viewerType: 'microsoft-office',
+        usePreviewOffice: true,
+        message: 'Gunakan /api/preview-office untuk preview file Office',
         downloadUrl: `/api/download?id=${documentId}`,
         fileName: document.fileName
       })
