@@ -2214,8 +2214,13 @@ export default function ESOPApp() {
         const res = await fetch(`/api/file?action=preview&id=${id}`)
         const contentType = res.headers.get('content-type') || ''
 
-        if (contentType.includes('application/pdf')) {
+        if (res.ok && (contentType.includes('application/pdf') || contentType === '')) {
           const blob = await res.blob()
+          if (blob.size === 0) {
+            toast({ title: '⚠️ File Kosong', description: 'File ini tidak memiliki isi (0 bytes).', variant: 'destructive' })
+            setPreviewLoading(null)
+            return
+          }
           const url = window.URL.createObjectURL(blob)
           window.open(url, '_blank')
           setPreviewLoading(null)
@@ -2224,13 +2229,24 @@ export default function ESOPApp() {
         }
 
         const text = await res.text()
+
+        if (!res.ok) {
+          console.error(`[Preview PDF] API Error ${res.status}:`, text)
+          toast({ title: `Error ${res.status}`, description: 'Gagal memuat preview dari server.', variant: 'destructive' })
+          setPreviewLoading(null)
+          return
+        }
+
         try {
+          if (!text.trim()) {
+            throw new Error('Empty response body')
+          }
           const data = JSON.parse(text)
           if (data.downloadUrl) {
             window.open(data.downloadUrl, '_blank')
           }
         } catch (e) {
-          console.error('[Preview PDF] Failed to parse JSON. Raw text:', text)
+          console.error('[Preview PDF] Failed to parse JSON. Status:', res.status, 'Raw text:', text)
           toast({ title: 'Error API', description: 'Gagal membaca response server (PDF).', variant: 'destructive' })
         }
         setPreviewLoading(null)
@@ -2424,8 +2440,14 @@ export default function ESOPApp() {
         const res = await fetch(`/api/file?action=preview&id=${id}`)
         const contentType = res.headers.get('content-type') || ''
 
-        if (contentType.includes('application/pdf')) {
+        // Fallback or explicit check for PDF. Notice we also check if res.ok is successful
+        if (res.ok && (contentType.includes('application/pdf') || contentType === '')) {
           const blob = await res.blob()
+          if (blob.size === 0) {
+            toast({ title: '⚠️ File Kosong', description: 'File ini tidak memiliki isi (0 bytes).', variant: 'destructive' })
+            setPreviewLoading(null)
+            return
+          }
           const url = window.URL.createObjectURL(blob)
           window.open(url, '_blank')
           setPreviewLoading(null)
@@ -2434,13 +2456,24 @@ export default function ESOPApp() {
         }
 
         const text = await res.text()
+
+        if (!res.ok) {
+          console.error(`[Preview PDF] API Error ${res.status}:`, text)
+          toast({ title: `Error ${res.status}`, description: 'Gagal memuat preview tiket publik dari server.', variant: 'destructive' })
+          setPreviewLoading(null)
+          return
+        }
+
         try {
+          if (!text.trim()) {
+            throw new Error('Empty response body')
+          }
           const data = JSON.parse(text)
           if (data.downloadUrl) {
             window.open(data.downloadUrl, '_blank')
           }
         } catch (e) {
-          console.error('[Preview PDF] Failed to parse JSON. Raw text:', text)
+          console.error('[Preview PDF] Failed to parse JSON. Status:', res.status, 'Raw text:', text)
           toast({ title: 'Error API', description: 'Gagal membaca response server (PDF Publik).', variant: 'destructive' })
         }
         setPreviewLoading(null)
