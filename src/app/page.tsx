@@ -341,7 +341,7 @@ function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
         const radius = 45 // percentage from center
         const x = 50 + radius * Math.cos(angle)
         const y = 50 + radius * Math.sin(angle)
-        
+
         return (
           <motion.div
             key={i}
@@ -350,10 +350,10 @@ function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
               left: `${x}%`,
               top: `${y}%`,
               transform: 'translate(-50%, -50%)',
-              background: i % 2 === 0 
+              background: i % 2 === 0
                 ? 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 70%)'
                 : 'radial-gradient(circle, rgba(251,191,36,1) 0%, rgba(251,191,36,0) 70%)',
-              boxShadow: i % 2 === 0 
+              boxShadow: i % 2 === 0
                 ? '0 0 6px 2px rgba(255,255,255,0.8)'
                 : '0 0 6px 2px rgba(251,191,36,0.8)',
             }}
@@ -374,10 +374,10 @@ function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
       {/* Main shimmer sweep over logo */}
       <motion.div
         className="absolute inset-0 z-10 overflow-hidden"
-        style={{ 
+        style={{
           pointerEvents: 'none',
           borderRadius: '50%',
-         }}
+        }}
       >
         <motion.div
           className="absolute inset-0"
@@ -841,7 +841,7 @@ export default function ESOPApp() {
   const [originalProfilePhoto, setOriginalProfilePhoto] = useState<string | null>(null)
   const [profileLoading, setProfileLoading] = useState(false)
   const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null)
-  
+
   // Image cropper state
   const [showImageCropper, setShowImageCropper] = useState(false)
   const [photoToCrop, setPhotoToCrop] = useState<File | null>(null)
@@ -1641,13 +1641,13 @@ export default function ESOPApp() {
       const urlParams = new URLSearchParams(window.location.search)
       const resetToken = urlParams.get('reset-token')
       const resetEmail = urlParams.get('email')
-      
+
       if (resetToken && resetEmail) {
         console.log('[Reset Password] Found reset token in URL')
         setResetPasswordToken(resetToken)
         setResetPasswordEmail(decodeURIComponent(resetEmail))
         setShowResetPassword(true)
-        
+
         // Clear the URL parameters without refreshing
         const newUrl = window.location.pathname
         window.history.replaceState({}, '', newUrl)
@@ -1856,12 +1856,15 @@ export default function ESOPApp() {
   const handleLogout = async () => {
     // Tampilkan animasi goodbye dahulu
     setShowLogoutAnimation(true)
-    // Proses logout di background
-    try {
-      await fetch('/api/auth', { method: 'DELETE' })
-    } catch (_) { /* ignore */ }
-    // Tunggu animasi selesai (3 detik), lalu reset state
-    setTimeout(() => {
+
+    // Tunggu animasi selesai (3 detik), baru hapus cookie dan reset state
+    // Ini memastikan foto profil masih bisa dimuat oleh browser saat animasi dimainkan
+    setTimeout(async () => {
+      // Proses logout API di background
+      try {
+        await fetch('/api/auth', { method: 'DELETE' })
+      } catch (_) { /* ignore */ }
+
       setShowLogoutAnimation(false)
       setUser(null)
       setIsAuthenticated(false)
@@ -3600,6 +3603,192 @@ export default function ESOPApp() {
           </div>
         </motion.header>
 
+
+        {/* Reset Password Dialog */}
+        <Dialog open={showResetPassword} onOpenChange={(open) => {
+          if (!open) {
+            setShowResetPassword(false)
+            setResetPasswordToken(null)
+            setResetPasswordEmail('')
+            setResetPasswordForm({ newPassword: '', confirmPassword: '' })
+            setResetPasswordSuccess(false)
+            setResetPasswordError(null)
+          }
+        }}>
+          <DialogContent className="sm:max-w-md bg-slate-900 border-0 shadow-2xl overflow-hidden p-0 gap-0" aria-describedby={undefined}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3 }}
+            >
+              {/* Header */}
+              <div className="relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-green-500 via-emerald-600 to-teal-700">
+                  <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2740%27 height=%2740%27 viewBox=%270 0 40 40%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cg fill=%27%23fff%27 fill-opacity=%270.08%27%3E%3Cpath d=%27M20 20.5V18H0v2h20zm0-18V0H18v2.5h2z%27/%3E%3C/g%3E%3C/svg%3E')] opacity-60" />
+                </div>
+
+                <div className="relative px-6 py-5 flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/30">
+                    <Key className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold">Buat Password Baru</h2>
+                    <p className="text-xs text-gray-300">Password baru untuk {resetPasswordEmail}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 space-y-4">
+                {!resetPasswordSuccess ? (
+                  <>
+                    <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                      <div className="flex items-start gap-3">
+                        <Shield className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm text-green-300 font-medium">Buat Password Baru</p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Password harus minimal 6 karakter.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {resetPasswordError && (
+                      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3">
+                        <p className="text-sm text-red-400">{resetPasswordError}</p>
+                      </div>
+                    )}
+
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-gray-300 text-sm font-medium">Password Baru</Label>
+                        <Input
+                          type="password"
+                          value={resetPasswordForm.newPassword}
+                          onChange={(e) => setResetPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                          placeholder="Minimal 6 karakter"
+                          className="h-12 bg-slate-800/50 border-2 border-green-500/30 focus:border-green-500 text-white placeholder:text-gray-500 rounded-xl"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-gray-300 text-sm font-medium">Konfirmasi Password</Label>
+                        <Input
+                          type="password"
+                          value={resetPasswordForm.confirmPassword}
+                          onChange={(e) => setResetPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                          placeholder="Ulangi password baru"
+                          className="h-12 bg-slate-800/50 border-2 border-green-500/30 focus:border-green-500 text-white placeholder:text-gray-500 rounded-xl"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setShowResetPassword(false)
+                          setResetPasswordToken(null)
+                          setResetPasswordEmail('')
+                          setResetPasswordForm({ newPassword: '', confirmPassword: '' })
+                          setResetPasswordError(null)
+                        }}
+                        className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800 h-11 rounded-xl"
+                      >
+                        Batal
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={async () => {
+                          // Validate passwords
+                          if (!resetPasswordForm.newPassword || resetPasswordForm.newPassword.length < 6) {
+                            setResetPasswordError('Password minimal 6 karakter')
+                            return
+                          }
+                          if (resetPasswordForm.newPassword !== resetPasswordForm.confirmPassword) {
+                            setResetPasswordError('Password tidak cocok')
+                            return
+                          }
+
+                          setResetPasswordLoading(true)
+                          setResetPasswordError(null)
+                          try {
+                            const res = await fetch('/api/auth/reset-password', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                email: resetPasswordEmail,
+                                token: resetPasswordToken,
+                                newPassword: resetPasswordForm.newPassword
+                              })
+                            })
+                            const data = await res.json()
+
+                            if (data.error) {
+                              setResetPasswordError(data.error)
+                            } else {
+                              setResetPasswordSuccess(true)
+                              toast({
+                                title: '✅ Password Berhasil Direset',
+                                description: 'Silakan login dengan password baru Anda.',
+                                duration: 5000
+                              })
+                            }
+                          } catch (error) {
+                            setResetPasswordError('Terjadi kesalahan. Silakan coba lagi.')
+                          } finally {
+                            setResetPasswordLoading(false)
+                          }
+                        }}
+                        disabled={resetPasswordLoading}
+                        className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white h-11 rounded-xl font-semibold shadow-lg shadow-green-500/20"
+                      >
+                        {resetPasswordLoading ? (
+                          <span className="flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Menyimpan...
+                          </span>
+                        ) : (
+                          'Simpan Password Baru'
+                        )}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-center py-6"
+                  >
+                    <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/30">
+                      <CheckCircle className="w-10 h-10 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">Password Berhasil Direset!</h3>
+                    <p className="text-gray-400 text-sm mb-6">
+                      Password Anda telah berhasil diubah. Silakan login dengan password baru.
+                    </p>
+                    <Button
+                      onClick={() => {
+                        setShowResetPassword(false)
+                        setResetPasswordToken(null)
+                        setResetPasswordEmail('')
+                        setResetPasswordForm({ newPassword: '', confirmPassword: '' })
+                        setResetPasswordSuccess(false)
+                        setShowLogin(true)
+                      }}
+                      className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-8 rounded-xl"
+                    >
+                      Login Sekarang
+                    </Button>
+                  </motion.div>
+                )}
+              </div>
+            </motion.div>
+          </DialogContent>
+        </Dialog>
+
         {/* Public Content - Optimized Premium Layout (Zero Scrolling) */}
         <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-2 sm:p-4 lg:p-6 max-h-screen overflow-hidden">
           {/* Animated Hero Section - Compressed */}
@@ -4339,10 +4528,10 @@ export default function ESOPApp() {
                             // Validate email format
                             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
                             if (!forgotPasswordEmail || !emailRegex.test(forgotPasswordEmail)) {
-                              toast({ 
-                                title: '⚠️ Format Email Tidak Valid', 
-                                description: 'Masukkan alamat email yang benar, contoh: nama@email.com', 
-                                variant: 'destructive' 
+                              toast({
+                                title: '⚠️ Format Email Tidak Valid',
+                                description: 'Masukkan alamat email yang benar, contoh: nama@email.com',
+                                variant: 'destructive'
                               })
                               return
                             }
@@ -4359,32 +4548,32 @@ export default function ESOPApp() {
                               if (data.error) {
                                 // Check if email not registered
                                 if (data.notRegistered) {
-                                  toast({ 
-                                    title: '❌ Email Tidak Terdaftar', 
-                                    description: data.error, 
+                                  toast({
+                                    title: '❌ Email Tidak Terdaftar',
+                                    description: data.error,
                                     variant: 'destructive',
                                     duration: 6000
                                   })
                                 } else {
-                                  toast({ 
-                                    title: '⚠️ Gagal Mengirim', 
-                                    description: data.error, 
-                                    variant: 'destructive' 
+                                  toast({
+                                    title: '⚠️ Gagal Mengirim',
+                                    description: data.error,
+                                    variant: 'destructive'
                                   })
                                 }
                               } else {
                                 setForgotPasswordSuccess(true)
-                                toast({ 
-                                  title: '✅ Email Terkirim', 
+                                toast({
+                                  title: '✅ Email Terkirim',
                                   description: 'Silakan cek inbox atau folder spam email Anda untuk link reset password.',
                                   duration: 8000
                                 })
                               }
                             } catch (error) {
-                              toast({ 
-                                title: '❌ Kesalahan Jaringan', 
-                                description: 'Gagal menghubungi server. Periksa koneksi internet Anda.', 
-                                variant: 'destructive' 
+                              toast({
+                                title: '❌ Kesalahan Jaringan',
+                                description: 'Gagal menghubungi server. Periksa koneksi internet Anda.',
+                                variant: 'destructive'
                               })
                             } finally {
                               setForgotPasswordLoading(false)
@@ -4793,14 +4982,22 @@ export default function ESOPApp() {
                 />
 
                 {/* Inner circle */}
-                <div className="absolute inset-2 rounded-full bg-gradient-to-br from-amber-800 via-yellow-700 to-orange-800 flex items-center justify-center">
-                  <motion.div
-                    animate={{ scale: [1, 1.1, 1] }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
-                    className="text-5xl"
-                  >
-                    👑
-                  </motion.div>
+                <div className="absolute inset-2 rounded-full bg-gradient-to-br from-amber-800 via-yellow-700 to-orange-800 flex items-center justify-center overflow-hidden border-2 border-yellow-500/50">
+                  {loginSuccessPhoto ? (
+                    <img
+                      src={loginSuccessPhoto}
+                      alt={loginSuccessName || 'Developer'}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <motion.div
+                      animate={{ scale: [1, 1.1, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                      className="text-5xl"
+                    >
+                      👑
+                    </motion.div>
+                  )}
                 </div>
 
                 {/* Pulsing glow */}
@@ -4981,8 +5178,8 @@ export default function ESOPApp() {
                   transition={{ duration: 0.8, type: 'spring' }}
                 >
                   {loginSuccessPhoto ? (
-                    <img 
-                      src={loginSuccessPhoto} 
+                    <img
+                      src={loginSuccessPhoto}
                       alt={loginSuccessName}
                       className="w-full h-full object-cover"
                     />
@@ -5133,11 +5330,11 @@ export default function ESOPApp() {
                 <Button variant="ghost" className="text-white hover:bg-white/10 flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 hover:border-white/20 transition-all duration-200">
                   <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg overflow-hidden">
                     {user?.profilePhotoUrl ? (
-                      <img 
+                      <img
                         key={`profile-header-${user.photoUpdatedAt || Date.now()}`}
-                        src={user.profilePhotoUrl} 
-                        alt="Profile" 
-                        className="w-full h-full object-cover" 
+                        src={user.profilePhotoUrl}
+                        alt="Profile"
+                        className="w-full h-full object-cover"
                       />
                     ) : (
                       <span className="text-white text-sm font-bold">{user?.name?.charAt(0)?.toUpperCase()}</span>
@@ -5159,11 +5356,11 @@ export default function ESOPApp() {
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg overflow-hidden">
                       {user?.profilePhotoUrl ? (
-                        <img 
+                        <img
                           key={`profile-dropdown-${user.photoUpdatedAt || Date.now()}`}
-                          src={user.profilePhotoUrl} 
-                          alt="Profile" 
-                          className="w-full h-full object-cover" 
+                          src={user.profilePhotoUrl}
+                          alt="Profile"
+                          className="w-full h-full object-cover"
                         />
                       ) : (
                         <span className="text-white text-base font-bold">{user?.name?.charAt(0)?.toUpperCase()}</span>
@@ -5178,10 +5375,10 @@ export default function ESOPApp() {
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Menu Items */}
                 <div className="space-y-1">
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     onClick={() => {
                       handleLogout()
                       setShowLogin(true)
@@ -5227,10 +5424,10 @@ export default function ESOPApp() {
                     </div>
                   </DropdownMenuItem>
                 </div>
-                
+
                 {/* Logout Section */}
                 <div className="mt-2 pt-2 border-t border-white/10">
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     onClick={handleLogout}
                     className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-red-400 hover:text-red-300 hover:bg-red-500/10 focus:bg-red-500/10 transition-all duration-150 group"
                   >
@@ -5278,13 +5475,13 @@ export default function ESOPApp() {
               >
                 <Button
                   variant={currentPage === item.id ? 'default' : 'ghost'}
-                  className={`w-full justify-start gap-3 px-4 py-5 rounded-xl border-l-4 transition-all duration-300 group ${currentPage === item.id 
-                    ? 'border-orange-500 bg-gradient-to-r from-orange-500/25 via-orange-500/10 to-transparent text-white shadow-lg shadow-orange-500/10' 
+                  className={`w-full justify-start gap-3 px-4 py-5 rounded-xl border-l-4 transition-all duration-300 group ${currentPage === item.id
+                    ? 'border-orange-500 bg-gradient-to-r from-orange-500/25 via-orange-500/10 to-transparent text-white shadow-lg shadow-orange-500/10'
                     : 'border-transparent text-gray-400 hover:border-orange-500/50 hover:bg-white/5 hover:text-white'}`}
                   onClick={() => handleNavigation(item.id)}
                 >
-                  <div className={`p-1.5 rounded-lg transition-all duration-300 ${currentPage === item.id 
-                    ? 'bg-orange-500/30 text-orange-300' 
+                  <div className={`p-1.5 rounded-lg transition-all duration-300 ${currentPage === item.id
+                    ? 'bg-orange-500/30 text-orange-300'
                     : 'bg-gray-700/50 text-gray-400 group-hover:bg-orange-500/20 group-hover:text-orange-300'}`}>
                     <item.icon className={`w-5 h-5 ${syncStatus.isSyncing ? 'animate-spin-slow' : ''}`} />
                   </div>
@@ -5332,7 +5529,7 @@ export default function ESOPApp() {
                   animate={{ opacity: [0.4, 0.7, 0.4] }}
                   transition={{ duration: 2, repeat: Infinity }}
                 />
-                
+
                 {/* Footer container */}
                 <div className="relative px-6 py-2.5 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 rounded-lg border border-orange-500/30 overflow-hidden hover:border-orange-500/60 transition-colors">
                   {/* Animated shimmer */}
@@ -5345,7 +5542,7 @@ export default function ESOPApp() {
                     animate={{ backgroundPosition: ['200% 0', '-200% 0'] }}
                     transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
                   />
-                  
+
                   {/* Text */}
                   <p className="text-sm font-bold relative z-10 text-center">
                     <span className="text-gray-400">© </span>
@@ -5454,10 +5651,10 @@ export default function ESOPApp() {
                               )}
                             </Button>
                           </motion.div>
-                          
+
                           {/* Divider */}
                           <div className="w-px h-6 bg-slate-200" />
-                          
+
                           {/* PDF Export */}
                           <motion.div
                             whileHover={{ scale: 1.02 }}
@@ -8224,11 +8421,11 @@ export default function ESOPApp() {
                                     <div className="flex items-center gap-3">
                                       <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-orange-200 shadow-sm bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center flex-shrink-0">
                                         {userWithExtra.profilePhotoUrl ? (
-                                          <img 
+                                          <img
                                             key={userWithExtra.profilePhotoUrl}
-                                            src={userWithExtra.profilePhotoUrl} 
-                                            alt={u.name} 
-                                            className="w-full h-full object-cover" 
+                                            src={userWithExtra.profilePhotoUrl}
+                                            alt={u.name}
+                                            className="w-full h-full object-cover"
                                           />
                                         ) : (
                                           <span className="text-white font-bold text-sm">{u.name?.charAt(0)?.toUpperCase()}</span>
@@ -8510,10 +8707,10 @@ export default function ESOPApp() {
                           // Validate email format
                           const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
                           if (!forgotPasswordEmail || !emailRegex.test(forgotPasswordEmail)) {
-                            toast({ 
-                              title: '⚠️ Format Email Tidak Valid', 
-                              description: 'Masukkan alamat email yang benar, contoh: nama@email.com', 
-                              variant: 'destructive' 
+                            toast({
+                              title: '⚠️ Format Email Tidak Valid',
+                              description: 'Masukkan alamat email yang benar, contoh: nama@email.com',
+                              variant: 'destructive'
                             })
                             return
                           }
@@ -8530,32 +8727,32 @@ export default function ESOPApp() {
                             if (data.error) {
                               // Check if email not registered
                               if (data.notRegistered) {
-                                toast({ 
-                                  title: '❌ Email Tidak Terdaftar', 
-                                  description: data.error, 
+                                toast({
+                                  title: '❌ Email Tidak Terdaftar',
+                                  description: data.error,
                                   variant: 'destructive',
                                   duration: 6000
                                 })
                               } else {
-                                toast({ 
-                                  title: '⚠️ Gagal Mengirim', 
-                                  description: data.error, 
-                                  variant: 'destructive' 
+                                toast({
+                                  title: '⚠️ Gagal Mengirim',
+                                  description: data.error,
+                                  variant: 'destructive'
                                 })
                               }
                             } else {
                               setForgotPasswordSuccess(true)
-                              toast({ 
-                                title: '✅ Email Terkirim', 
+                              toast({
+                                title: '✅ Email Terkirim',
                                 description: 'Silakan cek inbox atau folder spam email Anda untuk link reset password.',
                                 duration: 8000
                               })
                             }
                           } catch (error) {
-                            toast({ 
-                              title: '❌ Kesalahan Jaringan', 
-                              description: 'Gagal menghubungi server. Periksa koneksi internet Anda.', 
-                              variant: 'destructive' 
+                            toast({
+                              title: '❌ Kesalahan Jaringan',
+                              description: 'Gagal menghubungi server. Periksa koneksi internet Anda.',
+                              variant: 'destructive'
                             })
                           } finally {
                             setForgotPasswordLoading(false)
@@ -8625,190 +8822,6 @@ export default function ESOPApp() {
         </DialogContent>
       </Dialog>
 
-      {/* Reset Password Dialog */}
-      <Dialog open={showResetPassword} onOpenChange={(open) => {
-        if (!open) {
-          setShowResetPassword(false)
-          setResetPasswordToken(null)
-          setResetPasswordEmail('')
-          setResetPasswordForm({ newPassword: '', confirmPassword: '' })
-          setResetPasswordSuccess(false)
-          setResetPasswordError(null)
-        }
-      }}>
-        <DialogContent className="sm:max-w-md bg-slate-900 border-0 shadow-2xl overflow-hidden p-0 gap-0" aria-describedby={undefined}>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
-          >
-            {/* Header */}
-            <div className="relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-green-500 via-emerald-600 to-teal-700">
-                <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2740%27 height=%2740%27 viewBox=%270 0 40 40%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cg fill=%27%23fff%27 fill-opacity=%270.08%27%3E%3Cpath d=%27M20 20.5V18H0v2h20zm0-18V0H18v2.5h2z%27/%3E%3C/g%3E%3C/svg%3E')] opacity-60" />
-              </div>
-              
-              <div className="relative px-6 py-5 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/30">
-                  <Key className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold">Buat Password Baru</h2>
-                  <p className="text-xs text-gray-300">Password baru untuk {resetPasswordEmail}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="p-6 space-y-4">
-              {!resetPasswordSuccess ? (
-                <>
-                  <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                      <Shield className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm text-green-300 font-medium">Buat Password Baru</p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          Password harus minimal 6 karakter.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {resetPasswordError && (
-                    <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3">
-                      <p className="text-sm text-red-400">{resetPasswordError}</p>
-                    </div>
-                  )}
-
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-gray-300 text-sm font-medium">Password Baru</Label>
-                      <Input
-                        type="password"
-                        value={resetPasswordForm.newPassword}
-                        onChange={(e) => setResetPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
-                        placeholder="Minimal 6 karakter"
-                        className="h-12 bg-slate-800/50 border-2 border-green-500/30 focus:border-green-500 text-white placeholder:text-gray-500 rounded-xl"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-gray-300 text-sm font-medium">Konfirmasi Password</Label>
-                      <Input
-                        type="password"
-                        value={resetPasswordForm.confirmPassword}
-                        onChange={(e) => setResetPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                        placeholder="Ulangi password baru"
-                        className="h-12 bg-slate-800/50 border-2 border-green-500/30 focus:border-green-500 text-white placeholder:text-gray-500 rounded-xl"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3 pt-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setShowResetPassword(false)
-                        setResetPasswordToken(null)
-                        setResetPasswordEmail('')
-                        setResetPasswordForm({ newPassword: '', confirmPassword: '' })
-                        setResetPasswordError(null)
-                      }}
-                      className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800 h-11 rounded-xl"
-                    >
-                      Batal
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={async () => {
-                        // Validate passwords
-                        if (!resetPasswordForm.newPassword || resetPasswordForm.newPassword.length < 6) {
-                          setResetPasswordError('Password minimal 6 karakter')
-                          return
-                        }
-                        if (resetPasswordForm.newPassword !== resetPasswordForm.confirmPassword) {
-                          setResetPasswordError('Password tidak cocok')
-                          return
-                        }
-
-                        setResetPasswordLoading(true)
-                        setResetPasswordError(null)
-                        try {
-                          const res = await fetch('/api/auth/reset-password', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              email: resetPasswordEmail,
-                              token: resetPasswordToken,
-                              newPassword: resetPasswordForm.newPassword
-                            })
-                          })
-                          const data = await res.json()
-
-                          if (data.error) {
-                            setResetPasswordError(data.error)
-                          } else {
-                            setResetPasswordSuccess(true)
-                            toast({
-                              title: '✅ Password Berhasil Direset',
-                              description: 'Silakan login dengan password baru Anda.',
-                              duration: 5000
-                            })
-                          }
-                        } catch (error) {
-                          setResetPasswordError('Terjadi kesalahan. Silakan coba lagi.')
-                        } finally {
-                          setResetPasswordLoading(false)
-                        }
-                      }}
-                      disabled={resetPasswordLoading}
-                      className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white h-11 rounded-xl font-semibold shadow-lg shadow-green-500/20"
-                    >
-                      {resetPasswordLoading ? (
-                        <span className="flex items-center gap-2">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Menyimpan...
-                        </span>
-                      ) : (
-                        'Simpan Password Baru'
-                      )}
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-center py-6"
-                >
-                  <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/30">
-                    <CheckCircle className="w-10 h-10 text-white" />
-                  </div>
-                  <h3 className="text-xl font-bold text-white mb-2">Password Berhasil Direset!</h3>
-                  <p className="text-gray-400 text-sm mb-6">
-                    Password Anda telah berhasil diubah. Silakan login dengan password baru.
-                  </p>
-                  <Button
-                    onClick={() => {
-                      setShowResetPassword(false)
-                      setResetPasswordToken(null)
-                      setResetPasswordEmail('')
-                      setResetPasswordForm({ newPassword: '', confirmPassword: '' })
-                      setResetPasswordSuccess(false)
-                      setShowLogin(true)
-                    }}
-                    className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-8 rounded-xl"
-                  >
-                    Login Sekarang
-                  </Button>
-                </motion.div>
-              )}
-            </div>
-          </motion.div>
-        </DialogContent>
-      </Dialog>
 
       {/* Settings Dialog */}
       <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
@@ -8819,11 +8832,11 @@ export default function ESOPApp() {
             <div className="absolute inset-0 bg-gradient-to-br from-orange-500 via-red-500 to-pink-600">
               <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2740%27 height=%2740%27 viewBox=%270 0 40 40%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cg fill=%27%23fff%27 fill-opacity=%270.05%27%3E%3Cpath d=%27M20 20.5V18H0v2h20zm0-18V0H18v2.5h2z%27/%3E%3C/g%3E%3C/svg%3E')] opacity-40" />
             </div>
-            
+
             {/* Floating orbs */}
             <div className="absolute top-4 right-8 w-20 h-20 rounded-full bg-white/10 blur-xl" />
             <div className="absolute bottom-2 left-12 w-16 h-16 rounded-full bg-yellow-300/20 blur-lg" />
-            
+
             <div className="relative px-8 py-6 flex items-center gap-5">
               {/* Avatar with glow */}
               <div className="relative">
@@ -8860,7 +8873,7 @@ export default function ESOPApp() {
                   />
                 </label>
               </div>
-              
+
               <div className="flex-1">
                 <DialogTitle className="text-lg font-bold text-white drop-shadow-sm">
                   {profileForm.name || user?.name}
@@ -8890,22 +8903,20 @@ export default function ESOPApp() {
           <div className="flex border-b border-gray-100 bg-gray-50/50">
             <button
               onClick={() => setSettingsTab('profile')}
-              className={`flex-1 py-4 px-4 text-sm font-semibold flex items-center justify-center gap-2 border-b-2 transition-all duration-200 ${
-                settingsTab === 'profile'
-                  ? 'border-orange-500 text-orange-600 bg-white'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-              }`}
+              className={`flex-1 py-4 px-4 text-sm font-semibold flex items-center justify-center gap-2 border-b-2 transition-all duration-200 ${settingsTab === 'profile'
+                ? 'border-orange-500 text-orange-600 bg-white'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                }`}
             >
               <User className="w-4 h-4" />
               Edit Profil
             </button>
             <button
               onClick={() => setSettingsTab('password')}
-              className={`flex-1 py-4 px-4 text-sm font-semibold flex items-center justify-center gap-2 border-b-2 transition-all duration-200 ${
-                settingsTab === 'password'
-                  ? 'border-orange-500 text-orange-600 bg-white'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-              }`}
+              className={`flex-1 py-4 px-4 text-sm font-semibold flex items-center justify-center gap-2 border-b-2 transition-all duration-200 ${settingsTab === 'password'
+                ? 'border-orange-500 text-orange-600 bg-white'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                }`}
             >
               <Key className="w-4 h-4" />
               Ganti Password
@@ -8927,7 +8938,7 @@ export default function ESOPApp() {
                       <p className="text-xs text-gray-500">Perbarui data profil Anda</p>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-5">
                     {/* Name Field */}
                     <div className="space-y-2">
@@ -8969,15 +8980,15 @@ export default function ESOPApp() {
                   profileForm.email !== originalProfileForm.email ||
                   selectedPhotoFile !== null ||
                   (profilePhoto === null && originalProfilePhoto !== null)) && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl"
-                  >
-                    <div className="w-3 h-3 rounded-full bg-amber-500 animate-pulse" />
-                    <span className="text-sm text-amber-700 font-medium">Ada perubahan yang belum disimpan</span>
-                  </motion.div>
-                )}
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl"
+                    >
+                      <div className="w-3 h-3 rounded-full bg-amber-500 animate-pulse" />
+                      <span className="text-sm text-amber-700 font-medium">Ada perubahan yang belum disimpan</span>
+                    </motion.div>
+                  )}
 
                 {/* Action Buttons */}
                 <div className="flex justify-end gap-3 pt-4">
@@ -9038,10 +9049,10 @@ export default function ESOPApp() {
                           if (data.user) {
                             // Add cache-busting parameter to force refresh
                             const timestamp = Date.now()
-                            const photoUrlWithCache = data.user.profilePhotoUrl 
+                            const photoUrlWithCache = data.user.profilePhotoUrl
                               ? `${data.user.profilePhotoUrl}${data.user.profilePhotoUrl.includes('?') ? '&' : '?'}t=${timestamp}`
                               : null
-                            
+
                             setUser(prev => prev ? {
                               ...prev,
                               name: data.user.name,
@@ -9052,10 +9063,10 @@ export default function ESOPApp() {
                             } : null)
                             setOriginalProfileForm({ name: data.user.name, email: data.user.email })
                             setOriginalProfilePhoto(photoUrlWithCache)
-                            
+
                             // Also update the user in the users list if it exists
-                            setUsers(prev => prev.map(u => 
-                              u.id === data.user.id 
+                            setUsers(prev => prev.map(u =>
+                              u.id === data.user.id
                                 ? { ...u, name: data.user.name, email: data.user.email, profilePhoto: data.user.profilePhoto, profilePhotoUrl: photoUrlWithCache }
                                 : u
                             ))
@@ -9156,17 +9167,16 @@ export default function ESOPApp() {
                         type="password"
                         value={passwordChangeForm.confirmPassword}
                         onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, confirmPassword: e.target.value })}
-                        className={`border-2 bg-white text-gray-900 h-12 rounded-xl focus:ring-4 transition-all ${
-                          passwordChangeForm.confirmPassword && passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword
-                            ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
-                            : passwordChangeForm.confirmPassword && passwordChangeForm.newPassword === passwordChangeForm.confirmPassword
+                        className={`border-2 bg-white text-gray-900 h-12 rounded-xl focus:ring-4 transition-all ${passwordChangeForm.confirmPassword && passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword
+                          ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+                          : passwordChangeForm.confirmPassword && passwordChangeForm.newPassword === passwordChangeForm.confirmPassword
                             ? 'border-green-400 focus:border-green-500 focus:ring-green-100'
                             : 'border-gray-200 focus:border-orange-400 focus:ring-orange-100'
-                        }`}
+                          }`}
                         placeholder="Konfirmasi password baru"
                       />
                       {passwordChangeForm.confirmPassword && passwordChangeForm.newPassword === passwordChangeForm.confirmPassword && (
-                        <motion.p 
+                        <motion.p
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           className="text-sm text-green-600 flex items-center gap-1 font-medium"

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import bcrypt from 'bcryptjs'
+
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,14 +33,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Token sudah kadaluarsa. Silakan minta link reset password baru.' }, { status: 400 })
     }
 
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10)
-
-    // Update user password and clear reset token
+    // Update user password (in plaintext to match login logic) and clear reset token
     await db.user.update({
       where: { id: user.id },
       data: {
-        password: hashedPassword,
+        password: newPassword,
         resetToken: null,
         resetTokenExpiry: null
       }
@@ -48,9 +45,9 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Reset Password] Password reset successful for: ${email}`)
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Password berhasil direset. Silakan login dengan password baru.' 
+    return NextResponse.json({
+      success: true,
+      message: 'Password berhasil direset. Silakan login dengan password baru.'
     })
 
   } catch (error) {

@@ -26,10 +26,11 @@ export async function GET() {
     let profilePhotoUrl = null
     if (user.profilePhoto) {
       const r2Url = getR2PublicUrl(user.profilePhoto)
+      const cacheBuster = user.updatedAt ? new Date(user.updatedAt).getTime() : Date.now()
       if (r2Url) {
-        profilePhotoUrl = `${r2Url}?v=${user.updatedAt ? new Date(user.updatedAt).getTime() : Date.now()}`
+        profilePhotoUrl = `${r2Url}?v=${cacheBuster}`
       } else {
-        profilePhotoUrl = user.profilePhoto
+        profilePhotoUrl = `/api/users/photo?key=${encodeURIComponent(user.profilePhoto)}&v=${cacheBuster}`
       }
     }
 
@@ -54,24 +55,24 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json()
-    
+
     if (!email || !password) {
       return NextResponse.json({ error: 'Email dan password diperlukan' }, { status: 400 })
     }
-    
+
     const user = await db.user.findUnique({
       where: { email }
     })
-    
+
     if (!user) {
       return NextResponse.json({ error: 'Email atau password salah' }, { status: 401 })
     }
-    
+
     // Simple password comparison (in production, use bcrypt)
     if (user.password !== password) {
       return NextResponse.json({ error: 'Email atau password salah' }, { status: 401 })
     }
-    
+
     // Create log
     await db.log.create({
       data: {
@@ -80,15 +81,16 @@ export async function POST(request: NextRequest) {
         deskripsi: `User ${user.name} berhasil login`
       }
     })
-    
+
     // Get profile photo URL if exists
     let profilePhotoUrl = null
     if (user.profilePhoto) {
       const r2Url = getR2PublicUrl(user.profilePhoto)
+      const cacheBuster = user.updatedAt ? new Date(user.updatedAt).getTime() : Date.now()
       if (r2Url) {
-        profilePhotoUrl = `${r2Url}?v=${user.updatedAt ? new Date(user.updatedAt).getTime() : Date.now()}`
+        profilePhotoUrl = `${r2Url}?v=${cacheBuster}`
       } else {
-        profilePhotoUrl = user.profilePhoto
+        profilePhotoUrl = `/api/users/photo?key=${encodeURIComponent(user.profilePhoto)}&v=${cacheBuster}`
       }
     }
 
@@ -105,7 +107,7 @@ export async function POST(request: NextRequest) {
       isAuthenticated: true,
       success: true
     })
-    
+
     // Set cookie on response
     response.cookies.set('userId', user.id, {
       httpOnly: true,
@@ -114,11 +116,12 @@ export async function POST(request: NextRequest) {
       maxAge: 60 * 60 * 24 * 7, // 7 days
       path: '/'
     })
-    
+
     return response
   } catch (error) {
     console.error('Login error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan' }, { status: 500 })
+    const errM = error instanceof Error ? error.message : 'Terjadi kesalahan'
+    return NextResponse.json({ error: errM, rawError: String(error) }, { status: 500 })
   }
 }
 

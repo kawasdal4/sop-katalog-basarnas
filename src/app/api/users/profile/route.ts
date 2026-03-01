@@ -159,7 +159,7 @@ export async function PUT(request: NextRequest) {
 
       // Don't pass folder option since photoKey already includes the folder prefix
       await uploadToR2(photoBuffer, photoKey, photo.type)
-      
+
       console.log('[Profile API] Photo uploaded successfully:', photoKey)
       updateData.profilePhoto = photoKey
     }
@@ -186,8 +186,9 @@ export async function PUT(request: NextRequest) {
         const cacheBuster = updatedUser.updatedAt ? new Date(updatedUser.updatedAt).getTime() : Date.now()
         profilePhotoUrl = `${r2Url}?v=${cacheBuster}`
       } else {
-        // Fallback to the key itself if public URL is not configured
-        profilePhotoUrl = updatedUser.profilePhoto
+        // Fallback to proxy route
+        const cacheBuster = updatedUser.updatedAt ? new Date(updatedUser.updatedAt).getTime() : Date.now()
+        profilePhotoUrl = `/api/users/photo?key=${encodeURIComponent(updatedUser.profilePhoto)}&v=${cacheBuster}`
       }
     }
 
@@ -211,6 +212,7 @@ export async function PUT(request: NextRequest) {
     })
   } catch (error) {
     console.error('Update profile error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan saat memperbarui profil' }, { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : 'Terjadi kesalahan saat memperbarui profil'
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }
