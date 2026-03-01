@@ -1877,6 +1877,7 @@ export default function ESOPApp() {
     formData.append('judul', form.judul)
     formData.append('kategori', form.kategori)
     formData.append('jenis', form.jenis)
+    formData.append('lingkup', form.lingkup || 'BCC')
     formData.append('tahun', form.tahun.toString())
     // For public submissions, use default 'AKTIF' status since publicForm doesn't have status field
     formData.append('status', isPublic ? 'AKTIF' : (form as typeof uploadForm).status)
