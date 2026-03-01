@@ -53,9 +53,9 @@ export async function POST(request: NextRequest) {
 
     console.log('[Forgot Password] Token stored for user:', user.email)
 
-    // Create reset URL - use the current request origin or fallback
-    const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const resetUrl = `${origin}/?reset-token=${resetToken}&email=${encodeURIComponent(email)}`
+    // Create reset URL - prefer environment variable for production
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.headers.get('origin') || 'http://localhost:3000'
+    const resetUrl = `${appUrl}/?reset-token=${resetToken}&email=${encodeURIComponent(email)}`
 
     console.log('[Forgot Password] Reset URL:', resetUrl)
 
@@ -158,8 +158,11 @@ Tim E-Katalog SOP Direktorat Kesiapsiagaan BASARNAS
 
   } catch (error) {
     console.error('[Forgot Password] Error:', error)
+    console.error('[Forgot Password] Error type:', typeof error)
+    console.error('[Forgot Password] Error message:', error instanceof Error ? error.message : String(error))
+    console.error('[Forgot Password] Error stack:', error instanceof Error ? error.stack : 'No stack')
     return NextResponse.json({ 
-      error: 'Terjadi kesalahan. Silakan coba lagi.' 
+      error: 'Terjadi kesalahan. Silakan coba lagi.'
     }, { status: 500 })
   }
 }

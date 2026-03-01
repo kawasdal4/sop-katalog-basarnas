@@ -638,6 +638,15 @@ export default function ESOPApp() {
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false)
   const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState(false)
 
+  // Reset Password state
+  const [showResetPassword, setShowResetPassword] = useState(false)
+  const [resetPasswordToken, setResetPasswordToken] = useState<string | null>(null)
+  const [resetPasswordEmail, setResetPasswordEmail] = useState<string>('')
+  const [resetPasswordForm, setResetPasswordForm] = useState({ newPassword: '', confirmPassword: '' })
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false)
+  const [resetPasswordSuccess, setResetPasswordSuccess] = useState(false)
+  const [resetPasswordError, setResetPasswordError] = useState<string | null>(null)
+
   // Navigation
   const [currentPage, setCurrentPage] = useState<PageView>('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -1625,6 +1634,26 @@ export default function ESOPApp() {
     // Fetch R2 status on mount for public page display
     fetchR2Status()
   }, [checkAuth, initSystem, fetchR2Status])
+
+  // Check for reset password token in URL
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const resetToken = urlParams.get('reset-token')
+      const resetEmail = urlParams.get('email')
+      
+      if (resetToken && resetEmail) {
+        console.log('[Reset Password] Found reset token in URL')
+        setResetPasswordToken(resetToken)
+        setResetPasswordEmail(decodeURIComponent(resetEmail))
+        setShowResetPassword(true)
+        
+        // Clear the URL parameters without refreshing
+        const newUrl = window.location.pathname
+        window.history.replaceState({}, '', newUrl)
+      }
+    }
+  }, [])
 
   // Load user-specific arsipSeenCount when user logs in
   useEffect(() => {
@@ -8591,6 +8620,191 @@ export default function ESOPApp() {
                   </motion.div>
                 )}
               </div>
+            </div>
+          </motion.div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={showResetPassword} onOpenChange={(open) => {
+        if (!open) {
+          setShowResetPassword(false)
+          setResetPasswordToken(null)
+          setResetPasswordEmail('')
+          setResetPasswordForm({ newPassword: '', confirmPassword: '' })
+          setResetPasswordSuccess(false)
+          setResetPasswordError(null)
+        }
+      }}>
+        <DialogContent className="sm:max-w-md bg-slate-900 border-0 shadow-2xl overflow-hidden p-0 gap-0" aria-describedby={undefined}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            {/* Header */}
+            <div className="relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-green-500 via-emerald-600 to-teal-700">
+                <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2740%27 height=%2740%27 viewBox=%270 0 40 40%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cg fill=%27%23fff%27 fill-opacity=%270.08%27%3E%3Cpath d=%27M20 20.5V18H0v2h20zm0-18V0H18v2.5h2z%27/%3E%3C/g%3E%3C/svg%3E')] opacity-60" />
+              </div>
+              
+              <div className="relative px-6 py-5 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/30">
+                  <Key className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">Buat Password Baru</h2>
+                  <p className="text-xs text-gray-300">Password baru untuk {resetPasswordEmail}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4">
+              {!resetPasswordSuccess ? (
+                <>
+                  <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <Shield className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm text-green-300 font-medium">Buat Password Baru</p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Password harus minimal 6 karakter.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {resetPasswordError && (
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3">
+                      <p className="text-sm text-red-400">{resetPasswordError}</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-gray-300 text-sm font-medium">Password Baru</Label>
+                      <Input
+                        type="password"
+                        value={resetPasswordForm.newPassword}
+                        onChange={(e) => setResetPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                        placeholder="Minimal 6 karakter"
+                        className="h-12 bg-slate-800/50 border-2 border-green-500/30 focus:border-green-500 text-white placeholder:text-gray-500 rounded-xl"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-gray-300 text-sm font-medium">Konfirmasi Password</Label>
+                      <Input
+                        type="password"
+                        value={resetPasswordForm.confirmPassword}
+                        onChange={(e) => setResetPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                        placeholder="Ulangi password baru"
+                        className="h-12 bg-slate-800/50 border-2 border-green-500/30 focus:border-green-500 text-white placeholder:text-gray-500 rounded-xl"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setShowResetPassword(false)
+                        setResetPasswordToken(null)
+                        setResetPasswordEmail('')
+                        setResetPasswordForm({ newPassword: '', confirmPassword: '' })
+                        setResetPasswordError(null)
+                      }}
+                      className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800 h-11 rounded-xl"
+                    >
+                      Batal
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={async () => {
+                        // Validate passwords
+                        if (!resetPasswordForm.newPassword || resetPasswordForm.newPassword.length < 6) {
+                          setResetPasswordError('Password minimal 6 karakter')
+                          return
+                        }
+                        if (resetPasswordForm.newPassword !== resetPasswordForm.confirmPassword) {
+                          setResetPasswordError('Password tidak cocok')
+                          return
+                        }
+
+                        setResetPasswordLoading(true)
+                        setResetPasswordError(null)
+                        try {
+                          const res = await fetch('/api/auth/reset-password', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              email: resetPasswordEmail,
+                              token: resetPasswordToken,
+                              newPassword: resetPasswordForm.newPassword
+                            })
+                          })
+                          const data = await res.json()
+
+                          if (data.error) {
+                            setResetPasswordError(data.error)
+                          } else {
+                            setResetPasswordSuccess(true)
+                            toast({
+                              title: '✅ Password Berhasil Direset',
+                              description: 'Silakan login dengan password baru Anda.',
+                              duration: 5000
+                            })
+                          }
+                        } catch (error) {
+                          setResetPasswordError('Terjadi kesalahan. Silakan coba lagi.')
+                        } finally {
+                          setResetPasswordLoading(false)
+                        }
+                      }}
+                      disabled={resetPasswordLoading}
+                      className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white h-11 rounded-xl font-semibold shadow-lg shadow-green-500/20"
+                    >
+                      {resetPasswordLoading ? (
+                        <span className="flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Menyimpan...
+                        </span>
+                      ) : (
+                        'Simpan Password Baru'
+                      )}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-center py-6"
+                >
+                  <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/30">
+                    <CheckCircle className="w-10 h-10 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">Password Berhasil Direset!</h3>
+                  <p className="text-gray-400 text-sm mb-6">
+                    Password Anda telah berhasil diubah. Silakan login dengan password baru.
+                  </p>
+                  <Button
+                    onClick={() => {
+                      setShowResetPassword(false)
+                      setResetPasswordToken(null)
+                      setResetPasswordEmail('')
+                      setResetPasswordForm({ newPassword: '', confirmPassword: '' })
+                      setResetPasswordSuccess(false)
+                      setShowLogin(true)
+                    }}
+                    className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-8 rounded-xl"
+                  >
+                    Login Sekarang
+                  </Button>
+                </motion.div>
+              )}
             </div>
           </motion.div>
         </DialogContent>

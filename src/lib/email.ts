@@ -2,38 +2,46 @@
  * Email Service
  * 
  * Handles email notifications for the SOP Katalog system
+ * Using Brevo (Sendinblue) SMTP
  */
 
 import nodemailer from 'nodemailer'
 import { db } from '@/lib/db'
 
-// Email configuration
-const EMAIL_USER = process.env.EMAIL_USER
-const EMAIL_PASS = process.env.EMAIL_PASS
+// Email configuration - Brevo SMTP
+const SMTP_HOST = process.env.SMTP_HOST || 'smtp-relay.brevo.com'
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587')
+const SMTP_USER = process.env.SMTP_USER
+const SMTP_PASS = process.env.SMTP_PASS
+const EMAIL_FROM = process.env.EMAIL_FROM || 'noreply@sop-katalog.basarnas.go.id'
 const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME || 'E-Katalog SOP Direktorat Kesiapsiagaan'
 
 // Debug logging
 console.log('[Email Service] Configuration:', {
-  hasEmailUser: !!EMAIL_USER,
-  hasEmailPass: !!EMAIL_PASS,
-  emailUser: EMAIL_USER ? `${EMAIL_USER.substring(0, 3)}***@${EMAIL_USER.split('@')[1]}` : 'not set',
+  smtpHost: SMTP_HOST,
+  smtpPort: SMTP_PORT,
+  hasSmtpUser: !!SMTP_USER,
+  hasSmtpPass: !!SMTP_PASS,
+  emailFrom: EMAIL_FROM,
   fromName: EMAIL_FROM_NAME
 })
 
 // Create transporter
 function createTransporter() {
-  if (!EMAIL_USER || !EMAIL_PASS) {
-    console.warn('⚠️ [Email] Email credentials not configured')
+  if (!SMTP_USER || !SMTP_PASS) {
+    console.warn('⚠️ [Email] SMTP credentials not configured')
     return null
   }
 
-  console.log('[Email Service] Creating transporter for:', EMAIL_USER)
+  console.log('[Email Service] Creating transporter')
   
   return nodemailer.createTransport({
-    service: 'gmail',
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: false, // use STARTTLS
     auth: {
-      user: EMAIL_USER,
-      pass: EMAIL_PASS
+      user: SMTP_USER,
+      pass: SMTP_PASS
     }
   })
 }
@@ -84,13 +92,13 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
     const toList = recipients.map(r => r.name ? `"${r.name}" <${r.email}>` : r.email)
 
     console.log('[Email] Preparing to send email:', {
-      from: EMAIL_USER,
+      from: `"${EMAIL_FROM_NAME}" <${EMAIL_FROM}>`,
       to: toList.join(', '),
       subject: options.subject
     })
 
     const mailOptions = {
-      from: `"${EMAIL_FROM_NAME}" <${EMAIL_USER}>`,
+      from: `"${EMAIL_FROM_NAME}" <${EMAIL_FROM}>`,
       to: toList.join(', '),
       subject: options.subject,
       html: options.html,
