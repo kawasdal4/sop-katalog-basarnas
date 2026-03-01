@@ -46,7 +46,8 @@ export async function GET(request: NextRequest) {
     if (search) {
       whereConditions.push({
         judul: {
-          contains: search
+          contains: search,
+          ...(isProduction ? { mode: 'insensitive' } : {})
         }
       })
     }
