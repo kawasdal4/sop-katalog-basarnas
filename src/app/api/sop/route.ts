@@ -45,7 +45,9 @@ export async function GET(request: NextRequest) {
     // In SQLite, Prisma's `contains` translates to `LIKE` which is case-insensitive by default
     if (search) {
       whereConditions.push({
-        judul: { contains: search }
+        judul: {
+          contains: search
+        }
       })
     }
 

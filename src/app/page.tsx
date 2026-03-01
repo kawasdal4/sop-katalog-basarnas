@@ -599,6 +599,7 @@ export default function ESOPApp() {
   // Pagination
   const [sopPagination, setSopPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 })
   const [logsPagination, setLogsPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 })
+  const [verificationPagination, setVerificationPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 })
   const [arsipPagination, setArsipPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 })
 
   // Filters
@@ -1430,9 +1431,10 @@ export default function ESOPApp() {
     }
   }, [searchInput, sopFilters.kategori, sopFilters.jenis, sopFilters.lingkup, sopFilters.status, sopFilters.tahun, sopPagination.page, sopPagination.limit, sortBy, toast])
 
-  const fetchVerificationList = useCallback(async (filter = 'SEMUA', lingkupFilter = 'SEMUA', search = '', sortByParam = 'uploadedAt-desc') => {
+  const fetchVerificationList = useCallback(async (filter = 'SEMUA', lingkupFilter = 'SEMUA', search = '', sortByParam = 'uploadedAt-desc', pageInput?: number) => {
     setVerifikasiLoading(true)
     try {
+      const page = pageInput || verificationPagination.page
       const params = new URLSearchParams()
       params.append('publicOnly', 'true')
       if (filter !== 'SEMUA') {
@@ -1445,22 +1447,31 @@ export default function ESOPApp() {
         params.append('search', search)
       }
       params.append('sortBy', sortByParam)
+      params.append('page', page.toString())
+      params.append('limit', verificationPagination.limit.toString())
 
       const res = await fetch(`/api/sop?${params}`)
       const data = await res.json()
       if (!data.error) {
         setVerificationList(data.data)
+        setVerificationPagination(p => ({
+          ...p,
+          total: data.pagination.total,
+          totalPages: data.pagination.totalPages,
+          page: page
+        }))
       }
     } catch (error) {
       console.error('Fetch verification error:', error)
     } finally {
       setVerifikasiLoading(false)
     }
-  }, [])
+  }, [verificationPagination.page, verificationPagination.limit])
 
-  const fetchArsipList = useCallback(async (lingkupFilter = 'SEMUA', search = '', sortByParam = 'uploadedAt-desc') => {
+  const fetchArsipList = useCallback(async (lingkupFilter = 'SEMUA', search = '', sortByParam = 'uploadedAt-desc', pageInput?: number) => {
     setArsipLoading(true)
     try {
+      const page = pageInput || arsipPagination.page
       const params = new URLSearchParams()
       params.append('publicOnly', 'true')
       params.append('verificationStatus', 'DITOLAK')
@@ -1471,19 +1482,26 @@ export default function ESOPApp() {
         params.append('search', search)
       }
       params.append('sortBy', sortByParam)
+      params.append('page', page.toString())
+      params.append('limit', arsipPagination.limit.toString())
 
       const res = await fetch(`/api/sop?${params}`)
       const data = await res.json()
       if (!data.error) {
         setArsipList(data.data)
-        setArsipPagination(p => ({ ...p, total: data.pagination.total, totalPages: data.pagination.totalPages }))
+        setArsipPagination(p => ({
+          ...p,
+          total: data.pagination.total,
+          totalPages: data.pagination.totalPages,
+          page: page
+        }))
       }
     } catch (error) {
       console.error('Fetch arsip error:', error)
     } finally {
       setArsipLoading(false)
     }
-  }, [])
+  }, [arsipPagination.page, arsipPagination.limit])
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -1651,11 +1669,11 @@ export default function ESOPApp() {
     // Immediate fetch on page load or filter change (no debounce for initial load)
     // Only debounce when user is typing in search
     const debounceTimer = setTimeout(() => {
-      fetchVerificationList(verificationFilter, verificationLingkupFilter, verificationSearch, verificationSortBy)
+      fetchVerificationList(verificationFilter, verificationLingkupFilter, verificationSearch, verificationSortBy, verificationPagination.page)
     }, verificationSearch ? 300 : 0) // No debounce for initial load or filter changes
 
     return () => clearTimeout(debounceTimer)
-  }, [verificationSearch, verificationFilter, verificationLingkupFilter, verificationSortBy, isAuthenticated, currentPage, fetchVerificationList])
+  }, [verificationSearch, verificationFilter, verificationLingkupFilter, verificationSortBy, verificationPagination.page, isAuthenticated, currentPage, fetchVerificationList])
 
   // Live search for arsip page with debounce
   useEffect(() => {
@@ -1664,11 +1682,25 @@ export default function ESOPApp() {
     // Immediate fetch on page load (no debounce for initial load)
     // Only debounce when user is typing in search
     const debounceTimer = setTimeout(() => {
-      fetchArsipList(arsipLingkupFilter, arsipSearch, arsipSortBy)
+      fetchArsipList(arsipLingkupFilter, arsipSearch, arsipSortBy, arsipPagination.page)
     }, arsipSearch ? 300 : 0) // No debounce for initial load
 
     return () => clearTimeout(debounceTimer)
-  }, [arsipSearch, arsipLingkupFilter, arsipSortBy, isAuthenticated, currentPage, fetchArsipList])
+  }, [arsipSearch, arsipLingkupFilter, arsipSortBy, arsipPagination.page, isAuthenticated, currentPage, fetchArsipList])
+
+  // Reset page for verifikasi
+  useEffect(() => {
+    if (isAuthenticated && currentPage === 'verifikasi') {
+      setVerificationPagination(p => ({ ...p, page: 1 }))
+    }
+  }, [verificationSearch, verificationFilter, verificationLingkupFilter, verificationSortBy, isAuthenticated, currentPage])
+
+  // Reset page for arsip
+  useEffect(() => {
+    if (isAuthenticated && currentPage === 'arsip') {
+      setArsipPagination(p => ({ ...p, page: 1 }))
+    }
+  }, [arsipSearch, arsipLingkupFilter, arsipSortBy, isAuthenticated, currentPage])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -6377,431 +6409,1231 @@ export default function ESOPApp() {
 
 
                 {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <StatCard title="Total SOP Aktif" value={stats?.totalAktif || 0} icon={CheckCircle} color="orange" delay={0} />
-              <StatCard title="Menunggu Verifikasi" value={stats?.totalPublikMenunggu || 0} icon={Clock} color="yellow" delay={0.1} />
-              <StatCard title="Total Ditolak" value={stats?.totalPublikDitolak || 0} icon={XCircle} color="red" delay={0.2} />
-            </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <StatCard title="Total SOP Aktif" value={stats?.totalAktif || 0} icon={CheckCircle} color="orange" delay={0} />
+                  <StatCard title="Menunggu Verifikasi" value={stats?.totalPublikMenunggu || 0} icon={Clock} color="yellow" delay={0.1} />
+                  <StatCard title="Total Ditolak" value={stats?.totalPublikDitolak || 0} icon={XCircle} color="red" delay={0.2} />
+                </div>
 
-            {/* Verification Table */}
-            <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white">
-                <CardTitle className="text-lg">Daftar Pengajuan Publik</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0 relative">
-                {/* Loading Overlay */}
-                {verifikasiLoading && (
-                  <div className="absolute top-0 inset-x-0 h-1 z-10 overflow-hidden">
-                    <div className="w-full h-full bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-400 animate-sync-progress" />
-                  </div>
-                )}
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-gradient-to-r from-orange-400 to-yellow-400">
-                        <TableHead className="font-bold text-white">Pengirim</TableHead>
-                        <TableHead className="font-bold text-white">Judul</TableHead>
-                        <TableHead className="font-bold text-white">Jenis</TableHead>
-                        <TableHead className="font-bold text-white">Kategori</TableHead>
-                        <TableHead className="font-bold text-white">Lingkup</TableHead>
-                        <TableHead className="font-bold text-white">Status</TableHead>
-                        <TableHead className="font-bold text-white">Keterangan</TableHead>
-                        <TableHead className="font-bold text-white text-center">Aksi</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {verificationList.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center text-gray-500 py-12">
-                            <div className="flex flex-col items-center gap-2">
-                              <FileText className="w-12 h-12 text-gray-400" />
-                              <p>Tidak ada pengajuan</p>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        verificationList.map((sop) => (
-                          <TableRow key={sop.id} className="hover:bg-orange-50 border-b border-gray-200">
-                            <TableCell>
-                              <div>
-                                <p className="font-semibold text-blue-900">{sop.submitterName}</p>
-                                <p className="text-sm text-gray-600">{sop.submitterEmail}</p>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <FileTypeIcon fileName={sop.fileName} className="w-5 h-5 flex-shrink-0" />
-                                <div>
-                                  <span className="font-semibold text-blue-900">{sop.judul}</span>
-                                  <div className="text-xs text-gray-500 mt-0.5">
-                                    <span className="text-gray-400">Upload:</span> {new Date(sop.uploadedAt).toLocaleString('id-ID', {
-                                      day: 'numeric',
-                                      month: 'short',
-                                      year: 'numeric',
-                                      hour: '2-digit',
-                                      minute: '2-digit'
-                                    })}
-                                  </div>
-                                  {sop.verifiedAt && (
-                                    <div className={`text - xs mt - 0.5 ${sop.verificationStatus === 'DISETUJUI' ? 'text-green-600' : 'text-red-600'
-                                      } `}>
-                                      <span className={sop.verificationStatus === 'DISETUJUI' ? 'text-green-500' : 'text-red-500'}>
-                                        {sop.verificationStatus === 'DISETUJUI' ? 'Disetujui:' : 'Ditolak:'}
-                                      </span> {new Date(sop.verifiedAt).toLocaleString('id-ID', {
-                                        day: 'numeric',
-                                        month: 'short',
-                                        year: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={sop.jenis === 'SOP' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white'}>
-                                {sop.jenis}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="border-orange-500 bg-orange-50 text-orange-700">{sop.kategori}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="border-blue-500 bg-blue-50 text-blue-700">{sop.lingkup || '-'}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={
-                                sop.verificationStatus === 'MENUNGGU' ? 'bg-blue-500 text-white' :
-                                  sop.verificationStatus === 'DISETUJUI' ? 'bg-green-500 text-white' :
-                                    'bg-red-500 text-white'
-                              }>
-                                {sop.verificationStatus}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-gray-600 text-sm max-w-[200px]">
-                              {sop.keterangan && (
-                                <span className="text-gray-700 block">Catatan: {sop.keterangan}</span>
-                              )}
-                              {sop.rejectionReason && (
-                                <span className="text-red-600 block">Alasan: {sop.rejectionReason}</span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center justify-center gap-1">
-                                <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} title="Preview" className="hover:bg-cyan-100">
-                                  <Eye className="w-4 h-4 text-cyan-600" />
-                                </Button>
-                                <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-100">
-                                  <Download className="w-4 h-4 text-green-600" />
-                                </Button>
-                                {sop.verificationStatus === 'MENUNGGU' && (
-                                  <>
-                                    <Button size="icon" variant="ghost" onClick={() => handleVerification(sop.id, 'DISETUJUI')} title="Setujui" className="hover:bg-green-100">
-                                      <Check className="w-4 h-4 text-green-600" />
-                                    </Button>
-                                    <Button size="icon" variant="ghost" onClick={() => handleOpenRejectDialog(sop.id)} title="Tolak" className="hover:bg-red-100">
-                                      <X className="w-4 h-4 text-red-600" />
-                                    </Button>
-                                    {/* Rejection Dialog - Moved inside Verifikasi page */}
-                                    <Dialog open={showRejectDialog && rejectTargetId === sop.id} onOpenChange={(open) => {
-                                      if (!open) {
-                                        setShowRejectDialog(false)
-                                        setRejectTargetId(null)
-                                        setRejectReason('')
-                                      }
-                                    }}>
-                                      <DialogContent className="sm:max-w-md bg-gradient-to-b from-slate-900 to-slate-800 border-2 border-orange-500 shadow-2xl" aria-describedby={undefined}>
-                                        <DialogHeader>
-                                          <DialogTitle className="text-xl font-bold text-white flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg">
-                                              <XCircle className="w-6 h-6 text-white" />
-                                            </div>
-                                            <div>
-                                              <span className="bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-400 bg-clip-text text-transparent">
-                                                Tolak Pengajuan
-                                              </span>
-                                              <p className="text-xs text-gray-400 font-normal mt-0.5">BCC - SOP Katalog</p>
-                                            </div>
-                                          </DialogTitle>
-                                          <DialogDescription className="text-gray-300 pt-2">
-                                            Masukkan alasan penolakan untuk pengajuan ini. Alasan akan ditampilkan kepada pengaju.
-                                          </DialogDescription>
-                                        </DialogHeader>
-                                        <div className="py-4">
-                                          <Label className="font-medium text-orange-400 mb-2 block flex items-center gap-2">
-                                            <AlertTriangle className="w-4 h-4" />
-                                            Alasan Penolakan
-                                          </Label>
-                                          <Textarea
-                                            value={rejectReason}
-                                            onChange={(e) => setRejectReason(e.target.value)}
-                                            placeholder="Contoh: Dokumen tidak lengkap, format tidak sesuai, dll..."
-                                            rows={4}
-                                            className="border-2 border-orange-500/30 bg-slate-800/50 text-white placeholder:text-gray-500 focus:border-orange-500 focus:ring-orange-500/20 rounded-lg"
-                                          />
-                                        </div>
-                                        <DialogFooter className="gap-2">
-                                          <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() => {
-                                              setShowRejectDialog(false)
-                                              setRejectTargetId(null)
-                                              setRejectReason('')
-                                            }}
-                                            className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
-                                          >
-                                            Batal
-                                          </Button>
-                                          <Button
-                                            type="button"
-                                            onClick={handleConfirmReject}
-                                            disabled={!rejectReason.trim()}
-                                            className="bg-gradient-to-r from-orange-500 via-red-500 to-orange-600 hover:from-orange-600 hover:via-red-600 hover:to-orange-700 text-white shadow-lg shadow-orange-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
-                                          >
-                                            <X className="w-4 h-4 mr-2" />
-                                            Tolak Pengajuan
-                                          </Button>
-                                        </DialogFooter>
-                                      </DialogContent>
-                                    </Dialog>
-                                  </>
-                                )}
-                              </div>
-                            </TableCell>
+                {/* Verification Table */}
+                <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white">
+                    <CardTitle className="text-lg">Daftar Pengajuan Publik</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0 relative">
+                    {/* Loading Overlay */}
+                    {verifikasiLoading && (
+                      <div className="absolute top-0 inset-x-0 h-1 z-10 overflow-hidden">
+                        <div className="w-full h-full bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-400 animate-sync-progress" />
+                      </div>
+                    )}
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-gradient-to-r from-orange-400 to-yellow-400">
+                            <TableHead className="font-bold text-white">Pengirim</TableHead>
+                            <TableHead className="font-bold text-white">Judul</TableHead>
+                            <TableHead className="font-bold text-white">Jenis</TableHead>
+                            <TableHead className="font-bold text-white">Kategori</TableHead>
+                            <TableHead className="font-bold text-white">Lingkup</TableHead>
+                            <TableHead className="font-bold text-white">Status</TableHead>
+                            <TableHead className="font-bold text-white">Keterangan</TableHead>
+                            <TableHead className="font-bold text-white text-center">Aksi</TableHead>
                           </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div >
-          )
-}
+                        </TableHeader>
+                        <TableBody>
+                          {verificationList.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={7} className="text-center text-gray-500 py-12">
+                                <div className="flex flex-col items-center gap-2">
+                                  <FileText className="w-12 h-12 text-gray-400" />
+                                  <p>Tidak ada pengajuan</p>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            verificationList.map((sop) => (
+                              <TableRow key={sop.id} className="hover:bg-orange-50 border-b border-gray-200">
+                                <TableCell>
+                                  <div>
+                                    <p className="font-semibold text-blue-900">{sop.submitterName}</p>
+                                    <p className="text-sm text-gray-600">{sop.submitterEmail}</p>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <FileTypeIcon fileName={sop.fileName} className="w-5 h-5 flex-shrink-0" />
+                                    <div>
+                                      <span className="font-semibold text-blue-900">{sop.judul}</span>
+                                      <div className="text-xs text-gray-500 mt-0.5">
+                                        <span className="text-gray-400">Upload:</span> {new Date(sop.uploadedAt).toLocaleString('id-ID', {
+                                          day: 'numeric',
+                                          month: 'short',
+                                          year: 'numeric',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })}
+                                      </div>
+                                      {sop.verifiedAt && (
+                                        <div className={`text - xs mt - 0.5 ${sop.verificationStatus === 'DISETUJUI' ? 'text-green-600' : 'text-red-600'
+                                          } `}>
+                                          <span className={sop.verificationStatus === 'DISETUJUI' ? 'text-green-500' : 'text-red-500'}>
+                                            {sop.verificationStatus === 'DISETUJUI' ? 'Disetujui:' : 'Ditolak:'}
+                                          </span> {new Date(sop.verifiedAt).toLocaleString('id-ID', {
+                                            day: 'numeric',
+                                            month: 'short',
+                                            year: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge className={sop.jenis === 'SOP' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white'}>
+                                    {sop.jenis}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="border-orange-500 bg-orange-50 text-orange-700">{sop.kategori}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="border-blue-500 bg-blue-50 text-blue-700">{sop.lingkup || '-'}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge className={
+                                    sop.verificationStatus === 'MENUNGGU' ? 'bg-blue-500 text-white' :
+                                      sop.verificationStatus === 'DISETUJUI' ? 'bg-green-500 text-white' :
+                                        'bg-red-500 text-white'
+                                  }>
+                                    {sop.verificationStatus}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-gray-600 text-sm max-w-[200px]">
+                                  {sop.keterangan && (
+                                    <span className="text-gray-700 block">Catatan: {sop.keterangan}</span>
+                                  )}
+                                  {sop.rejectionReason && (
+                                    <span className="text-red-600 block">Alasan: {sop.rejectionReason}</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} title="Preview" className="hover:bg-cyan-100">
+                                      <Eye className="w-4 h-4 text-cyan-600" />
+                                    </Button>
+                                    <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-100">
+                                      <Download className="w-4 h-4 text-green-600" />
+                                    </Button>
+                                    {sop.verificationStatus === 'MENUNGGU' && (
+                                      <>
+                                        <Button size="icon" variant="ghost" onClick={() => handleVerification(sop.id, 'DISETUJUI')} title="Setujui" className="hover:bg-green-100">
+                                          <Check className="w-4 h-4 text-green-600" />
+                                        </Button>
+                                        <Button size="icon" variant="ghost" onClick={() => handleOpenRejectDialog(sop.id)} title="Tolak" className="hover:bg-red-100">
+                                          <X className="w-4 h-4 text-red-600" />
+                                        </Button>
+                                        {/* Rejection Dialog - Moved inside Verifikasi page */}
+                                        <Dialog open={showRejectDialog && rejectTargetId === sop.id} onOpenChange={(open) => {
+                                          if (!open) {
+                                            setShowRejectDialog(false)
+                                            setRejectTargetId(null)
+                                            setRejectReason('')
+                                          }
+                                        }}>
+                                          <DialogContent className="sm:max-w-md bg-gradient-to-b from-slate-900 to-slate-800 border-2 border-orange-500 shadow-2xl" aria-describedby={undefined}>
+                                            <DialogHeader>
+                                              <DialogTitle className="text-xl font-bold text-white flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg">
+                                                  <XCircle className="w-6 h-6 text-white" />
+                                                </div>
+                                                <div>
+                                                  <span className="bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-400 bg-clip-text text-transparent">
+                                                    Tolak Pengajuan
+                                                  </span>
+                                                  <p className="text-xs text-gray-400 font-normal mt-0.5">BCC - SOP Katalog</p>
+                                                </div>
+                                              </DialogTitle>
+                                              <DialogDescription className="text-gray-300 pt-2">
+                                                Masukkan alasan penolakan untuk pengajuan ini. Alasan akan ditampilkan kepada pengaju.
+                                              </DialogDescription>
+                                            </DialogHeader>
+                                            <div className="py-4">
+                                              <Label className="font-medium text-orange-400 mb-2 block flex items-center gap-2">
+                                                <AlertTriangle className="w-4 h-4" />
+                                                Alasan Penolakan
+                                              </Label>
+                                              <Textarea
+                                                value={rejectReason}
+                                                onChange={(e) => setRejectReason(e.target.value)}
+                                                placeholder="Contoh: Dokumen tidak lengkap, format tidak sesuai, dll..."
+                                                rows={4}
+                                                className="border-2 border-orange-500/30 bg-slate-800/50 text-white placeholder:text-gray-500 focus:border-orange-500 focus:ring-orange-500/20 rounded-lg"
+                                              />
+                                            </div>
+                                            <DialogFooter className="gap-2">
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() => {
+                                                  setShowRejectDialog(false)
+                                                  setRejectTargetId(null)
+                                                  setRejectReason('')
+                                                }}
+                                                className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
+                                              >
+                                                Batal
+                                              </Button>
+                                              <Button
+                                                type="button"
+                                                onClick={handleConfirmReject}
+                                                disabled={!rejectReason.trim()}
+                                                className="bg-gradient-to-r from-orange-500 via-red-500 to-orange-600 hover:from-orange-600 hover:via-red-600 hover:to-orange-700 text-white shadow-lg shadow-orange-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                                              >
+                                                <X className="w-4 h-4 mr-2" />
+                                                Tolak Pengajuan
+                                              </Button>
+                                            </DialogFooter>
+                                          </DialogContent>
+                                        </Dialog>
+                                      </>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
 
-          {/* Arsip Page */}
-          {
-            currentPage === 'arsip' && (
-              <motion.div
-                key="arsip"
-                variants={fadeInUp}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                className="space-y-6"
-              >
-                <div className="flex items-center justify-between">
-                  <ShimmerTitle subtitle="File yang ditolak dari pengajuan publik">Arsip File Ditolak</ShimmerTitle>
-                </div>
-
-                {/* Search Bar */}
-                <div className="rounded-2xl overflow-hidden shadow-2xl" style={{ background: 'linear-gradient(135deg, #1a0a0a 0%, #1e1015 50%, #1a0a0a 100%)', border: '1px solid rgba(239,68,68,0.25)' }}>
-                  <div className="flex items-center gap-2 px-5 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #b91c1c)' }}><Search className="w-3.5 h-3.5 text-white" /></div>
-                    <span className="text-sm font-bold text-white">Filter &amp; Pencarian</span>
+                {/* Pagination */}
+                <div className="flex items-center justify-between mt-4 bg-orange-50 p-4 rounded-xl border border-orange-100 shadow-sm">
+                  <p className="text-sm text-blue-900 font-medium">
+                    Menampilkan <span className="text-orange-600 font-bold">{verificationList.length}</span> dari <span className="text-orange-600 font-bold">{verificationPagination.total}</span> pengajuan
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={verificationPagination.page === 1}
+                      onClick={() => setVerificationPagination(p => ({ ...p, page: p.page - 1 }))}
+                      className="border-orange-300 text-orange-600 hover:bg-orange-100 rounded-lg transition-colors"
+                    >
+                      <ChevronLeft className="w-4 h-4 mr-1" /> Prev
+                    </Button>
+                    <div className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-lg border border-orange-200">
+                      <span className="text-sm font-bold text-orange-600">{verificationPagination.page}</span>
+                      <span className="text-xs text-gray-400">/</span>
+                      <span className="text-sm font-medium text-gray-600">{verificationPagination.totalPages || 1}</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={verificationPagination.page >= verificationPagination.totalPages}
+                      onClick={() => setVerificationPagination(p => ({ ...p, page: p.page + 1 }))}
+                      className="border-orange-300 text-orange-600 hover:bg-orange-100 rounded-lg transition-colors"
+                    >
+                      Next <ChevronRight className="w-4 h-4 ml-1" />
+                    </Button>
                   </div>
-                  <div className="p-4">
-                    <div className="flex flex-wrap items-end gap-3">
-                      {/* Search */}
-                      <div className="flex-1 min-w-[200px]">
-                        <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1.5">Cari</p>
-                        <div className="relative">
-                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#f87171' }} />
-                          <Input
-                            placeholder="Cari judul, nama, email..."
-                            value={arsipSearch}
-                            onChange={(e) => setArsipSearch(e.target.value)}
-                            className="pl-10 h-10 text-white placeholder:text-gray-500 text-sm rounded-xl"
-                            style={{ background: 'rgba(255,255,255,0.06)', border: arsipSearch ? '1.5px solid rgba(239,68,68,0.6)' : '1.5px solid rgba(255,255,255,0.1)', boxShadow: arsipSearch ? '0 0 10px rgba(239,68,68,0.2)' : 'none' }}
-                          />
+                </div>
+              </motion.div >
+            )
+            }
+
+            {/* Arsip Page */}
+            {
+              currentPage === 'arsip' && (
+                <motion.div
+                  key="arsip"
+                  variants={fadeInUp}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  className="space-y-6"
+                >
+                  <div className="flex items-center justify-between">
+                    <ShimmerTitle subtitle="File yang ditolak dari pengajuan publik">Arsip File Ditolak</ShimmerTitle>
+                  </div>
+
+                  {/* Search Bar */}
+                  <div className="rounded-2xl overflow-hidden shadow-2xl" style={{ background: 'linear-gradient(135deg, #1a0a0a 0%, #1e1015 50%, #1a0a0a 100%)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                    <div className="flex items-center gap-2 px-5 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #b91c1c)' }}><Search className="w-3.5 h-3.5 text-white" /></div>
+                      <span className="text-sm font-bold text-white">Filter &amp; Pencarian</span>
+                    </div>
+                    <div className="p-4">
+                      <div className="flex flex-wrap items-end gap-3">
+                        {/* Search */}
+                        <div className="flex-1 min-w-[200px]">
+                          <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1.5">Cari</p>
+                          <div className="relative">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#f87171' }} />
+                            <Input
+                              placeholder="Cari judul, nama, email..."
+                              value={arsipSearch}
+                              onChange={(e) => setArsipSearch(e.target.value)}
+                              className="pl-10 h-10 text-white placeholder:text-gray-500 text-sm rounded-xl"
+                              style={{ background: 'rgba(255,255,255,0.06)', border: arsipSearch ? '1.5px solid rgba(239,68,68,0.6)' : '1.5px solid rgba(255,255,255,0.1)', boxShadow: arsipSearch ? '0 0 10px rgba(239,68,68,0.2)' : 'none' }}
+                            />
+                          </div>
                         </div>
-                      </div>
-                      {/* Lingkup */}
-                      <div className="min-w-[140px]">
-                        <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1.5">Lingkup</p>
-                        <Select value={arsipLingkupFilter} onValueChange={(v) => setArsipLingkupFilter(v)}>
-                          <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: arsipLingkupFilter !== 'SEMUA' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.06)', border: arsipLingkupFilter !== 'SEMUA' ? '1.5px solid rgba(239,68,68,0.4)' : '1.5px solid rgba(255,255,255,0.1)', color: arsipLingkupFilter !== 'SEMUA' ? '#fca5a5' : '#9ca3af' }}>
-                            <SelectValue placeholder="Filter Lingkup" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="SEMUA">Semua Lingkup</SelectItem>
-                            {LINGKUP_OPTIONS.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {/* Sort */}
-                      <div className="min-w-[140px]">
-                        <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1.5">Urutkan</p>
-                        <Select value={arsipSortBy} onValueChange={(v) => setArsipSortBy(v as 'uploadedAt-desc' | 'uploadedAt-asc')}>
-                          <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.1)', color: '#9ca3af' }}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="uploadedAt-desc">Terbaru</SelectItem>
-                            <SelectItem value="uploadedAt-asc">Terlama</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        {/* Lingkup */}
+                        <div className="min-w-[140px]">
+                          <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1.5">Lingkup</p>
+                          <Select value={arsipLingkupFilter} onValueChange={(v) => setArsipLingkupFilter(v)}>
+                            <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: arsipLingkupFilter !== 'SEMUA' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.06)', border: arsipLingkupFilter !== 'SEMUA' ? '1.5px solid rgba(239,68,68,0.4)' : '1.5px solid rgba(255,255,255,0.1)', color: arsipLingkupFilter !== 'SEMUA' ? '#fca5a5' : '#9ca3af' }}>
+                              <SelectValue placeholder="Filter Lingkup" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="SEMUA">Semua Lingkup</SelectItem>
+                              {LINGKUP_OPTIONS.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {/* Sort */}
+                        <div className="min-w-[140px]">
+                          <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1.5">Urutkan</p>
+                          <Select value={arsipSortBy} onValueChange={(v) => setArsipSortBy(v as 'uploadedAt-desc' | 'uploadedAt-asc')}>
+                            <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.1)', color: '#9ca3af' }}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="uploadedAt-desc">Terbaru</SelectItem>
+                              <SelectItem value="uploadedAt-asc">Terlama</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-      {/* Stats Cards */}
-      < div className="grid grid-cols-1 md:grid-cols-2 gap-4" >
-        <StatCard title="Total File Ditolak" value={arsipList.length} icon={XCircle} color="red" delay={0} />
-        <StatCard title="Folder Arsip" value="Publik-Ditolak" icon={FolderOpen} color="orange" delay={0.1} />
-      </div >
+                  {/* Stats Cards */}
+                  < div className="grid grid-cols-1 md:grid-cols-2 gap-4" >
+                    <StatCard title="Total File Ditolak" value={arsipList.length} icon={XCircle} color="red" delay={0} />
+                    <StatCard title="Folder Arsip" value="Publik-Ditolak" icon={FolderOpen} color="orange" delay={0.1} />
+                  </div >
 
-      {/* Arsip Table */}
-      < Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden" >
-        <CardHeader className="bg-gradient-to-r from-red-500 to-orange-500 text-white">
-          <CardTitle className="text-lg">Daftar File Ditolak</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0 relative">
-          {/* Loading Overlay */}
-          {arsipLoading && (
-            <div className="absolute top-0 inset-x-0 h-1 z-10 overflow-hidden">
-              <div className="w-full h-full bg-gradient-to-r from-red-400 via-orange-400 to-red-400 animate-sync-progress" />
-            </div>
-          )}
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gradient-to-r from-red-400 to-orange-400">
-                  <TableHead className="font-bold text-white">Pengirim</TableHead>
-                  <TableHead className="font-bold text-white">Judul</TableHead>
-                  <TableHead className="font-bold text-white">Jenis</TableHead>
-                  <TableHead className="font-bold text-white">Kategori</TableHead>
-                  <TableHead className="font-bold text-white">Lingkup</TableHead>
-                  <TableHead className="font-bold text-white">Alasan Penolakan</TableHead>
-                  <TableHead className="font-bold text-white text-center">Aksi</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {arsipList.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-gray-500 py-12">
-                      <div className="flex flex-col items-center gap-2">
-                        <FolderOpen className="w-12 h-12 text-gray-400" />
-                        <p>Tidak ada file di arsip</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  arsipList.map((sop) => (
-                    <TableRow key={sop.id} className="hover:bg-red-50 border-b border-gray-200">
-                      <TableCell>
-                        <div>
-                          <p className="font-semibold text-blue-900">{sop.submitterName}</p>
-                          <p className="text-sm text-gray-600">{sop.submitterEmail}</p>
+                  {/* Arsip Table */}
+                  < Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden" >
+                    <CardHeader className="bg-gradient-to-r from-red-500 to-orange-500 text-white">
+                      <CardTitle className="text-lg">Daftar File Ditolak</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0 relative">
+                      {/* Loading Overlay */}
+                      {arsipLoading && (
+                        <div className="absolute top-0 inset-x-0 h-1 z-10 overflow-hidden">
+                          <div className="w-full h-full bg-gradient-to-r from-red-400 via-orange-400 to-red-400 animate-sync-progress" />
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <FileTypeIcon fileName={sop.fileName} className="w-5 h-5 flex-shrink-0" />
-                          <div>
-                            <span className="font-semibold text-blue-900">{sop.judul}</span>
-                            {sop.verifiedAt && (
-                              <div className="text-xs text-red-600 mt-0.5">
-                                <span className="text-red-500">Ditolak:</span> {new Date(sop.verifiedAt).toLocaleString('id-ID', {
-                                  day: 'numeric',
-                                  month: 'short',
-                                  year: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
+                      )}
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-gradient-to-r from-red-400 to-orange-400">
+                              <TableHead className="font-bold text-white">Pengirim</TableHead>
+                              <TableHead className="font-bold text-white">Judul</TableHead>
+                              <TableHead className="font-bold text-white">Jenis</TableHead>
+                              <TableHead className="font-bold text-white">Kategori</TableHead>
+                              <TableHead className="font-bold text-white">Lingkup</TableHead>
+                              <TableHead className="font-bold text-white">Alasan Penolakan</TableHead>
+                              <TableHead className="font-bold text-white text-center">Aksi</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {arsipList.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={6} className="text-center text-gray-500 py-12">
+                                  <div className="flex flex-col items-center gap-2">
+                                    <FolderOpen className="w-12 h-12 text-gray-400" />
+                                    <p>Tidak ada file di arsip</p>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              arsipList.map((sop) => (
+                                <TableRow key={sop.id} className="hover:bg-red-50 border-b border-gray-200">
+                                  <TableCell>
+                                    <div>
+                                      <p className="font-semibold text-blue-900">{sop.submitterName}</p>
+                                      <p className="text-sm text-gray-600">{sop.submitterEmail}</p>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      <FileTypeIcon fileName={sop.fileName} className="w-5 h-5 flex-shrink-0" />
+                                      <div>
+                                        <span className="font-semibold text-blue-900">{sop.judul}</span>
+                                        {sop.verifiedAt && (
+                                          <div className="text-xs text-red-600 mt-0.5">
+                                            <span className="text-red-500">Ditolak:</span> {new Date(sop.verifiedAt).toLocaleString('id-ID', {
+                                              day: 'numeric',
+                                              month: 'short',
+                                              year: 'numeric',
+                                              hour: '2-digit',
+                                              minute: '2-digit'
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge className={sop.jenis === 'SOP' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white'}>
+                                      {sop.jenis}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="border-orange-500 bg-orange-50 text-orange-700">{sop.kategori}</Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="border-blue-500 bg-blue-50 text-blue-700">{sop.lingkup || '-'}</Badge>
+                                  </TableCell>
+                                  <TableCell className="text-gray-600 text-sm max-w-[200px]">
+                                    {sop.keterangan && (
+                                      <span className="text-gray-700 block">Catatan: {sop.keterangan}</span>
+                                    )}
+                                    <span className="text-red-600 block">Alasan: {sop.rejectionReason || 'Tidak ada alasan'}</span>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} title="Preview" className="hover:bg-cyan-100">
+                                        <Eye className="w-4 h-4 text-cyan-600" />
+                                      </Button>
+                                      <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-100">
+                                        <Download className="w-4 h-4 text-green-600" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card >
+
+                  {/* Pagination */}
+                  <div className="flex items-center justify-between mt-4 bg-red-50 p-4 rounded-xl border border-red-100 shadow-sm">
+                    <p className="text-sm text-blue-900 font-medium">
+                      Menampilkan <span className="text-red-600 font-bold">{arsipList.length}</span> dari <span className="text-red-600 font-bold">{arsipPagination.total}</span> file ditolak
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={arsipPagination.page === 1}
+                        onClick={() => setArsipPagination(p => ({ ...p, page: p.page - 1 }))}
+                        className="border-red-300 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                      >
+                        <ChevronLeft className="w-4 h-4 mr-1" /> Prev
+                      </Button>
+                      <div className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-lg border border-red-200">
+                        <span className="text-sm font-bold text-red-600">{arsipPagination.page}</span>
+                        <span className="text-xs text-gray-400">/</span>
+                        <span className="text-sm font-medium text-gray-600">{arsipPagination.totalPages || 1}</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={arsipPagination.page >= arsipPagination.totalPages}
+                        onClick={() => setArsipPagination(p => ({ ...p, page: p.page + 1 }))}
+                        className="border-red-300 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                      >
+                        Next <ChevronRight className="w-4 h-4 ml-1" />
+                      </Button>
+                    </div>
+                  </div>
+                </motion.div >
+              )
+            }
+
+            {
+              currentPage === 'logs' && (
+                <motion.div
+                  key="logs"
+                  variants={fadeInUp}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  className="space-y-6"
+                >
+                  <ShimmerTitle subtitle="Riwayat semua aktivitas sistem">Log Aktivitas</ShimmerTitle>
+
+                  <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
+                    <CardContent className="p-0">
+                      <ScrollArea className="h-[600px]">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-gradient-to-r from-orange-500 to-yellow-500 sticky top-0">
+                              <TableHead className="font-bold text-white">Waktu</TableHead>
+                              <TableHead className="font-bold text-white">User</TableHead>
+                              <TableHead className="font-bold text-white">Aktivitas</TableHead>
+                              <TableHead className="font-bold text-white">Deskripsi</TableHead>
+                              <TableHead className="font-bold text-white">File</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {logs.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center text-gray-500 py-8">
+                                  Tidak ada log
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              logs.map((log) => (
+                                <TableRow key={log.id} className="hover:bg-orange-50 border-b border-gray-200">
+                                  <TableCell className="text-sm text-gray-700">
+                                    {new Date(log.createdAt).toLocaleString('id-ID')}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div>
+                                      <p className="font-semibold text-blue-900">{log.user?.name}</p>
+                                      <p className="text-xs text-gray-500">{log.user?.email}</p>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className={
+                                      log.aktivitas === 'LOGIN' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                                        log.aktivitas === 'UPLOAD' ? 'bg-green-100 text-green-700 border-green-300' :
+                                          log.aktivitas === 'DOWNLOAD' ? 'bg-purple-100 text-purple-700 border-purple-300' :
+                                            log.aktivitas === 'PREVIEW' ? 'bg-cyan-100 text-cyan-700 border-cyan-300' :
+                                              log.aktivitas === 'VERIFIKASI' ? 'bg-orange-100 text-orange-700 border-orange-300' :
+                                                'bg-gray-100 text-gray-700 border-gray-300'
+                                    }>
+                                      {log.aktivitas}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-gray-700">{log.deskripsi}</TableCell>
+                                  <TableCell>
+                                    {log.sopFile && (
+                                      <span className="text-sm text-orange-600 font-medium truncate max-w-[200px] block">{log.sopFile.judul}</span>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
+                      </ScrollArea>
+                    </CardContent>
+                  </Card>
+
+                  {/* Pagination */}
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-gray-600">
+                      Menampilkan {logs.length} log
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={logsPagination.page === 1}
+                        onClick={() => setLogsPagination(p => ({ ...p, page: p.page - 1 }))}
+                        className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      <span className="text-sm text-gray-600 font-medium">Halaman {logsPagination.page}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={logsPagination.page >= logsPagination.totalPages}
+                        onClick={() => setLogsPagination(p => ({ ...p, page: p.page + 1 }))}
+                        className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </motion.div>
+              )
+            }
+
+            {
+              currentPage === 'users' && (user?.role === 'DEVELOPER' || user?.role === 'ADMIN') && (
+                <motion.div
+                  key="users"
+                  variants={fadeInUp}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  className="space-y-6"
+                >
+                  <div className="flex items-center justify-between">
+                    <ShimmerTitle subtitle="Kelola pengguna sistem">Manajemen User</ShimmerTitle>
+                    <Dialog open={showUserDialog} onOpenChange={setShowUserDialog}>
+                      <DialogTrigger asChild>
+                        <Button className="btn-sar bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-lg shadow-orange-500/30">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Tambah User
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl p-0 overflow-hidden" aria-describedby={undefined}>
+                        {/* Header with gradient */}
+                        <DialogHeader className="bg-gradient-to-r from-orange-500 to-yellow-500 p-5 text-white">
+                          <DialogTitle className="text-lg font-bold flex items-center gap-2 text-white">
+                            <Users className="w-5 h-5" />
+                            Tambah User Baru
+                          </DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleCreateUser} className="p-5 space-y-5">
+                          <div className="space-y-2">
+                            <Label className="font-semibold text-blue-900">Nama Lengkap</Label>
+                            <Input
+                              value={newUserForm.name}
+                              onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
+                              placeholder="Masukkan nama lengkap"
+                              required
+                              className="border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 h-11"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="font-semibold text-blue-900">Email</Label>
+                            <Input
+                              type="email"
+                              value={newUserForm.email}
+                              onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
+                              placeholder="Masukkan email"
+                              required
+                              className="border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 h-11"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="font-semibold text-blue-900">Password</Label>
+                            <Input
+                              type="password"
+                              autoComplete="new-password"
+                              value={newUserForm.password}
+                              onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
+                              placeholder="Masukkan password"
+                              required
+                              className="border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 h-11"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="font-semibold text-blue-900">Role</Label>
+                            <Select value={newUserForm.role} onValueChange={(v) => setNewUserForm({ ...newUserForm, role: v })}>
+                              <SelectTrigger className="border-2 border-gray-200 focus:border-orange-500 text-gray-900 h-11">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ADMIN">Admin</SelectItem>
+                                <SelectItem value="STAF">Staf</SelectItem>
+                                <SelectItem value="DEVELOPER">Developer</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <DialogFooter className="pt-2 gap-2">
+                            <Button type="button" variant="outline" onClick={() => setShowUserDialog(false)} className="border-gray-300 text-gray-700 hover:bg-gray-100">Batal</Button>
+                            <Button type="submit" className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white" disabled={loading}>
+                              Simpan
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* Desktop Sync Dialog - Upload edited file */}
+                    <Dialog open={showDesktopSyncDialog} onOpenChange={setShowDesktopSyncDialog}>
+                      <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
+                        <DialogHeader>
+                          <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                            <RefreshCw className="w-5 h-5 text-orange-600" />
+                            Selesai Edit & Sync
+                          </DialogTitle>
+                          <DialogDescription className="text-gray-600">
+                            Upload file hasil edit untuk disinkronkan ke storage
+                          </DialogDescription>
+                        </DialogHeader>
+
+                        {excelEditData && (
+                          <div className="space-y-4">
+                            {/* File Info */}
+                            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                              <div className="flex items-start gap-3">
+                                {['docx', 'doc'].includes(excelEditData.fileType || '') ? (
+                                  <FileText className="w-10 h-10 text-blue-600 mt-1" />
+                                ) : (
+                                  <FileSpreadsheet className="w-10 h-10 text-green-600 mt-1" />
+                                )}
+                                <div>
+                                  <p className="font-bold text-gray-900">{excelEditData.fileName}</p>
+                                  <p className="text-sm text-gray-600">{excelEditData.judul}</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Session Info */}
+                            {desktopEditSessionToken && (
+                              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                <p className="text-sm text-blue-800">
+                                  <strong>Session aktif:</strong> Tanpa batas waktu
+                                </p>
+                                <p className="text-xs text-blue-600 mt-1">
+                                  Original hash: {desktopEditOriginalHash?.slice(0, 16)}...
+                                </p>
                               </div>
                             )}
+
+                            {/* File Picker */}
+                            <div className="space-y-3">
+                              <Label className="text-sm font-semibold text-gray-700">
+                                Pilih File Hasil Edit
+                              </Label>
+                              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
+                                <input
+                                  type="file"
+                                  accept=".xlsx,.xls,.xlsm,.docx,.doc"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0]
+                                    if (file) {
+                                      setDesktopSyncFile(file)
+                                    }
+                                  }}
+                                  className="hidden"
+                                  id="desktop-sync-file"
+                                />
+                                <label
+                                  htmlFor="desktop-sync-file"
+                                  className="cursor-pointer"
+                                >
+                                  {desktopSyncFile ? (
+                                    <div className="flex items-center justify-center gap-2">
+                                      <CheckCircle className="w-5 h-5 text-green-600" />
+                                      <span className="text-sm text-gray-700">{desktopSyncFile.name}</span>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <Upload className="w-10 h-10 text-gray-400 mx-auto mb-2" />
+                                      <p className="text-sm text-gray-600">
+                                        Klik untuk memilih file
+                                      </p>
+                                      <p className="text-xs text-gray-400 mt-1">
+                                        Format: .xlsx, .xls, .xlsm, .docx, .doc
+                                      </p>
+                                    </>
+                                  )}
+                                </label>
+                              </div>
+                            </div>
+
+                            {/* Info */}
+                            <Alert className="bg-amber-50 border-amber-200">
+                              <AlertTriangle className="w-4 h-4 text-amber-600" />
+                              <AlertDescription className="text-amber-800 text-sm">
+                                <strong>Penting:</strong> File akan di-checksum dan dibandingkan dengan file asli.
+                                Jika tidak ada perubahan, file tidak akan di-upload.
+                              </AlertDescription>
+                            </Alert>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={sop.jenis === 'SOP' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white'}>
-                          {sop.jenis}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="border-orange-500 bg-orange-50 text-orange-700">{sop.kategori}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="border-blue-500 bg-blue-50 text-blue-700">{sop.lingkup || '-'}</Badge>
-                      </TableCell>
-                      <TableCell className="text-gray-600 text-sm max-w-[200px]">
-                        {sop.keterangan && (
-                          <span className="text-gray-700 block">Catatan: {sop.keterangan}</span>
                         )}
-                        <span className="text-red-600 block">Alasan: {sop.rejectionReason || 'Tidak ada alasan'}</span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-center gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} title="Preview" className="hover:bg-cyan-100">
-                            <Eye className="w-4 h-4 text-cyan-600" />
+
+                        <DialogFooter className="gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setShowDesktopSyncDialog(false)}
+                            className="border-gray-300 text-gray-700 hover:bg-gray-100"
+                          >
+                            Batal
                           </Button>
-                          <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-100">
-                            <Download className="w-4 h-4 text-green-600" />
+                          <Button
+                            type="button"
+                            onClick={handleDesktopSync}
+                            disabled={!desktopSyncFile || desktopSyncing}
+                            className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
+                          >
+                            {desktopSyncing ? (
+                              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Syncing...</>
+                            ) : (
+                              <><RefreshCw className="w-4 h-4 mr-2" /> Sync ke R2</>
+                            )}
                           </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* Excel Edit Diagnostic Dialog */}
+                    <Dialog open={showDiagnosticDialog} onOpenChange={setShowDiagnosticDialog}>
+                      <DialogContent className="sm:max-w-2xl bg-white border-2 border-orange-200 shadow-xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+                        <DialogHeader>
+                          <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                            <Activity className="w-5 h-5 text-orange-600" />
+                            Diagnostik Excel Edit System
+                          </DialogTitle>
+                          <DialogDescription className="text-gray-600">
+                            Memeriksa semua komponen untuk fitur edit Excel dengan Microsoft 365
+                          </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-4">
+                          {diagnosticLoading && (
+                            <div className="flex flex-col items-center justify-center py-8">
+                              <Loader2 className="w-10 h-10 text-orange-500 animate-spin mb-4" />
+                              <p className="text-gray-600">Menjalankan diagnostik...</p>
+                            </div>
+                          )}
+
+                          {diagnosticResult && !diagnosticLoading && (
+                            <>
+                              {/* Summary */}
+                              <div className={`p - 4 rounded - lg ${diagnosticResult.success
+                                ? 'bg-green-50 border border-green-200'
+                                : 'bg-red-50 border border-red-200'
+                                } `}>
+                                <div className="flex items-center gap-3">
+                                  {diagnosticResult.success ? (
+                                    <CheckCircle className="w-8 h-8 text-green-500" />
+                                  ) : (
+                                    <XCircle className="w-8 h-8 text-red-500" />
+                                  )}
+                                  <div>
+                                    <p className={`font - bold ${diagnosticResult.success ? 'text-green-800' : 'text-red-800'} `}>
+                                      {diagnosticResult.success ? 'Semua Sistem Berfungsi!' : 'Terdapat Masalah'}
+                                    </p>
+                                    <p className={`text - sm ${diagnosticResult.success ? 'text-green-600' : 'text-red-600'} `}>
+                                      {diagnosticResult.message}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Stats */}
+                                <div className="flex gap-4 mt-3 text-sm">
+                                  <span className="text-gray-600">
+                                    Total: <strong>{diagnosticResult.summary.totalSteps}</strong>
+                                  </span>
+                                  <span className="text-green-600">
+                                    Pass: <strong>{diagnosticResult.summary.passed}</strong>
+                                  </span>
+                                  <span className="text-red-600">
+                                    Fail: <strong>{diagnosticResult.summary.failed}</strong>
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Results List */}
+                              <div className="space-y-3">
+                                <h4 className="font-semibold text-gray-700">Detail Hasil:</h4>
+                                {diagnosticResult.results.map((result, index) => (
+                                  <div
+                                    key={index}
+                                    className={`p - 3 rounded - lg border ${result.success
+                                      ? 'bg-green-50 border-green-200'
+                                      : 'bg-red-50 border-red-200'
+                                      } `}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        {result.success ? (
+                                          <CheckCircle className="w-5 h-5 text-green-500" />
+                                        ) : (
+                                          <XCircle className="w-5 h-5 text-red-500" />
+                                        )}
+                                        <span className="font-medium text-gray-900">{result.step}</span>
+                                      </div>
+                                      {result.duration && (
+                                        <span className="text-xs text-gray-500">{result.duration}ms</span>
+                                      )}
+                                    </div>
+                                    <p className={`text - sm mt - 1 ${result.success ? 'text-green-700' : 'text-red-700'} `}>
+                                      {result.message}
+                                    </p>
+                                    {result.error && (
+                                      <p className="text-xs text-red-600 mt-1 font-mono bg-red-100 p-2 rounded">
+                                        {result.error}
+                                      </p>
+                                    )}
+                                    {result.details && (
+                                      <div className="mt-2 text-xs bg-gray-100 p-2 rounded font-mono overflow-x-auto">
+                                        {Object.entries(result.details).map(([key, value]) => (
+                                          <div key={key} className="flex gap-2">
+                                            <span className="text-gray-500">{key}:</span>
+                                            <span className={typeof value === 'string' && value.includes('✅') ? 'text-green-600' : typeof value === 'string' && value.includes('❌') ? 'text-red-600' : 'text-gray-700'}>
+                                              {String(value)}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Next Steps */}
+                              {!diagnosticResult.success && diagnosticResult.nextSteps.length > 0 && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                  <h4 className="font-semibold text-amber-800 mb-2">Langkah Selanjutnya:</h4>
+                                  <ul className="list-disc list-inside space-y-1 text-sm text-amber-700">
+                                    {diagnosticResult.nextSteps.map((step, index) => (
+                                      <li key={index}>{step}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </>
+                          )}
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+
+                        <DialogFooter className="gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setShowDiagnosticDialog(false)}
+                            className="border-gray-300 text-gray-700 hover:bg-gray-100"
+                          >
+                            Tutup
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={handleRunDiagnostic}
+                            disabled={diagnosticLoading}
+                            className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
+                          >
+                            {diagnosticLoading ? (
+                              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menjalankan...</>
+                            ) : (
+                              <><RefreshCw className="w-4 h-4 mr-2" /> Jalankan Ulang</>
+                            )}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+
+                  <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
+                    <CardContent className="p-0">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-gradient-to-r from-orange-500 to-yellow-500">
+                            <TableHead className="font-bold text-white">Nama</TableHead>
+                            <TableHead className="font-bold text-white">Email</TableHead>
+                            {usersIncludePassword && (
+                              <TableHead className="font-bold text-white">Password</TableHead>
+                            )}
+                            <TableHead className="font-bold text-white">Role</TableHead>
+                            <TableHead className="font-bold text-white">Terakhir Login</TableHead>
+                            <TableHead className="font-bold text-white">Aktivitas</TableHead>
+                            <TableHead className="font-bold text-white text-center">Aksi</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {users.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={usersIncludePassword ? 7 : 6} className="text-center text-gray-500 py-8">
+                                Tidak ada user
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            users.map((u) => {
+                              const userWithExtra = u as User & { lastLoginAt?: string; _count?: { logs: number }; password?: string }
+                              // Only DEVELOPER can delete ADMIN and DEVELOPER users
+                              const canDelete = user?.role === 'DEVELOPER' || (user?.role === 'ADMIN' && u.role === 'STAF')
+                              return (
+                                <TableRow key={u.id} className="hover:bg-orange-50 border-b border-gray-200">
+                                  <TableCell className="font-semibold text-blue-900">{u.name}</TableCell>
+                                  <TableCell className="text-gray-700">{u.email}</TableCell>
+                                  {usersIncludePassword && (
+                                    <TableCell className="text-gray-600 font-mono text-sm bg-gray-50">
+                                      {userWithExtra.password || '-'}
+                                    </TableCell>
+                                  )}
+                                  <TableCell>
+                                    <Badge className={u.role === 'ADMIN' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : u.role === 'DEVELOPER' ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white' : 'bg-gradient-to-r from-cyan-500 to-cyan-600 text-white'}>
+                                      {u.role}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-gray-600">
+                                    {userWithExtra.lastLoginAt ? new Date(userWithExtra.lastLoginAt).toLocaleString('id-ID') : 'Belum pernah login'}
+                                  </TableCell>
+                                  <TableCell className="text-gray-600">
+                                    {userWithExtra._count?.logs || 0} aktivitas
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => {
+                                          setEditUserData(userWithExtra)
+                                          setEditUserForm({ name: u.name, email: u.email, role: u.role || 'STAF' })
+                                          setShowEditUserDialog(true)
+                                        }}
+                                        className="hover:bg-orange-100"
+                                        title="Edit User"
+                                      >
+                                        <Edit className="w-4 h-4 text-orange-500" />
+                                      </Button>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={async () => {
+                                          setSelectedUserForActivity(u)
+                                          try {
+                                            const res = await fetch(`/ api / logs ? userId = ${u.id} `)
+                                            const data = await res.json()
+                                            setUserActivityLogs(data.data || [])
+                                            setShowUserActivityDialog(true)
+                                          } catch (error) {
+                                            console.error('Error fetching user activity:', error)
+                                          }
+                                        }}
+                                        className="hover:bg-cyan-100"
+                                        title="Lihat Riwayat"
+                                      >
+                                        <History className="w-4 h-4 text-cyan-500" />
+                                      </Button>
+                                      {canDelete && (
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          onClick={() => handleDeleteUser(u.id)}
+                                          className="hover:bg-red-100"
+                                          title="Hapus User"
+                                        >
+                                          <Trash2 className="w-4 h-4 text-red-500" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })
+                          )}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )
+            }
+          </AnimatePresence >
+        </main >
+      </div >
+
+      {/* Edit User Dialog */}
+      < Dialog open={showEditUserDialog} onOpenChange={setShowEditUserDialog} >
+        <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <Edit className="w-5 h-5 text-orange-600" />
+              Edit User
+            </DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Perbarui informasi user
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="font-medium text-gray-700">Nama</Label>
+              <Input
+                value={editUserForm.name}
+                onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })}
+                className="border-gray-300 bg-white text-gray-900"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-medium text-gray-700">Email</Label>
+              <Input
+                value={editUserForm.email}
+                onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
+                className="border-gray-300 bg-white text-gray-900"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-medium text-gray-700">Role</Label>
+              <Select value={editUserForm.role} onValueChange={(v) => setEditUserForm({ ...editUserForm, role: v })}>
+                <SelectTrigger className="border-gray-300 bg-white text-gray-900">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ADMIN">Admin</SelectItem>
+                  <SelectItem value="STAF">Staf</SelectItem>
+                  <SelectItem value="DEVELOPER">Developer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        </CardContent>
-      </Card >
-    </motion.div >
-  )
-}
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowEditUserDialog(false)}
+              className="border-gray-300 text-gray-700 hover:bg-gray-100"
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              onClick={async () => {
+                if (!editUserData) return
+                try {
+                  const res = await fetch('/api/users', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      id: editUserData.id,
+                      name: editUserForm.name,
+                      email: editUserForm.email,
+                      role: editUserForm.role
+                    })
+                  })
+                  const data = await res.json()
+                  if (data.error) {
+                    toast({ title: 'Error', description: data.error, variant: 'destructive' })
+                  } else {
+                    toast({ title: '✅ Berhasil', description: 'User berhasil diperbarui!' })
+                    setShowEditUserDialog(false)
+                    fetchUsers()
+                  }
+                } catch (error) {
+                  toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
+                }
+              }}
+              className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
+            >
+              Simpan Perubahan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog >
 
-{
-  currentPage === 'logs' && (
-    <motion.div
-      key="logs"
-      variants={fadeInUp}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      className="space-y-6"
-    >
-      <ShimmerTitle subtitle="Riwayat semua aktivitas sistem">Log Aktivitas</ShimmerTitle>
+      {/* Password Change Dialog */}
+      < Dialog open={showPasswordChangeDialog} onOpenChange={setShowPasswordChangeDialog} >
+        <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <Shield className="w-5 h-5 text-orange-600" />
+              Ganti Password
+            </DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Ubah password akun Anda
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="font-medium text-gray-700">Password Lama</Label>
+              <Input
+                type="password"
+                value={passwordChangeForm.currentPassword}
+                onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, currentPassword: e.target.value })}
+                className="border-gray-300 bg-white text-gray-900"
+                placeholder="Masukkan password lama"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-medium text-gray-700">Password Baru</Label>
+              <Input
+                type="password"
+                value={passwordChangeForm.newPassword}
+                onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, newPassword: e.target.value })}
+                className="border-gray-300 bg-white text-gray-900"
+                placeholder="Masukkan password baru (min. 4 karakter)"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-medium text-gray-700">Konfirmasi Password Baru</Label>
+              <Input
+                type="password"
+                value={passwordChangeForm.confirmPassword}
+                onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, confirmPassword: e.target.value })}
+                className="border-gray-300 bg-white text-gray-900"
+                placeholder="Konfirmasi password baru"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowPasswordChangeDialog(false)}
+              className="border-gray-300 text-gray-700 hover:bg-gray-100"
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              disabled={passwordChangeLoading}
+              onClick={async () => {
+                // Validation
+                if (!passwordChangeForm.currentPassword || !passwordChangeForm.newPassword || !passwordChangeForm.confirmPassword) {
+                  toast({ title: 'Error', description: 'Semua field harus diisi', variant: 'destructive' })
+                  return
+                }
+                if (passwordChangeForm.newPassword.length < 4) {
+                  toast({ title: 'Error', description: 'Password baru minimal 4 karakter', variant: 'destructive' })
+                  return
+                }
+                if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
+                  toast({ title: 'Error', description: 'Konfirmasi password tidak cocok', variant: 'destructive' })
+                  return
+                }
 
-      <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
-        <CardContent className="p-0">
-          <ScrollArea className="h-[600px]">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gradient-to-r from-orange-500 to-yellow-500 sticky top-0">
-                  <TableHead className="font-bold text-white">Waktu</TableHead>
-                  <TableHead className="font-bold text-white">User</TableHead>
-                  <TableHead className="font-bold text-white">Aktivitas</TableHead>
-                  <TableHead className="font-bold text-white">Deskripsi</TableHead>
-                  <TableHead className="font-bold text-white">File</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {logs.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-gray-500 py-8">
-                      Tidak ada log
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  logs.map((log) => (
-                    <TableRow key={log.id} className="hover:bg-orange-50 border-b border-gray-200">
-                      <TableCell className="text-sm text-gray-700">
-                        {new Date(log.createdAt).toLocaleString('id-ID')}
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="font-semibold text-blue-900">{log.user?.name}</p>
-                          <p className="text-xs text-gray-500">{log.user?.email}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
+                setPasswordChangeLoading(true)
+                try {
+                  const res = await fetch('/api/users/password', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      currentPassword: passwordChangeForm.currentPassword,
+                      newPassword: passwordChangeForm.newPassword
+                    })
+                  })
+                  const data = await res.json()
+                  if (data.error) {
+                    toast({ title: 'Error', description: data.error, variant: 'destructive' })
+                  } else {
+                    toast({ title: '✅ Berhasil', description: 'Password berhasil diubah!' })
+                    setShowPasswordChangeDialog(false)
+                  }
+                } catch (error) {
+                  toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
+                } finally {
+                  setPasswordChangeLoading(false)
+                }
+              }}
+              className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
+            >
+              {passwordChangeLoading ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</>
+              ) : (
+                'Simpan Password'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog >
+
+      {/* User Activity Dialog */}
+      < Dialog open={showUserActivityDialog} onOpenChange={setShowUserActivityDialog} >
+        <DialogContent className="sm:max-w-2xl bg-white border-2 border-cyan-200 shadow-xl max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <History className="w-5 h-5 text-cyan-600" />
+              Riwayat Aktivitas: {selectedUserForActivity?.name}
+            </DialogTitle>
+            <DialogDescription className="text-gray-600">
+              {selectedUserForActivity?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {userActivityLogs.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">
+                <History className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                <p>Belum ada aktivitas</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {userActivityLogs.map((log) => (
+                  <div key={log.id} className="flex items-start gap-3 p-3 bg-cyan-50 rounded-lg">
+                    <div className="w-2 h-2 mt-2 rounded-full bg-cyan-500" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
                         <Badge variant="outline" className={
                           log.aktivitas === 'LOGIN' ? 'bg-blue-100 text-blue-700 border-blue-300' :
                             log.aktivitas === 'UPLOAD' ? 'bg-green-100 text-green-700 border-green-300' :
@@ -6812,985 +7644,249 @@ export default function ESOPApp() {
                         }>
                           {log.aktivitas}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-gray-700">{log.deskripsi}</TableCell>
-                      <TableCell>
-                        {log.sopFile && (
-                          <span className="text-sm text-orange-600 font-medium truncate max-w-[200px] block">{log.sopFile.judul}</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </ScrollArea>
-        </CardContent>
-      </Card>
-
-      {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-600">
-          Menampilkan {logs.length} log
-        </p>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={logsPagination.page === 1}
-            onClick={() => setLogsPagination(p => ({ ...p, page: p.page - 1 }))}
-            className="border-orange-300 text-orange-600 hover:bg-orange-50"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <span className="text-sm text-gray-600 font-medium">Halaman {logsPagination.page}</span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={logsPagination.page >= logsPagination.totalPages}
-            onClick={() => setLogsPagination(p => ({ ...p, page: p.page + 1 }))}
-            className="border-orange-300 text-orange-600 hover:bg-orange-50"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-    </motion.div>
-  )
-}
-
-{
-  currentPage === 'users' && (user?.role === 'DEVELOPER' || user?.role === 'ADMIN') && (
-    <motion.div
-      key="users"
-      variants={fadeInUp}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      className="space-y-6"
-    >
-      <div className="flex items-center justify-between">
-        <ShimmerTitle subtitle="Kelola pengguna sistem">Manajemen User</ShimmerTitle>
-        <Dialog open={showUserDialog} onOpenChange={setShowUserDialog}>
-          <DialogTrigger asChild>
-            <Button className="btn-sar bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-lg shadow-orange-500/30">
-              <Plus className="w-4 h-4 mr-2" />
-              Tambah User
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl p-0 overflow-hidden" aria-describedby={undefined}>
-            {/* Header with gradient */}
-            <DialogHeader className="bg-gradient-to-r from-orange-500 to-yellow-500 p-5 text-white">
-              <DialogTitle className="text-lg font-bold flex items-center gap-2 text-white">
-                <Users className="w-5 h-5" />
-                Tambah User Baru
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleCreateUser} className="p-5 space-y-5">
-              <div className="space-y-2">
-                <Label className="font-semibold text-blue-900">Nama Lengkap</Label>
-                <Input
-                  value={newUserForm.name}
-                  onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
-                  placeholder="Masukkan nama lengkap"
-                  required
-                  className="border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 h-11"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="font-semibold text-blue-900">Email</Label>
-                <Input
-                  type="email"
-                  value={newUserForm.email}
-                  onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
-                  placeholder="Masukkan email"
-                  required
-                  className="border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 h-11"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="font-semibold text-blue-900">Password</Label>
-                <Input
-                  type="password"
-                  autoComplete="new-password"
-                  value={newUserForm.password}
-                  onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
-                  placeholder="Masukkan password"
-                  required
-                  className="border-2 border-gray-200 focus:border-orange-500 text-gray-900 placeholder:text-gray-400 h-11"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="font-semibold text-blue-900">Role</Label>
-                <Select value={newUserForm.role} onValueChange={(v) => setNewUserForm({ ...newUserForm, role: v })}>
-                  <SelectTrigger className="border-2 border-gray-200 focus:border-orange-500 text-gray-900 h-11">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ADMIN">Admin</SelectItem>
-                    <SelectItem value="STAF">Staf</SelectItem>
-                    <SelectItem value="DEVELOPER">Developer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <DialogFooter className="pt-2 gap-2">
-                <Button type="button" variant="outline" onClick={() => setShowUserDialog(false)} className="border-gray-300 text-gray-700 hover:bg-gray-100">Batal</Button>
-                <Button type="submit" className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white" disabled={loading}>
-                  Simpan
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {/* Desktop Sync Dialog - Upload edited file */}
-        <Dialog open={showDesktopSyncDialog} onOpenChange={setShowDesktopSyncDialog}>
-          <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
-            <DialogHeader>
-              <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <RefreshCw className="w-5 h-5 text-orange-600" />
-                Selesai Edit & Sync
-              </DialogTitle>
-              <DialogDescription className="text-gray-600">
-                Upload file hasil edit untuk disinkronkan ke storage
-              </DialogDescription>
-            </DialogHeader>
-
-            {excelEditData && (
-              <div className="space-y-4">
-                {/* File Info */}
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    {['docx', 'doc'].includes(excelEditData.fileType || '') ? (
-                      <FileText className="w-10 h-10 text-blue-600 mt-1" />
-                    ) : (
-                      <FileSpreadsheet className="w-10 h-10 text-green-600 mt-1" />
-                    )}
-                    <div>
-                      <p className="font-bold text-gray-900">{excelEditData.fileName}</p>
-                      <p className="text-sm text-gray-600">{excelEditData.judul}</p>
+                        <span className="text-xs text-gray-500">
+                          {new Date(log.createdAt).toLocaleString('id-ID')}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700 mt-1">{log.deskripsi}</p>
+                      {log.sopFile && (
+                        <p className="text-xs text-orange-600 mt-1">{log.sopFile.judul}</p>
+                      )}
                     </div>
                   </div>
-                </div>
-
-                {/* Session Info */}
-                {desktopEditSessionToken && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-sm text-blue-800">
-                      <strong>Session aktif:</strong> Tanpa batas waktu
-                    </p>
-                    <p className="text-xs text-blue-600 mt-1">
-                      Original hash: {desktopEditOriginalHash?.slice(0, 16)}...
-                    </p>
-                  </div>
-                )}
-
-                {/* File Picker */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-semibold text-gray-700">
-                    Pilih File Hasil Edit
-                  </Label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
-                    <input
-                      type="file"
-                      accept=".xlsx,.xls,.xlsm,.docx,.doc"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) {
-                          setDesktopSyncFile(file)
-                        }
-                      }}
-                      className="hidden"
-                      id="desktop-sync-file"
-                    />
-                    <label
-                      htmlFor="desktop-sync-file"
-                      className="cursor-pointer"
-                    >
-                      {desktopSyncFile ? (
-                        <div className="flex items-center justify-center gap-2">
-                          <CheckCircle className="w-5 h-5 text-green-600" />
-                          <span className="text-sm text-gray-700">{desktopSyncFile.name}</span>
-                        </div>
-                      ) : (
-                        <>
-                          <Upload className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                          <p className="text-sm text-gray-600">
-                            Klik untuk memilih file
-                          </p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            Format: .xlsx, .xls, .xlsm, .docx, .doc
-                          </p>
-                        </>
-                      )}
-                    </label>
-                  </div>
-                </div>
-
-                {/* Info */}
-                <Alert className="bg-amber-50 border-amber-200">
-                  <AlertTriangle className="w-4 h-4 text-amber-600" />
-                  <AlertDescription className="text-amber-800 text-sm">
-                    <strong>Penting:</strong> File akan di-checksum dan dibandingkan dengan file asli.
-                    Jika tidak ada perubahan, file tidak akan di-upload.
-                  </AlertDescription>
-                </Alert>
+                ))}
               </div>
             )}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowUserActivityDialog(false)}
+              className="border-gray-300 text-gray-700 hover:bg-gray-100"
+            >
+              Tutup
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog >
 
-            <DialogFooter className="gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowDesktopSyncDialog(false)}
-                className="border-gray-300 text-gray-700 hover:bg-gray-100"
-              >
-                Batal
-              </Button>
-              <Button
-                type="button"
-                onClick={handleDesktopSync}
-                disabled={!desktopSyncFile || desktopSyncing}
-                className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
-              >
-                {desktopSyncing ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Syncing...</>
-                ) : (
-                  <><RefreshCw className="w-4 h-4 mr-2" /> Sync ke R2</>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+      {/* Glowing Footer - Bottom Left - Visible on all pages */}
+      < motion.div
+        className="fixed bottom-4 left-4 z-50"
+        initial={{ opacity: 0, y: 50 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.8 }}
+      >
+        <div className="relative cursor-pointer" onClick={() => setShowCopyrightPopup(true)}>
+          {/* Glow effect */}
+          <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-yellow-400 rounded-lg blur-md opacity-60 animate-pulse" />
 
-        {/* Excel Edit Diagnostic Dialog */}
-        <Dialog open={showDiagnosticDialog} onOpenChange={setShowDiagnosticDialog}>
-          <DialogContent className="sm:max-w-2xl bg-white border-2 border-orange-200 shadow-xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
-            <DialogHeader>
-              <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <Activity className="w-5 h-5 text-orange-600" />
-                Diagnostik Excel Edit System
+          {/* Shimmer container */}
+          <div className="relative px-4 py-2 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 rounded-lg border border-orange-500/30 overflow-hidden hover:border-orange-500/60 transition-colors">
+            {/* Animated shimmer */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-400/20 to-transparent animate-shimmer" />
+
+            {/* Text with glow */}
+            <p className="text-sm font-medium relative z-10">
+              <span className="text-gray-400">© </span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-yellow-300 to-orange-400 animate-pulse font-bold hover:from-yellow-300 hover:via-orange-400 hover:to-yellow-300 transition-all">
+                FOE - 2026
+              </span>
+            </p>
+          </div>
+        </div>
+      </motion.div >
+
+      {/* PDF Edit Warning Dialog - Aesthetic Design */}
+      < Dialog open={showPdfWarningDialog} onOpenChange={setShowPdfWarningDialog} >
+        <DialogContent className="sm:max-w-lg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-red-500/50 shadow-2xl overflow-hidden" aria-describedby={undefined}>
+          {/* Animated background effects */}
+          <div className="absolute inset-0 overflow-hidden">
+            {/* Radar sweep */}
+            <motion.div
+              className="absolute -top-20 -right-20 w-60 h-60 rounded-full"
+              style={{
+                background: 'conic-gradient(from 0deg, transparent 0deg, rgba(239, 68, 68, 0.15) 30deg, transparent 60deg)'
+              }}
+              animate={{ rotate: 360 }}
+              transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+            />
+
+            {/* Floating particles */}
+            {[...Array(6)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute w-1 h-1 rounded-full bg-red-400/50"
+                style={{
+                  left: `${10 + i * 15}% `,
+                  top: `${20 + (i % 3) * 25}% `,
+                }}
+                animate={{
+                  y: [-10, 10, -10],
+                  opacity: [0.3, 0.7, 0.3]
+                }}
+                transition={{
+                  duration: 2 + i * 0.3,
+                  repeat: Infinity,
+                  delay: i * 0.2
+                }}
+              />
+            ))}
+          </div>
+
+          <div className="relative z-10">
+            <DialogHeader className="text-center pb-4">
+              {/* Animated warning icon */}
+              <motion.div
+                className="mx-auto mb-4"
+                animate={{
+                  scale: [1, 1.1, 1],
+                  rotate: [0, 5, -5, 0]
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: 'easeInOut'
+                }}
+              >
+                <div className="relative">
+                  {/* Glow ring */}
+                  <motion.div
+                    className="absolute inset-0 rounded-full bg-red-500/30 blur-xl"
+                    animate={{
+                      scale: [1, 1.3, 1],
+                      opacity: [0.5, 0.8, 0.5]
+                    }}
+                    transition={{
+                      duration: 1.5,
+                      repeat: Infinity
+                    }}
+                  />
+
+                  {/* Icon container */}
+                  <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-lg shadow-red-500/50">
+                    <FileIcon className="w-10 h-10 text-white" />
+                  </div>
+
+                  {/* X mark overlay */}
+                  <motion.div
+                    className="absolute inset-0 flex items-center justify-center"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    <div className="w-24 h-24 rounded-full border-4 border-red-400 flex items-center justify-center">
+                      <XCircle className="w-12 h-12 text-red-400" />
+                    </div>
+                  </motion.div>
+                </div>
+              </motion.div>
+
+              <DialogTitle className="text-2xl font-bold">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-300 to-red-400">
+                  PDF Tidak Bisa Di-edit
+                </span>
               </DialogTitle>
-              <DialogDescription className="text-gray-600">
-                Memeriksa semua komponen untuk fitur edit Excel dengan Microsoft 365
+
+              <DialogDescription className="text-gray-400 text-sm mt-2">
+                File PDF tidak mendukung fitur edit langsung
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4">
-              {diagnosticLoading && (
-                <div className="flex flex-col items-center justify-center py-8">
-                  <Loader2 className="w-10 h-10 text-orange-500 animate-spin mb-4" />
-                  <p className="text-gray-600">Menjalankan diagnostik...</p>
-                </div>
-              )}
-
-              {diagnosticResult && !diagnosticLoading && (
-                <>
-                  {/* Summary */}
-                  <div className={`p - 4 rounded - lg ${diagnosticResult.success
-                    ? 'bg-green-50 border border-green-200'
-                    : 'bg-red-50 border border-red-200'
-                    } `}>
-                    <div className="flex items-center gap-3">
-                      {diagnosticResult.success ? (
-                        <CheckCircle className="w-8 h-8 text-green-500" />
-                      ) : (
-                        <XCircle className="w-8 h-8 text-red-500" />
-                      )}
-                      <div>
-                        <p className={`font - bold ${diagnosticResult.success ? 'text-green-800' : 'text-red-800'} `}>
-                          {diagnosticResult.success ? 'Semua Sistem Berfungsi!' : 'Terdapat Masalah'}
-                        </p>
-                        <p className={`text - sm ${diagnosticResult.success ? 'text-green-600' : 'text-red-600'} `}>
-                          {diagnosticResult.message}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Stats */}
-                    <div className="flex gap-4 mt-3 text-sm">
-                      <span className="text-gray-600">
-                        Total: <strong>{diagnosticResult.summary.totalSteps}</strong>
-                      </span>
-                      <span className="text-green-600">
-                        Pass: <strong>{diagnosticResult.summary.passed}</strong>
-                      </span>
-                      <span className="text-red-600">
-                        Fail: <strong>{diagnosticResult.summary.failed}</strong>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Results List */}
-                  <div className="space-y-3">
-                    <h4 className="font-semibold text-gray-700">Detail Hasil:</h4>
-                    {diagnosticResult.results.map((result, index) => (
-                      <div
-                        key={index}
-                        className={`p - 3 rounded - lg border ${result.success
-                          ? 'bg-green-50 border-green-200'
-                          : 'bg-red-50 border-red-200'
-                          } `}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            {result.success ? (
-                              <CheckCircle className="w-5 h-5 text-green-500" />
-                            ) : (
-                              <XCircle className="w-5 h-5 text-red-500" />
-                            )}
-                            <span className="font-medium text-gray-900">{result.step}</span>
-                          </div>
-                          {result.duration && (
-                            <span className="text-xs text-gray-500">{result.duration}ms</span>
-                          )}
-                        </div>
-                        <p className={`text - sm mt - 1 ${result.success ? 'text-green-700' : 'text-red-700'} `}>
-                          {result.message}
-                        </p>
-                        {result.error && (
-                          <p className="text-xs text-red-600 mt-1 font-mono bg-red-100 p-2 rounded">
-                            {result.error}
-                          </p>
-                        )}
-                        {result.details && (
-                          <div className="mt-2 text-xs bg-gray-100 p-2 rounded font-mono overflow-x-auto">
-                            {Object.entries(result.details).map(([key, value]) => (
-                              <div key={key} className="flex gap-2">
-                                <span className="text-gray-500">{key}:</span>
-                                <span className={typeof value === 'string' && value.includes('✅') ? 'text-green-600' : typeof value === 'string' && value.includes('❌') ? 'text-red-600' : 'text-gray-700'}>
-                                  {String(value)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Next Steps */}
-                  {!diagnosticResult.success && diagnosticResult.nextSteps.length > 0 && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                      <h4 className="font-semibold text-amber-800 mb-2">Langkah Selanjutnya:</h4>
-                      <ul className="list-disc list-inside space-y-1 text-sm text-amber-700">
-                        {diagnosticResult.nextSteps.map((step, index) => (
-                          <li key={index}>{step}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            <DialogFooter className="gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowDiagnosticDialog(false)}
-                className="border-gray-300 text-gray-700 hover:bg-gray-100"
-              >
-                Tutup
-              </Button>
-              <Button
-                type="button"
-                onClick={handleRunDiagnostic}
-                disabled={diagnosticLoading}
-                className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
-              >
-                {diagnosticLoading ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menjalankan...</>
-                ) : (
-                  <><RefreshCw className="w-4 h-4 mr-2" /> Jalankan Ulang</>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-gradient-to-r from-orange-500 to-yellow-500">
-                <TableHead className="font-bold text-white">Nama</TableHead>
-                <TableHead className="font-bold text-white">Email</TableHead>
-                {usersIncludePassword && (
-                  <TableHead className="font-bold text-white">Password</TableHead>
-                )}
-                <TableHead className="font-bold text-white">Role</TableHead>
-                <TableHead className="font-bold text-white">Terakhir Login</TableHead>
-                <TableHead className="font-bold text-white">Aktivitas</TableHead>
-                <TableHead className="font-bold text-white text-center">Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={usersIncludePassword ? 7 : 6} className="text-center text-gray-500 py-8">
-                    Tidak ada user
-                  </TableCell>
-                </TableRow>
-              ) : (
-                users.map((u) => {
-                  const userWithExtra = u as User & { lastLoginAt?: string; _count?: { logs: number }; password?: string }
-                  // Only DEVELOPER can delete ADMIN and DEVELOPER users
-                  const canDelete = user?.role === 'DEVELOPER' || (user?.role === 'ADMIN' && u.role === 'STAF')
-                  return (
-                    <TableRow key={u.id} className="hover:bg-orange-50 border-b border-gray-200">
-                      <TableCell className="font-semibold text-blue-900">{u.name}</TableCell>
-                      <TableCell className="text-gray-700">{u.email}</TableCell>
-                      {usersIncludePassword && (
-                        <TableCell className="text-gray-600 font-mono text-sm bg-gray-50">
-                          {userWithExtra.password || '-'}
-                        </TableCell>
-                      )}
-                      <TableCell>
-                        <Badge className={u.role === 'ADMIN' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : u.role === 'DEVELOPER' ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white' : 'bg-gradient-to-r from-cyan-500 to-cyan-600 text-white'}>
-                          {u.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-gray-600">
-                        {userWithExtra.lastLoginAt ? new Date(userWithExtra.lastLoginAt).toLocaleString('id-ID') : 'Belum pernah login'}
-                      </TableCell>
-                      <TableCell className="text-gray-600">
-                        {userWithExtra._count?.logs || 0} aktivitas
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => {
-                              setEditUserData(userWithExtra)
-                              setEditUserForm({ name: u.name, email: u.email, role: u.role || 'STAF' })
-                              setShowEditUserDialog(true)
-                            }}
-                            className="hover:bg-orange-100"
-                            title="Edit User"
-                          >
-                            <Edit className="w-4 h-4 text-orange-500" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={async () => {
-                              setSelectedUserForActivity(u)
-                              try {
-                                const res = await fetch(`/ api / logs ? userId = ${u.id} `)
-                                const data = await res.json()
-                                setUserActivityLogs(data.data || [])
-                                setShowUserActivityDialog(true)
-                              } catch (error) {
-                                console.error('Error fetching user activity:', error)
-                              }
-                            }}
-                            className="hover:bg-cyan-100"
-                            title="Lihat Riwayat"
-                          >
-                            <History className="w-4 h-4 text-cyan-500" />
-                          </Button>
-                          {canDelete && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleDeleteUser(u.id)}
-                              className="hover:bg-red-100"
-                              title="Hapus User"
-                            >
-                              <Trash2 className="w-4 h-4 text-red-500" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </motion.div>
-  )
-}
-          </AnimatePresence >
-        </main >
-      </div >
-
-  {/* Edit User Dialog */ }
-  < Dialog open = { showEditUserDialog } onOpenChange = { setShowEditUserDialog } >
-    <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
-      <DialogHeader>
-        <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-          <Edit className="w-5 h-5 text-orange-600" />
-          Edit User
-        </DialogTitle>
-        <DialogDescription className="text-gray-600">
-          Perbarui informasi user
-        </DialogDescription>
-      </DialogHeader>
-      <div className="space-y-4 py-4">
-        <div className="space-y-2">
-          <Label className="font-medium text-gray-700">Nama</Label>
-          <Input
-            value={editUserForm.name}
-            onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })}
-            className="border-gray-300 bg-white text-gray-900"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label className="font-medium text-gray-700">Email</Label>
-          <Input
-            value={editUserForm.email}
-            onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
-            className="border-gray-300 bg-white text-gray-900"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label className="font-medium text-gray-700">Role</Label>
-          <Select value={editUserForm.role} onValueChange={(v) => setEditUserForm({ ...editUserForm, role: v })}>
-            <SelectTrigger className="border-gray-300 bg-white text-gray-900">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ADMIN">Admin</SelectItem>
-              <SelectItem value="STAF">Staf</SelectItem>
-              <SelectItem value="DEVELOPER">Developer</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      <DialogFooter className="gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setShowEditUserDialog(false)}
-          className="border-gray-300 text-gray-700 hover:bg-gray-100"
-        >
-          Batal
-        </Button>
-        <Button
-          type="button"
-          onClick={async () => {
-            if (!editUserData) return
-            try {
-              const res = await fetch('/api/users', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  id: editUserData.id,
-                  name: editUserForm.name,
-                  email: editUserForm.email,
-                  role: editUserForm.role
-                })
-              })
-              const data = await res.json()
-              if (data.error) {
-                toast({ title: 'Error', description: data.error, variant: 'destructive' })
-              } else {
-                toast({ title: '✅ Berhasil', description: 'User berhasil diperbarui!' })
-                setShowEditUserDialog(false)
-                fetchUsers()
-              }
-            } catch (error) {
-              toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
-            }
-          }}
-          className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
-        >
-          Simpan Perubahan
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-      </Dialog >
-
-  {/* Password Change Dialog */ }
-  < Dialog open = { showPasswordChangeDialog } onOpenChange = { setShowPasswordChangeDialog } >
-    <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
-      <DialogHeader>
-        <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-          <Shield className="w-5 h-5 text-orange-600" />
-          Ganti Password
-        </DialogTitle>
-        <DialogDescription className="text-gray-600">
-          Ubah password akun Anda
-        </DialogDescription>
-      </DialogHeader>
-      <div className="space-y-4 py-4">
-        <div className="space-y-2">
-          <Label className="font-medium text-gray-700">Password Lama</Label>
-          <Input
-            type="password"
-            value={passwordChangeForm.currentPassword}
-            onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, currentPassword: e.target.value })}
-            className="border-gray-300 bg-white text-gray-900"
-            placeholder="Masukkan password lama"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label className="font-medium text-gray-700">Password Baru</Label>
-          <Input
-            type="password"
-            value={passwordChangeForm.newPassword}
-            onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, newPassword: e.target.value })}
-            className="border-gray-300 bg-white text-gray-900"
-            placeholder="Masukkan password baru (min. 4 karakter)"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label className="font-medium text-gray-700">Konfirmasi Password Baru</Label>
-          <Input
-            type="password"
-            value={passwordChangeForm.confirmPassword}
-            onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, confirmPassword: e.target.value })}
-            className="border-gray-300 bg-white text-gray-900"
-            placeholder="Konfirmasi password baru"
-          />
-        </div>
-      </div>
-      <DialogFooter className="gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setShowPasswordChangeDialog(false)}
-          className="border-gray-300 text-gray-700 hover:bg-gray-100"
-        >
-          Batal
-        </Button>
-        <Button
-          type="button"
-          disabled={passwordChangeLoading}
-          onClick={async () => {
-            // Validation
-            if (!passwordChangeForm.currentPassword || !passwordChangeForm.newPassword || !passwordChangeForm.confirmPassword) {
-              toast({ title: 'Error', description: 'Semua field harus diisi', variant: 'destructive' })
-              return
-            }
-            if (passwordChangeForm.newPassword.length < 4) {
-              toast({ title: 'Error', description: 'Password baru minimal 4 karakter', variant: 'destructive' })
-              return
-            }
-            if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
-              toast({ title: 'Error', description: 'Konfirmasi password tidak cocok', variant: 'destructive' })
-              return
-            }
-
-            setPasswordChangeLoading(true)
-            try {
-              const res = await fetch('/api/users/password', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  currentPassword: passwordChangeForm.currentPassword,
-                  newPassword: passwordChangeForm.newPassword
-                })
-              })
-              const data = await res.json()
-              if (data.error) {
-                toast({ title: 'Error', description: data.error, variant: 'destructive' })
-              } else {
-                toast({ title: '✅ Berhasil', description: 'Password berhasil diubah!' })
-                setShowPasswordChangeDialog(false)
-              }
-            } catch (error) {
-              toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
-            } finally {
-              setPasswordChangeLoading(false)
-            }
-          }}
-          className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
-        >
-          {passwordChangeLoading ? (
-            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</>
-          ) : (
-            'Simpan Password'
-          )}
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-      </Dialog >
-
-  {/* User Activity Dialog */ }
-  < Dialog open = { showUserActivityDialog } onOpenChange = { setShowUserActivityDialog } >
-    <DialogContent className="sm:max-w-2xl bg-white border-2 border-cyan-200 shadow-xl max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
-      <DialogHeader>
-        <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-          <History className="w-5 h-5 text-cyan-600" />
-          Riwayat Aktivitas: {selectedUserForActivity?.name}
-        </DialogTitle>
-        <DialogDescription className="text-gray-600">
-          {selectedUserForActivity?.email}
-        </DialogDescription>
-      </DialogHeader>
-      <div className="py-4">
-        {userActivityLogs.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
-            <History className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-            <p>Belum ada aktivitas</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {userActivityLogs.map((log) => (
-              <div key={log.id} className="flex items-start gap-3 p-3 bg-cyan-50 rounded-lg">
-                <div className="w-2 h-2 mt-2 rounded-full bg-cyan-500" />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className={
-                      log.aktivitas === 'LOGIN' ? 'bg-blue-100 text-blue-700 border-blue-300' :
-                        log.aktivitas === 'UPLOAD' ? 'bg-green-100 text-green-700 border-green-300' :
-                          log.aktivitas === 'DOWNLOAD' ? 'bg-purple-100 text-purple-700 border-purple-300' :
-                            log.aktivitas === 'PREVIEW' ? 'bg-cyan-100 text-cyan-700 border-cyan-300' :
-                              log.aktivitas === 'VERIFIKASI' ? 'bg-orange-100 text-orange-700 border-orange-300' :
-                                'bg-gray-100 text-gray-700 border-gray-300'
-                    }>
-                      {log.aktivitas}
-                    </Badge>
-                    <span className="text-xs text-gray-500">
-                      {new Date(log.createdAt).toLocaleString('id-ID')}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-700 mt-1">{log.deskripsi}</p>
-                  {log.sopFile && (
-                    <p className="text-xs text-orange-600 mt-1">{log.sopFile.judul}</p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      <DialogFooter>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setShowUserActivityDialog(false)}
-          className="border-gray-300 text-gray-700 hover:bg-gray-100"
-        >
-          Tutup
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-      </Dialog >
-
-  {/* Glowing Footer - Bottom Left - Visible on all pages */ }
-  < motion.div
-className = "fixed bottom-4 left-4 z-50"
-initial = {{ opacity: 0, y: 50 }}
-animate = {{ opacity: 1, y: 0 }}
-transition = {{ delay: 0.8 }}
-      >
-  <div className="relative cursor-pointer" onClick={() => setShowCopyrightPopup(true)}>
-    {/* Glow effect */}
-    <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-yellow-400 rounded-lg blur-md opacity-60 animate-pulse" />
-
-    {/* Shimmer container */}
-    <div className="relative px-4 py-2 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 rounded-lg border border-orange-500/30 overflow-hidden hover:border-orange-500/60 transition-colors">
-      {/* Animated shimmer */}
-      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-400/20 to-transparent animate-shimmer" />
-
-      {/* Text with glow */}
-      <p className="text-sm font-medium relative z-10">
-        <span className="text-gray-400">© </span>
-        <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-yellow-300 to-orange-400 animate-pulse font-bold hover:from-yellow-300 hover:via-orange-400 hover:to-yellow-300 transition-all">
-          FOE - 2026
-        </span>
-      </p>
-    </div>
-  </div>
-      </motion.div >
-
-  {/* PDF Edit Warning Dialog - Aesthetic Design */ }
-  < Dialog open = { showPdfWarningDialog } onOpenChange = { setShowPdfWarningDialog } >
-    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-red-500/50 shadow-2xl overflow-hidden" aria-describedby={undefined}>
-      {/* Animated background effects */}
-      <div className="absolute inset-0 overflow-hidden">
-        {/* Radar sweep */}
-        <motion.div
-          className="absolute -top-20 -right-20 w-60 h-60 rounded-full"
-          style={{
-            background: 'conic-gradient(from 0deg, transparent 0deg, rgba(239, 68, 68, 0.15) 30deg, transparent 60deg)'
-          }}
-          animate={{ rotate: 360 }}
-          transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
-        />
-
-        {/* Floating particles */}
-        {[...Array(6)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-1 h-1 rounded-full bg-red-400/50"
-            style={{
-              left: `${10 + i * 15}% `,
-              top: `${20 + (i % 3) * 25}% `,
-            }}
-            animate={{
-              y: [-10, 10, -10],
-              opacity: [0.3, 0.7, 0.3]
-            }}
-            transition={{
-              duration: 2 + i * 0.3,
-              repeat: Infinity,
-              delay: i * 0.2
-            }}
-          />
-        ))}
-      </div>
-
-      <div className="relative z-10">
-        <DialogHeader className="text-center pb-4">
-          {/* Animated warning icon */}
-          <motion.div
-            className="mx-auto mb-4"
-            animate={{
-              scale: [1, 1.1, 1],
-              rotate: [0, 5, -5, 0]
-            }}
-            transition={{
-              duration: 2,
-              repeat: Infinity,
-              ease: 'easeInOut'
-            }}
-          >
-            <div className="relative">
-              {/* Glow ring */}
+            <div className="space-y-4 py-4">
+              {/* Main message */}
               <motion.div
-                className="absolute inset-0 rounded-full bg-red-500/30 blur-xl"
-                animate={{
-                  scale: [1, 1.3, 1],
-                  opacity: [0.5, 0.8, 0.5]
-                }}
-                transition={{
-                  duration: 1.5,
-                  repeat: Infinity
-                }}
-              />
-
-              {/* Icon container */}
-              <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-lg shadow-red-500/50">
-                <FileIcon className="w-10 h-10 text-white" />
-              </div>
-
-              {/* X mark overlay */}
-              <motion.div
-                className="absolute inset-0 flex items-center justify-center"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
+                className="bg-red-500/10 border border-red-500/30 rounded-xl p-4"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
               >
-                <div className="w-24 h-24 rounded-full border-4 border-red-400 flex items-center justify-center">
-                  <XCircle className="w-12 h-12 text-red-400" />
+                <p className="text-gray-300 text-sm leading-relaxed">
+                  Format <span className="text-red-400 font-semibold">PDF (Portable Document Format)</span> didesain untuk distribusi dokumen yang sudah final, bukan untuk editing. Berbeda dengan file Excel atau Word, PDF tidak dapat dimodifikasi secara langsung.
+                </p>
+              </motion.div>
+
+              {/* Solution cards */}
+              <motion.div
+                className="grid grid-cols-2 gap-3"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+              >
+                <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileSpreadsheet className="w-4 h-4 text-green-400" />
+                    <span className="text-green-400 text-xs font-semibold">EXCEL</span>
+                  </div>
+                  <p className="text-gray-400 text-xs">
+                    Upload ulang dalam format <span className="text-green-400">.xlsx</span> atau <span className="text-green-400">.xls</span>
+                  </p>
+                </div>
+
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileText className="w-4 h-4 text-blue-400" />
+                    <span className="text-blue-400 text-xs font-semibold">WORD</span>
+                  </div>
+                  <p className="text-gray-400 text-xs">
+                    Upload ulang dalam format <span className="text-blue-400">.docx</span> atau <span className="text-blue-400">.doc</span>
+                  </p>
+                </div>
+              </motion.div>
+
+              {/* Tip section */}
+              <motion.div
+                className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6 }}
+              >
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-amber-400 text-xs font-semibold mb-1">TIP</p>
+                    <p className="text-gray-400 text-xs">
+                      Jika Anda memiliki file asli sebelum dikonversi ke PDF, upload file tersebut untuk mengaktifkan fitur edit.
+                    </p>
+                  </div>
                 </div>
               </motion.div>
             </div>
-          </motion.div>
 
-          <DialogTitle className="text-2xl font-bold">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-300 to-red-400">
-              PDF Tidak Bisa Di-edit
-            </span>
-          </DialogTitle>
-
-          <DialogDescription className="text-gray-400 text-sm mt-2">
-            File PDF tidak mendukung fitur edit langsung
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 py-4">
-          {/* Main message */}
-          <motion.div
-            className="bg-red-500/10 border border-red-500/30 rounded-xl p-4"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <p className="text-gray-300 text-sm leading-relaxed">
-              Format <span className="text-red-400 font-semibold">PDF (Portable Document Format)</span> didesain untuk distribusi dokumen yang sudah final, bukan untuk editing. Berbeda dengan file Excel atau Word, PDF tidak dapat dimodifikasi secara langsung.
-            </p>
-          </motion.div>
-
-          {/* Solution cards */}
-          <motion.div
-            className="grid grid-cols-2 gap-3"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <FileSpreadsheet className="w-4 h-4 text-green-400" />
-                <span className="text-green-400 text-xs font-semibold">EXCEL</span>
-              </div>
-              <p className="text-gray-400 text-xs">
-                Upload ulang dalam format <span className="text-green-400">.xlsx</span> atau <span className="text-green-400">.xls</span>
-              </p>
-            </div>
-
-            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <FileText className="w-4 h-4 text-blue-400" />
-                <span className="text-blue-400 text-xs font-semibold">WORD</span>
-              </div>
-              <p className="text-gray-400 text-xs">
-                Upload ulang dalam format <span className="text-blue-400">.docx</span> atau <span className="text-blue-400">.doc</span>
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Tip section */}
-          <motion.div
-            className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-          >
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-amber-400 text-xs font-semibold mb-1">TIP</p>
-                <p className="text-gray-400 text-xs">
-                  Jika Anda memiliki file asli sebelum dikonversi ke PDF, upload file tersebut untuk mengaktifkan fitur edit.
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-
-        <DialogFooter className="pt-4">
-          <motion.div
-            className="w-full"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <Button
-              type="button"
-              onClick={() => setShowPdfWarningDialog(false)}
-              className="w-full bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-red-500/25"
-            >
-              <X className="w-4 h-4 mr-2" />
-              Tutup
-            </Button>
-          </motion.div>
-        </DialogFooter>
-      </div>
-    </DialogContent>
+            <DialogFooter className="pt-4">
+              <motion.div
+                className="w-full"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <Button
+                  type="button"
+                  onClick={() => setShowPdfWarningDialog(false)}
+                  className="w-full bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-red-500/25"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Tutup
+                </Button>
+              </motion.div>
+            </DialogFooter>
+          </div>
+        </DialogContent>
       </Dialog >
 
 
-  {/* Copyright Popup */ }
-  < CopyrightPopup show = { showCopyrightPopup } onClose = {() => setShowCopyrightPopup(false)} />
+      {/* Copyright Popup */}
+      < CopyrightPopup show={showCopyrightPopup} onClose={() => setShowCopyrightPopup(false)} />
 
-{/* Print Loading Dialog */ }
-<PrintLoadingDialog
-  open={showPrintDialog}
-  onClose={handlePrintDialogClose}
-  fileId={printDialogFileId}
-  fileName={printDialogFileName}
-  fileType={printDialogFileType}
-  onComplete={handlePrintComplete}
-/>
+      {/* Print Loading Dialog */}
+      <PrintLoadingDialog
+        open={showPrintDialog}
+        onClose={handlePrintDialogClose}
+        fileId={printDialogFileId}
+        fileName={printDialogFileName}
+        fileType={printDialogFileType}
+        onComplete={handlePrintComplete}
+      />
     </div >
   )
 }
