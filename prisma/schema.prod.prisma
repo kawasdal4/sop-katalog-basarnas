@@ -16,10 +16,11 @@ model User {
   email     String   @unique
   password  String
   name      String
-  role      String   @default("STAF") // ADMIN or STAF
+  role      String   @default("STAF") // ADMIN, STAF, or DEVELOPER
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   lastLoginAt DateTime? // Last login timestamp
+  lastArsipVisitAt DateTime? // Last time the user visited the Arsip page
   
   // Relations
   logs     Log[]
@@ -34,12 +35,13 @@ model SopFile {
   tahun        Int
   kategori     String   // SIAGA, LATIHAN, LAINNYA
   jenis        String   // SOP or IK
+  lingkup      String?  // BCC, Dit. Siaga, Basarnas, Kantor SAR, Antar Instansi, Internasional
   status       String   @default("AKTIF") // AKTIF, REVIEW, KADALUARSA
   
   // File info
   fileName     String
   filePath     String
-  fileType     String   // xlsx or pdf
+  fileType     String   // xlsx, xls, pdf, docx, doc, etc
   driveFileId  String?  // Google Drive file ID
   
   // PDF Preview
