@@ -386,7 +386,8 @@ function StatCard({
   icon: Icon,
   color,
   delay = 0,
-  trend
+  trend,
+  action
 }: {
   title: string
   value: number | string
@@ -394,6 +395,7 @@ function StatCard({
   color: string
   delay?: number
   trend?: 'up' | 'down'
+  action?: React.ReactNode
 }) {
   const colorClasses: Record<string, { bg: string; icon: string; text: string; border: string; titleText: string }> = {
     orange: {
@@ -470,12 +472,15 @@ function StatCard({
                 </div>
               )}
             </div>
-            <motion.div
-              className={`w-14 h-14 ${c.icon} rounded-xl flex items-center justify-center shadow-lg`}
-              whileHover={{ rotate: 5, scale: 1.1 }}
-            >
-              <Icon className="w-7 h-7" />
-            </motion.div>
+            <div className="flex flex-col items-end gap-2">
+              {action}
+              <motion.div
+                className={`w-14 h-14 ${c.icon} rounded-xl flex items-center justify-center shadow-lg`}
+                whileHover={{ rotate: 5, scale: 1.1 }}
+              >
+                <Icon className="w-7 h-7" />
+              </motion.div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -3083,10 +3088,38 @@ export default function ESOPApp() {
           duration: 3000
         })
         fetchSopFiles()
+        fetchVerificationList(verificationFilter, verificationLingkupFilter, verificationSearch, verificationSortBy)
+        fetchArsipList(arsipLingkupFilter, arsipSearch, arsipSortBy)
         fetchStats()
       }
     } catch (error) {
       toast({ title: '❌ Error', description: 'Terjadi kesalahan saat menghapus file', variant: 'destructive' })
+    }
+  }
+
+  // Handle reset stats (bulk delete by status)
+  const handleResetStats = async (status: 'MENUNGGU' | 'DITOLAK') => {
+    const categoryName = status === 'MENUNGGU' ? 'Verifikasi (Menunggu)' : 'Arsip (Ditolak)'
+    if (!confirm(`⚠️ PERINGATAN DEVELOPER ⚠️\n\nAnda yakin ingin MENGHAPUS SEMUA file di kategori ${categoryName}?\n\nTindakan ini akan menghapus data permanen dari database dan storage.`)) return
+
+    try {
+      const res = await fetch(`/api/sop?bulkStatus=${status}`, { method: 'DELETE' })
+      const data = await res.json()
+
+      if (data.error) {
+        toast({ title: '❌ Gagal', description: data.error, variant: 'destructive' })
+      } else {
+        toast({
+          title: '✅ Berhasil',
+          description: data.message || 'Counter berhasil di-reset ke 0!',
+          duration: 3000
+        })
+        if (status === 'MENUNGGU') fetchVerificationList(verificationFilter, verificationLingkupFilter, verificationSearch, verificationSortBy)
+        else fetchArsipList(arsipLingkupFilter, arsipSearch, arsipSortBy)
+        fetchStats()
+      }
+    } catch (error) {
+      toast({ title: '❌ Error', description: 'Terjadi kesalahan saat melakukan reset stats', variant: 'destructive' })
     }
   }
 
@@ -6305,7 +6338,7 @@ export default function ESOPApp() {
                       size="sm"
                       disabled={sopPagination.page <= 1 || katalogLoading}
                       onClick={() => setSopPagination(p => ({ ...p, page: p.page - 1 }))}
-                      className="border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
+                      className="border-orange-500/30 text-orange-400 hover:bg-orange-500/10 disabled:opacity-50"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </Button>
@@ -6315,7 +6348,7 @@ export default function ESOPApp() {
                       size="sm"
                       disabled={sopPagination.page >= sopPagination.totalPages || katalogLoading}
                       onClick={() => setSopPagination(p => ({ ...p, page: p.page + 1 }))}
-                      className="border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
+                      className="border-orange-500/30 text-orange-400 hover:bg-orange-500/10 disabled:opacity-50"
                     >
                       <ChevronRight className="w-4 h-4" />
                     </Button>
@@ -6411,8 +6444,42 @@ export default function ESOPApp() {
                 {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <StatCard title="Total SOP Aktif" value={stats?.totalAktif || 0} icon={CheckCircle} color="orange" delay={0} />
-                  <StatCard title="Menunggu Verifikasi" value={stats?.totalPublikMenunggu || 0} icon={Clock} color="yellow" delay={0.1} />
-                  <StatCard title="Total Ditolak" value={stats?.totalPublikDitolak || 0} icon={XCircle} color="red" delay={0.2} />
+                  <StatCard
+                    title="Menunggu Verifikasi"
+                    value={stats?.totalPublikMenunggu || 0}
+                    icon={Clock}
+                    color="yellow"
+                    delay={0.1}
+                    action={user?.role === 'DEVELOPER' ? (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 text-yellow-600 hover:bg-yellow-100 rounded-full"
+                        onClick={() => handleResetStats('MENUNGGU')}
+                        title="Reset Stats (Hapus Semua Menunggu)"
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                      </Button>
+                    ) : undefined}
+                  />
+                  <StatCard
+                    title="Total Ditolak"
+                    value={stats?.totalPublikDitolak || 0}
+                    icon={XCircle}
+                    color="red"
+                    delay={0.2}
+                    action={user?.role === 'DEVELOPER' ? (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 text-red-600 hover:bg-red-100 rounded-full"
+                        onClick={() => handleResetStats('DITOLAK')}
+                        title="Reset Stats (Hapus Semua Arsip)"
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                      </Button>
+                    ) : undefined}
+                  />
                 </div>
 
                 {/* Verification Table */}
@@ -6600,6 +6667,11 @@ export default function ESOPApp() {
                                         </Dialog>
                                       </>
                                     )}
+                                    {user?.role === 'DEVELOPER' && (
+                                      <Button size="icon" variant="ghost" onClick={() => handleDeleteSop(sop.id, sop.judul)} title="Hapus Permanen (Dev)" className="hover:bg-red-100">
+                                        <Trash2 className="w-4 h-4 text-red-600" />
+                                      </Button>
+                                    )}
                                   </div>
                                 </TableCell>
                               </TableRow>
@@ -6620,9 +6692,9 @@ export default function ESOPApp() {
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled={verificationPagination.page === 1}
+                      disabled={verificationPagination.page === 1 || verifikasiLoading}
                       onClick={() => setVerificationPagination(p => ({ ...p, page: p.page - 1 }))}
-                      className="border-orange-300 text-orange-600 hover:bg-orange-100 rounded-lg transition-colors"
+                      className="border-orange-300 text-orange-600 hover:bg-orange-100 rounded-lg transition-colors disabled:opacity-50"
                     >
                       <ChevronLeft className="w-4 h-4 mr-1" /> Prev
                     </Button>
@@ -6634,9 +6706,9 @@ export default function ESOPApp() {
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled={verificationPagination.page >= verificationPagination.totalPages}
+                      disabled={verificationPagination.page >= verificationPagination.totalPages || verifikasiLoading}
                       onClick={() => setVerificationPagination(p => ({ ...p, page: p.page + 1 }))}
-                      className="border-orange-300 text-orange-600 hover:bg-orange-100 rounded-lg transition-colors"
+                      className="border-orange-300 text-orange-600 hover:bg-orange-100 rounded-lg transition-colors disabled:opacity-50"
                     >
                       Next <ChevronRight className="w-4 h-4 ml-1" />
                     </Button>
@@ -6715,7 +6787,24 @@ export default function ESOPApp() {
 
                   {/* Stats Cards */}
                   < div className="grid grid-cols-1 md:grid-cols-2 gap-4" >
-                    <StatCard title="Total File Ditolak" value={arsipList.length} icon={XCircle} color="red" delay={0} />
+                    <StatCard
+                      title="Total File Ditolak"
+                      value={arsipList.length}
+                      icon={XCircle}
+                      color="red"
+                      delay={0}
+                      action={user?.role === 'DEVELOPER' ? (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 text-red-600 hover:bg-red-100 rounded-full"
+                          onClick={() => handleResetStats('DITOLAK')}
+                          title="Reset Stats (Hapus Semua Arsip)"
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                        </Button>
+                      ) : undefined}
+                    />
                     <StatCard title="Folder Arsip" value="Publik-Ditolak" icon={FolderOpen} color="orange" delay={0.1} />
                   </div >
 
@@ -6807,6 +6896,11 @@ export default function ESOPApp() {
                                       <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-100">
                                         <Download className="w-4 h-4 text-green-600" />
                                       </Button>
+                                      {user?.role === 'DEVELOPER' && (
+                                        <Button size="icon" variant="ghost" onClick={() => handleDeleteSop(sop.id, sop.judul)} title="Hapus Permanen (Dev)" className="hover:bg-red-100">
+                                          <Trash2 className="w-4 h-4 text-red-600" />
+                                        </Button>
+                                      )}
                                     </div>
                                   </TableCell>
                                 </TableRow>
@@ -6827,9 +6921,9 @@ export default function ESOPApp() {
                       <Button
                         variant="outline"
                         size="sm"
-                        disabled={arsipPagination.page === 1}
+                        disabled={arsipPagination.page === 1 || arsipLoading}
                         onClick={() => setArsipPagination(p => ({ ...p, page: p.page - 1 }))}
-                        className="border-red-300 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                        className="border-red-300 text-red-600 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50"
                       >
                         <ChevronLeft className="w-4 h-4 mr-1" /> Prev
                       </Button>
@@ -6841,9 +6935,9 @@ export default function ESOPApp() {
                       <Button
                         variant="outline"
                         size="sm"
-                        disabled={arsipPagination.page >= arsipPagination.totalPages}
+                        disabled={arsipPagination.page >= arsipPagination.totalPages || arsipLoading}
                         onClick={() => setArsipPagination(p => ({ ...p, page: p.page + 1 }))}
-                        className="border-red-300 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                        className="border-red-300 text-red-600 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50"
                       >
                         Next <ChevronRight className="w-4 h-4 ml-1" />
                       </Button>

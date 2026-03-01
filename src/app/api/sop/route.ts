@@ -633,9 +633,74 @@ export async function DELETE(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
+    const bulkStatus = searchParams.get('bulkStatus')
+
+    // Handle Bulk Delete
+    if (bulkStatus) {
+      if (user.role !== 'DEVELOPER') {
+        return NextResponse.json({ error: 'Hanya developer yang dapat melakukan reset stats' }, { status: 403 })
+      }
+
+      const filesToDelete = await db.sopFile.findMany({
+        where: {
+          verificationStatus: bulkStatus,
+          isPublicSubmission: true
+        }
+      })
+
+      if (filesToDelete.length === 0) {
+        return NextResponse.json({ success: true, message: 'Tidak ada file untuk dihapus' })
+      }
+
+      // Cleanup storage for all files
+      for (const file of filesToDelete) {
+        if (file.filePath && file.filePath.includes('/')) {
+          try { await deleteFromR2(file.filePath) } catch (e) { console.warn(`Failed to delete ${file.filePath} from R2:`, e) }
+        }
+        if (file.driveFileId) {
+          import('@/lib/google-drive').then(gd => {
+            gd.deleteFileFromDrive(file.driveFileId!).catch(e => console.warn(`Failed to delete ${file.driveFileId} from GDrive:`, e))
+          })
+        }
+      }
+
+      // Delete FileSync records
+      try {
+        await db.fileSync.deleteMany({
+          where: {
+            OR: [
+              { r2Key: { in: filesToDelete.map(f => f.filePath).filter(Boolean) as string[] } },
+              { driveFileId: { in: filesToDelete.map(f => f.driveFileId).filter(Boolean) as string[] } }
+            ]
+          }
+        })
+      } catch (syncError) {
+        console.warn('⚠️ Failed to delete bulk FileSync records:', syncError)
+      }
+
+      // Delete from database
+      await db.sopFile.deleteMany({
+        where: { id: { in: filesToDelete.map(f => f.id) } }
+      })
+
+      // Log the bulk deletion
+      try {
+        await db.log.create({
+          data: {
+            userId: userIdCookie,
+            aktivitas: 'DELETE_BULK',
+            deskripsi: `Reset stats: Hapus masal ${filesToDelete.length} file dengan status ${bulkStatus}`,
+          }
+        })
+      } catch (logError) {
+        console.warn('⚠️ Failed to create bulk delete log:', logError)
+      }
+
+      return NextResponse.json({ success: true, message: `${filesToDelete.length} file berhasil dihapus` })
+    }
 
     if (!id) {
-      return NextResponse.json({ error: 'ID diperlukan' }, { status: 400 })
+      return NextResponse.json({ error: 'ID atau bulkStatus diperlukan' }, { status: 400 })
     }
 
     // Get file info first
