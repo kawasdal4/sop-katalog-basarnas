@@ -258,48 +258,92 @@ const slideInLeft = {
   exit: { opacity: 1 }
 }
 
-// Shimmer Title Component with yellow glow
+// Majestic Animated Title Component
 function ShimmerTitle({ children, subtitle }: { children: React.ReactNode; subtitle?: string }) {
+  const letters = typeof children === 'string' ? children.split('') : [];
+
   return (
-    <div className="relative">
-      <h2 className="text-2xl font-bold relative inline-block">
+    <div className="relative group cursor-default">
+      <h2 className="text-3xl md:text-4xl font-black relative inline-flex overflow-hidden pb-2">
         {/* Glow effect */}
-        <motion.span
-          className="absolute inset-0 blur-xl bg-yellow-400/50 rounded-lg"
+        <motion.div
+          className="absolute inset-0 blur-2xl bg-yellow-400/30 rounded-full"
           animate={{
-            opacity: [0.5, 0.8, 0.5],
-            scale: [1, 1.05, 1]
+            opacity: [0.3, 0.6, 0.3],
+            scale: [0.8, 1.2, 0.8],
           }}
           transition={{
-            duration: 2,
+            duration: 4,
             repeat: Infinity,
             ease: 'easeInOut'
           }}
         />
 
-        {/* Main text with shimmer */}
-        <span className="relative bg-gradient-to-r from-yellow-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">
-          {children}
-        </span>
+        {/* Text Container */}
+        <div className="relative z-10 flex">
+          {typeof children === 'string' ? (
+            letters.map((letter, index) => (
+              <motion.span
+                key={index}
+                className="inline-block text-transparent bg-clip-text bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500"
+                style={{
+                  textShadow: '0 4px 20px rgba(250, 204, 21, 0.3)',
+                }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: 0.5,
+                  delay: index * 0.05,
+                  type: 'spring',
+                  damping: 12,
+                  stiffness: 200
+                }}
+                whileHover={{
+                  y: -5,
+                  scale: 1.1,
+                  color: '#facc15', // text-yellow-400
+                  transition: { duration: 0.2 }
+                }}
+              >
+                {letter === ' ' ? '\u00A0' : letter}
+              </motion.span>
+            ))
+          ) : (
+            <span className="text-transparent bg-clip-text bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500">
+              {children}
+            </span>
+          )}
+        </div>
 
-        {/* Shimmer overlay */}
-        <motion.span
-          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent bg-clip-text text-transparent"
-          style={{ backgroundSize: '200% 100%' }}
+        {/* Sweeping Shimmer Line Below Text */}
+        <motion.div
+          className="absolute bottom-0 left-0 h-1 rounded-full bg-gradient-to-r from-transparent via-yellow-400 to-transparent"
+          initial={{ width: '0%', opacity: 0 }}
           animate={{
-            backgroundPosition: ['200% 0', '-200% 0']
+            width: ['0%', '100%', '0%'],
+            left: ['0%', '0%', '100%'],
+            opacity: [0, 1, 0]
           }}
           transition={{
-            duration: 2.5,
+            duration: 3,
             repeat: Infinity,
-            ease: 'linear'
+            ease: 'easeInOut',
+            repeatDelay: 1
           }}
-        >
-          {children}
-        </motion.span>
+        />
       </h2>
+
+      {/* Animated Subtitle */}
       {subtitle && (
-        <p className="text-gray-400 text-sm mt-1">{subtitle}</p>
+        <motion.p
+          className="text-slate-500 dark:text-slate-400 text-sm md:text-base mt-2 font-medium tracking-wide flex items-center gap-2"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.5, duration: 0.5 }}
+        >
+          <span className="w-8 h-[2px] bg-yellow-400/50 rounded-full inline-block" />
+          {subtitle}
+        </motion.p>
       )}
     </div>
   )
@@ -5139,154 +5183,135 @@ export default function ESOPApp() {
                           Tambah SOP/IK
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="sm:max-w-lg bg-white border-0 shadow-2xl overflow-hidden p-0 rounded-2xl" aria-describedby={undefined}>
-                        {/* Header with Basarnas theme */}
-                        <div className="relative bg-gradient-to-br from-orange-500 via-orange-600 to-red-700 p-5 text-white overflow-hidden">
-                          {/* Animated background */}
-                          <div className="absolute inset-0 overflow-hidden">
-                            <motion.div
-                              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[250px] h-[250px] rounded-full opacity-20"
-                              style={{
-                                background: 'conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.2) 30deg, transparent 60deg)'
-                              }}
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
-                            />
+                      <DialogContent className="sm:max-w-xl p-0 overflow-hidden border-0 shadow-[0_0_40px_rgba(0,0,0,0.5)] bg-slate-900 rounded-[1.5rem]" aria-describedby={undefined}>
+                        {/* Premium Glassmorphism Header */}
+                        <div className="relative overflow-hidden p-6" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' }}>
+                          <div className="absolute inset-0 pointer-events-none">
+                            <motion.div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-orange-500/10 blur-3xl" animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }} />
+                            <motion.div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full bg-red-500/10 blur-3xl" animate={{ scale: [1.2, 1, 1.2], opacity: [0.4, 0.7, 0.4] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }} />
+                            <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.1) 1px, transparent 0)', backgroundSize: '16px 16px' }} />
                           </div>
 
-                          <div className="relative z-10 flex items-center gap-4">
+                          <div className="relative z-10 flex items-center gap-5">
                             <motion.div
-                              className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-xl border border-white/20"
+                              className="w-16 h-16 rounded-2xl flex items-center justify-center relative shadow-2xl"
+                              style={{ background: 'linear-gradient(135deg, rgba(249,115,22,0.9), rgba(220,38,38,0.9))', boxShadow: '0 10px 30px -10px rgba(249,115,22,0.5)' }}
                               initial={{ scale: 0, rotate: -180 }}
                               animate={{ scale: 1, rotate: 0 }}
-                              transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
+                              transition={{ type: 'spring', stiffness: 200, damping: 15 }}
                             >
-                              <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center">
-                                <Upload className="w-5 h-5 text-orange-600" />
-                              </div>
+                              <div className="absolute inset-0 rounded-2xl border border-white/20" />
+                              <Upload className="w-8 h-8 text-white drop-shadow-md" />
                             </motion.div>
                             <div>
-                              <DialogTitle className="text-xl font-bold text-white">
-                                Upload Dokumen Baru
+                              <DialogTitle className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-400 tracking-tight">
+                                Upload Dokumen
                               </DialogTitle>
-                              <DialogDescription className="text-orange-100/80 text-sm mt-0.5">
-                                Tambahkan SOP atau IK ke katalog sistem
+                              <DialogDescription className="text-slate-400 text-sm mt-1 font-medium">
+                                Tambahkan SOP/IK baru ke dalam katalog sistem digital.
                               </DialogDescription>
                             </div>
                           </div>
                         </div>
 
-                        {/* Form Content */}
-                        <form onSubmit={(e) => handleUpload(e)} className="p-5 space-y-4 bg-gradient-to-b from-white via-orange-50/10 to-white">
-                          {/* Section: Informasi Dokumen */}
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2 pb-2 border-b border-orange-100">
-                              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
-                                <FileText className="w-2.5 h-2.5 text-white" />
-                              </div>
-                              <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Informasi Dokumen</span>
-                            </div>
+                        {/* Form Content inside Glassmorphism container */}
+                        <form onSubmit={(e) => handleUpload(e)} className="p-6 space-y-6 bg-slate-900 border-t border-slate-800">
 
-                            <div className="space-y-1.5">
-                              <Label className="text-xs font-semibold text-gray-600 flex items-center gap-1">
-                                Judul SOP/IK <span className="text-red-500">*</span>
-                              </Label>
+                          {/* Grid Inputs */}
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Judul Dokumen <span className="text-red-500">*</span></Label>
                               <Input
                                 value={uploadForm.judul}
                                 onChange={(e) => setUploadForm({ ...uploadForm, judul: e.target.value })}
-                                placeholder="Masukkan judul dokumen"
+                                placeholder="Ketik judul SOP atau IK di sini..."
                                 required
-                                className="h-10 border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 placeholder:text-gray-400 rounded-xl text-sm bg-white shadow-sm"
+                                className="h-11 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-orange-500 focus:ring-orange-500/20 rounded-xl transition-all font-medium"
                               />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-gray-600">Kategori</Label>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Kategori</Label>
                                 <Select value={uploadForm.kategori} onValueChange={(v) => setUploadForm({ ...uploadForm, kategori: v })}>
-                                  <SelectTrigger className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-xs bg-white shadow-sm">
+                                  <SelectTrigger className="h-11 bg-slate-800/50 border-slate-700 text-slate-200 focus:border-orange-500 rounded-xl">
                                     <SelectValue placeholder="Pilih kategori" />
                                   </SelectTrigger>
-                                  <SelectContent className="rounded-xl">
-                                    {KATEGORI_OPTIONS.map(k => <SelectItem key={k} value={k} className="text-xs">{k}</SelectItem>)}
+                                  <SelectContent className="bg-slate-800 border-slate-700 text-slate-200 rounded-xl">
+                                    {KATEGORI_OPTIONS.map(k => <SelectItem key={k} value={k} className="focus:bg-slate-700 focus:text-white">{k}</SelectItem>)}
                                   </SelectContent>
                                 </Select>
                               </div>
-                              <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-gray-600">Lingkup</Label>
+                              <div className="space-y-2">
+                                <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Lingkup</Label>
                                 <Select value={uploadForm.lingkup} onValueChange={(v) => setUploadForm({ ...uploadForm, lingkup: v })}>
-                                  <SelectTrigger className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-xs bg-white shadow-sm">
+                                  <SelectTrigger className="h-11 bg-slate-800/50 border-slate-700 text-slate-200 focus:border-orange-500 rounded-xl">
                                     <SelectValue placeholder="Pilih lingkup" />
                                   </SelectTrigger>
-                                  <SelectContent className="rounded-xl">
-                                    {LINGKUP_OPTIONS.map(l => <SelectItem key={l} value={l} className="text-xs">{l}</SelectItem>)}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-gray-600">Jenis</Label>
-                                <Select value={uploadForm.jenis} onValueChange={(v) => setUploadForm({ ...uploadForm, jenis: v })}>
-                                  <SelectTrigger className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-xs bg-white shadow-sm">
-                                    <SelectValue placeholder="Pilih jenis" />
-                                  </SelectTrigger>
-                                  <SelectContent className="rounded-xl">
-                                    {JENIS_OPTIONS.map(j => <SelectItem key={j} value={j} className="text-xs">{j}</SelectItem>)}
+                                  <SelectContent className="bg-slate-800 border-slate-700 text-slate-200 rounded-xl">
+                                    {LINGKUP_OPTIONS.map(l => <SelectItem key={l} value={l} className="focus:bg-slate-700 focus:text-white">{l}</SelectItem>)}
                                   </SelectContent>
                                 </Select>
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-gray-600">Tahun</Label>
-                                <Input
-                                  type="number"
-                                  value={uploadForm.tahun || ''}
-                                  onChange={(e) => setUploadForm({ ...uploadForm, tahun: parseInt(e.target.value) })}
-                                  required
-                                  className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-xs bg-white shadow-sm text-center"
-                                />
-                              </div>
-                              <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-gray-600">Status</Label>
-                                <Select value={uploadForm.status} onValueChange={(v) => setUploadForm({ ...uploadForm, status: v })}>
-                                  <SelectTrigger className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-xs bg-white shadow-sm">
-                                    <SelectValue placeholder="Pilih status" />
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Jenis</Label>
+                                <Select value={uploadForm.jenis} onValueChange={(v) => setUploadForm({ ...uploadForm, jenis: v })}>
+                                  <SelectTrigger className="h-11 bg-slate-800/50 border-slate-700 text-slate-200 focus:border-orange-500 rounded-xl">
+                                    <SelectValue placeholder="Pilih jenis" />
                                   </SelectTrigger>
-                                  <SelectContent className="rounded-xl">
-                                    {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}
+                                  <SelectContent className="bg-slate-800 border-slate-700 text-slate-200 rounded-xl">
+                                    {JENIS_OPTIONS.map(j => <SelectItem key={j} value={j} className="focus:bg-slate-700 focus:text-white">{j}</SelectItem>)}
                                   </SelectContent>
                                 </Select>
                               </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Status</Label>
+                                <Select value={uploadForm.status} onValueChange={(v) => setUploadForm({ ...uploadForm, status: v })}>
+                                  <SelectTrigger className="h-11 bg-slate-800/50 border-slate-700 text-slate-200 focus:border-orange-500 rounded-xl">
+                                    <SelectValue placeholder="Pilih status" />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-slate-800 border-slate-700 text-slate-200 rounded-xl">
+                                    {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s} className="focus:bg-slate-700 focus:text-white">{s}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Tahun</Label>
+                              <Input
+                                type="number"
+                                value={uploadForm.tahun || ''}
+                                onChange={(e) => setUploadForm({ ...uploadForm, tahun: parseInt(e.target.value) })}
+                                required
+                                className="h-11 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-orange-500 focus:ring-orange-500/20 rounded-xl text-center font-medium"
+                              />
                             </div>
                           </div>
 
-                          {/* Section: Upload File */}
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2 pb-2 border-b border-orange-100">
-                              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
-                                <Upload className="w-2.5 h-2.5 text-white" />
-                              </div>
-                              <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Upload File</span>
-                            </div>
+                          {/* Futuristic File Dropzone */}
+                          <div className="space-y-2">
+                            <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                              File Dokumen <span className="text-red-500">*</span>
+                            </Label>
 
-                            {/* Custom File Upload Dropzone */}
-                            <div
-                              className={`relative border - 2 border - dashed rounded - xl p - 5 text - center cursor - pointer transition - all duration - 200 overflow - hidden ${uploadForm.file
-                                ? 'border-green-400 bg-green-50'
-                                : 'border-orange-300 bg-orange-50/50 hover:border-orange-500 hover:bg-orange-50'
-                                } `}
+                            <motion.div
+                              whileHover={{ scale: uploadForm.file ? 1 : 1.01 }}
+                              whileTap={{ scale: 0.98 }}
+                              className={`relative border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-300 group overflow-hidden ${uploadForm.file
+                                ? 'border-orange-500/50 bg-orange-500/5 ring-4 ring-orange-500/10'
+                                : 'border-slate-700 bg-slate-800/30 hover:border-orange-500/50 hover:bg-slate-800/80 hover:shadow-[0_0_20px_rgba(249,115,22,0.1)]'
+                                }`}
                               onClick={() => document.getElementById('file-input')?.click()}
-                              onDragOver={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                              }}
+                              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                               onDrop={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                const file = e.dataTransfer.files?.[0]
+                                e.preventDefault(); e.stopPropagation();
+                                const file = e.dataTransfer.files?.[0];
                                 if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.pdf') || file.name.endsWith('.docx') || file.name.endsWith('.doc'))) {
-                                  setUploadForm({ ...uploadForm, file })
+                                  setUploadForm({ ...uploadForm, file });
                                 }
                               }}
                             >
@@ -5298,106 +5323,94 @@ export default function ESOPApp() {
                                 onChange={(e) => setUploadForm({ ...uploadForm, file: e.target.files?.[0] || null })}
                               />
 
-                              {/* Animated background on hover */}
-                              {!uploadForm.file && (
-                                <motion.div
-                                  className="absolute inset-0 bg-gradient-to-r from-orange-500/0 via-orange-500/5 to-orange-500/0"
-                                  initial={{ x: '-100%' }}
-                                  whileHover={{ x: '100%' }}
-                                  transition={{ duration: 0.6 }}
-                                />
-                              )}
-
                               {uploadForm.file ? (
-                                <div className="flex items-center justify-center gap-3 relative z-10">
-                                  <div className="flex-shrink-0">
-                                    {uploadForm.file.name.endsWith('.xlsx') || uploadForm.file.name.endsWith('.xls') ? (
-                                      <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center shadow-md">
-                                        <FileSpreadsheet className="w-6 h-6 text-green-600" />
+                                <div className="flex items-center justify-between gap-4 relative z-10">
+                                  <div className="flex items-center gap-4">
+                                    <div className="relative">
+                                      <div className="absolute inset-0 bg-orange-500 blur-md opacity-20 rounded-full" />
+                                      <div className="w-14 h-14 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center relative z-10 shadow-lg">
+                                        {uploadForm.file.name.endsWith('.xlsx') || uploadForm.file.name.endsWith('.xls') ? (
+                                          <FileSpreadsheet className="w-7 h-7 text-green-400" />
+                                        ) : uploadForm.file.name.endsWith('.docx') || uploadForm.file.name.endsWith('.doc') ? (
+                                          <FileText className="w-7 h-7 text-blue-400" />
+                                        ) : (
+                                          <FileIcon className="w-7 h-7 text-red-400" />
+                                        )}
                                       </div>
-                                    ) : uploadForm.file.name.endsWith('.docx') || uploadForm.file.name.endsWith('.doc') ? (
-                                      <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center shadow-md">
-                                        <FileText className="w-6 h-6 text-blue-600" />
-                                      </div>
-                                    ) : (
-                                      <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center shadow-md">
-                                        <FileIcon className="w-6 h-6 text-red-600" />
-                                      </div>
-                                    )}
+                                    </div>
+                                    <div className="text-left">
+                                      <p className="font-bold text-white text-sm max-w-[220px] truncate">{uploadForm.file.name}</p>
+                                      <p className="text-xs text-orange-400 font-medium mt-0.5">{(uploadForm.file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                    </div>
                                   </div>
-                                  <div className="flex-1 text-left">
-                                    <p className="font-medium text-gray-800 truncate max-w-[200px]">{uploadForm.file.name}</p>
-                                    <p className="text-xs text-gray-500">{(uploadForm.file.size / 1024).toFixed(1)} KB</p>
-                                  </div>
-                                  <button
+                                  <motion.button
+                                    whileHover={{ scale: 1.1, rotate: 90 }}
+                                    whileTap={{ scale: 0.9 }}
                                     type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setUploadForm({ ...uploadForm, file: null })
-                                    }}
-                                    className="flex-shrink-0 p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-600 transition-colors"
+                                    onClick={(e) => { e.stopPropagation(); setUploadForm({ ...uploadForm, file: null }); }}
+                                    className="p-2 rounded-full bg-slate-800 border border-slate-700 text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                                   >
-                                    <X className="w-4 h-4" />
-                                  </button>
+                                    <X className="w-5 h-5" />
+                                  </motion.button>
                                 </div>
                               ) : (
-                                <div className="space-y-3 relative z-10">
+                                <div className="space-y-4 relative z-10 py-4">
                                   <div className="flex justify-center">
                                     <motion.div
-                                      className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg"
-                                      whileHover={{ scale: 1.05 }}
+                                      className="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center shadow-lg group-hover:border-orange-500/30 group-hover:bg-slate-800 group-hover:shadow-[0_0_15px_rgba(249,115,22,0.2)] transition-all"
+                                      animate={{ y: [0, -5, 0] }}
+                                      transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
                                     >
-                                      <Upload className="w-6 h-6 text-white" />
+                                      <Cloud className="w-7 h-7 text-slate-400 group-hover:text-orange-400 transition-colors" />
                                     </motion.div>
                                   </div>
                                   <div>
-                                    <p className="font-medium text-gray-700 text-sm">
-                                      <span className="text-orange-600">Klik untuk upload</span> atau drag & drop
+                                    <p className="font-bold text-white text-sm">
+                                      <span className="text-orange-400">Pilih File</span> atau seret ke sini
                                     </p>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                      Format: XLSX, PDF, DOCX (Maks. 50 MB)
+                                    <p className="text-xs text-slate-500 mt-1.5 font-medium">
+                                      Mendukung XLSX, DOCX, PDF (Maks. 50MB)
                                     </p>
                                   </div>
                                 </div>
                               )}
-                            </div>
+                            </motion.div>
                           </div>
 
                           {/* Action Buttons */}
-                          <div className="flex gap-3 pt-2">
+                          <div className="flex gap-3 pt-4 border-t border-slate-800 mt-6 relative">
+                            {/* Decorative glow above buttons */}
+                            <div className="absolute -top-6 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-orange-500/20 to-transparent" />
+
                             <Button
                               type="button"
-                              variant="outline"
                               onClick={() => setShowUploadDialog(false)}
-                              className="flex-1 h-10 border-2 border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl font-medium"
+                              className="w-1/3 h-12 bg-slate-800 hover:bg-slate-700 text-white border-0 rounded-xl font-bold transition-colors"
                             >
                               Batal
                             </Button>
                             <Button
                               type="submit"
-                              className="flex-1 h-10 bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 hover:from-orange-600 hover:via-orange-700 hover:to-red-700 text-white shadow-lg shadow-orange-500/30 rounded-xl font-bold relative overflow-hidden"
+                              className="flex-1 h-12 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white border-0 shadow-[0_0_20px_rgba(249,115,22,0.3)] hover:shadow-[0_0_25px_rgba(249,115,22,0.5)] rounded-xl font-bold relative overflow-hidden transition-all"
                               disabled={loading}
                             >
                               <motion.div
                                 className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                                animate={loading ? {} : { x: ['-100%', '100%'] }}
-                                transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                                animate={loading ? {} : { x: ['-200%', '200%'] }}
+                                transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
                               />
                               <span className="relative z-10 flex items-center justify-center gap-2">
                                 {loading ? (
                                   <>
-                                    <motion.div
-                                      animate={{ rotate: 360 }}
-                                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                                    >
-                                      <RefreshCw className="w-4 h-4" />
+                                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
+                                      <RefreshCw className="w-5 h-5" />
                                     </motion.div>
-                                    <span>Mengupload...</span>
+                                    <span>Memproses...</span>
                                   </>
                                 ) : (
                                   <>
-                                    <Upload className="w-4 h-4" />
-                                    <span>Upload Dokumen</span>
+                                    <Send className="w-5 h-5" />
+                                    <span>Upload ke Server</span>
                                   </>
                                 )}
                               </span>
