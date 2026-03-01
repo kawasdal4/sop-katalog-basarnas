@@ -4828,33 +4828,87 @@ export default function ESOPApp() {
             {/* User Menu Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="text-white hover:bg-white/10 flex items-center gap-2">
-                  <div className="text-right">
-                    <p className="text-sm font-medium">{user?.name}</p>
-                    <p className="text-xs text-orange-400">{user?.role}</p>
+                <Button variant="ghost" className="text-white hover:bg-white/10 flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 hover:border-white/20 transition-all duration-200">
+                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg">
+                    <span className="text-white text-sm font-bold">{user?.name?.charAt(0)?.toUpperCase()}</span>
                   </div>
-                  <ChevronDown className="w-4 h-4" />
+                  <div className="text-left">
+                    <p className="text-sm font-medium leading-tight">{user?.name}</p>
+                    <p className="text-[10px] text-orange-400 font-medium uppercase tracking-wider">{user?.role}</p>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-gray-400 ml-1" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => {
-                  handleLogout()
-                  setShowLogin(true)
-                }}>
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Switch User
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => {
-                  setPasswordChangeForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
-                  setShowPasswordChangeDialog(true)
-                }}>
-                  <Shield className="w-4 h-4 mr-2" />
-                  Ganti Password
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleLogout}>
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Logout
-                </DropdownMenuItem>
+              <DropdownMenuContent 
+                align="end" 
+                className="w-56 p-2 bg-gray-900/95 backdrop-blur-xl border border-white/10 shadow-2xl rounded-xl overflow-hidden"
+              >
+                {/* User Info Header */}
+                <div className="px-3 py-3 mb-2 border-b border-white/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg">
+                      <span className="text-white text-base font-bold">{user?.name?.charAt(0)?.toUpperCase()}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-white truncate">{user?.name}</p>
+                      <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+                      <span className="inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-[10px] font-semibold bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                        {user?.role}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Menu Items */}
+                <div className="space-y-1">
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      handleLogout()
+                      setShowLogin(true)
+                    }}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-gray-300 hover:text-white hover:bg-white/5 focus:bg-white/5 transition-all duration-150 group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
+                      <RefreshCw className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Switch User</p>
+                      <p className="text-[10px] text-gray-500">Ganti akun pengguna</p>
+                    </div>
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      setPasswordChangeForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+                      setShowPasswordChangeDialog(true)
+                    }}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-gray-300 hover:text-white hover:bg-white/5 focus:bg-white/5 transition-all duration-150 group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
+                      <Shield className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Ganti Password</p>
+                      <p className="text-[10px] text-gray-500">Ubah kata sandi akun</p>
+                    </div>
+                  </DropdownMenuItem>
+                </div>
+                
+                {/* Logout Section */}
+                <div className="mt-2 pt-2 border-t border-white/10">
+                  <DropdownMenuItem 
+                    onClick={handleLogout}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-red-400 hover:text-red-300 hover:bg-red-500/10 focus:bg-red-500/10 transition-all duration-150 group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center group-hover:bg-red-500/20 transition-colors">
+                      <LogOut className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Logout</p>
+                      <p className="text-[10px] text-red-400/60">Keluar dari aplikasi</p>
+                    </div>
+                  </DropdownMenuItem>
+                </div>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
