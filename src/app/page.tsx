@@ -2149,7 +2149,13 @@ export default function ESOPApp() {
       const res = await fetch(`/api/download?id=${id}`)
 
       if (!res.ok) {
-        const errorData = await res.json()
+        const errorText = await res.text()
+        let errorData = { error: 'Unknown Error' };
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          console.error('[Download API] Error was not JSON:', errorText)
+        }
         throw new Error(errorData.error || 'Gagal mengunduh file')
       }
 
@@ -2217,9 +2223,15 @@ export default function ESOPApp() {
           return
         }
 
-        const data = await res.json()
-        if (data.downloadUrl) {
-          window.open(data.downloadUrl, '_blank')
+        const text = await res.text()
+        try {
+          const data = JSON.parse(text)
+          if (data.downloadUrl) {
+            window.open(data.downloadUrl, '_blank')
+          }
+        } catch (e) {
+          console.error('[Preview PDF] Failed to parse JSON. Raw text:', text)
+          toast({ title: 'Error API', description: 'Gagal membaca response server (PDF).', variant: 'destructive' })
         }
         setPreviewLoading(null)
         fetchStats()
@@ -2240,7 +2252,14 @@ export default function ESOPApp() {
           body: JSON.stringify({ fileId: id })
         })
 
-        const data = await res.json()
+        const text = await res.text()
+        let data;
+        try {
+          data = JSON.parse(text)
+        } catch (e) {
+          console.error('[Preview Office] Failed to parse JSON. Status:', res.status, 'Raw text:', text)
+          throw new Error('Gagal membaca response dari server (Office Preview).')
+        }
 
         console.log('📋 [Preview] Response:', { success: data.success, viewerUrl: data.viewerUrl?.substring(0, 100) })
 
