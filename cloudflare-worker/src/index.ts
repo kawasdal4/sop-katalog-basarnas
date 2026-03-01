@@ -74,7 +74,7 @@ async function getOrCreateFolder(env: Env, token: string): Promise<string> {
   return (await create.json() as DriveItem).id;
 }
 
-export default {
+const workerHandler = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const { pathname, searchParams } = new URL(request.url);
     const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
@@ -142,3 +142,5 @@ export default {
     }
   },
 };
+
+export default workerHandler;

@@ -79,13 +79,20 @@ import {
   Activity,
   Zap,
   Target,
-  Award
+  Award,
+  Settings,
+  Camera,
+  User,
+  Mail,
+  Key,
+  Trash
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { StorageStatus } from '@/components/storage'
 import PrintLoadingDialog from '@/components/PrintLoadingDialog'
 import CopyrightPopup from '@/components/CopyrightPopup'
 import LogoutAnimation from '@/components/LogoutAnimation'
+import ImageCropper from '@/components/ImageCropper'
 
 // Types
 type UserRole = 'ADMIN' | 'STAF' | 'DEVELOPER' | null
@@ -97,6 +104,9 @@ interface User {
   name: string
   role: UserRole
   createdAt?: string
+  profilePhoto?: string
+  profilePhotoUrl?: string
+  photoUpdatedAt?: number // Timestamp for cache busting
 }
 
 interface SopFile {
@@ -258,98 +268,57 @@ const slideInLeft = {
   exit: { opacity: 1 }
 }
 
-// Majestic Animated Title Component
-function ShimmerTitle({ children, subtitle }: { children: React.ReactNode; subtitle?: string }) {
-  const letters = typeof children === 'string' ? children.split('') : [];
+// Elegant Animated Title Component with Premium Typography
+function ShimmerTitle({ children, subtitle, size = 'md' }: { children: React.ReactNode; subtitle?: string; size?: 'sm' | 'md' | 'lg' }) {
+  const sizeClasses = {
+    sm: 'text-lg md:text-xl font-semibold',
+    md: 'text-xl md:text-2xl font-bold',
+    lg: 'text-2xl md:text-3xl font-bold'
+  }
+
+  const subtitleSizeClasses = {
+    sm: 'text-xs',
+    md: 'text-xs md:text-sm',
+    lg: 'text-sm'
+  }
 
   return (
     <div className="relative group cursor-default">
-      <h2 className="text-3xl md:text-4xl font-black relative inline-flex overflow-hidden pb-2">
-        {/* Glow effect */}
-        <motion.div
-          className="absolute inset-0 blur-2xl bg-yellow-400/30 rounded-full"
-          animate={{
-            opacity: [0.3, 0.6, 0.3],
-            scale: [0.8, 1.2, 0.8],
-          }}
-          transition={{
-            duration: 4,
-            repeat: Infinity,
-            ease: 'easeInOut'
-          }}
-        />
-
+      <h2 className={`${sizeClasses[size]} relative inline-flex overflow-hidden pb-1.5 tracking-tight`} style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" }}>
         {/* Text Container */}
         <div className="relative z-10 flex">
-          {typeof children === 'string' ? (
-            letters.map((letter, index) => (
-              <motion.span
-                key={index}
-                className="inline-block text-transparent bg-clip-text bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500"
-                style={{
-                  textShadow: '0 4px 20px rgba(250, 204, 21, 0.3)',
-                }}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  duration: 0.5,
-                  delay: index * 0.05,
-                  type: 'spring',
-                  damping: 12,
-                  stiffness: 200
-                }}
-                whileHover={{
-                  y: -5,
-                  scale: 1.1,
-                  color: '#facc15', // text-yellow-400
-                  transition: { duration: 0.2 }
-                }}
-              >
-                {letter === ' ' ? '\u00A0' : letter}
-              </motion.span>
-            ))
-          ) : (
-            <span className="text-transparent bg-clip-text bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500">
-              {children}
-            </span>
-          )}
+          <span
+            className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 via-amber-400 to-orange-500"
+            style={{
+              textShadow: '0 1px 8px rgba(251, 146, 60, 0.15)',
+              letterSpacing: '-0.01em',
+            }}
+          >
+            {children}
+          </span>
         </div>
 
-        {/* Sweeping Shimmer Line Below Text */}
+        {/* Subtle underline accent */}
         <motion.div
-          className="absolute bottom-0 left-0 h-1 rounded-full bg-gradient-to-r from-transparent via-yellow-400 to-transparent"
-          initial={{ width: '0%', opacity: 0 }}
-          animate={{
-            width: ['0%', '100%', '0%'],
-            left: ['0%', '0%', '100%'],
-            opacity: [0, 1, 0]
-          }}
-          transition={{
-            duration: 3,
-            repeat: Infinity,
-            ease: 'easeInOut',
-            repeatDelay: 1
-          }}
+          className="absolute bottom-0 left-0 h-[2px] rounded-full bg-gradient-to-r from-orange-400 to-amber-400"
+          initial={{ width: '0%' }}
+          animate={{ width: '40%' }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
         />
       </h2>
 
-      {/* Animated Subtitle */}
+      {/* Subtitle */}
       {subtitle && (
-        <motion.p
-          className="text-slate-500 dark:text-slate-400 text-sm md:text-base mt-2 font-medium tracking-wide flex items-center gap-2"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.5, duration: 0.5 }}
-        >
-          <span className="w-8 h-[2px] bg-yellow-400/50 rounded-full inline-block" />
+        <p className={`${subtitleSizeClasses[size]} text-slate-500 mt-1 font-medium tracking-wide flex items-center gap-2`}>
+          <span className="w-4 h-[1px] bg-orange-400/60 rounded-full inline-block" />
           {subtitle}
-        </motion.p>
+        </p>
       )}
     </div>
   )
 }
 
-// SAR Logo Component with animations
+// SAR Logo Component with stunning sparkle animations that follow logo shape
 function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
   const sizeClasses = {
     sm: 'w-8 h-8',
@@ -357,68 +326,100 @@ function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
     lg: 'w-16 h-16'
   }
 
-  const iconSizes = {
-    sm: 'w-5 h-5',
-    md: 'w-8 h-8',
-    lg: 'w-12 h-12'
-  }
+  const logoUrl = 'https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/logo.png'
 
   return (
     <motion.div
-      className={`relative ${sizeClasses[size]} rounded-xl bg-gradient-to-br from-orange-500 via-orange-600 to-red-600 flex items-center justify-center overflow-hidden shadow-lg`}
-      whileHover={{ scale: 1.05 }}
+      className={`relative ${sizeClasses[size]} overflow-visible`}
+      whileHover={{ scale: 1.08 }}
       whileTap={{ scale: 0.95 }}
     >
-      {/* Animated shimmer effect */}
+      {/* Sparkle particles that follow logo shape */}
+      {[...Array(8)].map((_, i) => {
+        // Position sparkles around the logo in a circular pattern
+        const angle = (i * 45) * (Math.PI / 180)
+        const radius = 45 // percentage from center
+        const x = 50 + radius * Math.cos(angle)
+        const y = 50 + radius * Math.sin(angle)
+        
+        return (
+          <motion.div
+            key={i}
+            className="absolute w-1.5 h-1.5 rounded-full"
+            style={{
+              left: `${x}%`,
+              top: `${y}%`,
+              transform: 'translate(-50%, -50%)',
+              background: i % 2 === 0 
+                ? 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 70%)'
+                : 'radial-gradient(circle, rgba(251,191,36,1) 0%, rgba(251,191,36,0) 70%)',
+              boxShadow: i % 2 === 0 
+                ? '0 0 6px 2px rgba(255,255,255,0.8)'
+                : '0 0 6px 2px rgba(251,191,36,0.8)',
+            }}
+            animate={{
+              opacity: [0, 1, 0],
+              scale: [0.5, 1.2, 0.5],
+            }}
+            transition={{
+              duration: 1.8 + (i * 0.15),
+              repeat: Infinity,
+              delay: i * 0.2,
+              ease: 'easeInOut',
+            }}
+          />
+        )
+      })}
+
+      {/* Main shimmer sweep over logo */}
       <motion.div
-        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+        className="absolute inset-0 z-10 overflow-hidden"
+        style={{ 
+          pointerEvents: 'none',
+          borderRadius: '50%',
+         }}
+      >
+        <motion.div
+          className="absolute inset-0"
+          style={{
+            background: 'linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.6) 50%, transparent 65%)',
+            backgroundSize: '200% 100%',
+          }}
+          animate={{
+            backgroundPosition: ['200% 0', '-200% 0'],
+          }}
+          transition={{
+            duration: 2.5,
+            repeat: Infinity,
+            ease: 'linear',
+          }}
+        />
+      </motion.div>
+
+      {/* Glowing border that follows logo */}
+      <motion.div
+        className="absolute inset-0 z-5 rounded-full"
         animate={{
-          x: ['-100%', '100%']
+          boxShadow: [
+            '0 0 8px 2px rgba(251,191,36,0.4)',
+            '0 0 16px 4px rgba(251,191,36,0.6)',
+            '0 0 8px 2px rgba(251,191,36,0.4)',
+          ],
         }}
         transition={{
           duration: 2,
           repeat: Infinity,
-          ease: 'linear'
+          ease: 'easeInOut',
         }}
       />
 
-      {/* Sparkle particles */}
-      <motion.div
-        className="absolute inset-0"
-        animate={{
-          background: [
-            'radial-gradient(circle at 20% 30%, rgba(255,255,255,0.8) 0%, transparent 2px)',
-            'radial-gradient(circle at 80% 70%, rgba(255,255,255,0.8) 0%, transparent 2px)',
-            'radial-gradient(circle at 50% 50%, rgba(255,255,255,0.8) 0%, transparent 2px)',
-            'radial-gradient(circle at 20% 30%, rgba(255,255,255,0.8) 0%, transparent 2px)'
-          ]
-        }}
-        transition={{
-          duration: 1.5,
-          repeat: Infinity,
-          ease: 'easeInOut'
-        }}
+      {/* Logo image - no background */}
+      <img
+        src={logoUrl}
+        alt="BASARNAS Logo"
+        className="relative z-20 w-full h-full object-contain"
+        style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.3))' }}
       />
-
-      {/* Rescue beacon pulse */}
-      <motion.div
-        className="absolute inset-0 rounded-xl"
-        animate={{
-          boxShadow: [
-            '0 0 0 0 rgba(249, 115, 22, 0.4)',
-            '0 0 0 10px rgba(249, 115, 22, 0)',
-            '0 0 0 0 rgba(249, 115, 22, 0)'
-          ]
-        }}
-        transition={{
-          duration: 1.5,
-          repeat: Infinity,
-          ease: 'easeOut'
-        }}
-      />
-
-      {/* Logo icon */}
-      <Shield className={`${iconSizes[size]} text-white relative z-10`} />
     </motion.div>
   )
 }
@@ -632,6 +633,10 @@ export default function ESOPApp() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loginForm, setLoginForm] = useState({ email: '', password: '' })
   const [showLogin, setShowLogin] = useState(false)
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('')
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false)
+  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState(false)
 
   // Navigation
   const [currentPage, setCurrentPage] = useState<PageView>('dashboard')
@@ -790,6 +795,7 @@ export default function ESOPApp() {
   const [showLoginSuccess, setShowLoginSuccess] = useState(false)
   const [loginSuccessName, setLoginSuccessName] = useState('')
   const [loginSuccessRole, setLoginSuccessRole] = useState<'ADMIN' | 'STAF' | 'DEVELOPER' | null>(null)
+  const [loginSuccessPhoto, setLoginSuccessPhoto] = useState<string | null>(null)
 
   // Loading states for operations with Basarnas animation
   const [previewLoading, setPreviewLoading] = useState<string | null>(null)
@@ -816,6 +822,20 @@ export default function ESOPApp() {
   const [showPasswordChangeDialog, setShowPasswordChangeDialog] = useState(false)
   const [passwordChangeForm, setPasswordChangeForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
   const [passwordChangeLoading, setPasswordChangeLoading] = useState(false)
+
+  // Settings dialog
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false)
+  const [settingsTab, setSettingsTab] = useState<'profile' | 'password'>('profile')
+  const [profileForm, setProfileForm] = useState({ name: '', email: '' })
+  const [originalProfileForm, setOriginalProfileForm] = useState({ name: '', email: '' })
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null)
+  const [originalProfilePhoto, setOriginalProfilePhoto] = useState<string | null>(null)
+  const [profileLoading, setProfileLoading] = useState(false)
+  const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null)
+  
+  // Image cropper state
+  const [showImageCropper, setShowImageCropper] = useState(false)
+  const [photoToCrop, setPhotoToCrop] = useState<File | null>(null)
 
   // Password visibility in users table (for DEVELOPER)
   const [usersIncludePassword, setUsersIncludePassword] = useState(false)
@@ -1772,6 +1792,7 @@ export default function ESOPApp() {
         // Show beautiful login success animation
         setLoginSuccessName(data.user?.name || 'User')
         setLoginSuccessRole(data.user?.role || null)
+        setLoginSuccessPhoto(data.user?.profilePhotoUrl || null)
         setShowLoginSuccess(true)
 
         // Hide animation after 3 seconds
@@ -3790,34 +3811,38 @@ export default function ESOPApp() {
           </motion.div>
         </main>
 
-
-
-        {/* Glowing Footer - Bottom Left */}
-        <motion.div
-          className="fixed bottom-4 left-4 z-50"
-          initial={{ opacity: 0, y: 50 }}
+        {/* Footer - Copyright */}
+        <motion.footer
+          className="relative z-10 mt-auto py-4 px-6"
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
+          transition={{ delay: 0.5 }}
         >
-          <div className="relative cursor-pointer" onClick={() => setShowCopyrightPopup(true)}>
-            {/* Glow effect */}
-            <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-yellow-400 rounded-lg blur-md opacity-60 animate-pulse" />
-
-            {/* Shimmer container */}
-            <div className="relative px-4 py-2 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 rounded-lg border border-orange-500/30 overflow-hidden hover:border-orange-500/60 transition-colors">
-              {/* Animated shimmer */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-400/20 to-transparent animate-shimmer" />
-
-              {/* Text with glow */}
-              <p className="text-sm font-medium relative z-10">
-                <span className="text-gray-400">© </span>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-yellow-300 to-orange-400 animate-pulse font-bold hover:from-yellow-300 hover:via-orange-400 hover:to-yellow-300 transition-all">
-                  FOE - 2026
-                </span>
-              </p>
-            </div>
+          <div className="flex items-center justify-start">
+            <motion.button
+              onClick={() => setShowCopyrightPopup(true)}
+              className="group relative cursor-pointer"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              {/* Glow effect */}
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-orange-500 to-yellow-400 rounded-lg blur-md opacity-40"
+                animate={{ opacity: [0.3, 0.6, 0.3] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              />
+              {/* Footer container */}
+              <div className="relative px-5 py-2 bg-gradient-to-r from-gray-900/80 via-gray-800/80 to-gray-900/80 backdrop-blur-sm rounded-lg border border-orange-500/30 overflow-hidden hover:border-orange-500/60 transition-colors">
+                <p className="text-sm font-bold relative z-10 text-center">
+                  <span className="text-gray-400">© </span>
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-yellow-300 to-orange-400">
+                    FOE - 2026
+                  </span>
+                </p>
+              </div>
+            </motion.button>
           </div>
-        </motion.div>
+        </motion.footer>
 
         {/* Login Dialog */}
         <Dialog open={showLogin} onOpenChange={setShowLogin}>
@@ -4068,6 +4093,27 @@ export default function ESOPApp() {
                     </div>
                   </motion.div>
 
+                  {/* Forgot Password Link */}
+                  <motion.div
+                    className="text-right"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.55 }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowLogin(false)
+                        setShowForgotPassword(true)
+                        setForgotPasswordEmail(loginForm.email || '')
+                        setForgotPasswordSuccess(false)
+                      }}
+                      className="text-sm text-orange-400 hover:text-orange-300 transition-colors font-medium"
+                    >
+                      Lupa Password?
+                    </button>
+                  </motion.div>
+
                   {/* Buttons */}
                   <motion.div
                     className="flex gap-4 pt-4"
@@ -4162,6 +4208,223 @@ export default function ESOPApp() {
           </DialogContent>
         </Dialog>
 
+        {/* Forgot Password Dialog */}
+        <Dialog open={showForgotPassword} onOpenChange={(open) => {
+          setShowForgotPassword(open)
+          if (!open) {
+            setForgotPasswordSuccess(false)
+          }
+        }}>
+          <DialogContent className="sm:max-w-md bg-transparent border-0 overflow-visible p-0 shadow-none" aria-describedby={undefined}>
+            <DialogTitle className="sr-only">Reset Password</DialogTitle>
+
+            {/* Animated Background Container */}
+            <motion.div
+              className="relative"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+            >
+              {/* Outer Glow Ring */}
+              <motion.div
+                className="absolute -inset-4 rounded-3xl"
+                style={{
+                  background: 'conic-gradient(from 0deg, #3b82f6, #8b5cf6, #3b82f6, #06b6d4, #3b82f6)',
+                  filter: 'blur(20px)',
+                  opacity: 0.4
+                }}
+                animate={{ rotate: 360 }}
+                transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+              />
+
+              {/* Main Card */}
+              <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl border border-blue-500/30 overflow-hidden backdrop-blur-xl">
+                {/* Header */}
+                <div className="relative p-6 text-white border-b border-white/10">
+                  <motion.div
+                    className="absolute top-0 left-0 right-0 h-1"
+                    style={{
+                      background: 'linear-gradient(90deg, #3b82f6, #8b5cf6, #06b6d4, #3b82f6)',
+                      backgroundSize: '200% 100%',
+                    }}
+                    animate={{ backgroundPosition: ['0% 0%', '200% 0%'] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+                  />
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                      <Key className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold">Reset Password</h2>
+                      <p className="text-xs text-gray-400">Kirim link reset ke email terdaftar</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="p-6 space-y-4">
+                  {!forgotPasswordSuccess ? (
+                    <>
+                      <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+                        <div className="flex items-start gap-3">
+                          <Mail className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm text-blue-300 font-medium">Masukkan Email Terdaftar</p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              Link reset password akan dikirim ke email yang sudah terdaftar di sistem.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-gray-300 text-sm font-medium flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-blue-400" />
+                          Alamat Email
+                        </Label>
+                        <Input
+                          type="email"
+                          value={forgotPasswordEmail}
+                          onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                          placeholder="email@example.com"
+                          className="h-12 bg-slate-800/50 border-2 border-blue-500/30 focus:border-blue-500 text-white placeholder:text-gray-500 rounded-xl"
+                        />
+                      </div>
+
+                      <div className="flex gap-3 pt-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setShowForgotPassword(false)
+                            setShowLogin(true)
+                          }}
+                          className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800 h-11 rounded-xl"
+                        >
+                          Batal
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={async () => {
+                            // Validate email format
+                            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+                            if (!forgotPasswordEmail || !emailRegex.test(forgotPasswordEmail)) {
+                              toast({ 
+                                title: '⚠️ Format Email Tidak Valid', 
+                                description: 'Masukkan alamat email yang benar, contoh: nama@email.com', 
+                                variant: 'destructive' 
+                              })
+                              return
+                            }
+
+                            setForgotPasswordLoading(true)
+                            try {
+                              const res = await fetch('/api/auth/forgot-password', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ email: forgotPasswordEmail })
+                              })
+                              const data = await res.json()
+
+                              if (data.error) {
+                                // Check if email not registered
+                                if (data.notRegistered) {
+                                  toast({ 
+                                    title: '❌ Email Tidak Terdaftar', 
+                                    description: data.error, 
+                                    variant: 'destructive',
+                                    duration: 6000
+                                  })
+                                } else {
+                                  toast({ 
+                                    title: '⚠️ Gagal Mengirim', 
+                                    description: data.error, 
+                                    variant: 'destructive' 
+                                  })
+                                }
+                              } else {
+                                setForgotPasswordSuccess(true)
+                                toast({ 
+                                  title: '✅ Email Terkirim', 
+                                  description: 'Silakan cek inbox atau folder spam email Anda untuk link reset password.',
+                                  duration: 8000
+                                })
+                              }
+                            } catch (error) {
+                              toast({ 
+                                title: '❌ Kesalahan Jaringan', 
+                                description: 'Gagal menghubungi server. Periksa koneksi internet Anda.', 
+                                variant: 'destructive' 
+                              })
+                            } finally {
+                              setForgotPasswordLoading(false)
+                            }
+                          }}
+                          disabled={forgotPasswordLoading}
+                          className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white h-11 rounded-xl font-semibold shadow-lg shadow-blue-500/20"
+                        >
+                          {forgotPasswordLoading ? (
+                            <span className="flex items-center gap-2">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Memeriksa...
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-2">
+                              <Mail className="w-4 h-4" />
+                              Kirim Link Reset
+                            </span>
+                          )}
+                        </Button>
+                      </div>
+
+                      {/* Help text */}
+                      <p className="text-center text-xs text-gray-500 pt-2">
+                        Belum punya akun? Hubungi administrator sistem.
+                      </p>
+                    </>
+                  ) : (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="text-center py-4"
+                    >
+                      <motion.div
+                        className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center"
+                        animate={{ scale: [1, 1.1, 1] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        <Check className="w-8 h-8 text-white" />
+                      </motion.div>
+                      <h3 className="text-lg font-bold text-white mb-2">Email Terkirim!</h3>
+                      <p className="text-gray-400 text-sm mb-2">
+                        Link reset password telah dikirim ke:
+                      </p>
+                      <p className="text-blue-400 font-medium mb-4 bg-blue-500/10 py-2 px-4 rounded-lg inline-block">
+                        {forgotPasswordEmail}
+                      </p>
+                      <p className="text-gray-500 text-xs mb-6">
+                        Cek folder spam jika email tidak ditemukan di inbox.
+                      </p>
+                      <Button
+                        onClick={() => {
+                          setShowForgotPassword(false)
+                          setShowLogin(true)
+                          setForgotPasswordSuccess(false)
+                          setForgotPasswordEmail('')
+                        }}
+                        className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 rounded-xl"
+                      >
+                        Kembali ke Login
+                      </Button>
+                    </motion.div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </DialogContent>
+        </Dialog>
+
         {/* Copyright Popup */}
         <CopyrightPopup show={showCopyrightPopup} onClose={() => setShowCopyrightPopup(false)} />
       </div >
@@ -4174,7 +4437,7 @@ export default function ESOPApp() {
       <SARBackground />
 
       {/* Logout Animation */}
-      <LogoutAnimation show={showLogoutAnimation} userName={user?.name} />
+      <LogoutAnimation show={showLogoutAnimation} userName={user?.name} userPhoto={user?.profilePhotoUrl} />
 
       {/* Login Success Full Screen Animation */}
       <AnimatePresence>
@@ -4683,12 +4946,22 @@ export default function ESOPApp() {
                   transition={{ duration: 2, repeat: Infinity }}
                 />
                 <motion.div
-                  className={`w-28 h-28 rounded-full flex items-center justify-center border-4 border-white/30 ${loginSuccessRole === 'ADMIN' ? 'bg-red-600' : loginSuccessRole === 'STAF' ? 'bg-green-600' : 'bg-purple-600'}`}
+                  className={`w-28 h-28 rounded-full flex items-center justify-center border-4 border-white/30 overflow-hidden ${loginSuccessPhoto ? '' : loginSuccessRole === 'ADMIN' ? 'bg-red-600' : loginSuccessRole === 'STAF' ? 'bg-green-600' : 'bg-purple-600'}`}
                   initial={{ rotate: -90 }}
                   animate={{ rotate: 0 }}
                   transition={{ duration: 0.8, type: 'spring' }}
                 >
-                  <Shield className="w-14 h-14 text-white drop-shadow-lg" />
+                  {loginSuccessPhoto ? (
+                    <img 
+                      src={loginSuccessPhoto} 
+                      alt={loginSuccessName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-4xl font-bold text-white">
+                      {loginSuccessName?.charAt(0)?.toUpperCase()}
+                    </span>
+                  )}
                 </motion.div>
               </div>
 
@@ -4829,8 +5102,17 @@ export default function ESOPApp() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="text-white hover:bg-white/10 flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 hover:border-white/20 transition-all duration-200">
-                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg">
-                    <span className="text-white text-sm font-bold">{user?.name?.charAt(0)?.toUpperCase()}</span>
+                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg overflow-hidden">
+                    {user?.profilePhotoUrl ? (
+                      <img 
+                        key={`profile-header-${user.photoUpdatedAt || Date.now()}`}
+                        src={user.profilePhotoUrl} 
+                        alt="Profile" 
+                        className="w-full h-full object-cover" 
+                      />
+                    ) : (
+                      <span className="text-white text-sm font-bold">{user?.name?.charAt(0)?.toUpperCase()}</span>
+                    )}
                   </div>
                   <div className="text-left">
                     <p className="text-sm font-medium leading-tight">{user?.name}</p>
@@ -4839,15 +5121,24 @@ export default function ESOPApp() {
                   <ChevronDown className="w-4 h-4 text-gray-400 ml-1" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent 
-                align="end" 
+              <DropdownMenuContent
+                align="end"
                 className="w-56 p-2 bg-gray-900/95 backdrop-blur-xl border border-white/10 shadow-2xl rounded-xl overflow-hidden"
               >
                 {/* User Info Header */}
                 <div className="px-3 py-3 mb-2 border-b border-white/10">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg">
-                      <span className="text-white text-base font-bold">{user?.name?.charAt(0)?.toUpperCase()}</span>
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg overflow-hidden">
+                      {user?.profilePhotoUrl ? (
+                        <img 
+                          key={`profile-dropdown-${user.photoUpdatedAt || Date.now()}`}
+                          src={user.profilePhotoUrl} 
+                          alt="Profile" 
+                          className="w-full h-full object-cover" 
+                        />
+                      ) : (
+                        <span className="text-white text-base font-bold">{user?.name?.charAt(0)?.toUpperCase()}</span>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-white truncate">{user?.name}</p>
@@ -4876,20 +5167,34 @@ export default function ESOPApp() {
                       <p className="text-[10px] text-gray-500">Ganti akun pengguna</p>
                     </div>
                   </DropdownMenuItem>
-                  
-                  <DropdownMenuItem 
-                    onClick={() => {
-                      setPasswordChangeForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
-                      setShowPasswordChangeDialog(true)
+
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      // Fetch current profile
+                      try {
+                        const res = await fetch('/api/users/profile')
+                        const data = await res.json()
+                        const formData = { name: data.name || '', email: data.email || '' }
+                        const photoUrl = data.profilePhotoUrl || null
+                        setProfileForm(formData)
+                        setOriginalProfileForm(formData)
+                        setProfilePhoto(photoUrl)
+                        setOriginalProfilePhoto(photoUrl)
+                        setSettingsTab('profile')
+                        setSelectedPhotoFile(null)
+                      } catch (e) {
+                        console.error('Failed to fetch profile:', e)
+                      }
+                      setShowSettingsDialog(true)
                     }}
                     className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-gray-300 hover:text-white hover:bg-white/5 focus:bg-white/5 transition-all duration-150 group"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
-                      <Shield className="w-4 h-4 text-emerald-400" />
+                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center group-hover:bg-amber-500/20 transition-colors">
+                      <Settings className="w-4 h-4 text-amber-400" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-medium">Ganti Password</p>
-                      <p className="text-[10px] text-gray-500">Ubah kata sandi akun</p>
+                      <p className="text-sm font-medium">Settings</p>
+                      <p className="text-[10px] text-gray-500">Kelola profil & keamanan</p>
                     </div>
                   </DropdownMenuItem>
                 </div>
@@ -4934,7 +5239,7 @@ export default function ESOPApp() {
           <div className="absolute inset-0 bg-gray-900/70" />
 
           {/* Navigation */}
-          <nav className="relative z-10 py-4 space-y-1 flex-1">
+          <nav className="relative z-10 py-4 space-y-2 flex-1 px-2">
             {menuItems.filter(item => item.roles.includes(user?.role || '')).map((item, index) => (
               <motion.div
                 key={item.id}
@@ -4944,17 +5249,25 @@ export default function ESOPApp() {
               >
                 <Button
                   variant={currentPage === item.id ? 'default' : 'ghost'}
-                  className={`w-full justify-start gap-4 px-6 py-6 rounded-none border-l-4 transition-all duration-200 ${currentPage === item.id ? 'border-orange-500 bg-gradient-to-r from-orange-500/20 to-transparent text-white' : 'border-transparent text-gray-300 hover:border-gray-400 hover:bg-white/10 hover:text-white'}`}
+                  className={`w-full justify-start gap-3 px-4 py-5 rounded-xl border-l-4 transition-all duration-300 group ${currentPage === item.id 
+                    ? 'border-orange-500 bg-gradient-to-r from-orange-500/25 via-orange-500/10 to-transparent text-white shadow-lg shadow-orange-500/10' 
+                    : 'border-transparent text-gray-400 hover:border-orange-500/50 hover:bg-white/5 hover:text-white'}`}
                   onClick={() => handleNavigation(item.id)}
                 >
-                  <item.icon className={`w-5 h-5 ${syncStatus.isSyncing ? 'animate-spin-slow' : ''}`} />
-                  {item.label}
+                  <div className={`p-1.5 rounded-lg transition-all duration-300 ${currentPage === item.id 
+                    ? 'bg-orange-500/30 text-orange-300' 
+                    : 'bg-gray-700/50 text-gray-400 group-hover:bg-orange-500/20 group-hover:text-orange-300'}`}>
+                    <item.icon className={`w-5 h-5 ${syncStatus.isSyncing ? 'animate-spin-slow' : ''}`} />
+                  </div>
+                  <span className={`font-medium tracking-wide text-sm ${currentPage === item.id ? 'text-white' : ''}`}>
+                    {item.label}
+                  </span>
                   {/* Notification badge for Verifikasi SOP - only show if > 0 */}
                   {item.id === 'verifikasi' && stats?.totalPublikMenunggu !== undefined && stats.totalPublikMenunggu > 0 && (
                     <motion.span
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
-                      className="ml-auto min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg animate-pulse"
+                      className="ml-auto min-w-[22px] h-5 px-2 bg-gradient-to-r from-red-500 to-rose-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-red-500/30"
                     >
                       {stats.totalPublikMenunggu}
                     </motion.span>
@@ -4964,7 +5277,7 @@ export default function ESOPApp() {
                     <motion.span
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
-                      className="ml-auto min-w-[20px] h-5 px-1.5 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg animate-pulse"
+                      className="ml-auto min-w-[22px] h-5 px-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-amber-500/30"
                     >
                       {stats.totalPublikDitolakBaru}
                     </motion.span>
@@ -4973,6 +5286,48 @@ export default function ESOPApp() {
               </motion.div>
             ))}
           </nav>
+
+          {/* Sidebar Footer - FOE 2026 */}
+          <div className="relative z-10 mt-auto pb-6 px-4">
+            <div className="flex justify-center">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="relative cursor-pointer"
+                onClick={() => setShowCopyrightPopup(true)}
+              >
+                {/* Glow effect */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-orange-500 to-yellow-400 rounded-lg blur-md opacity-60"
+                  animate={{ opacity: [0.4, 0.7, 0.4] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
+                
+                {/* Footer container */}
+                <div className="relative px-6 py-2.5 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 rounded-lg border border-orange-500/30 overflow-hidden hover:border-orange-500/60 transition-colors">
+                  {/* Animated shimmer */}
+                  <motion.div
+                    className="absolute inset-0"
+                    style={{
+                      background: 'linear-gradient(90deg, transparent 0%, rgba(251,191,36,0.15) 50%, transparent 100%)',
+                      backgroundSize: '200% 100%',
+                    }}
+                    animate={{ backgroundPosition: ['200% 0', '-200% 0'] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+                  />
+                  
+                  {/* Text */}
+                  <p className="text-sm font-bold relative z-10 text-center">
+                    <span className="text-gray-400">© </span>
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-yellow-300 to-orange-400">
+                      FOE - 2026
+                    </span>
+                  </p>
+                </div>
+              </motion.div>
+            </div>
+          </div>
 
           {/* Syncing Animation Overlay */}
           <AnimatePresence>
@@ -5031,33 +5386,86 @@ export default function ESOPApp() {
                       variants={fadeInUp}
                     >
                       <ShimmerTitle subtitle="Overview sistem katalog SOP dan IK">Laporan Analitik</ShimmerTitle>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => handleExport('xlsx')}
-                          disabled={exportingXlsx}
-                          className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10 shadow-lg shadow-orange-500/5"
-                        >
-                          {exportingXlsx ? (
-                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                          ) : (
-                            <FileSpreadsheet className="w-4 h-4 mr-2" />
-                          )}
-                          {exportingXlsx ? 'Memproses...' : 'Export Excel'}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => handleExport('pdf')}
-                          disabled={exportingPdf}
-                          className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10 shadow-lg shadow-orange-500/5"
-                        >
-                          {exportingPdf ? (
-                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                          ) : (
-                            <FileIcon className="w-4 h-4 mr-2" />
-                          )}
-                          {exportingPdf ? 'Memproses...' : 'Export PDF'}
-                        </Button>
+                      <div className="flex flex-wrap items-center gap-3">
+                        {/* Export Buttons Container */}
+                        <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-xl">
+                          {/* Excel Export */}
+                          <motion.div
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                          >
+                            <Button
+                              variant="ghost"
+                              onClick={() => handleExport('xlsx')}
+                              disabled={exportingXlsx}
+                              className="group relative overflow-hidden bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white border-0 rounded-lg px-4 py-2 h-9 shadow-md shadow-emerald-500/20 transition-all duration-300"
+                            >
+                              <motion.div
+                                className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0"
+                                initial={{ x: '-100%' }}
+                                whileHover={{ x: '100%' }}
+                                transition={{ duration: 0.6 }}
+                              />
+                              {exportingXlsx ? (
+                                <motion.div
+                                  className="flex items-center gap-2"
+                                  initial={{ opacity: 0 }}
+                                  animate={{ opacity: 1 }}
+                                >
+                                  <RefreshCw className="w-4 h-4 animate-spin" />
+                                  <span className="text-sm font-medium">Memproses...</span>
+                                </motion.div>
+                              ) : (
+                                <div className="flex items-center gap-2 relative z-10">
+                                  <div className="w-5 h-5 rounded bg-white/20 flex items-center justify-center">
+                                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                                  </div>
+                                  <span className="text-sm font-semibold">Excel</span>
+                                </div>
+                              )}
+                            </Button>
+                          </motion.div>
+                          
+                          {/* Divider */}
+                          <div className="w-px h-6 bg-slate-200" />
+                          
+                          {/* PDF Export */}
+                          <motion.div
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                          >
+                            <Button
+                              variant="ghost"
+                              onClick={() => handleExport('pdf')}
+                              disabled={exportingPdf}
+                              className="group relative overflow-hidden bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white border-0 rounded-lg px-4 py-2 h-9 shadow-md shadow-red-500/20 transition-all duration-300"
+                            >
+                              <motion.div
+                                className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0"
+                                initial={{ x: '-100%' }}
+                                whileHover={{ x: '100%' }}
+                                transition={{ duration: 0.6 }}
+                              />
+                              {exportingPdf ? (
+                                <motion.div
+                                  className="flex items-center gap-2"
+                                  initial={{ opacity: 0 }}
+                                  animate={{ opacity: 1 }}
+                                >
+                                  <RefreshCw className="w-4 h-4 animate-spin" />
+                                  <span className="text-sm font-medium">Memproses...</span>
+                                </motion.div>
+                              ) : (
+                                <div className="flex items-center gap-2 relative z-10">
+                                  <div className="w-5 h-5 rounded bg-white/20 flex items-center justify-center">
+                                    <FileIcon className="w-3.5 h-3.5" />
+                                  </div>
+                                  <span className="text-sm font-semibold">PDF</span>
+                                </div>
+                              )}
+                            </Button>
+                          </motion.div>
+                        </div>
                       </div>
                     </motion.div>
 
@@ -5516,10 +5924,10 @@ export default function ESOPApp() {
                               <Upload className="w-8 h-8 text-white drop-shadow-md" />
                             </motion.div>
                             <div>
-                              <DialogTitle className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-400 tracking-tight">
+                              <DialogTitle className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-400 tracking-tight">
                                 Upload Dokumen
                               </DialogTitle>
-                              <DialogDescription className="text-slate-400 text-sm mt-1 font-medium">
+                              <DialogDescription className="text-slate-400 text-xs mt-1 font-medium">
                                 Tambahkan SOP/IK baru ke dalam katalog sistem digital.
                               </DialogDescription>
                             </div>
@@ -7758,7 +8166,7 @@ export default function ESOPApp() {
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-gradient-to-r from-orange-500 to-yellow-500">
-                            <TableHead className="font-bold text-white">Nama</TableHead>
+                            <TableHead className="font-bold text-white">User</TableHead>
                             <TableHead className="font-bold text-white">Email</TableHead>
                             {usersIncludePassword && (
                               <TableHead className="font-bold text-white">Password</TableHead>
@@ -7778,12 +8186,28 @@ export default function ESOPApp() {
                             </TableRow>
                           ) : (
                             users.map((u) => {
-                              const userWithExtra = u as User & { lastLoginAt?: string; _count?: { logs: number }; password?: string }
+                              const userWithExtra = u as User & { lastLoginAt?: string; _count?: { logs: number }; password?: string; profilePhotoUrl?: string }
                               // Only DEVELOPER can delete ADMIN and DEVELOPER users
                               const canDelete = user?.role === 'DEVELOPER' || (user?.role === 'ADMIN' && u.role === 'STAF')
                               return (
                                 <TableRow key={u.id} className="hover:bg-orange-50 border-b border-gray-200">
-                                  <TableCell className="font-semibold text-blue-900">{u.name}</TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-orange-200 shadow-sm bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center flex-shrink-0">
+                                        {userWithExtra.profilePhotoUrl ? (
+                                          <img 
+                                            key={userWithExtra.profilePhotoUrl}
+                                            src={userWithExtra.profilePhotoUrl} 
+                                            alt={u.name} 
+                                            className="w-full h-full object-cover" 
+                                          />
+                                        ) : (
+                                          <span className="text-white font-bold text-sm">{u.name?.charAt(0)?.toUpperCase()}</span>
+                                        )}
+                                      </div>
+                                      <span className="font-semibold text-blue-900">{u.name}</span>
+                                    </div>
+                                  </TableCell>
                                   <TableCell className="text-gray-700">{u.email}</TableCell>
                                   {usersIncludePassword && (
                                     <TableCell className="text-gray-600 font-mono text-sm bg-gray-50">
@@ -7822,7 +8246,7 @@ export default function ESOPApp() {
                                         onClick={async () => {
                                           setSelectedUserForActivity(u)
                                           try {
-                                            const res = await fetch(`/ api / logs ? userId = ${u.id} `)
+                                            const res = await fetch(`/api/logs?userId=${u.id}`)
                                             const data = await res.json()
                                             setUserActivityLogs(data.data || [])
                                             setShowUserActivityDialog(true)
@@ -7949,6 +8373,662 @@ export default function ESOPApp() {
           </DialogFooter>
         </DialogContent>
       </Dialog >
+
+      {/* Forgot Password Dialog */}
+      <Dialog open={showForgotPassword} onOpenChange={(open) => {
+        setShowForgotPassword(open)
+        if (!open) {
+          setForgotPasswordSuccess(false)
+        }
+      }}>
+        <DialogContent className="sm:max-w-md bg-transparent border-0 overflow-visible p-0 shadow-none" aria-describedby={undefined}>
+          <DialogTitle className="sr-only">Reset Password</DialogTitle>
+
+          {/* Animated Background Container */}
+          <motion.div
+            className="relative"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+          >
+            {/* Outer Glow Ring */}
+            <motion.div
+              className="absolute -inset-4 rounded-3xl"
+              style={{
+                background: 'conic-gradient(from 0deg, #3b82f6, #8b5cf6, #3b82f6, #06b6d4, #3b82f6)',
+                filter: 'blur(20px)',
+                opacity: 0.4
+              }}
+              animate={{ rotate: 360 }}
+              transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+            />
+
+            {/* Main Card */}
+            <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl border border-blue-500/30 overflow-hidden backdrop-blur-xl">
+              {/* Header */}
+              <div className="relative p-6 text-white border-b border-white/10">
+                <motion.div
+                  className="absolute top-0 left-0 right-0 h-1"
+                  style={{
+                    background: 'linear-gradient(90deg, #3b82f6, #8b5cf6, #06b6d4, #3b82f6)',
+                    backgroundSize: '200% 100%',
+                  }}
+                  animate={{ backgroundPosition: ['0% 0%', '200% 0%'] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+                />
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                    <Key className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold">Reset Password</h2>
+                    <p className="text-xs text-gray-400">Kirim link reset ke email terdaftar</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 space-y-4">
+                {!forgotPasswordSuccess ? (
+                  <>
+                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+                      <div className="flex items-start gap-3">
+                        <Mail className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm text-blue-300 font-medium">Masukkan Email Terdaftar</p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Link reset password akan dikirim ke email yang sudah terdaftar di sistem.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-gray-300 text-sm font-medium flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-blue-400" />
+                        Alamat Email
+                      </Label>
+                      <Input
+                        type="email"
+                        value={forgotPasswordEmail}
+                        onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && forgotPasswordEmail && forgotPasswordEmail.includes('@')) {
+                            e.currentTarget.form?.dispatchEvent(new Event('submit', { bubbles: true }))
+                          }
+                        }}
+                        placeholder="email@example.com"
+                        className="h-12 bg-slate-800/50 border-2 border-blue-500/30 focus:border-blue-500 text-white placeholder:text-gray-500 rounded-xl"
+                      />
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setShowForgotPassword(false)
+                          setShowLogin(true)
+                        }}
+                        className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800 h-11 rounded-xl"
+                      >
+                        Batal
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={async () => {
+                          // Validate email format
+                          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+                          if (!forgotPasswordEmail || !emailRegex.test(forgotPasswordEmail)) {
+                            toast({ 
+                              title: '⚠️ Format Email Tidak Valid', 
+                              description: 'Masukkan alamat email yang benar, contoh: nama@email.com', 
+                              variant: 'destructive' 
+                            })
+                            return
+                          }
+
+                          setForgotPasswordLoading(true)
+                          try {
+                            const res = await fetch('/api/auth/forgot-password', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ email: forgotPasswordEmail })
+                            })
+                            const data = await res.json()
+
+                            if (data.error) {
+                              // Check if email not registered
+                              if (data.notRegistered) {
+                                toast({ 
+                                  title: '❌ Email Tidak Terdaftar', 
+                                  description: data.error, 
+                                  variant: 'destructive',
+                                  duration: 6000
+                                })
+                              } else {
+                                toast({ 
+                                  title: '⚠️ Gagal Mengirim', 
+                                  description: data.error, 
+                                  variant: 'destructive' 
+                                })
+                              }
+                            } else {
+                              setForgotPasswordSuccess(true)
+                              toast({ 
+                                title: '✅ Email Terkirim', 
+                                description: 'Silakan cek inbox atau folder spam email Anda untuk link reset password.',
+                                duration: 8000
+                              })
+                            }
+                          } catch (error) {
+                            toast({ 
+                              title: '❌ Kesalahan Jaringan', 
+                              description: 'Gagal menghubungi server. Periksa koneksi internet Anda.', 
+                              variant: 'destructive' 
+                            })
+                          } finally {
+                            setForgotPasswordLoading(false)
+                          }
+                        }}
+                        disabled={forgotPasswordLoading}
+                        className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white h-11 rounded-xl font-semibold shadow-lg shadow-blue-500/20"
+                      >
+                        {forgotPasswordLoading ? (
+                          <span className="flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Memeriksa...
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-2">
+                            <Mail className="w-4 h-4" />
+                            Kirim Link Reset
+                          </span>
+                        )}
+                      </Button>
+                    </div>
+
+                    {/* Help text */}
+                    <p className="text-center text-xs text-gray-500 pt-2">
+                      Belum punya akun? Hubungi administrator sistem.
+                    </p>
+                  </>
+                ) : (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-center py-4"
+                  >
+                    <motion.div
+                      className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center"
+                      animate={{ scale: [1, 1.1, 1] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    >
+                      <Check className="w-8 h-8 text-white" />
+                    </motion.div>
+                    <h3 className="text-lg font-bold text-white mb-2">Email Terkirim!</h3>
+                    <p className="text-gray-400 text-sm mb-2">
+                      Link reset password telah dikirim ke:
+                    </p>
+                    <p className="text-blue-400 font-medium mb-4 bg-blue-500/10 py-2 px-4 rounded-lg inline-block">
+                      {forgotPasswordEmail}
+                    </p>
+                    <p className="text-gray-500 text-xs mb-6">
+                      Cek folder spam jika email tidak ditemukan di inbox.
+                    </p>
+                    <Button
+                      onClick={() => {
+                        setShowForgotPassword(false)
+                        setShowLogin(true)
+                        setForgotPasswordSuccess(false)
+                        setForgotPasswordEmail('')
+                      }}
+                      className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 rounded-xl"
+                    >
+                      Kembali ke Login
+                    </Button>
+                  </motion.div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Settings Dialog */}
+      <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
+        <DialogContent className="sm:max-w-2xl bg-white border-0 shadow-2xl overflow-hidden p-0 gap-0" aria-describedby={undefined}>
+          {/* Stunning Header with Gradient */}
+          <div className="relative overflow-hidden">
+            {/* Animated background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-orange-500 via-red-500 to-pink-600">
+              <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2740%27 height=%2740%27 viewBox=%270 0 40 40%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cg fill=%27%23fff%27 fill-opacity=%270.05%27%3E%3Cpath d=%27M20 20.5V18H0v2h20zm0-18V0H18v2.5h2z%27/%3E%3C/g%3E%3C/svg%3E')] opacity-40" />
+            </div>
+            
+            {/* Floating orbs */}
+            <div className="absolute top-4 right-8 w-20 h-20 rounded-full bg-white/10 blur-xl" />
+            <div className="absolute bottom-2 left-12 w-16 h-16 rounded-full bg-yellow-300/20 blur-lg" />
+            
+            <div className="relative px-8 py-6 flex items-center gap-5">
+              {/* Avatar with glow */}
+              <div className="relative">
+                <div className="absolute -inset-1 rounded-full bg-white/30 blur-md" />
+                <div className="relative w-20 h-20 rounded-full ring-4 ring-white/30 overflow-hidden bg-gradient-to-br from-white/20 to-white/5 flex items-center justify-center">
+                  {profilePhoto ? (
+                    <img src={profilePhoto} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-3xl font-black text-white drop-shadow-lg">
+                      {user?.name?.charAt(0)?.toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <label className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white text-orange-600 flex items-center justify-center cursor-pointer shadow-xl hover:scale-110 transition-transform ring-2 ring-orange-100">
+                  <Camera className="w-4 h-4" />
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        if (file.size > 5 * 1024 * 1024) {
+                          toast({ title: 'Error', description: 'Ukuran foto maksimal 5MB', variant: 'destructive' })
+                          return
+                        }
+                        // Open cropper instead of directly setting photo
+                        setPhotoToCrop(file)
+                        setShowImageCropper(true)
+                      }
+                      // Reset input
+                      e.target.value = ''
+                    }}
+                  />
+                </label>
+              </div>
+              
+              <div className="flex-1">
+                <DialogTitle className="text-lg font-bold text-white drop-shadow-sm">
+                  {profileForm.name || user?.name}
+                </DialogTitle>
+                <p className="text-white/80 text-xs mt-1">{profileForm.email || user?.email}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/20 text-white backdrop-blur-sm">
+                    {user?.role}
+                  </span>
+                  {profilePhoto && (
+                    <button
+                      onClick={() => {
+                        setProfilePhoto(null)
+                        setSelectedPhotoFile(null)
+                      }}
+                      className="px-3 py-1 rounded-full text-xs font-medium bg-red-500/30 text-red-100 hover:bg-red-500/50 transition-colors"
+                    >
+                      Hapus Foto
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tab Navigation */}
+          <div className="flex border-b border-gray-100 bg-gray-50/50">
+            <button
+              onClick={() => setSettingsTab('profile')}
+              className={`flex-1 py-4 px-4 text-sm font-semibold flex items-center justify-center gap-2 border-b-2 transition-all duration-200 ${
+                settingsTab === 'profile'
+                  ? 'border-orange-500 text-orange-600 bg-white'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <User className="w-4 h-4" />
+              Edit Profil
+            </button>
+            <button
+              onClick={() => setSettingsTab('password')}
+              className={`flex-1 py-4 px-4 text-sm font-semibold flex items-center justify-center gap-2 border-b-2 transition-all duration-200 ${
+                settingsTab === 'password'
+                  ? 'border-orange-500 text-orange-600 bg-white'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <Key className="w-4 h-4" />
+              Ganti Password
+            </button>
+          </div>
+
+          <div className="p-8">
+            {/* Profile Tab */}
+            {settingsTab === 'profile' && (
+              <div className="space-y-6">
+                {/* Form Card */}
+                <div className="bg-gradient-to-br from-gray-50 to-orange-50/30 rounded-2xl p-6 border border-gray-100">
+                  <div className="flex items-center gap-2 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-lg shadow-orange-200">
+                      <User className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-800">Informasi Pribadi</h3>
+                      <p className="text-xs text-gray-500">Perbarui data profil Anda</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-5">
+                    {/* Name Field */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-md bg-blue-100 flex items-center justify-center">
+                          <User className="w-3 h-3 text-blue-600" />
+                        </span>
+                        Nama Lengkap
+                      </label>
+                      <Input
+                        value={profileForm.name}
+                        onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                        className="border-2 border-gray-200 bg-white text-gray-900 h-12 rounded-xl focus:border-orange-400 focus:ring-4 focus:ring-orange-100 transition-all text-base"
+                        placeholder="Masukkan nama lengkap"
+                      />
+                    </div>
+
+                    {/* Email Field */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-md bg-green-100 flex items-center justify-center">
+                          <Mail className="w-3 h-3 text-green-600" />
+                        </span>
+                        Email
+                      </label>
+                      <Input
+                        type="email"
+                        value={profileForm.email}
+                        onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                        className="border-2 border-gray-200 bg-white text-gray-900 h-12 rounded-xl focus:border-orange-400 focus:ring-4 focus:ring-orange-100 transition-all text-base"
+                        placeholder="email@example.com"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Change Indicator */}
+                {(profileForm.name !== originalProfileForm.name ||
+                  profileForm.email !== originalProfileForm.email ||
+                  selectedPhotoFile !== null ||
+                  (profilePhoto === null && originalProfilePhoto !== null)) && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl"
+                  >
+                    <div className="w-3 h-3 rounded-full bg-amber-500 animate-pulse" />
+                    <span className="text-sm text-amber-700 font-medium">Ada perubahan yang belum disimpan</span>
+                  </motion.div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowSettingsDialog(false)}
+                    className="border-2 border-gray-200 text-gray-600 hover:bg-gray-50 rounded-xl px-8 h-11 font-semibold"
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={profileLoading}
+                    onClick={async () => {
+                      const hasNameChange = profileForm.name !== originalProfileForm.name
+                      const hasEmailChange = profileForm.email !== originalProfileForm.email
+                      const hasPhotoChange = selectedPhotoFile !== null || (profilePhoto === null && originalProfilePhoto !== null)
+
+                      if (!hasNameChange && !hasEmailChange && !hasPhotoChange) {
+                        toast({ title: 'ℹ️ Info', description: 'Tidak ada perubahan untuk disimpan' })
+                        return
+                      }
+
+                      if (!profileForm.name || profileForm.name.trim().length < 2) {
+                        toast({ title: 'Error', description: 'Nama minimal 2 karakter', variant: 'destructive' })
+                        return
+                      }
+
+                      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+                      if (!emailRegex.test(profileForm.email)) {
+                        toast({ title: 'Error', description: 'Format email tidak valid', variant: 'destructive' })
+                        return
+                      }
+
+                      setProfileLoading(true)
+                      try {
+                        const formData = new FormData()
+                        formData.append('name', profileForm.name)
+                        formData.append('email', profileForm.email)
+
+                        if (selectedPhotoFile) {
+                          formData.append('photo', selectedPhotoFile)
+                        } else if (!profilePhoto && user?.profilePhoto) {
+                          formData.append('removePhoto', 'true')
+                        }
+
+                        const res = await fetch('/api/users/profile', {
+                          method: 'PUT',
+                          body: formData
+                        })
+                        const data = await res.json()
+
+                        if (data.error) {
+                          toast({ title: 'Error', description: data.error, variant: 'destructive' })
+                        } else {
+                          toast({ title: '✅ Berhasil', description: data.message || 'Profil berhasil diperbarui!' })
+                          if (data.user) {
+                            // Add cache-busting parameter to force refresh
+                            const timestamp = Date.now()
+                            const photoUrlWithCache = data.user.profilePhotoUrl 
+                              ? `${data.user.profilePhotoUrl}${data.user.profilePhotoUrl.includes('?') ? '&' : '?'}t=${timestamp}`
+                              : null
+                            
+                            setUser(prev => prev ? {
+                              ...prev,
+                              name: data.user.name,
+                              email: data.user.email,
+                              profilePhoto: data.user.profilePhoto,
+                              profilePhotoUrl: photoUrlWithCache,
+                              photoUpdatedAt: timestamp
+                            } : null)
+                            setOriginalProfileForm({ name: data.user.name, email: data.user.email })
+                            setOriginalProfilePhoto(photoUrlWithCache)
+                            
+                            // Also update the user in the users list if it exists
+                            setUsers(prev => prev.map(u => 
+                              u.id === data.user.id 
+                                ? { ...u, name: data.user.name, email: data.user.email, profilePhoto: data.user.profilePhoto, profilePhotoUrl: photoUrlWithCache }
+                                : u
+                            ))
+                          }
+                          setSelectedPhotoFile(null)
+                          setShowSettingsDialog(false)
+                        }
+                      } catch (error) {
+                        toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
+                      } finally {
+                        setProfileLoading(false)
+                      }
+                    }}
+                    className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl px-8 h-11 font-semibold shadow-lg shadow-orange-200"
+                  >
+                    {profileLoading ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</>
+                    ) : (
+                      'Simpan Perubahan'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Password Tab */}
+            {settingsTab === 'password' && (
+              <div className="space-y-6">
+                {/* Security Info Card */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-5 border border-blue-100">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center shadow-lg flex-shrink-0">
+                      <Shield className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-blue-900">Keamanan Akun</h3>
+                      <p className="text-sm text-blue-700 mt-1">Password minimal 4 karakter. Gunakan kombinasi huruf dan angka untuk keamanan lebih baik.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Form Card */}
+                <div className="bg-gradient-to-br from-gray-50 to-orange-50/30 rounded-2xl p-6 border border-gray-100">
+                  <div className="flex items-center gap-2 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center shadow-lg shadow-red-200">
+                      <Key className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-800">Ubah Password</h3>
+                      <p className="text-xs text-gray-500">Masukkan password lama dan baru</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    {/* Current Password */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-md bg-red-100 flex items-center justify-center">
+                          <Key className="w-3 h-3 text-red-600" />
+                        </span>
+                        Password Lama
+                      </label>
+                      <Input
+                        type="password"
+                        value={passwordChangeForm.currentPassword}
+                        onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, currentPassword: e.target.value })}
+                        className="border-2 border-gray-200 bg-white text-gray-900 h-12 rounded-xl focus:border-orange-400 focus:ring-4 focus:ring-orange-100 transition-all"
+                        placeholder="Masukkan password lama"
+                      />
+                    </div>
+
+                    {/* New Password */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-md bg-orange-100 flex items-center justify-center">
+                          <Shield className="w-3 h-3 text-orange-600" />
+                        </span>
+                        Password Baru
+                      </label>
+                      <Input
+                        type="password"
+                        value={passwordChangeForm.newPassword}
+                        onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, newPassword: e.target.value })}
+                        className="border-2 border-gray-200 bg-white text-gray-900 h-12 rounded-xl focus:border-orange-400 focus:ring-4 focus:ring-orange-100 transition-all"
+                        placeholder="Masukkan password baru"
+                      />
+                    </div>
+
+                    {/* Confirm Password */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-md bg-green-100 flex items-center justify-center">
+                          <Check className="w-3 h-3 text-green-600" />
+                        </span>
+                        Konfirmasi Password
+                      </label>
+                      <Input
+                        type="password"
+                        value={passwordChangeForm.confirmPassword}
+                        onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, confirmPassword: e.target.value })}
+                        className={`border-2 bg-white text-gray-900 h-12 rounded-xl focus:ring-4 transition-all ${
+                          passwordChangeForm.confirmPassword && passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword
+                            ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+                            : passwordChangeForm.confirmPassword && passwordChangeForm.newPassword === passwordChangeForm.confirmPassword
+                            ? 'border-green-400 focus:border-green-500 focus:ring-green-100'
+                            : 'border-gray-200 focus:border-orange-400 focus:ring-orange-100'
+                        }`}
+                        placeholder="Konfirmasi password baru"
+                      />
+                      {passwordChangeForm.confirmPassword && passwordChangeForm.newPassword === passwordChangeForm.confirmPassword && (
+                        <motion.p 
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="text-sm text-green-600 flex items-center gap-1 font-medium"
+                        >
+                          <Check className="w-4 h-4" /> Password cocok!
+                        </motion.p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowSettingsDialog(false)}
+                    className="border-2 border-gray-200 text-gray-600 hover:bg-gray-50 rounded-xl px-8 h-11 font-semibold"
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={passwordChangeLoading}
+                    onClick={async () => {
+                      if (!passwordChangeForm.currentPassword || !passwordChangeForm.newPassword || !passwordChangeForm.confirmPassword) {
+                        toast({ title: 'Error', description: 'Semua field harus diisi', variant: 'destructive' })
+                        return
+                      }
+                      if (passwordChangeForm.newPassword.length < 4) {
+                        toast({ title: 'Error', description: 'Password baru minimal 4 karakter', variant: 'destructive' })
+                        return
+                      }
+                      if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
+                        toast({ title: 'Error', description: 'Konfirmasi password tidak cocok', variant: 'destructive' })
+                        return
+                      }
+
+                      setPasswordChangeLoading(true)
+                      try {
+                        const res = await fetch('/api/users/password', {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            currentPassword: passwordChangeForm.currentPassword,
+                            newPassword: passwordChangeForm.newPassword
+                          })
+                        })
+                        const data = await res.json()
+                        if (data.error) {
+                          toast({ title: 'Error', description: data.error, variant: 'destructive' })
+                        } else {
+                          toast({ title: '✅ Berhasil', description: 'Password berhasil diubah!' })
+                          setPasswordChangeForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+                          setShowSettingsDialog(false)
+                        }
+                      } catch (error) {
+                        toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
+                      } finally {
+                        setPasswordChangeLoading(false)
+                      }
+                    }}
+                    className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl px-8 h-11 font-semibold shadow-lg shadow-orange-200"
+                  >
+                    {passwordChangeLoading ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</>
+                    ) : (
+                      'Ubah Password'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Password Change Dialog */}
       < Dialog open={showPasswordChangeDialog} onOpenChange={setShowPasswordChangeDialog} >
@@ -8118,33 +9198,6 @@ export default function ESOPApp() {
         </DialogContent>
       </Dialog >
 
-      {/* Glowing Footer - Bottom Left - Visible on all pages */}
-      < motion.div
-        className="fixed bottom-4 left-4 z-50"
-        initial={{ opacity: 0, y: 50 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.8 }}
-      >
-        <div className="relative cursor-pointer" onClick={() => setShowCopyrightPopup(true)}>
-          {/* Glow effect */}
-          <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-yellow-400 rounded-lg blur-md opacity-60 animate-pulse" />
-
-          {/* Shimmer container */}
-          <div className="relative px-4 py-2 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 rounded-lg border border-orange-500/30 overflow-hidden hover:border-orange-500/60 transition-colors">
-            {/* Animated shimmer */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-400/20 to-transparent animate-shimmer" />
-
-            {/* Text with glow */}
-            <p className="text-sm font-medium relative z-10">
-              <span className="text-gray-400">© </span>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-yellow-300 to-orange-400 animate-pulse font-bold hover:from-yellow-300 hover:via-orange-400 hover:to-yellow-300 transition-all">
-                FOE - 2026
-              </span>
-            </p>
-          </div>
-        </div>
-      </motion.div >
-
       {/* PDF Edit Warning Dialog - Aesthetic Design */}
       < Dialog open={showPdfWarningDialog} onOpenChange={setShowPdfWarningDialog} >
         <DialogContent className="sm:max-w-lg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-red-500/50 shadow-2xl overflow-hidden" aria-describedby={undefined}>
@@ -8230,13 +9283,13 @@ export default function ESOPApp() {
                 </div>
               </motion.div>
 
-              <DialogTitle className="text-2xl font-bold">
+              <DialogTitle className="text-lg font-bold">
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-300 to-red-400">
                   PDF Tidak Bisa Di-edit
                 </span>
               </DialogTitle>
 
-              <DialogDescription className="text-gray-400 text-sm mt-2">
+              <DialogDescription className="text-gray-400 text-xs mt-2">
                 File PDF tidak mendukung fitur edit langsung
               </DialogDescription>
             </DialogHeader>
@@ -8323,7 +9376,29 @@ export default function ESOPApp() {
 
 
       {/* Copyright Popup */}
-      < CopyrightPopup show={showCopyrightPopup} onClose={() => setShowCopyrightPopup(false)} />
+      <CopyrightPopup show={showCopyrightPopup} onClose={() => setShowCopyrightPopup(false)} />
+
+      {/* Image Cropper for Profile Photo */}
+      <ImageCropper
+        isOpen={showImageCropper}
+        onClose={() => {
+          setShowImageCropper(false)
+          setPhotoToCrop(null)
+        }}
+        imageFile={photoToCrop}
+        onCropComplete={(croppedFile) => {
+          setSelectedPhotoFile(croppedFile)
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            setProfilePhoto(e.target?.result as string)
+          }
+          reader.readAsDataURL(croppedFile)
+          setShowImageCropper(false)
+          setPhotoToCrop(null)
+        }}
+        aspectRatio={1}
+        circularCrop={true}
+      />
 
       {/* Print Loading Dialog */}
       <PrintLoadingDialog

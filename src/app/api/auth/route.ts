@@ -1,27 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { cookies } from 'next/headers'
+import { getR2PublicUrl } from '@/lib/r2-storage'
 
 // GET - Check current session
 export async function GET() {
   try {
     const cookieStore = await cookies()
     const userId = cookieStore.get('userId')?.value
-    
+
     if (!userId) {
       return NextResponse.json({ user: null, isAuthenticated: false })
     }
-    
+
+    // Get user without select to avoid Turbopack cache issues
     const user = await db.user.findUnique({
-      where: { id: userId },
-      select: { id: true, email: true, name: true, role: true }
+      where: { id: userId }
     })
-    
+
     if (!user) {
       return NextResponse.json({ user: null, isAuthenticated: false })
     }
-    
-    return NextResponse.json({ user, isAuthenticated: true })
+
+    // Get profile photo URL if exists
+    let profilePhotoUrl = null
+    if (user.profilePhoto) {
+      const r2Url = getR2PublicUrl(user.profilePhoto)
+      if (r2Url) {
+        profilePhotoUrl = `${r2Url}?v=${user.updatedAt ? new Date(user.updatedAt).getTime() : Date.now()}`
+      } else {
+        profilePhotoUrl = user.profilePhoto
+      }
+    }
+
+    return NextResponse.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        profilePhoto: user.profilePhoto,
+        profilePhotoUrl
+      },
+      isAuthenticated: true
+    })
   } catch (error) {
     console.error('Auth check error:', error)
     return NextResponse.json({ user: null, isAuthenticated: false })
@@ -59,9 +81,27 @@ export async function POST(request: NextRequest) {
       }
     })
     
+    // Get profile photo URL if exists
+    let profilePhotoUrl = null
+    if (user.profilePhoto) {
+      const r2Url = getR2PublicUrl(user.profilePhoto)
+      if (r2Url) {
+        profilePhotoUrl = `${r2Url}?v=${user.updatedAt ? new Date(user.updatedAt).getTime() : Date.now()}`
+      } else {
+        profilePhotoUrl = user.profilePhoto
+      }
+    }
+
     // Create response with user data
-    const response = NextResponse.json({ 
-      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+    const response = NextResponse.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        profilePhoto: user.profilePhoto,
+        profilePhotoUrl
+      },
       isAuthenticated: true,
       success: true
     })

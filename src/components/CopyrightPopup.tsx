@@ -81,15 +81,41 @@ export default function CopyrightPopup({ show, onClose }: CopyrightPopupProps) {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.5 }}
                 >
-                  <p className="text-orange-300/90 text-xs font-semibold uppercase tracking-wider mb-2">
-                    Developed & Maintained by:
-                  </p>
-                  <p className="text-white font-bold text-base">
-                    Muhammad Fuadunnas, S.I.Kom., M.IKom.
-                  </p>
-                  <p className="text-orange-200/70 text-sm mt-1">
-                    PKPP Ahli Muda – Direktorat Kesiapsiagaan
-                  </p>
+                  <div className="flex items-center gap-4">
+                    {/* Developer Photo */}
+                    <motion.div 
+                      className="relative shrink-0"
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ delay: 0.6, type: 'spring', stiffness: 200 }}
+                    >
+                      <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-orange-500/50 shadow-lg shadow-orange-500/20">
+                        <img 
+                          src="https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/foe.jpg" 
+                          alt="Developer" 
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      {/* Online indicator */}
+                      <motion.div 
+                        className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-gray-900"
+                        animate={{ scale: [1, 1.2, 1] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      />
+                    </motion.div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <p className="text-orange-300/90 text-xs font-semibold uppercase tracking-wider mb-1">
+                        Developed & Maintained by:
+                      </p>
+                      <p className="text-white font-bold text-sm truncate">
+                        Muhammad Fuadunnas, S.I.Kom., M.IKom.
+                      </p>
+                      <p className="text-orange-200/70 text-xs mt-0.5">
+                        PKPP Ahli Muda – Direktorat Kesiapsiagaan
+                      </p>
+                    </div>
+                  </div>
                 </motion.div>
                 
                 {/* Features */}

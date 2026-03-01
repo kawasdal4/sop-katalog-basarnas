@@ -18,11 +18,12 @@ model User {
   password  String
   name      String
   role      String   @default("STAF") // ADMIN, STAF, or DEVELOPER
+  profilePhoto String? // URL to profile photo in R2
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   lastLoginAt DateTime? // Last login timestamp
   lastArsipVisitAt DateTime? // Last time the user visited the Arsip page
-  
+
   // Relations
   logs     Log[]
   sopFiles SopFile[]

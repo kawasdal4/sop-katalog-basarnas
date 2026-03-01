@@ -57,7 +57,7 @@ const COLORS = [
     '#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff922b',
 ]
 
-export default function LogoutAnimation({ show, userName }: { show: boolean; userName?: string }) {
+export default function LogoutAnimation({ show, userName, userPhoto }: { show: boolean; userName?: string; userPhoto?: string | null }) {
     const [words, setWords] = useState<FloatingWord[]>([])
     const [phase, setPhase] = useState<'enter' | 'float' | 'exit'>('enter')
 
@@ -223,10 +223,13 @@ export default function LogoutAnimation({ show, userName }: { show: boolean; use
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         transition={{ duration: 0.6, type: 'spring', stiffness: 200, delay: 0.1 }}
                     >
-                        {/* Waving hand icon with glow */}
+                        {/* User photo or waving hand icon with glow */}
                         <motion.div
-                            className="w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center"
-                            style={{ background: 'linear-gradient(135deg, #f97316, #ef4444)' }}
+                            className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center overflow-hidden"
+                            style={{ 
+                                background: userPhoto ? 'transparent' : 'linear-gradient(135deg, #f97316, #ef4444)',
+                                border: userPhoto ? '3px solid rgba(249, 115, 22, 0.5)' : 'none'
+                            }}
                             animate={{
                                 boxShadow: [
                                     '0 0 30px rgba(249,115,22,0.5)',
@@ -236,13 +239,21 @@ export default function LogoutAnimation({ show, userName }: { show: boolean; use
                             }}
                             transition={{ duration: 1.5, repeat: Infinity }}
                         >
-                            <motion.span
-                                style={{ fontSize: 36 }}
-                                animate={{ rotate: [0, -15, 15, -15, 10, 0], scale: [1, 1.1, 1] }}
-                                transition={{ duration: 1, delay: 0.3, repeat: Infinity, repeatDelay: 1.5 }}
-                            >
-                                👋
-                            </motion.span>
+                            {userPhoto ? (
+                                <img 
+                                    src={userPhoto} 
+                                    alt={userName || 'User'}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <motion.span
+                                    style={{ fontSize: 36 }}
+                                    animate={{ rotate: [0, -15, 15, -15, 10, 0], scale: [1, 1.1, 1] }}
+                                    transition={{ duration: 1, delay: 0.3, repeat: Infinity, repeatDelay: 1.5 }}
+                                >
+                                    👋
+                                </motion.span>
+                            )}
                         </motion.div>
 
                         {/* Goodbye text */}

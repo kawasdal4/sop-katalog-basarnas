@@ -763,3 +763,62 @@
     -webkit-backdrop-filter: blur(8px);
   }
 }
+
+/* ============================================
+   CURSOR POINTER FOR INTERACTIVE ELEMENTS
+   ============================================ */
+
+/* All buttons */
+button,
+[role="button"],
+.btn-sar,
+input[type="submit"],
+input[type="button"],
+input[type="reset"] {
+  cursor: pointer !important;
+}
+
+/* All links */
+a,
+a[href] {
+  cursor: pointer !important;
+}
+
+/* All interactive elements with onclick or clickable classes */
+[onclick],
+.cursor-pointer,
+[data-clickable],
+.select-trigger,
+.dropdown-menu-item,
+.tab-trigger,
+.dialog-trigger,
+.menu-item {
+  cursor: pointer !important;
+}
+
+/* Specific UI components that need pointer cursor */
+button[class*="bg-"],
+button[class*="hover:"],
+[class*="btn-"],
+[role="tab"],
+[role="menuitem"],
+[role="option"],
+[role="link"],
+[class*="clickable"],
+[class*="onClick"] {
+  cursor: pointer !important;
+}
+
+/* Table rows and cells that are clickable */
+tr[onclick],
+td[onclick],
+tr[role="button"],
+td[role="button"] {
+  cursor: pointer !important;
+}
+
+/* Card components that act as buttons */
+.card[onclick],
+[class*="Card"][onclick] {
+  cursor: pointer !important;
+}

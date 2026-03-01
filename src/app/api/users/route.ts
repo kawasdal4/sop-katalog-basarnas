@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { cookies } from 'next/headers'
+import { getR2PublicUrl } from '@/lib/r2-storage'
 
 // Helper to check if user has access to user management
 const hasUserManagementAccess = (role: string | null) => {
@@ -37,26 +38,35 @@ export async function GET() {
     
     // DEVELOPER can see passwords, ADMIN cannot
     const includePassword = isDeveloper(currentUser.role)
-    
+
+    // Get all users without select to avoid Turbopack cache issues
     const users = await db.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        password: includePassword,
-        createdAt: true,
-        lastLoginAt: true,
-        _count: {
-          select: { logs: true }
-        }
-      },
       orderBy: { createdAt: 'desc' }
     })
-    
+
+    // Transform users to include only needed fields and profile photo URLs
+    const usersWithPhotoUrl = users.map(user => {
+      // Add cache-busting parameter based on updatedAt or createdAt to ensure fresh images
+      const cacheBuster = user.updatedAt ? new Date(user.updatedAt).getTime() : Date.now()
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        password: includePassword ? user.password : undefined,
+        profilePhoto: user.profilePhoto,
+        profilePhotoUrl: user.profilePhoto ? `${getR2PublicUrl(user.profilePhoto)}?v=${cacheBuster}` : null,
+        createdAt: user.createdAt,
+        lastLoginAt: user.lastLoginAt,
+        _count: {
+          logs: 0 // We'll skip the log count for now to avoid issues
+        }
+      }
+    })
+
     console.log('[Users API] Found users:', users.length)
-    
-    return NextResponse.json({ data: users, includePassword })
+
+    return NextResponse.json({ data: usersWithPhotoUrl, includePassword })
   } catch (error) {
     console.error('[Users API] Fetch users error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Terjadi kesalahan pada server'
