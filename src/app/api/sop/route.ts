@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
 import { uploadToR2, isR2Configured, deleteFromR2, moveR2Object } from '@/lib/r2-storage'
+import { notifySubmitterApproved, notifySubmitterRejected, notifyAdminsNewSubmission } from '@/lib/email'
 
 // Set runtime and max duration for Vercel
 export const runtime = 'nodejs'
@@ -370,93 +371,188 @@ export async function POST(request: NextRequest) {
         try {
           console.log(`📧 [Background] Preparing email notification for: ${judul}`)
 
-          // 1. Ambil seluruh email user aktif dari tabel user
-          const users = await db.user.findMany({
-            where: {
-              email: { not: '' }
-            },
-            select: { email: true }
+          // Format tanggal: DD MMMM YYYY HH:mm WIB
+          const formatter = new Intl.DateTimeFormat('id-ID', {
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'Asia/Jakarta'
+          })
+          const formattedDate = formatter.format(new Date()).replace(/\./g, ':') + ' WIB'
+
+          // Dapatkan nama pengupload
+          const uploader = await db.user.findUnique({ where: { id: userId }, select: { name: true } })
+          const penguploadName = isPublicSubmission ? (submitterName || 'System (Public Submission)') : (uploader?.name || 'Unknown User')
+
+          // 2. Konfigurasi transporter Gmail
+          const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+              user: process.env.EMAIL_USER,
+              pass: process.env.EMAIL_PASS
+            }
           })
 
-          const listEmailUsers = users.map(u => u.email).filter(Boolean)
+          const fromName = process.env.EMAIL_FROM_NAME || 'E-Katalog SOP Direktorat Kesiapsiagaan'
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sop-katalog-basarnas.vercel.app'
 
-          if (listEmailUsers.length > 0) {
-            // 2. Konfigurasi transporter Gmail
-            const transporter = nodemailer.createTransport({
-              service: 'gmail',
-              auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASS
-              }
+          if (isPublicSubmission) {
+            // For public submissions - notify admins only with verification request
+            const admins = await db.user.findMany({
+              where: {
+                role: { in: ['ADMIN', 'DEVELOPER'] },
+                email: { not: '' }
+              },
+              select: { email: true, name: true }
             })
 
-            // Format tanggal: DD MMMM YYYY HH:mm WIB
-            const formatter = new Intl.DateTimeFormat('id-ID', {
-              day: '2-digit',
-              month: 'long',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-              timeZone: 'Asia/Jakarta'
-            })
-            const formattedDate = formatter.format(new Date()).replace(/\./g, ':') + ' WIB'
+            if (admins.length > 0) {
+              const adminEmails = admins.map(a => a.email).filter(Boolean)
 
-            // Dapatkan nama pengupload
-            const uploader = await db.user.findUnique({ where: { id: userId }, select: { name: true } })
-            const penguploadName = isPublicSubmission ? (submitterName || 'System (Public Submission)') : (uploader?.name || 'Unknown User')
-
-            // 3. Format email body
-            const htmlBody = `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-                <h2 style="color: #f97316; margin-bottom: 20px;">SOP Baru Telah Ditambahkan</h2>
-                
-                <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
-                  <table style="width: 100%; border-collapse: collapse;">
-                    <tr>
-                      <td style="padding: 8px 0; color: #64748b; width: 150px;">Judul SOP</td>
-                      <td style="padding: 8px 0; font-weight: bold; color: #0f172a;">${judul}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding: 8px 0; color: #64748b;">Nama Pengupload</td>
-                      <td style="padding: 8px 0; font-weight: bold; color: #0f172a;">${penguploadName}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding: 8px 0; color: #64748b;">Waktu Upload</td>
-                      <td style="padding: 8px 0; font-weight: bold; color: #0f172a;">${formattedDate}</td>
-                    </tr>
-                  </table>
-                </div>
-                
-                <p style="color: #334155; line-height: 1.6;">
-                  SOP baru telah berhasil diunggah ke dalam sistem. Silakan login ke aplikasi E-Katalog SOP untuk melihat detail lebih lanjut.
-                </p>
-                
-                <div style="text-align: center; margin: 30px 0;">
-                  <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://sop-katalog-basarnas.vercel.app'}" style="background-color: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-                    Login ke Aplikasi
-                  </a>
-                </div>
-                
-                <div style="border-top: 1px solid #e2e8f0; margin-top: 30px; padding-top: 20px; text-align: center;">
-                  <p style="color: #94a3b8; font-size: 12px; margin: 0;">
-                    Direktorat Kesiapsiagaan - BASARNAS
+              const htmlBody = `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                  <h2 style="color: #dc2626; margin-bottom: 20px;">📋 Pengajuan SOP/IK Baru - Perlu Verifikasi</h2>
+                  
+                  <div style="background-color: #fef2f2; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #dc2626;">
+                    <p style="margin: 0; font-weight: bold; color: #991b1b;">
+                      ⚠️ Ada pengajuan SOP/IK dari publik yang memerlukan verifikasi Anda.
+                    </p>
+                  </div>
+                  
+                  <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                      <tr>
+                        <td style="padding: 8px 0; color: #64748b; width: 150px;">Nomor</td>
+                        <td style="padding: 8px 0; font-weight: bold; color: #0f172a;">${nomorSop}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #64748b;">Judul</td>
+                        <td style="padding: 8px 0; font-weight: bold; color: #0f172a;">${judul}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #64748b;">Jenis</td>
+                        <td style="padding: 8px 0; font-weight: bold; color: #0f172a;">${jenis}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #64748b;">Kategori</td>
+                        <td style="padding: 8px 0; font-weight: bold; color: #0f172a;">${kategori}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #64748b;">Nama Pengaju</td>
+                        <td style="padding: 8px 0; font-weight: bold; color: #0f172a;">${submitterName || '-'}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #64748b;">Email Pengaju</td>
+                        <td style="padding: 8px 0; font-weight: bold; color: #0f172a;">${submitterEmail || '-'}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #64748b;">Waktu Pengajuan</td>
+                        <td style="padding: 8px 0; font-weight: bold; color: #0f172a;">${formattedDate}</td>
+                      </tr>
+                      ${keterangan ? `
+                      <tr>
+                        <td style="padding: 8px 0; color: #64748b;">Keterangan</td>
+                        <td style="padding: 8px 0; font-weight: bold; color: #0f172a;">${keterangan}</td>
+                      </tr>
+                      ` : ''}
+                    </table>
+                  </div>
+                  
+                  <p style="color: #334155; line-height: 1.6;">
+                    Silakan login ke aplikasi E-Katalog SOP untuk melakukan verifikasi pengajuan ini.
                   </p>
+                  
+                  <div style="text-align: center; margin: 30px 0;">
+                    <a href="${appUrl}" style="background-color: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                      Verifikasi Sekarang
+                    </a>
+                  </div>
+                  
+                  <div style="border-top: 1px solid #e2e8f0; margin-top: 30px; padding-top: 20px; text-align: center;">
+                    <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+                      Direktorat Kesiapsiagaan - BASARNAS
+                    </p>
+                  </div>
                 </div>
-              </div>
-            `
+              `
 
-            // 4. Kirim email
-            const fromName = process.env.EMAIL_FROM_NAME || 'E-Katalog SOP Direktorat Kesiapsiagaan'
-            const info = await transporter.sendMail({
-              from: `"${fromName}" <${process.env.EMAIL_USER}>`,
-              to: listEmailUsers,
-              subject: 'SOP Baru Ditambahkan',
-              html: htmlBody
+              const info = await transporter.sendMail({
+                from: `"${fromName}" <${process.env.EMAIL_USER}>`,
+                to: adminEmails,
+                subject: `[Perlu Verifikasi] Pengajuan Baru: ${nomorSop} - ${judul}`,
+                html: htmlBody
+              })
+
+              console.log(`✅ [Background] Verification email sent to ${adminEmails.length} admins. Message ID: ${info.messageId}`)
+            } else {
+              console.log(`ℹ️ [Background] No admin users found to send verification email.`)
+            }
+          } else {
+            // For regular uploads - notify all users
+            const users = await db.user.findMany({
+              where: {
+                email: { not: '' }
+              },
+              select: { email: true }
             })
 
-            console.log(`✅ [Background] Email sent successfully to ${listEmailUsers.length} users. Message ID: ${info.messageId}`)
-          } else {
-            console.log(`ℹ️ [Background] No active users found to send email.`)
+            const listEmailUsers = users.map(u => u.email).filter(Boolean)
+
+            if (listEmailUsers.length > 0) {
+              // 3. Format email body
+              const htmlBody = `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                  <h2 style="color: #f97316; margin-bottom: 20px;">SOP Baru Telah Ditambahkan</h2>
+                  
+                  <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                      <tr>
+                        <td style="padding: 8px 0; color: #64748b; width: 150px;">Judul SOP</td>
+                        <td style="padding: 8px 0; font-weight: bold; color: #0f172a;">${judul}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #64748b;">Nama Pengupload</td>
+                        <td style="padding: 8px 0; font-weight: bold; color: #0f172a;">${penguploadName}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #64748b;">Waktu Upload</td>
+                        <td style="padding: 8px 0; font-weight: bold; color: #0f172a;">${formattedDate}</td>
+                      </tr>
+                    </table>
+                  </div>
+                  
+                  <p style="color: #334155; line-height: 1.6;">
+                    SOP baru telah berhasil diunggah ke dalam sistem. Silakan login ke aplikasi E-Katalog SOP untuk melihat detail lebih lanjut.
+                  </p>
+                  
+                  <div style="text-align: center; margin: 30px 0;">
+                    <a href="${appUrl}" style="background-color: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                      Login ke Aplikasi
+                    </a>
+                  </div>
+                  
+                  <div style="border-top: 1px solid #e2e8f0; margin-top: 30px; padding-top: 20px; text-align: center;">
+                    <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+                      Direktorat Kesiapsiagaan - BASARNAS
+                    </p>
+                  </div>
+                </div>
+              `
+
+              // 4. Kirim email
+              const info = await transporter.sendMail({
+                from: `"${fromName}" <${process.env.EMAIL_USER}>`,
+                to: listEmailUsers,
+                subject: 'SOP Baru Ditambahkan',
+                html: htmlBody
+              })
+
+              console.log(`✅ [Background] Email sent successfully to ${listEmailUsers.length} users. Message ID: ${info.messageId}`)
+            } else {
+              console.log(`ℹ️ [Background] No active users found to send email.`)
+            }
           }
         } catch (emailError) {
           console.error('❌ [Background] Email sending failed:', emailError)
@@ -726,6 +822,39 @@ export async function PUT(request: NextRequest) {
       })
     } catch (logError) {
       console.warn('⚠️ Failed to create log:', logError)
+    }
+
+    // Send email notification for public submission verification (background)
+    if (verificationStatus && sopFile.isPublicSubmission && sopFile.submitterEmail) {
+      if (verificationStatus === 'DISETUJUI') {
+        notifySubmitterApproved(
+          sopFile.submitterEmail,
+          sopFile.submitterName,
+          {
+            nomorSop: sopFile.nomorSop,
+            judul: sopFile.judul,
+            jenis: sopFile.jenis,
+            verifiedBy: userId,
+            verifiedAt: sopFile.verifiedAt || new Date()
+          }
+        ).catch(err => {
+          console.warn('⚠️ Failed to send approval notification:', err)
+        })
+      } else if (verificationStatus === 'DITOLAK') {
+        notifySubmitterRejected(
+          sopFile.submitterEmail,
+          sopFile.submitterName,
+          {
+            nomorSop: sopFile.nomorSop,
+            judul: sopFile.judul,
+            jenis: sopFile.jenis,
+            rejectionReason: sopFile.rejectionReason,
+            verifiedAt: sopFile.verifiedAt || new Date()
+          }
+        ).catch(err => {
+          console.warn('⚠️ Failed to send rejection notification:', err)
+        })
+      }
     }
 
     return NextResponse.json({ success: true, data: sopFile })
