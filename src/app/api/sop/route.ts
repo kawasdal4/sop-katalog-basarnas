@@ -222,28 +222,51 @@ export async function POST(request: NextRequest) {
 
     const prefix = getPrefix(jenis)
 
-    // Get the latest SOP of the same jenis to determine the next number
-    const lastSop = await db.sopFile.findFirst({
-      where: { jenis },
-      orderBy: { nomorSop: 'desc' },
-      select: { nomorSop: true }
-    })
+    // Function to generate unique nomorSop with retry
+    const generateUniqueNomorSop = async (maxRetries = 5): Promise<string> => {
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        // Get the latest SOP of the same jenis to determine the next number
+        const lastSop = await db.sopFile.findFirst({
+          where: { jenis },
+          orderBy: { nomorSop: 'desc' },
+          select: { nomorSop: true }
+        })
 
-    let nextNumber = 1
-    if (lastSop && lastSop.nomorSop) {
-      // Extract the numeric part (e.g., from "SOP-0012" extract "0012")
-      const matches = lastSop.nomorSop.match(/\d+$/)
-      if (matches) {
-        nextNumber = parseInt(matches[0], 10) + 1
-      } else {
-        // Fallback if parsing fails
-        const existingCount = await db.sopFile.count({ where: { jenis } })
-        nextNumber = existingCount + 1
+        let nextNumber = 1
+        if (lastSop && lastSop.nomorSop) {
+          // Extract the numeric part (e.g., from "SOP-0012" extract "0012")
+          const matches = lastSop.nomorSop.match(/\d+$/)
+          if (matches) {
+            nextNumber = parseInt(matches[0], 10) + 1 + attempt
+          } else {
+            // Fallback if parsing fails
+            const existingCount = await db.sopFile.count({ where: { jenis } })
+            nextNumber = existingCount + 1 + attempt
+          }
+        }
+
+        // Generate new nomorSop (incremental)
+        const nomorSop = `${prefix}${String(nextNumber).padStart(4, '0')}`
+        
+        // Check if this nomorSop already exists
+        const existing = await db.sopFile.findUnique({
+          where: { nomorSop },
+          select: { id: true }
+        })
+        
+        if (!existing) {
+          return nomorSop
+        }
+        
+        console.log(`⚠️ Nomor ${nomorSop} already exists, retrying... (attempt ${attempt + 1})`)
       }
+      
+      // If all retries fail, use timestamp-based number as fallback
+      const fallbackNumber = Date.now().toString().slice(-6)
+      return `${prefix}${fallbackNumber}`
     }
 
-    // Generate new nomorSop (incremental)
-    const nomorSop = `${prefix}${String(nextNumber).padStart(4, '0')}`
+    const nomorSop = await generateUniqueNomorSop()
     console.log(`📝 Generated nomor: ${nomorSop}`)
 
     const bytes = await file.arrayBuffer()
@@ -318,8 +341,9 @@ export async function POST(request: NextRequest) {
       console.error('❌ Database error:', dbError)
       const prismaError = dbError as { code?: string; meta?: { target?: string[] } }
       if (prismaError.code === 'P2002') {
+        const target = prismaError.meta?.target?.join(', ') || 'field'
         return NextResponse.json({
-          error: `Dokumen dengan judul serupa sudah ada. Gunakan judul berbeda.`,
+          error: `Data dengan ${target} yang sama sudah ada. Silakan coba lagi.`,
           code: prismaError.code
         }, { status: 400 })
       }
