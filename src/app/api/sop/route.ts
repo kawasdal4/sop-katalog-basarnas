@@ -274,7 +274,7 @@ export async function POST(request: NextRequest) {
         console.log(`📤 Uploading to R2 (Primary): ${fileName}`)
 
         const r2Result = await uploadToR2(buffer, fileName, mimeType, {
-          folder: 'sop-files'
+          folder: isPublicSubmission ? 'public-files' : 'sop-files'
         })
         r2Key = r2Result.key
         filePath = r2Result.key

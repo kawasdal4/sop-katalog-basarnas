@@ -2330,6 +2330,210 @@ export default function ESOPApp() {
     }
   }
 
+  // ==========================================
+  // PUBLIC FILE HANDLERS (VERIFIKASI & ARSIP)
+  // ==========================================
+
+  // Download Khusus File Publik
+  const handleVerifikasiDownload = async (id: string) => {
+    // Cari spesifik di list verifikasi dan arsip (dibedakan lokasi arraynya)
+    const sop = verificationList.find(s => s.id === id) || arsipList.find(s => s.id === id)
+
+    if (!sop?.filePath && !sop?.driveFileId) {
+      toast({
+        title: '⚠️ File Tidak Tersedia',
+        description: 'File publik tidak ditemukan di storage.',
+        variant: 'destructive',
+        duration: 5000
+      })
+      return
+    }
+
+    setDownloadLoading(id) // Start loading animation
+
+    try {
+      const fileExt = sop.fileName.split('.').pop()?.toLowerCase() || 'pdf'
+      const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
+      const customFileName = `${sanitizeFileName(sop.judul)}.${fileExt}`
+
+      // Fetch file from our download API (avoids CORS issues)
+      const res = await fetch(`/api/download?id=${id}`)
+
+      if (!res.ok) {
+        const errorText = await res.text()
+        let errorData = { error: 'Unknown Error' };
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          console.error('[Download API] Error was not JSON:', errorText)
+        }
+        throw new Error(errorData.error || 'Gagal mengunduh file publik')
+      }
+
+      // Increment download counter
+      await fetch('/api/sop', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, incrementDownload: true })
+      })
+
+      // Get file blob
+      const blob = await res.blob()
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = customFileName
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+
+      setDownloadLoading(null)
+      toast({ title: '✅ Download Selesai', description: `File Publik: ${customFileName}` })
+      fetchStats()
+    } catch (error) {
+      console.error('Download error:', error)
+      setDownloadLoading(null)
+      toast({ title: '❌ Error', description: error instanceof Error ? error.message : 'Gagal mengunduh file publik', variant: 'destructive' })
+    }
+  }
+
+  // Preview Khusus File Publik
+  const handleVerifikasiPreview = async (id: string) => {
+    // Cari spesifik di list verifikasi dan arsip (dibedakan lokasi arraynya)
+    const sop = verificationList.find(s => s.id === id) || arsipList.find(s => s.id === id)
+    if (!sop) return
+
+    if (!sop.filePath && !sop.driveFileId) {
+      toast({
+        title: '⚠️ File Tidak Tersedia',
+        description: 'File publik tidak ditemukan di storage.',
+        variant: 'destructive',
+        duration: 5000
+      })
+      return
+    }
+
+    const fileExtension = sop.fileName.toLowerCase().split('.').pop()
+    setPreviewLoading(id) // Start loading animation
+
+    try {
+      if (fileExtension === 'pdf') {
+        const res = await fetch(`/api/file?action=preview&id=${id}`)
+        const contentType = res.headers.get('content-type') || ''
+
+        if (contentType.includes('application/pdf')) {
+          const blob = await res.blob()
+          const url = window.URL.createObjectURL(blob)
+          window.open(url, '_blank')
+          setPreviewLoading(null)
+          fetchStats()
+          return
+        }
+
+        const text = await res.text()
+        try {
+          const data = JSON.parse(text)
+          if (data.downloadUrl) {
+            window.open(data.downloadUrl, '_blank')
+          }
+        } catch (e) {
+          console.error('[Preview PDF] Failed to parse JSON. Raw text:', text)
+          toast({ title: 'Error API', description: 'Gagal membaca response server (PDF Publik).', variant: 'destructive' })
+        }
+        setPreviewLoading(null)
+        fetchStats()
+        return
+      }
+
+      if (['xlsx', 'xls', 'xlsm', 'docx', 'doc'].includes(fileExtension || '')) {
+        toast({
+          title: '📤 Mempersiapkan Preview Publik...',
+          description: 'Mengupload file publik ke OneDrive untuk preview di Office Online',
+          duration: 10000
+        })
+
+        const res = await fetch('/api/preview-office', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileId: id })
+        })
+
+        const text = await res.text()
+        let data;
+        try {
+          data = JSON.parse(text)
+        } catch (e) {
+          console.error('[Preview Office] Failed to parse JSON. Status:', res.status, 'Raw text:', text)
+          throw new Error('Gagal membaca response dari server (Office Preview Publik).')
+        }
+
+        console.log('📋 [Preview Publik] Response:', { success: data.success, viewerUrl: data.viewerUrl?.substring(0, 100) })
+
+        if (!data.success) {
+          throw new Error(data.error || 'Gagal mempersiapkan preview publik')
+        }
+
+        if (data.viewerUrl) {
+          console.log('🔗 [Preview Publik] Opening URL:', data.viewerUrl.substring(0, 150))
+          const previewWindow = window.open(data.viewerUrl, '_blank')
+
+          if (!previewWindow || previewWindow.closed) {
+            toast({
+              title: '⚠️ Popup Diblokir',
+              description: `Klik link ini untuk membuka preview publik: ${data.viewerUrl}`,
+              duration: 30000
+            })
+          } else {
+            toast({
+              title: '📊 Preview Publik Dibuka',
+              description: 'File dibuka di Microsoft Office Online. File temp akan dihapus setelah ditutup.',
+              duration: 5000
+            })
+
+            if (data.driveItemId) {
+              const checkClosed = setInterval(() => {
+                if (previewWindow.closed) {
+                  clearInterval(checkClosed)
+                  fetch('/api/preview-office', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ driveItemId: data.driveItemId })
+                  }).catch(err => console.warn('Failed to cleanup temp file:', err))
+                }
+              }, 2000)
+            }
+          }
+        }
+
+        setPreviewLoading(null)
+        fetchStats()
+        return
+      }
+
+      toast({
+        title: '⚠️ Preview Tidak Tersedia',
+        description: 'Tipe file publik ini tidak mendukung preview. Gunakan tombol download.',
+        variant: 'destructive',
+        duration: 5000
+      })
+      setPreviewLoading(null)
+
+    } catch (error) {
+      console.error('Preview error:', error)
+      setPreviewLoading(null)
+      toast({
+        title: '❌ Error',
+        description: error instanceof Error ? error.message : 'Gagal membuka preview file publik',
+        variant: 'destructive',
+        duration: 5000
+      })
+    }
+  }
+
+
   // Print file - Open loading dialog with progress
   const handlePrint = useCallback(async (id: string) => {
     // Find file from all available lists
@@ -2347,6 +2551,7 @@ export default function ESOPApp() {
     }
 
     const fileExtension = sop.fileName.toLowerCase().split('.').pop()
+
 
     // Check if file type is supported
     if (!['pdf', 'xlsx', 'xls', 'xlsm', 'docx', 'doc'].includes(fileExtension || '')) {
@@ -6620,7 +6825,7 @@ export default function ESOPApp() {
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex items-center justify-center gap-1">
-                                    <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} title="Preview" className="hover:bg-cyan-100" disabled={previewLoading === sop.id}>
+                                    <Button size="icon" variant="ghost" onClick={() => handleVerifikasiPreview(sop.id)} title="Preview" className="hover:bg-cyan-100" disabled={previewLoading === sop.id}>
                                       {previewLoading === sop.id ? (
                                         <div className="relative">
                                           <motion.div className="w-4 h-4 border-2 border-cyan-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
@@ -6630,7 +6835,7 @@ export default function ESOPApp() {
                                         <Eye className="w-4 h-4 text-cyan-600" />
                                       )}
                                     </Button>
-                                    <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-100" disabled={downloadLoading === sop.id}>
+                                    <Button size="icon" variant="ghost" onClick={() => handleVerifikasiDownload(sop.id)} title="Download" className="hover:bg-green-100" disabled={downloadLoading === sop.id}>
                                       {downloadLoading === sop.id ? (
                                         <div className="relative">
                                           <motion.div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
@@ -6936,7 +7141,7 @@ export default function ESOPApp() {
                                   </TableCell>
                                   <TableCell>
                                     <div className="flex items-center justify-center gap-1">
-                                      <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} title="Preview" className="hover:bg-cyan-100" disabled={previewLoading === sop.id}>
+                                      <Button size="icon" variant="ghost" onClick={() => handleVerifikasiPreview(sop.id)} title="Preview" className="hover:bg-cyan-100" disabled={previewLoading === sop.id}>
                                         {previewLoading === sop.id ? (
                                           <div className="relative">
                                             <motion.div className="w-4 h-4 border-2 border-cyan-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
@@ -6946,7 +7151,7 @@ export default function ESOPApp() {
                                           <Eye className="w-4 h-4 text-cyan-600" />
                                         )}
                                       </Button>
-                                      <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-100" disabled={downloadLoading === sop.id}>
+                                      <Button size="icon" variant="ghost" onClick={() => handleVerifikasiDownload(sop.id)} title="Download" className="hover:bg-green-100" disabled={downloadLoading === sop.id}>
                                         {downloadLoading === sop.id ? (
                                           <div className="relative">
                                             <motion.div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
