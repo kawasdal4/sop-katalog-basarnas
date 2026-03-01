@@ -23,6 +23,10 @@ model User {
   updatedAt DateTime @updatedAt
   lastLoginAt DateTime? // Last login timestamp
   lastArsipVisitAt DateTime? // Last time the user visited the Arsip page
+  
+  // Password reset fields
+  resetToken       String?  // Token for password reset
+  resetTokenExpiry DateTime? // When the reset token expires
 
   // Relations
   logs     Log[]

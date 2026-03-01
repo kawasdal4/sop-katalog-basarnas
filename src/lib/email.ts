@@ -12,6 +12,14 @@ const EMAIL_USER = process.env.EMAIL_USER
 const EMAIL_PASS = process.env.EMAIL_PASS
 const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME || 'E-Katalog SOP Direktorat Kesiapsiagaan'
 
+// Debug logging
+console.log('[Email Service] Configuration:', {
+  hasEmailUser: !!EMAIL_USER,
+  hasEmailPass: !!EMAIL_PASS,
+  emailUser: EMAIL_USER ? `${EMAIL_USER.substring(0, 3)}***@${EMAIL_USER.split('@')[1]}` : 'not set',
+  fromName: EMAIL_FROM_NAME
+})
+
 // Create transporter
 function createTransporter() {
   if (!EMAIL_USER || !EMAIL_PASS) {
@@ -19,6 +27,8 @@ function createTransporter() {
     return null
   }
 
+  console.log('[Email Service] Creating transporter for:', EMAIL_USER)
+  
   return nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -73,6 +83,12 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
     const recipients = Array.isArray(options.to) ? options.to : [options.to]
     const toList = recipients.map(r => r.name ? `"${r.name}" <${r.email}>` : r.email)
 
+    console.log('[Email] Preparing to send email:', {
+      from: EMAIL_USER,
+      to: toList.join(', '),
+      subject: options.subject
+    })
+
     const mailOptions = {
       from: `"${EMAIL_FROM_NAME}" <${EMAIL_USER}>`,
       to: toList.join(', '),
@@ -83,12 +99,21 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
     }
 
     const info = await transporter.sendMail(mailOptions)
-    console.log(`✅ [Email] Sent successfully: ${info.messageId}`)
+    console.log(`✅ [Email] Sent successfully:`, {
+      messageId: info.messageId,
+      response: info.response
+    })
     
     return { success: true }
-  } catch (error) {
-    console.error('❌ [Email] Failed to send email:', error)
-    return { success: false, error: String(error) }
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorCode = (error as { code?: string })?.code
+    console.error('❌ [Email] Failed to send email:', {
+      error: errorMessage,
+      code: errorCode,
+      stack: error instanceof Error ? error.stack : undefined
+    })
+    return { success: false, error: errorMessage }
   }
 }
 

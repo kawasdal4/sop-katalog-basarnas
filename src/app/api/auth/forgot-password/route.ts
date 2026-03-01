@@ -42,22 +42,22 @@ export async function POST(request: NextRequest) {
     const resetToken = generateResetToken()
     const resetTokenExpiry = new Date(Date.now() + TOKEN_EXPIRY)
 
-    // Store token in database - we'll add fields to User model
-    // For now, we'll use a simple approach with metadata
+    // Store token in database
     await db.user.update({
       where: { id: user.id },
       data: {
-        // Store token in a way we can retrieve later
-        // We'll use the updatedAt field as a proxy for token expiry check
-        updatedAt: new Date()
+        resetToken,
+        resetTokenExpiry
       }
     })
 
-    // Create reset URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}` 
-      : 'http://localhost:3000'
-    const resetUrl = `${baseUrl}?reset-token=${resetToken}&email=${encodeURIComponent(email)}`
+    console.log('[Forgot Password] Token stored for user:', user.email)
+
+    // Create reset URL - use the current request origin or fallback
+    const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const resetUrl = `${origin}/?reset-token=${resetToken}&email=${encodeURIComponent(email)}`
+
+    console.log('[Forgot Password] Reset URL:', resetUrl)
 
     // Send email
     const emailHtml = `
@@ -145,15 +145,15 @@ Tim E-Katalog SOP Direktorat Kesiapsiagaan BASARNAS
     if (!result.success) {
       console.error('[Forgot Password] Failed to send email:', result.error)
       return NextResponse.json({ 
-        error: 'Gagal mengirim email. Silakan coba lagi.' 
+        error: 'Gagal mengirim email. Silakan coba lagi atau hubungi administrator.' 
       }, { status: 500 })
     }
 
-    console.log(`[Forgot Password] Reset email sent to: ${email}`)
+    console.log(`[Forgot Password] Reset email sent successfully to: ${email}`)
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Link reset password telah dikirim ke email Anda.' 
+      message: 'Link reset password telah dikirim ke email Anda. Silakan cek inbox atau folder spam.' 
     })
 
   } catch (error) {
