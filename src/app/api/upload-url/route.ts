@@ -155,6 +155,65 @@ export async function PUT(request: NextRequest) {
 
     console.log(`📤 Confirming upload: ${uploadKey}`)
 
+    // ============================================
+    // AUTO-GENERATE SOP NUMBER
+    // Format: SOP-0001, IK-0001, LAINNYA-0001
+    // ============================================
+    const getPrefix = (jenis: string) => {
+      if (jenis === 'SOP') return 'SOP-'
+      if (jenis === 'IK') return 'IK-'
+      return 'LAINNYA-'
+    }
+
+    const prefix = getPrefix(jenis)
+
+    // Function to generate unique nomorSop with retry
+    const generateUniqueNomorSop = async (maxRetries = 5): Promise<string> => {
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        // Get the latest SOP of the same jenis to determine the next number
+        const lastSop = await db.sopFile.findFirst({
+          where: { jenis },
+          orderBy: { nomorSop: 'desc' },
+          select: { nomorSop: true }
+        })
+
+        let nextNumber = 1
+        if (lastSop && lastSop.nomorSop) {
+          // Extract the numeric part (e.g., from "SOP-0012" extract "0012")
+          const matches = lastSop.nomorSop.match(/\d+$/)
+          if (matches) {
+            nextNumber = parseInt(matches[0], 10) + 1 + attempt
+          } else {
+            // Fallback if parsing fails
+            const existingCount = await db.sopFile.count({ where: { jenis } })
+            nextNumber = existingCount + 1 + attempt
+          }
+        }
+
+        // Generate new nomorSop (incremental)
+        const nomorSop = `${prefix}${String(nextNumber).padStart(4, '0')}`
+        
+        // Check if this nomorSop already exists
+        const existing = await db.sopFile.findUnique({
+          where: { nomorSop },
+          select: { id: true }
+        })
+        
+        if (!existing) {
+          return nomorSop
+        }
+        
+        console.log(`⚠️ Nomor ${nomorSop} already exists, retrying... (attempt ${attempt + 1})`)
+      }
+      
+      // If all retries fail, use timestamp-based number as fallback
+      const fallbackNumber = Date.now().toString().slice(-6)
+      return `${prefix}${fallbackNumber}`
+    }
+
+    const nomorSop = await generateUniqueNomorSop()
+    console.log(`📝 Generated nomor: ${nomorSop}`)
+
     // Generate file name from judul
     const fileExt = fileName.split('.').pop()?.toLowerCase() || 'pdf'
     const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
@@ -181,26 +240,41 @@ export async function PUT(request: NextRequest) {
     }
 
     // Create SOP record
-    const sopFile = await db.sopFile.create({
-      data: {
-        judul,
-        tahun: parseInt(tahun),
-        kategori,
-        jenis,
-        lingkup,
-        status: status || 'AKTIF',
-        fileName: finalFileName,
-        filePath: finalKey,
-        fileType: fileExt,
-        driveFileId: null, // Will be set when backup completes
-        uploadedBy: userId,
-        isPublicSubmission: isPublicSubmission || false,
-        submitterName,
-        submitterEmail,
-        keterangan,
-        verificationStatus: isPublicSubmission ? 'MENUNGGU' : null
+    let sopFile
+    try {
+      sopFile = await db.sopFile.create({
+        data: {
+          nomorSop,
+          judul,
+          tahun: parseInt(tahun),
+          kategori,
+          jenis,
+          lingkup,
+          status: status || 'AKTIF',
+          fileName: finalFileName,
+          filePath: finalKey,
+          fileType: fileExt,
+          driveFileId: null, // Will be set when backup completes
+          uploadedBy: userId,
+          isPublicSubmission: isPublicSubmission || false,
+          submitterName,
+          submitterEmail,
+          keterangan,
+          verificationStatus: isPublicSubmission ? 'MENUNGGU' : null
+        }
+      })
+    } catch (dbError: unknown) {
+      console.error('❌ Database error:', dbError)
+      const prismaError = dbError as { code?: string; meta?: { target?: string[] } }
+      if (prismaError.code === 'P2002') {
+        const target = prismaError.meta?.target?.join(', ') || 'field'
+        return NextResponse.json({
+          error: `Data dengan ${target} yang sama sudah ada. Silakan coba lagi.`,
+          code: prismaError.code
+        }, { status: 400 })
       }
-    })
+      throw dbError
+    }
 
     // Create FileSync record
     try {
