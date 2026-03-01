@@ -347,7 +347,112 @@ export async function POST(request: NextRequest) {
     }
 
     // ============================================
-    // STEP 2: BACKGROUND Backup to Google Drive
+    // STEP 2: BACKGROUND Email Notification
+    // (Async, no await - user gets response immediately)
+    // ============================================
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      import('nodemailer').then(async (nodemailer) => {
+        try {
+          console.log(`📧 [Background] Preparing email notification for: ${judul}`)
+
+          // 1. Ambil seluruh email user aktif dari tabel user
+          const users = await db.user.findMany({
+            where: {
+              email: { not: '' }
+            },
+            select: { email: true }
+          })
+
+          const listEmailUsers = users.map(u => u.email).filter(Boolean)
+
+          if (listEmailUsers.length > 0) {
+            // 2. Konfigurasi transporter Gmail
+            const transporter = nodemailer.createTransport({
+              service: 'gmail',
+              auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+              }
+            })
+
+            // Format tanggal: DD MMMM YYYY HH:mm WIB
+            const formatter = new Intl.DateTimeFormat('id-ID', {
+              day: '2-digit',
+              month: 'long',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZone: 'Asia/Jakarta'
+            })
+            const formattedDate = formatter.format(new Date()).replace(/\./g, ':') + ' WIB'
+
+            // Dapatkan nama pengupload
+            const uploader = await db.user.findUnique({ where: { id: userId }, select: { name: true } })
+            const penguploadName = isPublicSubmission ? (submitterName || 'System (Public Submission)') : (uploader?.name || 'Unknown User')
+
+            // 3. Format email body
+            const htmlBody = `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                <h2 style="color: #f97316; margin-bottom: 20px;">SOP Baru Telah Ditambahkan</h2>
+                
+                <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                  <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                      <td style="padding: 8px 0; color: #64748b; width: 150px;">Judul SOP</td>
+                      <td style="padding: 8px 0; font-weight: bold; color: #0f172a;">${judul}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; color: #64748b;">Nama Pengupload</td>
+                      <td style="padding: 8px 0; font-weight: bold; color: #0f172a;">${penguploadName}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; color: #64748b;">Waktu Upload</td>
+                      <td style="padding: 8px 0; font-weight: bold; color: #0f172a;">${formattedDate}</td>
+                    </tr>
+                  </table>
+                </div>
+                
+                <p style="color: #334155; line-height: 1.6;">
+                  SOP baru telah berhasil diunggah ke dalam sistem. Silakan login ke aplikasi E-Katalog SOP untuk melihat detail lebih lanjut.
+                </p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://sop-katalog-basarnas.vercel.app'}" style="background-color: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                    Login ke Aplikasi
+                  </a>
+                </div>
+                
+                <div style="border-top: 1px solid #e2e8f0; margin-top: 30px; padding-top: 20px; text-align: center;">
+                  <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+                    Direktorat Kesiapsiagaan - BASARNAS
+                  </p>
+                </div>
+              </div>
+            `
+
+            // 4. Kirim email
+            const fromName = process.env.EMAIL_FROM_NAME || 'E-Katalog SOP Direktorat Kesiapsiagaan'
+            const info = await transporter.sendMail({
+              from: `"${fromName}" <${process.env.EMAIL_USER}>`,
+              to: listEmailUsers,
+              subject: 'SOP Baru Ditambahkan',
+              html: htmlBody
+            })
+
+            console.log(`✅ [Background] Email sent successfully to ${listEmailUsers.length} users. Message ID: ${info.messageId}`)
+          } else {
+            console.log(`ℹ️ [Background] No active users found to send email.`)
+          }
+        } catch (emailError) {
+          console.error('❌ [Background] Email sending failed:', emailError)
+        }
+      }).catch(err => {
+        console.error('❌ [Background] Failed to load nodemailer:', err)
+      })
+    }
+
+    // ============================================
+    // STEP 3: BACKGROUND Backup to Google Drive
     // (Async, no await - user gets response immediately)
     // ============================================
     import('@/lib/google-drive').then(async (gd) => {
