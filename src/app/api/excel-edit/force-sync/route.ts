@@ -238,9 +238,14 @@ export async function POST(request: NextRequest) {
           })
 
           const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://e-katalog-sop.cloud';
+          const internalApiKey = process.env.INTERNAL_API_KEY || 'sop-basarnas-internal-secret-2024';
+
           fetch(`${appUrl}/api/send-email`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${internalApiKey}`
+            },
             body: JSON.stringify({
               type: 'FILE_UPDATED',
               data: {

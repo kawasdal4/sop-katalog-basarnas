@@ -265,12 +265,18 @@ export async function PUT(request: NextRequest) {
         }
       })
 
-      // Trigger NEW_SUBMISSION notification to Admin (Async)
+      // Trigger notification via Internal API (Async)
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://e-katalog-sop.cloud';
+      const internalApiKey = process.env.INTERNAL_API_KEY || 'sop-basarnas-internal-secret-2024';
+
       if (isPublicSubmission) {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://e-katalog-sop.cloud';
+        // Notify admins about new public submission
         fetch(`${appUrl}/api/send-email`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${internalApiKey}`
+          },
           body: JSON.stringify({
             type: 'NEW_SUBMISSION',
             data: {
@@ -280,7 +286,25 @@ export async function PUT(request: NextRequest) {
               submitterEmail: submitterEmail || '-'
             }
           })
-        }).catch(err => console.warn('⚠️ [Background] Submission notification trigger failed:', err));
+        }).catch(err => console.warn('⚠️ [Background] Public submission notification failed:', err));
+      } else {
+        // Notify all users about new catalog SOP (Admin/Staf upload)
+        fetch(`${appUrl}/api/send-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${internalApiKey}`
+          },
+          body: JSON.stringify({
+            type: 'SOP_PUBLISHED',
+            data: {
+              nomorSop,
+              judul,
+              jenis,
+              kategori
+            }
+          })
+        }).catch(err => console.warn('⚠️ [Background] Catalog upload notification failed:', err));
       }
     } catch (dbError: unknown) {
       console.error('❌ Database error:', dbError)

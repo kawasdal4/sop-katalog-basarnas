@@ -4555,9 +4555,10 @@ export default function ESOPApp() {
                         <Button
                           type="button"
                           onClick={async () => {
-                            // Validate email format
+                            // Validate email format - more lenient regex and trim
+                            const trimmedEmail = (forgotPasswordEmail || '').trim()
                             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-                            if (!forgotPasswordEmail || !emailRegex.test(forgotPasswordEmail)) {
+                            if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
                               toast({
                                 title: '⚠️ Format Email Tidak Valid',
                                 description: 'Masukkan alamat email yang benar, contoh: nama@email.com',
@@ -4571,7 +4572,7 @@ export default function ESOPApp() {
                               const res = await fetch('/api/auth/forgot-password', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ email: forgotPasswordEmail })
+                                body: JSON.stringify({ email: trimmedEmail })
                               })
                               const data = await res.json()
 
@@ -8775,9 +8776,10 @@ export default function ESOPApp() {
                       <Button
                         type="button"
                         onClick={async () => {
-                          // Validate email format
+                          // Validate email format - more lenient regex and trim
+                          const trimmedEmail = (forgotPasswordEmail || '').trim()
                           const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-                          if (!forgotPasswordEmail || !emailRegex.test(forgotPasswordEmail)) {
+                          if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
                             toast({
                               title: '⚠️ Format Email Tidak Valid',
                               description: 'Masukkan alamat email yang benar, contoh: nama@email.com',
@@ -8791,7 +8793,7 @@ export default function ESOPApp() {
                             const res = await fetch('/api/auth/forgot-password', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ email: forgotPasswordEmail })
+                              body: JSON.stringify({ email: trimmedEmail })
                             })
                             const data = await res.json()
 

@@ -21,22 +21,29 @@ export const maxDuration = 300 // Extended duration for bulk sending
  */
 export async function POST(request: NextRequest) {
     try {
-        // 1. Security Check: Admin Only
+        // 1. Security Check: Admin Only or Internal System Key
         const cookieStore = await cookies()
         const userId = cookieStore.get('userId')?.value
+        const authHeader = request.headers.get('Authorization')
+        const internalApiKey = process.env.INTERNAL_API_KEY || 'sop-basarnas-internal-secret-2024'
+        const isInternalRequest = authHeader === `Bearer ${internalApiKey}`
 
-        if (!userId) {
+        if (!userId && !isInternalRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const user = await db.user.findUnique({
-            where: { id: userId },
-            select: { role: true }
-        })
+        if (userId) {
+            const user = await db.user.findUnique({
+                where: { id: userId },
+                select: { role: true }
+            })
 
-        if (!user || !['ADMIN', 'DEVELOPER'].includes(user.role)) {
-            // NOTE: We allow system-level triggers (public submissions) if we add a secret key check
-            // For now, assume this is triggered by an admin action
+            if (!user || !['ADMIN', 'DEVELOPER'].includes(user.role)) {
+                // Return unauthorized if it's not an internal request and user is not admin
+                if (!isInternalRequest) {
+                    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+                }
+            }
         }
 
         const body = await request.json()

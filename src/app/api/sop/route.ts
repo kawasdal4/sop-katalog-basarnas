@@ -391,6 +391,7 @@ export async function POST(request: NextRequest) {
     // (Async, no await - user gets response immediately)
     // ============================================
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://e-katalog-sop.cloud';
+    const internalApiKey = process.env.INTERNAL_API_KEY || 'sop-basarnas-internal-secret-2024';
 
     // Trigger notification in background
     (async () => {
@@ -399,7 +400,10 @@ export async function POST(request: NextRequest) {
           // Notify admins about new submission
           await fetch(`${appUrl}/api/send-email`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${internalApiKey}`
+            },
             body: JSON.stringify({
               type: 'SOP_SUBMITTED',
               data: {
@@ -413,7 +417,10 @@ export async function POST(request: NextRequest) {
           // Notify all users about new published SOP
           await fetch(`${appUrl}/api/send-email`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${internalApiKey}`
+            },
             body: JSON.stringify({
               type: 'SOP_PUBLISHED',
               data: {
@@ -607,9 +614,14 @@ export async function PUT(request: NextRequest) {
 
       // Trigger FILE_UPDATED notification to all users (Async)
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://e-katalog-sop.cloud';
+      const internalApiKey = process.env.INTERNAL_API_KEY || 'sop-basarnas-internal-secret-2024';
+
       fetch(`${appUrl}/api/send-email`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${internalApiKey}`
+        },
         body: JSON.stringify({
           type: 'FILE_UPDATED',
           data: {
@@ -668,9 +680,14 @@ export async function PUT(request: NextRequest) {
         updateData.status = 'REVIEW'
         // 2. Also notify all users that a new SOP has been published
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://e-katalog-sop.cloud';
+        const internalApiKey = process.env.INTERNAL_API_KEY || 'sop-basarnas-internal-secret-2024';
+
         fetch(`${appUrl}/api/send-email`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${internalApiKey}`
+          },
           body: JSON.stringify({
             type: 'SOP_PUBLISHED',
             data: {
@@ -730,6 +747,7 @@ export async function PUT(request: NextRequest) {
     // Send email notification for public submission verification (background)
     if (verificationStatus && sopFile.isPublicSubmission && sopFile.submitterEmail) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://e-katalog-sop.cloud';
+      const internalApiKey = process.env.INTERNAL_API_KEY || 'sop-basarnas-internal-secret-2024';
 
       const type = verificationStatus === 'DISETUJUI' ? 'SOP_APPROVED' : 'SOP_REJECTED'
       const emailParams = {
@@ -745,7 +763,10 @@ export async function PUT(request: NextRequest) {
       // Trigger background notification
       fetch(`${appUrl}/api/send-email`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${internalApiKey}`
+        },
         body: JSON.stringify(emailParams)
       }).catch(err => console.warn('⚠️ [Background] Verification email trigger failed:', err))
     }
