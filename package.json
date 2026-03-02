@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
-    "build": "cp prisma/schema.prod.prisma prisma/schema.prisma && prisma generate --schema=./prisma/schema.prisma && prisma db push --schema=./prisma/schema.prod.prisma --skip-generate && next build",
+    "build": "cp prisma/schema.prod.prisma prisma/schema.prisma && prisma generate --schema=./prisma/schema.prisma && prisma db push --schema=./prisma/schema.prod.prisma --skip-generate --accept-data-loss && next build",
     "postinstall": "node -e \"if(process.env.VERCEL){require('fs').copyFileSync('prisma/schema.prod.prisma','prisma/schema.prisma')}\" && prisma generate --schema=./prisma/schema.prisma",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
