@@ -116,7 +116,8 @@ export async function GET(request: NextRequest) {
     const sopFiles = await db.sopFile.findMany({
       where,
       include: {
-        user: { select: { name: true, email: true } }
+        user: { select: { name: true, email: true } },
+        updatedByUser: { select: { name: true, email: true } }
       },
       orderBy,
       skip: (page - 1) * limit,
@@ -606,6 +607,9 @@ export async function PUT(request: NextRequest) {
       if (lingkup !== undefined) updateData.lingkup = lingkup
       if (tahun) updateData.tahun = tahun
       if (status) updateData.status = status
+
+      // Track who made the edit
+      updateData.updatedBy = userId
 
       const sopFile = await db.sopFile.update({
         where: { id },

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { cookies } from 'next/headers'
 
-// GET - Fetch all logs with pagination
+// GET - Fetch all logs with pagination and filters
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies()
@@ -23,10 +23,37 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20')
     const aktivitas = searchParams.get('aktivitas') || ''
     const filterUserId = searchParams.get('userId') || ''
+    const timeFilter = searchParams.get('timeFilter') || ''
     
     const where: Record<string, unknown> = {}
     if (aktivitas) where.aktivitas = aktivitas
     if (filterUserId) where.userId = filterUserId
+    
+    // Time filter
+    if (timeFilter) {
+      const now = new Date()
+      let startDate: Date
+      
+      switch (timeFilter) {
+        case 'HARI_INI':
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
+          break
+        case 'MINGGU_INI':
+          const dayOfWeek = now.getDay()
+          const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)
+          startDate = new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0)
+          break
+        case 'BULAN_INI':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0)
+          break
+        default:
+          startDate = new Date(0) // All time
+      }
+      
+      if (timeFilter !== 'SEMUA') {
+        where.createdAt = { gte: startDate }
+      }
+    }
     
     const total = await db.log.count({ where })
     

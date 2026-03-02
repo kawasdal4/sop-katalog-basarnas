@@ -35,7 +35,9 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  Area,
+  AreaChart
 } from 'recharts'
 import {
   LayoutDashboard,
@@ -87,7 +89,9 @@ import {
   Key,
   Trash,
   Tag,
-  Calendar
+  Calendar,
+  PieChartIcon,
+  BarChart2
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { StorageStatus } from '@/components/storage'
@@ -95,6 +99,7 @@ import PrintLoadingDialog from '@/components/PrintLoadingDialog'
 import CopyrightPopup from '@/components/CopyrightPopup'
 import LogoutAnimation from '@/components/LogoutAnimation'
 import ImageCropper from '@/components/ImageCropper'
+import SARLoadingOverlay, { StatCardSkeleton, TableRowSkeleton } from '@/components/SARLoadingOverlay'
 
 // Types
 type UserRole = 'ADMIN' | 'STAF' | 'DEVELOPER' | null
@@ -127,7 +132,9 @@ interface SopFile {
   uploadedBy: string
   uploadedAt: string
   updatedAt?: string
+  updatedBy?: string
   user?: { name: string }
+  updatedByUser?: { name: string; email: string }
   isPublicSubmission?: boolean
   submitterName?: string
   submitterEmail?: string
@@ -175,6 +182,8 @@ interface Stats {
 }
 
 const COLORS = ['#f97316', '#eab308', '#22c55e', '#ef4444', '#3b82f6']
+
+const LINGKUP_COLORS = ['#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#22c55e', '#eab308', '#ef4444']
 
 const STATUS_COLORS: Record<string, string> = {
   'AKTIF': 'bg-green-100 text-green-800 border-green-200',
@@ -426,7 +435,7 @@ function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
   )
 }
 
-// Animated Stat Card Component
+// Animated Stat Card Component - Redesigned
 function StatCard({
   title,
   value,
@@ -434,7 +443,10 @@ function StatCard({
   color,
   delay = 0,
   trend,
-  action
+  action,
+  subtitle,
+  percentage,
+  total
 }: {
   title: string
   value: number | string
@@ -443,53 +455,86 @@ function StatCard({
   delay?: number
   trend?: 'up' | 'down'
   action?: React.ReactNode
+  subtitle?: string
+  percentage?: number
+  total?: number
 }) {
-  const colorClasses: Record<string, { bg: string; icon: string; text: string; border: string; titleText: string }> = {
+  const colorThemes: Record<string, {
+    gradient: string
+    iconBg: string
+    iconColor: string
+    valueColor: string
+    accentColor: string
+    glowColor: string
+    patternColor: string
+  }> = {
     orange: {
-      bg: 'from-white to-orange-50',
-      icon: 'bg-gradient-to-br from-orange-400 to-orange-600 text-white',
-      text: 'text-orange-700',
-      border: 'border-orange-200',
-      titleText: 'text-gray-800'
+      gradient: 'from-orange-50 via-white to-amber-50',
+      iconBg: 'bg-gradient-to-br from-orange-400 via-orange-500 to-amber-500',
+      iconColor: 'text-white',
+      valueColor: 'text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-amber-600',
+      accentColor: 'text-orange-500',
+      glowColor: 'shadow-orange-200/50',
+      patternColor: 'text-orange-100'
     },
     yellow: {
-      bg: 'from-white to-yellow-50',
-      icon: 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-white',
-      text: 'text-yellow-700',
-      border: 'border-yellow-200',
-      titleText: 'text-gray-800'
+      gradient: 'from-yellow-50 via-white to-amber-50',
+      iconBg: 'bg-gradient-to-br from-yellow-400 via-yellow-500 to-amber-500',
+      iconColor: 'text-white',
+      valueColor: 'text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-amber-600',
+      accentColor: 'text-yellow-500',
+      glowColor: 'shadow-yellow-200/50',
+      patternColor: 'text-yellow-100'
     },
     green: {
-      bg: 'from-white to-green-50',
-      icon: 'bg-gradient-to-br from-green-400 to-green-600 text-white',
-      text: 'text-green-700',
-      border: 'border-green-200',
-      titleText: 'text-gray-800'
+      gradient: 'from-emerald-50 via-white to-green-50',
+      iconBg: 'bg-gradient-to-br from-emerald-400 via-green-500 to-teal-500',
+      iconColor: 'text-white',
+      valueColor: 'text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600',
+      accentColor: 'text-emerald-500',
+      glowColor: 'shadow-emerald-200/50',
+      patternColor: 'text-emerald-100'
     },
     red: {
-      bg: 'from-white to-red-50',
-      icon: 'bg-gradient-to-br from-red-400 to-red-600 text-white',
-      text: 'text-red-700',
-      border: 'border-red-200',
-      titleText: 'text-gray-800'
+      gradient: 'from-red-50 via-white to-rose-50',
+      iconBg: 'bg-gradient-to-br from-red-400 via-rose-500 to-pink-500',
+      iconColor: 'text-white',
+      valueColor: 'text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-rose-600',
+      accentColor: 'text-red-500',
+      glowColor: 'shadow-red-200/50',
+      patternColor: 'text-red-100'
     },
     cyan: {
-      bg: 'from-white to-cyan-50',
-      icon: 'bg-gradient-to-br from-cyan-400 to-cyan-600 text-white',
-      text: 'text-cyan-700',
-      border: 'border-cyan-200',
-      titleText: 'text-gray-800'
+      gradient: 'from-cyan-50 via-white to-sky-50',
+      iconBg: 'bg-gradient-to-br from-cyan-400 via-sky-500 to-blue-500',
+      iconColor: 'text-white',
+      valueColor: 'text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-sky-600',
+      accentColor: 'text-cyan-500',
+      glowColor: 'shadow-cyan-200/50',
+      patternColor: 'text-cyan-100'
     },
     purple: {
-      bg: 'from-white to-purple-50',
-      icon: 'bg-gradient-to-br from-purple-400 to-purple-600 text-white',
-      text: 'text-purple-700',
-      border: 'border-purple-200',
-      titleText: 'text-gray-800'
+      gradient: 'from-purple-50 via-white to-violet-50',
+      iconBg: 'bg-gradient-to-br from-purple-400 via-violet-500 to-indigo-500',
+      iconColor: 'text-white',
+      valueColor: 'text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-violet-600',
+      accentColor: 'text-purple-500',
+      glowColor: 'shadow-purple-200/50',
+      patternColor: 'text-purple-100'
     },
+    blue: {
+      gradient: 'from-blue-50 via-white to-indigo-50',
+      iconBg: 'bg-gradient-to-br from-blue-400 via-indigo-500 to-violet-500',
+      iconColor: 'text-white',
+      valueColor: 'text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600',
+      accentColor: 'text-blue-500',
+      glowColor: 'shadow-blue-200/50',
+      patternColor: 'text-blue-100'
+    }
   }
 
-  const c = colorClasses[color] || colorClasses.orange
+  const theme = colorThemes[color] || colorThemes.orange
+  const percentageValue = percentage !== undefined ? percentage : (total && typeof value === 'number' ? Math.round((value / total) * 100) : undefined)
 
   return (
     <motion.div
@@ -497,38 +542,136 @@ function StatCard({
       initial="initial"
       animate="animate"
       transition={{ delay }}
-      whileHover={{ y: -4, transition: { duration: 0.2 } }}
+      whileHover={{ y: -6, scale: 1.02 }}
+      className="h-full"
     >
-      <Card className={`stat-card bg-gradient-to-br ${c.bg} border-2 ${c.border} overflow-hidden shadow-xl`}>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-xl font-bold ${c.titleText}`}>{title}</p>
-              <motion.p
-                className={`text-3xl font-bold ${c.text} mt-2`}
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: delay + 0.2, type: 'spring' }}
-              >
-                {value}
-              </motion.p>
-              {trend && (
-                <div className={`flex items-center gap-1 mt-2 text-xs font-medium ${trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-                  <TrendingUp className={`w-3 h-3 ${trend === 'down' ? 'rotate-180' : ''}`} />
-                  <span>{trend === 'up' ? 'Naik' : 'Turun'}</span>
-                </div>
+      <Card className={`relative overflow-hidden bg-gradient-to-br ${theme.gradient} border border-white/50 shadow-xl ${theme.glowColor} backdrop-blur-sm h-full`}>
+        {/* Animated Background Pattern */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {/* Floating circles */}
+          <motion.div
+            animate={{
+              scale: [1, 1.2, 1],
+              opacity: [0.3, 0.5, 0.3]
+            }}
+            transition={{ duration: 4, repeat: Infinity, delay: delay * 2 }}
+            className={`absolute -right-8 -top-8 w-32 h-32 rounded-full ${theme.patternColor} blur-2xl`}
+          />
+          <motion.div
+            animate={{
+              scale: [1.2, 1, 1.2],
+              opacity: [0.2, 0.4, 0.2]
+            }}
+            transition={{ duration: 5, repeat: Infinity, delay: delay * 2 + 0.5 }}
+            className={`absolute -left-4 -bottom-4 w-24 h-24 rounded-full ${theme.patternColor} blur-xl`}
+          />
+
+          {/* Decorative grid pattern */}
+          <div className={`absolute inset-0 opacity-[0.03] ${theme.patternColor}`} style={{
+            backgroundImage: `radial-gradient(circle at 1px 1px, currentColor 1px, transparent 1px)`,
+            backgroundSize: '20px 20px'
+          }} />
+        </div>
+
+        <CardContent className="relative p-5">
+          {/* Header with Icon */}
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-sm font-semibold text-gray-600 uppercase tracking-wider">{title}</p>
+                {trend && (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: delay + 0.3, type: 'spring' }}
+                    className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${trend === 'up' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}
+                  >
+                    <TrendingUp className={`w-2.5 h-2.5 ${trend === 'down' ? 'rotate-180' : ''}`} />
+                    {trend === 'up' ? '↑' : '↓'}
+                  </motion.span>
+                )}
+              </div>
+              {subtitle && (
+                <p className="text-xs text-gray-400">{subtitle}</p>
               )}
             </div>
-            <div className="flex flex-col items-end gap-2">
-              {action}
+
+            {/* Animated Icon */}
+            <motion.div
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ delay: delay + 0.1, type: 'spring', stiffness: 200 }}
+              whileHover={{ rotate: 15, scale: 1.1 }}
+              className={`relative ${theme.iconBg} p-3 rounded-2xl shadow-lg ${theme.glowColor}`}
+            >
+              {/* Glow effect */}
               <motion.div
-                className={`w-14 h-14 ${c.icon} rounded-xl flex items-center justify-center shadow-lg`}
-                whileHover={{ rotate: 5, scale: 1.1 }}
-              >
-                <Icon className="w-7 h-7" />
-              </motion.div>
-            </div>
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className={`absolute inset-0 rounded-2xl bg-white/30 blur-sm`}
+              />
+              <Icon className={`w-6 h-6 relative z-10 ${theme.iconColor}`} />
+            </motion.div>
           </div>
+
+          {/* Value with Animation */}
+          <div className="mb-3">
+            <motion.p
+              className={`text-4xl font-extrabold ${theme.valueColor} tracking-tight`}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: delay + 0.2, type: 'spring', stiffness: 100 }}
+            >
+              {typeof value === 'number' ? value.toLocaleString('id-ID') : value}
+            </motion.p>
+          </div>
+
+          {/* Progress Bar / Percentage */}
+          {(percentageValue !== undefined) && (
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-gray-400">Persentase</span>
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: delay + 0.4 }}
+                  className={`font-bold ${theme.accentColor}`}
+                >
+                  {percentageValue}%
+                </motion.span>
+              </div>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden shadow-inner">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${percentageValue}%` }}
+                  transition={{ delay: delay + 0.3, duration: 0.8, ease: "easeOut" }}
+                  className={`h-full ${theme.iconBg} rounded-full relative`}
+                >
+                  {/* Shimmer effect */}
+                  <motion.div
+                    animate={{ x: ['-100%', '200%'] }}
+                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                  />
+                </motion.div>
+              </div>
+            </div>
+          )}
+
+          {/* Action Button */}
+          {action && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: delay + 0.4 }}
+              className="mt-3 pt-3 border-t border-gray-100"
+            >
+              {action}
+            </motion.div>
+          )}
+
+          {/* Decorative Corner Accent */}
+          <div className={`absolute bottom-0 right-0 w-16 h-16 ${theme.iconBg} opacity-5 rounded-tl-[100px]`} />
         </CardContent>
       </Card>
     </motion.div>
@@ -696,6 +839,11 @@ export default function ESOPApp() {
   const [arsipSortBy, setArsipSortBy] = useState<'uploadedAt-desc' | 'uploadedAt-asc'>('uploadedAt-desc')
   const [arsipSeenCount, setArsipSeenCount] = useState(0) // Track count of rejected files user has seen
 
+  // Log Aktivitas filters
+  const [logsTimeFilter, setLogsTimeFilter] = useState('SEMUA') // SEMUA, HARI_INI, MINGGU_INI, BULAN_INI
+  const [logsUserFilter, setLogsUserFilter] = useState('SEMUA')
+  const [logsActivityFilter, setLogsActivityFilter] = useState('SEMUA')
+
   // Loading states for table pagination (to prevent blinking)
   const [katalogLoading, setKatalogLoading] = useState(false)
   const [verifikasiLoading, setVerifikasiLoading] = useState(false)
@@ -813,6 +961,11 @@ export default function ESOPApp() {
   const [loginSuccessName, setLoginSuccessName] = useState('')
   const [loginSuccessRole, setLoginSuccessRole] = useState<'ADMIN' | 'STAF' | 'DEVELOPER' | null>(null)
   const [loginSuccessPhoto, setLoginSuccessPhoto] = useState<string | null>(null)
+
+  // Initial dashboard loading overlay (shown on first load and after login)
+  const [showDashboardLoading, setShowDashboardLoading] = useState(false)
+  const [dashboardLoadMessage, setDashboardLoadMessage] = useState('Memuat Data')
+  const [dashboardLoadSubmessage, setDashboardLoadSubmessage] = useState('Mengambil informasi dari server...')
 
   // Loading states for operations with Basarnas animation
   const [previewLoading, setPreviewLoading] = useState<string | null>(null)
@@ -1009,9 +1162,15 @@ export default function ESOPApp() {
     try {
       const res = await fetch('/api/stats')
       const data = await res.json()
-      if (!data.error) setStats(data)
+      if (!data.error) {
+        setStats(data)
+        // Hide dashboard loading overlay after stats are loaded
+        setShowDashboardLoading(false)
+      }
     } catch (error) {
       console.error('Stats error:', error)
+      // Also hide loading on error
+      setShowDashboardLoading(false)
     }
   }, [])
 
@@ -1596,6 +1755,17 @@ export default function ESOPApp() {
         limit: logsPagination.limit.toString()
       })
 
+      // Add filters
+      if (logsTimeFilter !== 'SEMUA') {
+        params.append('timeFilter', logsTimeFilter)
+      }
+      if (logsUserFilter !== 'SEMUA') {
+        params.append('userId', logsUserFilter)
+      }
+      if (logsActivityFilter !== 'SEMUA') {
+        params.append('aktivitas', logsActivityFilter)
+      }
+
       const res = await fetch(`/api/logs?${params}`)
       const data = await res.json()
       if (!data.error) {
@@ -1605,7 +1775,7 @@ export default function ESOPApp() {
     } catch (error) {
       console.error('Fetch logs error:', error)
     }
-  }, [logsPagination.page, logsPagination.limit])
+  }, [logsPagination.page, logsPagination.limit, logsTimeFilter, logsUserFilter, logsActivityFilter])
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -1679,6 +1849,18 @@ export default function ESOPApp() {
     }
   }, [user?.id])
 
+  // Show dashboard loading on initial auth
+  useEffect(() => {
+    if (isAuthenticated && user && currentPage === 'dashboard') {
+      // Show loading overlay when navigating to dashboard (initial load)
+      if (!stats) {
+        setDashboardLoadMessage('Memuat Dashboard')
+        setDashboardLoadSubmessage('Mengambil data statistik...')
+        setShowDashboardLoading(true)
+      }
+    }
+  }, [isAuthenticated, user, currentPage, stats])
+
   // Fetch data when authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -1711,6 +1893,7 @@ export default function ESOPApp() {
     // No debounce for initial load or filter changes
     const debounceTimer = setTimeout(async () => {
       setIsSearching(true)
+      setKatalogLoading(true) // Show loading animation
       try {
         const params = new URLSearchParams()
         if (searchInput) params.append('search', searchInput)
@@ -1832,10 +2015,14 @@ export default function ESOPApp() {
         setLoginSuccessPhoto(data.user?.profilePhotoUrl || null)
         setShowLoginSuccess(true)
 
-        // Hide animation after 3 seconds
+        // After login success animation, show dashboard loading overlay
         setTimeout(() => {
           setShowLoginSuccess(false)
-        }, 3000)
+          // Show dashboard loading overlay
+          setDashboardLoadMessage('Selamat Datang, ' + (data.user?.name || 'User'))
+          setDashboardLoadSubmessage('Memuat data dashboard...')
+          setShowDashboardLoading(true)
+        }, 2500)
 
         // Run auto-rename in background (check and rename files that don't match titles)
         if (data.user?.role === 'ADMIN' || data.user?.role === 'DEVELOPER') {
@@ -4685,6 +4872,13 @@ export default function ESOPApp() {
     <div className="min-h-screen flex flex-col relative overflow-hidden">
       <SARBackground />
 
+      {/* Dashboard Loading Overlay - Glassmorphism SAR Theme */}
+      <SARLoadingOverlay
+        isVisible={showDashboardLoading}
+        message={dashboardLoadMessage}
+        submessage={dashboardLoadSubmessage}
+      />
+
       {/* Logout Animation */}
       <LogoutAnimation show={showLogoutAnimation} userName={user?.name} userPhoto={user?.profilePhotoUrl} />
 
@@ -5626,16 +5820,53 @@ export default function ESOPApp() {
                 className="space-y-6"
               >
                 {!stats ? (
-                  <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                      <motion.div
-                        className="sar-loading mx-auto mb-4"
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                      />
-                      <p className="text-gray-500">Memuat data...</p>
+                  // Show skeleton cards while loading
+                  <>
+                    <motion.div
+                      className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                    >
+                      <div className="h-8 w-48 bg-slate-200/30 rounded-lg animate-pulse" />
+                      <div className="h-9 w-32 bg-slate-200/30 rounded-lg animate-pulse" />
+                    </motion.div>
+
+                    {/* Stats Cards Skeleton */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {[0, 1, 2, 3].map((i) => (
+                        <StatCardSkeleton key={i} />
+                      ))}
                     </div>
-                  </div>
+
+                    {/* Status Cards Skeleton */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {[0, 1, 2, 3].map((i) => (
+                        <StatCardSkeleton key={i} />
+                      ))}
+                    </div>
+
+                    {/* Charts Skeleton */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <motion.div
+                        className="bg-white/80 backdrop-blur rounded-xl p-6 border border-slate-200 shadow-lg"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                      >
+                        <div className="h-6 w-32 bg-slate-200/50 rounded mb-4 animate-pulse" />
+                        <div className="h-[300px] bg-slate-100/50 rounded-lg animate-pulse" />
+                      </motion.div>
+                      <motion.div
+                        className="bg-white/80 backdrop-blur rounded-xl p-6 border border-slate-200 shadow-lg"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                      >
+                        <div className="h-6 w-32 bg-slate-200/50 rounded mb-4 animate-pulse" />
+                        <div className="h-[300px] bg-slate-100/50 rounded-lg animate-pulse" />
+                      </motion.div>
+                    </div>
+                  </>
                 ) : (
                   <>
                     <motion.div
@@ -5760,10 +5991,40 @@ export default function ESOPApp() {
                       className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
                       variants={staggerContainer}
                     >
-                      <StatCard title="Total SOP" value={stats.totalSop} icon={FileText} color="orange" delay={0} />
-                      <StatCard title="Total IK" value={stats.totalIk} icon={FolderOpen} color="yellow" delay={0.1} />
-                      <StatCard title="Total Preview" value={stats.totalPreviews || 0} icon={Eye} color="cyan" delay={0.2} />
-                      <StatCard title="Total Download" value={stats.totalDownloads || 0} icon={Download} color="purple" delay={0.3} />
+                      <StatCard
+                        title="Total SOP"
+                        value={stats.totalSop}
+                        icon={FileText}
+                        color="orange"
+                        delay={0}
+                        subtitle="Standar Operasional Prosedur"
+                        total={stats.totalSop + stats.totalIk}
+                      />
+                      <StatCard
+                        title="Total IK"
+                        value={stats.totalIk}
+                        icon={FolderOpen}
+                        color="yellow"
+                        delay={0.1}
+                        subtitle="Instruksi Kerja"
+                        total={stats.totalSop + stats.totalIk}
+                      />
+                      <StatCard
+                        title="Total Preview"
+                        value={stats.totalPreviews || 0}
+                        icon={Eye}
+                        color="cyan"
+                        delay={0.2}
+                        subtitle="Dokumen dilihat"
+                      />
+                      <StatCard
+                        title="Total Download"
+                        value={stats.totalDownloads || 0}
+                        icon={Download}
+                        color="purple"
+                        delay={0.3}
+                        subtitle="Dokumen diunduh"
+                      />
                     </motion.div>
 
                     {/* Status Cards */}
@@ -5771,10 +6032,42 @@ export default function ESOPApp() {
                       className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
                       variants={staggerContainer}
                     >
-                      <StatCard title="Aktif" value={stats.totalAktif} icon={CheckCircle} color="green" delay={0.4} />
-                      <StatCard title="Review" value={stats.totalReview} icon={Clock} color="yellow" delay={0.5} />
-                      <StatCard title="Kadaluarsa" value={stats.totalKadaluarsa} icon={XCircle} color="red" delay={0.6} />
-                      <StatCard title="Total Lingkup" value={stats.byLingkup?.length || 0} icon={Globe} color="blue" delay={0.7} />
+                      <StatCard
+                        title="Aktif"
+                        value={stats.totalAktif}
+                        icon={CheckCircle}
+                        color="green"
+                        delay={0.4}
+                        subtitle="Dokumen berlaku"
+                        total={stats.totalSop + stats.totalIk}
+                        trend={stats.totalAktif > stats.totalReview ? 'up' : undefined}
+                      />
+                      <StatCard
+                        title="Review"
+                        value={stats.totalReview}
+                        icon={Clock}
+                        color="yellow"
+                        delay={0.5}
+                        subtitle="Perlu ditinjau"
+                        total={stats.totalSop + stats.totalIk}
+                      />
+                      <StatCard
+                        title="Kadaluarsa"
+                        value={stats.totalKadaluarsa}
+                        icon={XCircle}
+                        color="red"
+                        delay={0.6}
+                        subtitle="Tidak berlaku"
+                        total={stats.totalSop + stats.totalIk}
+                      />
+                      <StatCard
+                        title="Lingkup"
+                        value={stats.byLingkup?.length || 0}
+                        icon={Globe}
+                        color="blue"
+                        delay={0.7}
+                        subtitle="Bidang kerja"
+                      />
                     </motion.div>
 
                     {/* Charts */}
@@ -5782,199 +6075,397 @@ export default function ESOPApp() {
                       className="grid grid-cols-1 lg:grid-cols-2 gap-6"
                       variants={fadeInUp}
                     >
-                      <Card className="glass-card border-0 shadow-xl">
-                        <CardHeader>
-                          <CardTitle className="text-lg text-blue-900 font-bold">Distribusi per Tahun</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={stats.byTahun}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" strokeOpacity={0.3} />
-                              <XAxis dataKey="tahun" stroke="#1e3a5f" tick={{ fill: '#1e3a5f', fontWeight: 600 }} />
-                              <YAxis stroke="#1e3a5f" tick={{ fill: '#1e3a5f', fontWeight: 600 }} />
-                              <Tooltip
-                                contentStyle={{
-                                  backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                                  border: '2px solid #f97316',
-                                  borderRadius: '12px',
-                                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
-                                }}
-                                itemStyle={{ color: '#1e3a5f', fontWeight: 600 }}
-                                labelStyle={{ color: '#f97316', fontWeight: 700 }}
-                              />
-                              <Bar dataKey="count" fill="url(#colorGradient)" name="Jumlah" radius={[4, 4, 0, 0]} />
-                              <defs>
-                                <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="#f97316" />
-                                  <stop offset="100%" stopColor="#ea580c" />
-                                </linearGradient>
-                              </defs>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
+                      {/* Bar Chart - Distribusi per Tahun */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                      >
+                        <Card className="relative overflow-hidden bg-gradient-to-br from-white via-orange-50/30 to-amber-50/50 border border-orange-100/50 shadow-2xl shadow-orange-200/20">
+                          {/* Decorative Elements */}
+                          <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-orange-400/10 to-transparent rounded-full blur-3xl" />
+                          <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-amber-400/10 to-transparent rounded-full blur-2xl" />
 
-                      <Card className="glass-card border-0 shadow-xl">
-                        <CardHeader>
-                          <CardTitle className="text-lg text-blue-900 font-bold">Distribusi per Kategori</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                              <Pie
-                                data={stats.byKategori}
-                                dataKey="count"
-                                nameKey="kategori"
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={80}
-                                labelLine={false}
-                                stroke="#1e3a5f"
-                                strokeWidth={2}
-                              >
-                                {stats.byKategori.map((_, index) => (
-                                  <Cell key={`cell - ${index} `} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                              </Pie>
-                              <Tooltip
-                                contentStyle={{
-                                  backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                                  border: '2px solid #f97316',
-                                  borderRadius: '12px',
-                                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
-                                }}
-                                itemStyle={{ color: '#1e3a5f', fontWeight: 600 }}
-                                labelStyle={{ color: '#f97316', fontWeight: 700 }}
-                              />
-                              <Legend
-                                layout="vertical"
-                                align="right"
-                                verticalAlign="middle"
-                                formatter={(value, entry) => <span className="text-blue-900 font-semibold">{value} ({entry.payload?.count || 0})</span>}
-                              />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
+                          <CardHeader className="relative pb-2">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <motion.div
+                                    animate={{ rotate: [0, 10, -10, 0] }}
+                                    transition={{ duration: 4, repeat: Infinity }}
+                                    className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center shadow-lg shadow-orange-200/50"
+                                  >
+                                    <BarChart2 className="w-5 h-5 text-white" />
+                                  </motion.div>
+                                  <div>
+                                    <CardTitle className="text-lg font-bold bg-gradient-to-r from-orange-700 to-amber-600 bg-clip-text text-transparent">
+                                      Distribusi per Tahun
+                                    </CardTitle>
+                                    <p className="text-xs text-gray-500">Jumlah dokumen berdasarkan tahun pembuatan</p>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-2xl font-bold text-orange-600">{stats.byTahun?.length || 0}</p>
+                                <p className="text-xs text-gray-400">Tahun</p>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="relative">
+                            <ResponsiveContainer width="100%" height={280}>
+                              <BarChart data={stats.byTahun}>
+                                <defs>
+                                  <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#f97316" stopOpacity={1}/>
+                                    <stop offset="50%" stopColor="#ea580c" stopOpacity={1}/>
+                                    <stop offset="100%" stopColor="#c2410c" stopOpacity={1}/>
+                                  </linearGradient>
+                                  <filter id="barShadow" x="-20%" y="-20%" width="140%" height="140%">
+                                    <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#f97316" floodOpacity="0.3"/>
+                                  </filter>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" strokeOpacity={0.5} vertical={false} />
+                                <XAxis
+                                  dataKey="tahun"
+                                  stroke="#fb923c"
+                                  tick={{ fill: '#f97316', fontWeight: 600, fontSize: 12 }}
+                                  axisLine={{ stroke: '#fed7aa' }}
+                                  tickLine={{ stroke: '#fdba74' }}
+                                />
+                                <YAxis
+                                  stroke="#fb923c"
+                                  tick={{ fill: '#f97316', fontWeight: 600, fontSize: 12 }}
+                                  axisLine={{ stroke: '#fed7aa' }}
+                                  tickLine={{ stroke: '#fdba74' }}
+                                />
+                                <Tooltip
+                                  content={({ active, payload, label }) => {
+                                    if (active && payload && payload.length) {
+                                      return (
+                                        <div className="bg-white/95 backdrop-blur-sm border-2 border-orange-300 rounded-xl shadow-2xl shadow-orange-200/50 p-3">
+                                          <div className="flex items-center gap-2 mb-2">
+                                            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-orange-400 to-amber-500" />
+                                            <span className="font-bold text-gray-700">Tahun {label}</span>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <FileText className="w-4 h-4 text-orange-500" />
+                                            <span className="text-2xl font-bold text-orange-600">{payload[0].value}</span>
+                                            <span className="text-gray-500 text-sm">dokumen</span>
+                                          </div>
+                                          <div className="mt-2 pt-2 border-t border-orange-100">
+                                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                              <div
+                                                className="h-full bg-gradient-to-r from-orange-400 to-amber-500 rounded-full"
+                                                style={{ width: `${Math.min(100, ((payload[0].value as number) / Math.max(...stats.byTahun.map(d => d.count))) * 100)}%` }}
+                                              />
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )
+                                    }
+                                    return null
+                                  }}
+                                />
+                                <Bar
+                                  dataKey="count"
+                                  fill="url(#barGradient)"
+                                  radius={[8, 8, 0, 0]}
+                                  filter="url(#barShadow)"
+                                  maxBarSize={60}
+                                >
+                                  {stats.byTahun.map((_, index) => (
+                                    <Cell key={`cell-${index}`} />
+                                  ))}
+                                </Bar>
+                              </BarChart>
+                            </ResponsiveContainer>
+                            {/* Summary */}
+                            <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t border-orange-100">
+                              {stats.byTahun.slice(0, 3).map((item, idx) => (
+                                <motion.div
+                                  key={item.tahun}
+                                  initial={{ opacity: 0, y: 10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ delay: 0.5 + idx * 0.1 }}
+                                  className="text-center"
+                                >
+                                  <p className="text-xs text-gray-400">{item.tahun}</p>
+                                  <p className="text-lg font-bold text-orange-600">{item.count}</p>
+                                </motion.div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
 
+                      {/* Pie Chart - Distribusi per Kategori */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 }}
+                      >
+                        <Card className="relative overflow-hidden bg-gradient-to-br from-white via-purple-50/30 to-pink-50/50 border border-purple-100/50 shadow-2xl shadow-purple-200/20">
+                          {/* Decorative Elements */}
+                          <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-purple-400/10 to-transparent rounded-full blur-3xl" />
+                          <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-pink-400/10 to-transparent rounded-full blur-2xl" />
 
+                          <CardHeader className="relative pb-2">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <motion.div
+                                    animate={{ scale: [1, 1.1, 1] }}
+                                    transition={{ duration: 3, repeat: Infinity }}
+                                    className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-200/50"
+                                  >
+                                    <PieChartIcon className="w-5 h-5 text-white" />
+                                  </motion.div>
+                                  <div>
+                                    <CardTitle className="text-lg font-bold bg-gradient-to-r from-purple-700 to-pink-600 bg-clip-text text-transparent">
+                                      Distribusi per Kategori
+                                    </CardTitle>
+                                    <p className="text-xs text-gray-500">Persebaran dokumen berdasarkan kategori</p>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-2xl font-bold text-purple-600">{stats.byKategori?.length || 0}</p>
+                                <p className="text-xs text-gray-400">Kategori</p>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="relative">
+                            <ResponsiveContainer width="100%" height={280}>
+                              <PieChart>
+                                <defs>
+                                  {COLORS.map((color, index) => (
+                                    <linearGradient key={`grad-${index}`} id={`pieGradient-${index}`} x1="0" y1="0" x2="1" y2="1">
+                                      <stop offset="0%" stopColor={color} stopOpacity={1}/>
+                                      <stop offset="100%" stopColor={color} stopOpacity={0.7}/>
+                                    </linearGradient>
+                                  ))}
+                                  <filter id="pieShadow" x="-50%" y="-50%" width="200%" height="200%">
+                                    <feDropShadow dx="0" dy="8" stdDeviation="8" floodColor="#a855f7" floodOpacity="0.2"/>
+                                  </filter>
+                                </defs>
+                                <Pie
+                                  data={stats.byKategori}
+                                  dataKey="count"
+                                  nameKey="kategori"
+                                  cx="50%"
+                                  cy="45%"
+                                  innerRadius={50}
+                                  outerRadius={90}
+                                  paddingAngle={3}
+                                  stroke="none"
+                                  filter="url(#pieShadow)"
+                                >
+                                  {stats.byKategori.map((_, index) => (
+                                    <Cell
+                                      key={`cell-${index}`}
+                                      fill={`url(#pieGradient-${index % COLORS.length})`}
+                                    />
+                                  ))}
+                                </Pie>
+                                <Tooltip
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload
+                                      const total = stats.byKategori.reduce((sum, item) => sum + item.count, 0)
+                                      const percentage = total > 0 ? Math.round((data.count / total) * 100) : 0
+                                      return (
+                                        <div className="bg-white/95 backdrop-blur-sm border-2 border-purple-300 rounded-xl shadow-2xl shadow-purple-200/50 p-3 min-w-[150px]">
+                                          <div className="flex items-center gap-2 mb-2">
+                                            <div
+                                              className="w-3 h-3 rounded-full"
+                                              style={{ background: `url(#pieGradient-${stats.byKategori.indexOf(data) % COLORS.length})` }}
+                                            />
+                                            <span className="font-bold text-gray-700">{data.kategori}</span>
+                                          </div>
+                                          <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                              <FolderOpen className="w-4 h-4 text-purple-500" />
+                                              <span className="text-2xl font-bold text-purple-600">{data.count}</span>
+                                            </div>
+                                            <div className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 text-xs font-bold">
+                                              {percentage}%
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )
+                                    }
+                                    return null
+                                  }}
+                                />
+                              </PieChart>
+                            </ResponsiveContainer>
+                            {/* Custom Legend */}
+                            <div className="flex flex-wrap justify-center gap-3 mt-2">
+                              {stats.byKategori.slice(0, 4).map((item, index) => (
+                                <motion.div
+                                  key={item.kategori}
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ delay: 0.6 + index * 0.1 }}
+                                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-50/80"
+                                >
+                                  <div
+                                    className="w-2.5 h-2.5 rounded-full"
+                                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                  />
+                                  <span className="text-xs font-medium text-gray-600">{item.kategori}</span>
+                                  <span className="text-xs font-bold text-gray-800">({item.count})</span>
+                                </motion.div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
 
-                      <Card className="glass-card border-0 shadow-xl">
-                        <CardHeader>
-                          <CardTitle className="text-lg text-blue-900 font-bold">Distribusi per Lingkup</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                              <Pie
-                                data={stats.byLingkup || []}
-                                dataKey="count"
-                                nameKey="lingkup"
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={80}
-                                labelLine={false}
-                                stroke="#1e3a5f"
-                                strokeWidth={2}
-                              >
-                                {(stats.byLingkup || []).map((_, index) => (
-                                  <Cell key={`cell - ${index} `} fill={COLORS[(index + 3) % COLORS.length]} />
-                                ))}
-                              </Pie>
-                              <Tooltip
-                                contentStyle={{
-                                  backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                                  border: '2px solid #f97316',
-                                  borderRadius: '12px',
-                                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
-                                }}
-                                itemStyle={{ color: '#1e3a5f', fontWeight: 600 }}
-                                labelStyle={{ color: '#f97316', fontWeight: 700 }}
-                              />
-                              <Legend
-                                layout="vertical"
-                                align="right"
-                                verticalAlign="middle"
-                                formatter={(value, entry) => <span className="text-blue-900 font-semibold">{value} ({entry.payload?.count || 0})</span>}
-                              />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
+                      {/* Pie Chart - Distribusi per Lingkup */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.5 }}
+                        className="lg:col-span-2"
+                      >
+                        <Card className="relative overflow-hidden bg-gradient-to-br from-white via-cyan-50/30 to-blue-50/50 border border-cyan-100/50 shadow-2xl shadow-cyan-200/20">
+                          {/* Decorative Elements */}
+                          <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-cyan-400/10 to-transparent rounded-full blur-3xl" />
+                          <div className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-blue-400/10 to-transparent rounded-full blur-2xl" />
 
-                      <Card className="bg-white border-2 border-orange-200 shadow-xl">
-                        <CardHeader>
-                          <CardTitle className="text-lg text-blue-900 font-bold">Distribusi per Jenis</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                              <Pie
-                                data={stats.byJenis}
-                                dataKey="count"
-                                nameKey="jenis"
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={80}
-                                labelLine={false}
-                                stroke="#1e3a5f"
-                                strokeWidth={2}
-                              >
-                                <Cell fill="#f97316" />
-                                <Cell fill="#eab308" />
-                              </Pie>
-                              <Tooltip
-                                contentStyle={{
-                                  backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                                  border: '2px solid #f97316',
-                                  borderRadius: '12px',
-                                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
-                                }}
-                                itemStyle={{ color: '#1e3a5f', fontWeight: 600 }}
-                                labelStyle={{ color: '#f97316', fontWeight: 700 }}
-                              />
-                              <Legend
-                                layout="vertical"
-                                align="right"
-                                verticalAlign="middle"
-                                formatter={(value, entry) => <span className="text-blue-900 font-semibold">{value} ({entry.payload?.count || 0})</span>}
-                              />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
-
-                      <Card className="bg-white border-2 border-orange-200 shadow-xl">
-                        <CardHeader>
-                          <CardTitle className="text-lg text-blue-900 font-bold">Distribusi per Status</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={stats.byStatus}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" strokeOpacity={0.3} />
-                              <XAxis dataKey="status" stroke="#1e3a5f" tick={{ fill: '#1e3a5f', fontWeight: 600 }} />
-                              <YAxis stroke="#1e3a5f" tick={{ fill: '#1e3a5f', fontWeight: 600 }} />
-                              <Tooltip
-                                contentStyle={{
-                                  backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                                  border: '2px solid #eab308',
-                                  borderRadius: '12px',
-                                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
-                                }}
-                                itemStyle={{ color: '#1e3a5f', fontWeight: 600 }}
-                                labelStyle={{ color: '#eab308', fontWeight: 700 }}
-                              />
-                              <Bar dataKey="count" fill="url(#yellowGradient)" name="Jumlah" radius={[4, 4, 0, 0]} />
-                              <defs>
-                                <linearGradient id="yellowGradient" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="#eab308" />
-                                  <stop offset="100%" stopColor="#ca8a04" />
-                                </linearGradient>
-                              </defs>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
+                          <CardHeader className="relative pb-2">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <motion.div
+                                    animate={{ rotate: [0, 360] }}
+                                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                                    className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center shadow-lg shadow-cyan-200/50"
+                                  >
+                                    <Globe className="w-5 h-5 text-white" />
+                                  </motion.div>
+                                  <div>
+                                    <CardTitle className="text-lg font-bold bg-gradient-to-r from-cyan-700 to-blue-600 bg-clip-text text-transparent">
+                                      Distribusi per Lingkup
+                                    </CardTitle>
+                                    <p className="text-xs text-gray-500">Persebaran dokumen berdasarkan lingkup kerja</p>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-2xl font-bold text-cyan-600">{stats.byLingkup?.length || 0}</p>
+                                <p className="text-xs text-gray-400">Lingkup</p>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="relative">
+                            <div className="flex flex-col lg:flex-row gap-6">
+                              <div className="flex-1">
+                                <ResponsiveContainer width="100%" height={260}>
+                                  <PieChart>
+                                    <defs>
+                                      {LINGKUP_COLORS.map((color, index) => (
+                                        <linearGradient key={`lingkup-grad-${index}`} id={`lingkupGradient-${index}`} x1="0" y1="0" x2="1" y2="1">
+                                          <stop offset="0%" stopColor={color} stopOpacity={1}/>
+                                          <stop offset="100%" stopColor={color} stopOpacity={0.7}/>
+                                        </linearGradient>
+                                      ))}
+                                      <filter id="lingkupShadow" x="-50%" y="-50%" width="200%" height="200%">
+                                        <feDropShadow dx="0" dy="8" stdDeviation="8" floodColor="#06b6d4" floodOpacity="0.2"/>
+                                      </filter>
+                                    </defs>
+                                    <Pie
+                                      data={stats.byLingkup || []}
+                                      dataKey="count"
+                                      nameKey="lingkup"
+                                      cx="50%"
+                                      cy="50%"
+                                      innerRadius={45}
+                                      outerRadius={85}
+                                      paddingAngle={2}
+                                      stroke="none"
+                                      filter="url(#lingkupShadow)"
+                                    >
+                                      {(stats.byLingkup || []).map((_, index) => (
+                                        <Cell
+                                          key={`cell-${index}`}
+                                          fill={`url(#lingkupGradient-${index % LINGKUP_COLORS.length})`}
+                                        />
+                                      ))}
+                                    </Pie>
+                                    <Tooltip
+                                      content={({ active, payload }) => {
+                                        if (active && payload && payload.length) {
+                                          const data = payload[0].payload
+                                          const total = (stats.byLingkup || []).reduce((sum, item) => sum + item.count, 0)
+                                          const percentage = total > 0 ? Math.round((data.count / total) * 100) : 0
+                                          return (
+                                            <div className="bg-white/95 backdrop-blur-sm border-2 border-cyan-300 rounded-xl shadow-2xl shadow-cyan-200/50 p-3 min-w-[150px]">
+                                              <div className="flex items-center gap-2 mb-2">
+                                                <Globe className="w-4 h-4 text-cyan-500" />
+                                                <span className="font-bold text-gray-700">{data.lingkup || 'Tidak Ada'}</span>
+                                              </div>
+                                              <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                  <FileText className="w-4 h-4 text-blue-500" />
+                                                  <span className="text-2xl font-bold text-cyan-600">{data.count}</span>
+                                                </div>
+                                                <div className="px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 text-xs font-bold">
+                                                  {percentage}%
+                                                </div>
+                                              </div>
+                                            </div>
+                                          )
+                                        }
+                                        return null
+                                      }}
+                                    />
+                                  </PieChart>
+                                </ResponsiveContainer>
+                              </div>
+                              {/* Custom Legend with Stats */}
+                              <div className="lg:w-64 flex flex-col justify-center">
+                                <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
+                                  {(stats.byLingkup || []).slice(0, 6).map((item, index) => {
+                                    const total = (stats.byLingkup || []).reduce((sum, i) => sum + i.count, 0)
+                                    const percentage = total > 0 ? Math.round((item.count / total) * 100) : 0
+                                    return (
+                                      <motion.div
+                                        key={item.lingkup}
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: 0.7 + index * 0.08 }}
+                                        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-gray-50 to-transparent border border-gray-100"
+                                      >
+                                        <div
+                                          className="w-3 h-3 rounded-full flex-shrink-0"
+                                          style={{ backgroundColor: LINGKUP_COLORS[index % LINGKUP_COLORS.length] }}
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-xs font-semibold text-gray-700 truncate">{item.lingkup || 'Tidak Ada'}</p>
+                                          <div className="flex items-center gap-2">
+                                            <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+                                              <motion.div
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${percentage}%` }}
+                                                transition={{ delay: 0.8 + index * 0.08, duration: 0.5 }}
+                                                className="h-full rounded-full"
+                                                style={{ backgroundColor: LINGKUP_COLORS[index % LINGKUP_COLORS.length] }}
+                                              />
+                                            </div>
+                                            <span className="text-xs font-bold text-gray-500">{item.count}</span>
+                                          </div>
+                                        </div>
+                                      </motion.div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
                     </motion.div>
 
                     {/* Recent Activity */}
@@ -7154,12 +7645,160 @@ export default function ESOPApp() {
                 {/* Table */}
                 <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
                   <CardContent className="p-0 relative">
-                    {/* Loading Overlay */}
+                    {/* Aesthetic Loading Overlay */}
+                    <AnimatePresence>
+                      {katalogLoading && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.3 }}
+                          className="absolute inset-0 z-20 flex items-center justify-center"
+                        >
+                          {/* Glassmorphism Background */}
+                          <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 via-white/80 to-yellow-500/10 backdrop-blur-sm" />
+
+                          {/* Decorative SAR Elements */}
+                          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                            {/* Floating rescue icons */}
+                            {[...Array(6)].map((_, i) => (
+                              <motion.div
+                                key={i}
+                                className="absolute"
+                                initial={{
+                                  x: Math.random() * 100 + "%",
+                                  y: Math.random() * 100 + "%",
+                                  scale: 0.3 + Math.random() * 0.4,
+                                  opacity: 0.1
+                                }}
+                                animate={{
+                                  y: [null, Math.random() * -50 - 20],
+                                  opacity: [0.1, 0.2, 0.1],
+                                  rotate: [0, Math.random() * 20 - 10]
+                                }}
+                                transition={{
+                                  duration: 3 + Math.random() * 2,
+                                  repeat: Infinity,
+                                  repeatType: "reverse",
+                                  delay: i * 0.3
+                                }}
+                              >
+                                {i % 3 === 0 ? (
+                                  <svg className="w-8 h-8 text-orange-400" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 2L4 7v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V7l-8-5zm0 2.18l6 3.72v5.1c0 4.5-3.08 8.4-6 9.69V4.18z"/>
+                                  </svg>
+                                ) : i % 3 === 1 ? (
+                                  <svg className="w-8 h-8 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                                  </svg>
+                                ) : (
+                                  <svg className="w-8 h-8 text-red-400" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5h3V8h4v4h3l-5 5z"/>
+                                  </svg>
+                                )}
+                              </motion.div>
+                            ))}
+                          </div>
+
+                          {/* Main Loading Content */}
+                          <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            transition={{ duration: 0.3, delay: 0.1 }}
+                            className="relative z-10 flex flex-col items-center gap-4"
+                          >
+                            {/* SAR Helicopter Animation */}
+                            <div className="relative w-24 h-24">
+                              {/* Main helicopter body */}
+                              <motion.div
+                                animate={{ y: [0, -8, 0] }}
+                                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                                className="absolute inset-0 flex items-center justify-center"
+                              >
+                                <svg className="w-20 h-20 text-orange-500 drop-shadow-lg" viewBox="0 0 64 64" fill="currentColor">
+                                  <ellipse cx="32" cy="38" rx="16" ry="10" className="text-orange-500" />
+                                  <ellipse cx="32" cy="38" rx="12" ry="7" className="text-orange-400" />
+                                  <rect x="46" y="36" width="14" height="4" rx="2" className="text-orange-600" />
+                                  <path d="M28 28 L32 18 L36 28" className="text-orange-600" />
+                                  <ellipse cx="32" cy="48" rx="4" ry="2" className="text-orange-300" />
+                                </svg>
+                              </motion.div>
+                              {/* Rotor blade */}
+                              <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 0.5, repeat: Infinity, ease: "linear" }}
+                                className="absolute top-4 left-1/2 -translate-x-1/2 origin-center"
+                              >
+                                <div className="w-24 h-1 bg-gradient-to-r from-transparent via-orange-400 to-transparent rounded-full shadow-lg" />
+                                <div className="w-24 h-1 bg-gradient-to-r from-transparent via-orange-300 to-transparent rounded-full -rotate-90 absolute top-0" />
+                              </motion.div>
+                              {/* Search light beam */}
+                              <motion.div
+                                animate={{ opacity: [0.3, 0.6, 0.3] }}
+                                transition={{ duration: 1, repeat: Infinity }}
+                                className="absolute top-12 left-1/2 -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-t-16 border-l-transparent border-r-transparent border-t-yellow-300/40"
+                              />
+                            </div>
+
+                            {/* Glass Card with Text */}
+                            <motion.div
+                              initial={{ y: 10, opacity: 0 }}
+                              animate={{ y: 0, opacity: 1 }}
+                              transition={{ delay: 0.2 }}
+                              className="relative px-8 py-4 rounded-2xl overflow-hidden"
+                            >
+                              {/* Glass background */}
+                              <div className="absolute inset-0 bg-white/70 backdrop-blur-md border border-white/50 shadow-xl" />
+                              <div className="absolute inset-0 bg-gradient-to-r from-orange-500/10 via-transparent to-yellow-500/10" />
+
+                              {/* Content */}
+                              <div className="relative flex items-center gap-3">
+                                {/* Animated dots */}
+                                <div className="flex gap-1">
+                                  {[0, 1, 2].map((i) => (
+                                    <motion.div
+                                      key={i}
+                                      animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
+                                      transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.15 }}
+                                      className="w-2 h-2 rounded-full bg-gradient-to-r from-orange-500 to-yellow-500"
+                                    />
+                                  ))}
+                                </div>
+                                <span className="text-gray-700 font-semibold text-lg tracking-wide">Memuat Data</span>
+                              </div>
+                            </motion.div>
+
+                            {/* Progress bar */}
+                            <motion.div
+                              initial={{ width: 0, opacity: 0 }}
+                              animate={{ width: 200, opacity: 1 }}
+                              transition={{ delay: 0.3 }}
+                              className="h-1.5 bg-gray-200 rounded-full overflow-hidden shadow-inner"
+                            >
+                              <motion.div
+                                animate={{ x: [-200, 200] }}
+                                transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                                className="w-1/2 h-full bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-400 rounded-full"
+                              />
+                            </motion.div>
+                          </motion.div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Progress bar at top */}
                     {katalogLoading && (
-                      <div className="absolute top-0 inset-x-0 h-1 z-10 overflow-hidden">
-                        <div className="w-full h-full bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-400 animate-sync-progress" />
+                      <div className="absolute top-0 inset-x-0 h-1 z-30 overflow-hidden">
+                        <motion.div
+                          initial={{ x: "-100%" }}
+                          animate={{ x: "100%" }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          className="w-1/2 h-full bg-gradient-to-r from-orange-400 via-yellow-300 to-orange-400"
+                        />
                       </div>
                     )}
+
                     <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
@@ -7173,15 +7812,33 @@ export default function ESOPApp() {
                             <TableHead className="font-bold text-white text-center">Aksi</TableHead>
                           </TableRow>
                         </TableHeader>
-                        <TableBody>
-                          {sopFiles.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={6} className="text-center text-gray-500 py-8">
-                                Tidak ada data
-                              </TableCell>
-                            </TableRow>
+                        <AnimatePresence mode="wait">
+                          {sopFiles.length === 0 && !katalogLoading ? (
+                            <motion.tbody
+                              key="empty"
+                              data-slot="table-body"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              className="[&_tr:last-child]:border-0"
+                            >
+                              <TableRow>
+                                <TableCell colSpan={7} className="text-center text-gray-500 py-8">
+                                  Tidak ada data
+                                </TableCell>
+                              </TableRow>
+                            </motion.tbody>
                           ) : (
-                            sopFiles.map((sop) => (
+                            <motion.tbody
+                              key={`data-page-${sopPagination.page}`}
+                              data-slot="table-body"
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              transition={{ duration: 0.3, ease: "easeOut" }}
+                              className="[&_tr:last-child]:border-0"
+                            >
+                              {sopFiles.map((sop, index) => (
                               <TableRow
                                 key={sop.id}
                                 className={`hover:bg-orange-50 border-b border-gray-200 transition-all duration-700 ${excelEditData?.id === sop.id ? 'bg-orange-50/80 relative active-edit-row' : ''}`}
@@ -7225,6 +7882,9 @@ export default function ESOPApp() {
                                             hour: '2-digit',
                                             minute: '2-digit'
                                           })}
+                                          {sop.updatedByUser && (
+                                            <span className="text-gray-400"> | <span className="text-amber-500">Last edited by:</span> <span className="text-amber-600 font-medium">{sop.updatedByUser.name}</span></span>
+                                          )}
                                         </div>
                                       )}
                                     </div>
@@ -7350,10 +8010,11 @@ export default function ESOPApp() {
                                   </div>
                                 </TableCell>
                               </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
+                                ))}
+                              </motion.tbody>
+                            )}
+                          </AnimatePresence>
+                        </Table>
                     </div>
                   </CardContent>
                 </Card>
@@ -7474,13 +8135,22 @@ export default function ESOPApp() {
 
                 {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <StatCard title="Total SOP Aktif" value={stats?.totalAktif || 0} icon={CheckCircle} color="orange" delay={0} />
+                  <StatCard
+                    title="SOP Aktif"
+                    value={stats?.totalAktif || 0}
+                    icon={CheckCircle}
+                    color="green"
+                    delay={0}
+                    subtitle="Dokumen yang berlaku"
+                    total={(stats?.totalAktif || 0) + (stats?.totalReview || 0) + (stats?.totalKadaluarsa || 0)}
+                  />
                   <StatCard
                     title="Menunggu Verifikasi"
                     value={stats?.totalPublikMenunggu || 0}
                     icon={Clock}
                     color="yellow"
                     delay={0.1}
+                    subtitle="Pengajuan dari publik"
                     action={user?.role === 'DEVELOPER' ? (
                       <Button
                         size="icon"
@@ -7494,11 +8164,12 @@ export default function ESOPApp() {
                     ) : undefined}
                   />
                   <StatCard
-                    title="Total Ditolak"
+                    title="Ditolak"
                     value={stats?.totalPublikDitolak || 0}
                     icon={XCircle}
                     color="red"
                     delay={0.2}
+                    subtitle="Pengajuan ditolak"
                     action={user?.role === 'DEVELOPER' ? (
                       <Button
                         size="icon"
@@ -7833,11 +8504,12 @@ export default function ESOPApp() {
                   {/* Stats Cards */}
                   < div className="grid grid-cols-1 md:grid-cols-2 gap-4" >
                     <StatCard
-                      title="Total File Ditolak"
+                      title="File Ditolak"
                       value={arsipList.length}
                       icon={XCircle}
                       color="red"
                       delay={0}
+                      subtitle="Pengajuan yang ditolak"
                       action={user?.role === 'DEVELOPER' ? (
                         <Button
                           size="icon"
@@ -7850,7 +8522,14 @@ export default function ESOPApp() {
                         </Button>
                       ) : undefined}
                     />
-                    <StatCard title="Folder Arsip" value="Publik-Ditolak" icon={FolderOpen} color="orange" delay={0.1} />
+                    <StatCard
+                      title="Lokasi Arsip"
+                      value="Publik-Ditolak"
+                      icon={FolderOpen}
+                      color="orange"
+                      delay={0.1}
+                      subtitle="Folder penyimpanan"
+                    />
                   </div >
 
                   {/* Arsip Table */}
@@ -8018,9 +8697,82 @@ export default function ESOPApp() {
                 >
                   <ShimmerTitle subtitle="Riwayat semua aktivitas sistem">Log Aktivitas</ShimmerTitle>
 
+                  {/* Filters */}
+                  <Card className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 border border-orange-500/30 shadow-xl overflow-hidden">
+                    <CardContent className="p-4">
+                      <div className="flex flex-wrap items-end gap-3">
+                        {/* Time Filter */}
+                        <div className="min-w-[140px]">
+                          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Waktu</p>
+                          <Select value={logsTimeFilter} onValueChange={(v) => { setLogsTimeFilter(v); setLogsPagination(p => ({ ...p, page: 1 })); }}>
+                            <SelectTrigger className="h-9 rounded-lg text-sm bg-gray-800/50 border-gray-700 text-gray-200">
+                              <SelectValue placeholder="Pilih Waktu" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="SEMUA">Semua Waktu</SelectItem>
+                              <SelectItem value="HARI_INI">Hari Ini</SelectItem>
+                              <SelectItem value="MINGGU_INI">Minggu Ini</SelectItem>
+                              <SelectItem value="BULAN_INI">Bulan Ini</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* User Filter */}
+                        <div className="min-w-[160px]">
+                          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">User</p>
+                          <Select value={logsUserFilter} onValueChange={(v) => { setLogsUserFilter(v); setLogsPagination(p => ({ ...p, page: 1 })); }}>
+                            <SelectTrigger className="h-9 rounded-lg text-sm bg-gray-800/50 border-gray-700 text-gray-200">
+                              <SelectValue placeholder="Pilih User" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="SEMUA">Semua User</SelectItem>
+                              {users.map(u => (
+                                <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Activity Filter */}
+                        <div className="min-w-[140px]">
+                          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Aktivitas</p>
+                          <Select value={logsActivityFilter} onValueChange={(v) => { setLogsActivityFilter(v); setLogsPagination(p => ({ ...p, page: 1 })); }}>
+                            <SelectTrigger className="h-9 rounded-lg text-sm bg-gray-800/50 border-gray-700 text-gray-200">
+                              <SelectValue placeholder="Pilih Aktivitas" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="SEMUA">Semua Aktivitas</SelectItem>
+                              <SelectItem value="LOGIN">Login</SelectItem>
+                              <SelectItem value="UPLOAD">Upload</SelectItem>
+                              <SelectItem value="DOWNLOAD">Download</SelectItem>
+                              <SelectItem value="PREVIEW">Preview</SelectItem>
+                              <SelectItem value="VERIFIKASI">Verifikasi</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Reset Button */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setLogsTimeFilter('SEMUA')
+                            setLogsUserFilter('SEMUA')
+                            setLogsActivityFilter('SEMUA')
+                            setLogsPagination(p => ({ ...p, page: 1 }))
+                          }}
+                          className="h-9 px-3 bg-gray-800/50 border-gray-700 text-gray-300 hover:bg-gray-700 hover:text-white"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                          Reset
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
                   <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
                     <CardContent className="p-0">
-                      <ScrollArea className="h-[600px]">
+                      <ScrollArea className="h-[500px]">
                         <Table>
                           <TableHeader>
                             <TableRow className="bg-gradient-to-r from-orange-500 to-yellow-500 sticky top-0">
@@ -9433,67 +10185,81 @@ export default function ESOPApp() {
         </DialogContent>
       </Dialog >
 
-      {/* User Activity Dialog */}
-      < Dialog open={showUserActivityDialog} onOpenChange={setShowUserActivityDialog} >
-        <DialogContent className="sm:max-w-none w-fit max-w-[95vw] bg-white border-2 border-cyan-200 shadow-xl overflow-visible" aria-describedby={undefined}>
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <History className="w-5 h-5 text-cyan-600" />
-              Riwayat Aktivitas: {selectedUserForActivity?.name}
+      {/* User Activity Dialog - Compact & Aesthetic */}
+      <Dialog open={showUserActivityDialog} onOpenChange={setShowUserActivityDialog}>
+        <DialogContent className="sm:max-w-md bg-white border-2 border-cyan-200 shadow-xl" aria-describedby={undefined}>
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <motion.div
+                animate={{ rotate: [0, 360] }}
+                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+              >
+                <History className="w-5 h-5 text-cyan-600" />
+              </motion.div>
+              Riwayat Aktivitas
             </DialogTitle>
-            <DialogDescription className="text-gray-600">
-              {selectedUserForActivity?.email}
+            <DialogDescription className="text-gray-500 text-sm">
+              {selectedUserForActivity?.name} • {selectedUserForActivity?.email}
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <div className="py-2">
             {userActivityLogs.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                <History className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                <p>Belum ada aktivitas</p>
+              <div className="text-center text-gray-400 py-8">
+                <History className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">Belum ada aktivitas</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {userActivityLogs.map((log) => (
-                  <div key={log.id} className="flex items-start gap-3 p-3 bg-cyan-50 rounded-lg">
-                    <div className="w-2 h-2 mt-2 rounded-full bg-cyan-500" />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={
-                          log.aktivitas === 'LOGIN' ? 'bg-blue-100 text-blue-700 border-blue-300' :
-                            log.aktivitas === 'UPLOAD' ? 'bg-green-100 text-green-700 border-green-300' :
-                              log.aktivitas === 'DOWNLOAD' ? 'bg-purple-100 text-purple-700 border-purple-300' :
-                                log.aktivitas === 'PREVIEW' ? 'bg-cyan-100 text-cyan-700 border-cyan-300' :
-                                  log.aktivitas === 'VERIFIKASI' ? 'bg-orange-100 text-orange-700 border-orange-300' :
-                                    'bg-gray-100 text-gray-700 border-gray-300'
-                        }>
-                          {log.aktivitas}
-                        </Badge>
-                        <span className="text-xs text-gray-500">
-                          {new Date(log.createdAt).toLocaleString('id-ID')}
-                        </span>
+              <ScrollArea className="h-[320px] pr-2">
+                <div className="space-y-2">
+                  {userActivityLogs.map((log, index) => (
+                    <motion.div
+                      key={log.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.03 }}
+                      className="flex items-start gap-2 p-2.5 bg-gradient-to-r from-gray-50 to-cyan-50/30 rounded-lg border border-gray-100 hover:border-cyan-200 transition-colors"
+                    >
+                      <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-cyan-400 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Badge variant="outline" className={
+                            log.aktivitas === 'LOGIN' ? 'bg-blue-50 text-blue-600 border-blue-200 text-[10px] px-1.5 py-0' :
+                              log.aktivitas === 'UPLOAD' ? 'bg-green-50 text-green-600 border-green-200 text-[10px] px-1.5 py-0' :
+                                log.aktivitas === 'DOWNLOAD' ? 'bg-purple-50 text-purple-600 border-purple-200 text-[10px] px-1.5 py-0' :
+                                  log.aktivitas === 'PREVIEW' ? 'bg-cyan-50 text-cyan-600 border-cyan-200 text-[10px] px-1.5 py-0' :
+                                    log.aktivitas === 'VERIFIKASI' ? 'bg-orange-50 text-orange-600 border-orange-200 text-[10px] px-1.5 py-0' :
+                                      'bg-gray-50 text-gray-600 border-gray-200 text-[10px] px-1.5 py-0'
+                          }>
+                            {log.aktivitas}
+                          </Badge>
+                          <span className="text-[10px] text-gray-400">
+                            {new Date(log.createdAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-0.5 line-clamp-1">{log.deskripsi}</p>
+                        {log.sopFile && (
+                          <p className="text-[10px] text-orange-500 mt-0.5 truncate">{log.sopFile.judul}</p>
+                        )}
                       </div>
-                      <p className="text-sm text-gray-700 mt-1">{log.deskripsi}</p>
-                      {log.sopFile && (
-                        <p className="text-xs text-orange-600 mt-1">{log.sopFile.judul}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </ScrollArea>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="pt-2">
             <Button
               type="button"
               variant="outline"
+              size="sm"
               onClick={() => setShowUserActivityDialog(false)}
-              className="border-gray-300 text-gray-700 hover:bg-gray-100"
+              className="border-gray-200 text-gray-600 hover:bg-gray-50"
             >
               Tutup
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog >
+      </Dialog>
 
       {/* PDF Edit Warning Dialog - Aesthetic Design */}
       < Dialog open={showPdfWarningDialog} onOpenChange={setShowPdfWarningDialog} >

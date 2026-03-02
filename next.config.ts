@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 
+// Force restart for env reload
 const nextConfig: NextConfig = {
   // output: "standalone",
   typescript: {

@@ -82,6 +82,12 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Update lastLoginAt
+    await db.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() }
+    })
+
     // Get profile photo URL if exists
     let profilePhotoUrl = null
     if (user.profilePhoto) {

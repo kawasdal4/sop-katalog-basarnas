@@ -29,8 +29,9 @@ model User {
   resetTokenExpiry DateTime? // When the reset token expires
 
   // Relations
-  logs     Log[]
-  sopFiles SopFile[]
+  logs            Log[]
+  sopFiles        SopFile[]      @relation("UploadedBy")
+  editedSopFiles  SopFile[]      @relation("UpdatedBy")
 }
 
 // SOP/IK File model
@@ -64,6 +65,9 @@ model SopFile {
   uploadedBy   String
   uploadedAt   DateTime @default(now())
   
+  // Last edit info
+  updatedBy    String?  // User who made the last edit
+  
   // For public submissions
   isPublicSubmission Boolean   @default(false)
   submitterName      String?
@@ -76,8 +80,9 @@ model SopFile {
   arsipFolder        String?  // Folder di arsip (e.g., 'Publik-Ditolak')
   
   // Relations
-  user     User     @relation(fields: [uploadedBy], references: [id])
-  logs     Log[]
+  user          User     @relation(fields: [uploadedBy], references: [id], name: "UploadedBy")
+  updatedByUser User?    @relation(fields: [updatedBy], references: [id], name: "UpdatedBy")
+  logs          Log[]
   
   updatedAt DateTime @updatedAt
 }
