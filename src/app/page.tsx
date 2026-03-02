@@ -6394,9 +6394,9 @@ export default function ESOPApp() {
 
                   {/* Edit SOP Dialog */}
                   <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-                    <DialogContent className="sm:max-w-md bg-white border-0 shadow-2xl p-0 rounded-2xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+                    <DialogContent className="sm:max-w-2xl bg-white border-0 shadow-2xl p-0 rounded-2xl max-h-[95vh] overflow-y-auto scrollbar-hide" aria-describedby={undefined}>
                       {/* Header with Basarnas theme */}
-                      <div className="relative bg-gradient-to-br from-orange-500 via-orange-600 to-red-700 p-5 text-white overflow-hidden">
+                      <div className="relative bg-gradient-to-br from-orange-500 via-orange-600 to-red-700 p-6 text-white overflow-hidden">
                         {/* Animated background */}
                         <div className="absolute inset-0 overflow-hidden">
                           <motion.div
@@ -6432,107 +6432,133 @@ export default function ESOPApp() {
                       </div>
 
                       {/* Form Content */}
-                      <form onSubmit={(e) => { e.preventDefault(); handleSaveEdit(); }} className="p-5 space-y-4 bg-gradient-to-b from-white via-orange-50/10 to-white">
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2 pb-2 border-b border-orange-100">
-                            <div className="w-4 h-4 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
-                              <FileText className="w-2 h-2 text-white" />
+                      <form onSubmit={(e) => { e.preventDefault(); handleSaveEdit(); }} className="p-6 space-y-6 bg-gradient-to-b from-white via-orange-50/5 to-white">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-4 md:col-span-2">
+                            <div className="flex items-center gap-2 pb-2 border-b border-orange-100/50">
+                              <div className="w-5 h-5 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                                <FileText className="w-3 h-3 text-orange-600" />
+                              </div>
+                              <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Informasi Utama</span>
                             </div>
-                            <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Informasi Dokumen</span>
-                          </div>
 
-                          <div className="space-y-1.5">
-                            <Label htmlFor="edit-nomor-sop" className="text-xs font-semibold text-gray-600">No. SOP</Label>
-                            <Input
-                              id="edit-nomor-sop"
-                              value={editForm.nomorSop}
-                              onChange={(e) => setEditForm({ ...editForm, nomorSop: e.target.value })}
-                              placeholder="Contoh: SOP-0001 atau IK-0001"
-                              className="h-9 border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 rounded-xl text-sm bg-white shadow-sm"
-                            />
-                          </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="space-y-1.5 md:col-span-1">
+                                <Label htmlFor="edit-nomor-sop" className="text-[11px] font-bold text-slate-500 uppercase ml-1">No. SOP</Label>
+                                <Input
+                                  id="edit-nomor-sop"
+                                  value={editForm.nomorSop}
+                                  onChange={(e) => setEditForm({ ...editForm, nomorSop: e.target.value })}
+                                  placeholder="SOP-XXXX"
+                                  className="h-10 border-slate-200 focus:border-orange-500 focus:ring-orange-500/10 rounded-xl bg-slate-50/30"
+                                />
+                              </div>
 
-                          <div className="space-y-1.5">
-                            <Label htmlFor="edit-judul" className="text-xs font-semibold text-gray-600">Judul <span className="text-red-500">*</span></Label>
-                            <Input
-                              id="edit-judul"
-                              value={editForm.judul}
-                              onChange={(e) => setEditForm({ ...editForm, judul: e.target.value })}
-                              className="h-9 border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500/20 text-gray-900 rounded-xl text-sm bg-white shadow-sm"
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                              <Label className="text-xs font-semibold text-gray-600">Kategori</Label>
-                              <Select value={editForm.kategori} onValueChange={(v) => setEditForm({ ...editForm, kategori: v })}>
-                                <SelectTrigger className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-xs bg-white shadow-sm">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="rounded-xl">
-                                  {KATEGORI_OPTIONS.map(k => (
-                                    <SelectItem key={k} value={k} className="text-xs">{k}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label className="text-xs font-semibold text-gray-600">Lingkup</Label>
-                              <Select value={editForm.lingkup} onValueChange={(v) => setEditForm({ ...editForm, lingkup: v })}>
-                                <SelectTrigger className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-xs bg-white shadow-sm">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="rounded-xl">
-                                  {LINGKUP_OPTIONS.map(l => (
-                                    <SelectItem key={l} value={l} className="text-xs">{l}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label className="text-xs font-semibold text-gray-600">Jenis</Label>
-                              <Select value={editForm.jenis} onValueChange={(v) => setEditForm({ ...editForm, jenis: v })}>
-                                <SelectTrigger className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-xs bg-white shadow-sm">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="rounded-xl">
-                                  {JENIS_OPTIONS.map(j => (
-                                    <SelectItem key={j} value={j} className="text-xs">{j}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                              <div className="space-y-1.5 md:col-span-2">
+                                <Label htmlFor="edit-judul" className="text-[11px] font-bold text-slate-500 uppercase ml-1">Judul Dokumen <span className="text-red-500">*</span></Label>
+                                <Input
+                                  id="edit-judul"
+                                  value={editForm.judul}
+                                  onChange={(e) => setEditForm({ ...editForm, judul: e.target.value })}
+                                  className="h-10 border-slate-200 focus:border-orange-500 focus:ring-orange-500/10 rounded-xl"
+                                />
+                              </div>
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                              <Label className="text-xs font-semibold text-gray-600">Tahun</Label>
-                              <Input
-                                type="number"
-                                value={editForm.tahun || ''}
-                                onChange={(e) => setEditForm({ ...editForm, tahun: parseInt(e.target.value) })}
-                                required
-                                className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-sm bg-white shadow-sm text-center"
-                              />
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-2 pb-2 border-b border-orange-100/50">
+                              <div className="w-5 h-5 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                                <Tag className="w-3 h-3 text-blue-600" />
+                              </div>
+                              <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Klasifikasi</span>
                             </div>
-                            <div className="space-y-1.5">
-                              <Label className="text-xs font-semibold text-gray-600">Status</Label>
-                              <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
-                                <SelectTrigger className="h-9 border-2 border-gray-200 focus:border-orange-500 text-gray-900 rounded-xl text-xs bg-white shadow-sm">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="rounded-xl">
-                                  {STATUS_OPTIONS.map(s => (
-                                    <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+
+                            <div className="space-y-3">
+                              <div className="space-y-1.5">
+                                <Label className="text-[11px] font-bold text-slate-500 uppercase ml-1">Kategori</Label>
+                                <Select value={editForm.kategori} onValueChange={(v) => setEditForm({ ...editForm, kategori: v })}>
+                                  <SelectTrigger className="h-10 border-slate-200 focus:border-orange-500 rounded-xl">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-xl">
+                                    {KATEGORI_OPTIONS.map(k => (
+                                      <SelectItem key={k} value={k}>{k}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <Label className="text-[11px] font-bold text-slate-500 uppercase ml-1">Lingkup</Label>
+                                <Select value={editForm.lingkup} onValueChange={(v) => setEditForm({ ...editForm, lingkup: v })}>
+                                  <SelectTrigger className="h-10 border-slate-200 focus:border-orange-500 rounded-xl">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-xl">
+                                    {LINGKUP_OPTIONS.map(l => (
+                                      <SelectItem key={l} value={l}>{l}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-2 pb-2 border-b border-orange-100/50">
+                              <div className="w-5 h-5 rounded-lg bg-green-500/10 flex items-center justify-center">
+                                <Calendar className="w-3 h-3 text-green-600" />
+                              </div>
+                              <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Metadata</span>
+                            </div>
+
+                            <div className="space-y-3">
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                  <Label className="text-[11px] font-bold text-slate-500 uppercase ml-1">Jenis</Label>
+                                  <Select value={editForm.jenis} onValueChange={(v) => setEditForm({ ...editForm, jenis: v })}>
+                                    <SelectTrigger className="h-10 border-slate-200 focus:border-orange-500 rounded-xl">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-xl">
+                                      {JENIS_OPTIONS.map(j => (
+                                        <SelectItem key={j} value={j}>{j}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-1.5">
+                                  <Label className="text-[11px] font-bold text-slate-500 uppercase ml-1">Tahun</Label>
+                                  <Input
+                                    type="number"
+                                    value={editForm.tahun || ''}
+                                    onChange={(e) => setEditForm({ ...editForm, tahun: parseInt(e.target.value) })}
+                                    required
+                                    className="h-10 border-slate-200 focus:border-orange-500 rounded-xl text-center"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <Label className="text-[11px] font-bold text-slate-500 uppercase ml-1">Status Dokumen</Label>
+                                <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
+                                  <SelectTrigger className="h-10 border-slate-200 focus:border-orange-500 rounded-xl">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-xl">
+                                    {STATUS_OPTIONS.map(s => (
+                                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
                             </div>
                           </div>
                         </div>
 
                         {/* Action Buttons */}
-                        <div className="flex gap-3 pt-2">
+                        <div className="flex gap-4 pt-4 border-t border-slate-100">
                           <Button
                             type="button"
                             variant="outline"
@@ -6562,9 +6588,9 @@ export default function ESOPApp() {
 
                   {/* Excel Edit Dialog - Microsoft 365 (No User Login Required) */}
                   <Dialog open={showExcelEditDialog} onOpenChange={setShowExcelEditDialog}>
-                    <DialogContent className="sm:max-w-lg p-0 border-0 shadow-2xl bg-gray-950 max-h-[90vh] overflow-y-auto" style={{ borderRadius: '1.25rem' }} aria-describedby={undefined}>
+                    <DialogContent className="sm:max-w-xl p-0 border-0 shadow-2xl bg-slate-950 max-h-[90vh] overflow-y-auto" style={{ borderRadius: '1.5rem' }} aria-describedby={undefined}>
                       {/* Gradient Header */}
-                      <div className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #1a2744 0%, #0f172a 50%, #1a1a2e 100%)', padding: '28px 28px 24px' }}>
+                      <div className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', padding: '32px' }}>
                         {/* Animated background orbs */}
                         <div className="absolute inset-0 overflow-hidden pointer-events-none">
                           <motion.div className="absolute -top-6 -right-6 w-32 h-32 rounded-full" style={{ background: 'radial-gradient(circle, rgba(34,197,94,0.2) 0%, transparent 70%)' }} animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 3, repeat: Infinity }} />
@@ -6691,9 +6717,9 @@ export default function ESOPApp() {
 
                   {/* Desktop Sync Dialog - Upload edited file */}
                   <Dialog open={showDesktopSyncDialog} onOpenChange={setShowDesktopSyncDialog}>
-                    <DialogContent className="sm:max-w-md p-0 border-0 shadow-2xl bg-gray-950 max-h-[90vh] overflow-y-auto" style={{ borderRadius: '1.25rem' }} aria-describedby={undefined}>
+                    <DialogContent className="sm:max-w-xl p-0 border-0 shadow-2xl bg-slate-950 max-h-[90vh] overflow-y-auto" style={{ borderRadius: '1.5rem' }} aria-describedby={undefined}>
                       {/* Gradient Header */}
-                      <div className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #1c1f3a 0%, #0f172a 50%, #1a1a2e 100%)', padding: '28px 28px 24px' }}>
+                      <div className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', padding: '32px' }}>
                         <div className="absolute inset-0 overflow-hidden pointer-events-none">
                           <motion.div className="absolute -top-6 -right-6 w-32 h-32 rounded-full" style={{ background: 'radial-gradient(circle, rgba(249,115,22,0.2) 0%, transparent 70%)' }} animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 3, repeat: Infinity }} />
                           <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
