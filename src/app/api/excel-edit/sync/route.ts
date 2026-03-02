@@ -8,9 +8,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { 
-  listEditFolderFiles, 
-  downloadFileFromOneDrive, 
+import {
+  listEditFolderFiles,
+  downloadFileFromOneDrive,
   parseFileMetadata,
   deleteFileFromOneDrive,
   getFileMetadata
@@ -74,16 +74,16 @@ function getR2Client() {
 export async function GET(request: NextRequest) {
   // Verify cron secret
   const authHeader = request.headers.get('authorization')
-  
+
   if (authHeader !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  
+
   console.log('🔄 Cron sync check started')
-  
+
   try {
     const results = await syncAllFiles()
-    
+
     return NextResponse.json({
       success: true,
       processed: results.length,
@@ -111,38 +111,38 @@ export async function POST(request: NextRequest) {
     // Validate admin session
     const cookieStore = await cookies()
     const userId = cookieStore.get('userId')?.value
-    
+
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    
+
     const user = await db.user.findUnique({
       where: { id: userId },
       select: { role: true, name: true },
     })
-    
+
     if (!user || user.role !== 'ADMIN' && user.role !== 'DEVELOPER') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
-    
+
     // Check R2 configuration
     if (!isR2Configured()) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         success: false,
         error: 'R2 tidak terkonfigurasi. Hubungi administrator.',
         needsSetup: true
       }, { status: 500 })
     }
-    
+
     // Check Azure/M365 configuration
     if (!isAzureConfigured()) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         success: false,
         error: 'Azure AD / Microsoft 365 tidak terkonfigurasi. Hubungi administrator.',
         needsSetup: true
       }, { status: 500 })
     }
-    
+
     // Parse request body
     let body: { driveItemId?: string } = {}
     try {
@@ -153,13 +153,13 @@ export async function POST(request: NextRequest) {
     } catch (parseError) {
       console.warn('Failed to parse request body, using empty body')
     }
-    
+
     const { driveItemId } = body
-    
+
     console.log('🔄 Manual sync triggered by:', userId, 'driveItemId:', driveItemId || 'all')
-    
+
     let results: SyncResult[]
-    
+
     if (driveItemId) {
       // Sync specific file
       const result = await syncSpecificFile(driveItemId)
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
       // Sync all files
       results = await syncAllFiles()
     }
-    
+
     // Log activity
     try {
       await db.log.create({
@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
     } catch (logError) {
       console.warn('Failed to log activity:', logError)
     }
-    
+
     return NextResponse.json({
       success: true,
       processed: results.length,
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('❌ Manual sync error:', error)
-    
+
     // Return proper JSON response even on error
     return NextResponse.json({
       success: false,
@@ -205,12 +205,12 @@ export async function POST(request: NextRequest) {
  */
 async function syncSpecificFile(driveItemId: string): Promise<SyncResult> {
   console.log(`📥 Syncing specific file: ${driveItemId}`)
-  
+
   // Get file metadata
   const fileMetadata = await getFileMetadata(driveItemId)
   const fileName = fileMetadata.name
   const description = fileMetadata.description || ''
-  
+
   return syncFileToR2(driveItemId, fileName, description)
 }
 
@@ -219,28 +219,28 @@ async function syncSpecificFile(driveItemId: string): Promise<SyncResult> {
  */
 async function syncAllFiles(): Promise<SyncResult[]> {
   const results: SyncResult[] = []
-  
+
   // List all files in edit folder
   const files = await listEditFolderFiles()
-  
+
   console.log(`📁 Found ${files.length} files in edit folder`)
-  
+
   for (const file of files) {
     try {
       // Check if file was modified recently (within 30 minutes for cron)
       const lastModified = new Date(file.lastModifiedDateTime || 0)
       const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000)
-      
+
       // Skip very old files (they might be from abandoned sessions)
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
       if (lastModified < oneDayAgo) {
         console.log(`⏭️ Skipping old file: ${file.name}`)
         continue
       }
-      
+
       const result = await syncFileToR2(file.id, file.name, file.description || '')
       results.push(result)
-      
+
     } catch (error) {
       console.error(`❌ Failed to sync ${file.name}:`, error)
       results.push({
@@ -253,7 +253,7 @@ async function syncAllFiles(): Promise<SyncResult[]> {
       })
     }
   }
-  
+
   return results
 }
 
@@ -261,33 +261,33 @@ async function syncAllFiles(): Promise<SyncResult[]> {
  * Sync single file to R2
  */
 async function syncFileToR2(
-  driveItemId: string, 
-  fileName: string, 
+  driveItemId: string,
+  fileName: string,
   description: string
 ): Promise<SyncResult> {
   // Parse R2 path from metadata
   const parsedMeta = parseFileMetadata(description)
-  
+
   if (!parsedMeta.r2Path) {
     // If no R2 path in metadata, construct from filename
     // This is a fallback - ideally metadata should contain the path
     console.warn(`⚠️ No R2 path in metadata for ${fileName}, using default path`)
   }
-  
+
   const r2Path = parsedMeta.r2Path || `sop-files/${fileName}`
-  
+
   console.log(`📥 Syncing: ${fileName} -> ${r2Path}`)
-  
+
   // Download from OneDrive
   const fileContent = await downloadFileFromOneDrive(driveItemId)
-  
+
   // Determine content type
   const fileExt = fileName.split('.').pop()?.toLowerCase() || 'xlsx'
   const contentType = CONTENT_TYPES[fileExt] || CONTENT_TYPES.xlsx
-  
+
   // Get R2 client
   const r2Client = getR2Client()
-  
+
   // Upload to R2
   const putCommand = new PutObjectCommand({
     Bucket: R2_BUCKET_NAME!,
@@ -300,13 +300,46 @@ async function syncFileToR2(
       'original-drive-item': driveItemId,
     },
   })
-  
+
   await r2Client.send(putCommand)
   console.log(`✅ Uploaded to R2: ${r2Path} (${fileContent.byteLength} bytes)`)
-  
+
+  // Trigger FILE_UPDATED notification to all users (Async)
+  // Try to find the related SOP file by filePath
+  try {
+    const sopFile = await db.sopFile.findFirst({
+      where: { filePath: r2Path },
+      select: { nomorSop: true, judul: true, id: true }
+    })
+
+    if (sopFile) {
+      // Update timestamp
+      await db.sopFile.update({
+        where: { id: sopFile.id },
+        data: { updatedAt: new Date() }
+      })
+
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://e-katalog-sop.cloud';
+      fetch(`${appUrl}/api/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'FILE_UPDATED',
+          data: {
+            nomorSop: sopFile.nomorSop,
+            judul: sopFile.judul,
+            updatedBy: 'Admin (M365 Sync)'
+          }
+        })
+      }).catch(err => console.warn('⚠️ [Background] Sync notification trigger failed:', err));
+    }
+  } catch (err) {
+    console.warn('⚠️ [Background] Failed to trigger sync notification:', err)
+  }
+
   // Delete from OneDrive
   await deleteFileFromOneDrive(driveItemId)
-  
+
   return {
     fileName,
     driveItemId,

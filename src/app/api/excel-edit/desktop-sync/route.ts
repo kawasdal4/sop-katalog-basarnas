@@ -43,33 +43,33 @@ const CONTENT_TYPES: Record<string, string> = {
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
   let cleanup: (() => Promise<void>) | null = null
-  
+
   try {
     // ============================================
     // STEP 1: Authentication Check
     // ============================================
     const cookieStore = await cookies()
     const userId = cookieStore.get('userId')?.value
-    
+
     if (!userId) {
       return NextResponse.json({
         success: false,
         error: 'Unauthorized - Silakan login terlebih dahulu',
       }, { status: 401 })
     }
-    
+
     const user = await db.user.findUnique({
       where: { id: userId },
       select: { role: true, name: true, email: true },
     })
-    
+
     if (!user || user.role !== 'ADMIN' && user.role !== 'DEVELOPER') {
       return NextResponse.json({
         success: false,
         error: 'Forbidden - Hanya admin yang dapat melakukan sync',
       }, { status: 403 })
     }
-    
+
     // Check R2 configuration
     if (!isR2Configured()) {
       return NextResponse.json({
@@ -78,31 +78,31 @@ export async function POST(request: NextRequest) {
         needsSetup: true,
       }, { status: 500 })
     }
-    
+
     // ============================================
     // STEP 2: Parse Request
     // ============================================
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     const sessionId = formData.get('sessionId') as string | null
-    
+
     if (!file) {
       return NextResponse.json({
         success: false,
         error: 'File tidak ditemukan dalam request',
       }, { status: 400 })
     }
-    
+
     if (!sessionId) {
       return NextResponse.json({
         success: false,
         error: 'Session ID diperlukan',
       }, { status: 400 })
     }
-    
+
     console.log(`📤 [Sync] Starting sync for session: ${sessionId}`)
     console.log(`📤 [Sync] File: ${file.name}, Size: ${file.size} bytes`)
-    
+
     // ============================================
     // STEP 3: Get Current File from R2 (for hash comparison)
     // ============================================
@@ -110,16 +110,16 @@ export async function POST(request: NextRequest) {
     const existingSession = await db.fileEditSession.findUnique({
       where: { id: sessionId }
     })
-    
+
     if (!existingSession) {
       return NextResponse.json({
         success: false,
         error: 'Session tidak ditemukan',
       }, { status: 404 })
     }
-    
+
     console.log(`📥 [Sync] Fetching current file from R2: ${existingSession.objectKey}`)
-    
+
     let currentR2Hash: string
     try {
       const result = await downloadFromR2(existingSession.objectKey)
@@ -130,25 +130,25 @@ export async function POST(request: NextRequest) {
       currentR2Hash = ''
       console.log(`⚠️ [Sync] Error fetching from R2: ${r2Error}, proceeding with upload`)
     }
-    
+
     // ============================================
     // STEP 4: Validate Session & Check Conflicts
     // ============================================
     const validation = await validateSession(sessionId, userId, currentR2Hash)
-    
+
     if (!validation.valid) {
       console.log(`❌ [Sync] Session validation failed: ${validation.error}`)
-      
+
       return NextResponse.json({
         success: false,
         error: validation.error,
       }, { status: 400 })
     }
-    
+
     // Check for conflict
     if (validation.conflict?.hasConflict) {
       console.log(`⚠️ [Sync] Conflict detected! Original: ${validation.conflict.originalHash.slice(0, 16)}... Current: ${validation.conflict.currentHash.slice(0, 16)}...`)
-      
+
       return NextResponse.json({
         success: false,
         error: 'CONFLICT_DETECTED',
@@ -162,59 +162,59 @@ export async function POST(request: NextRequest) {
         requiresForceSync: true,
       }, { status: 409 }) // 409 Conflict
     }
-    
+
     // ============================================
     // STEP 5: Calculate New Hash
     // ============================================
     const fileArrayBuffer = await file.arrayBuffer()
     const newFileBuffer = Buffer.from(fileArrayBuffer)
     const newHash = calculateHash(newFileBuffer)
-    
+
     console.log(`🔐 [Sync] New file hash: ${newHash.slice(0, 16)}...`)
-    
+
     // Check if file actually changed
     if (newHash === existingSession.originalHash) {
       console.log(`ℹ️ [Sync] File unchanged (same hash)`)
-      
+
       // Complete session without upload
       await completeSession(sessionId, newHash)
-      
+
       return NextResponse.json({
         success: true,
         message: 'File tidak berubah, tidak perlu upload ulang',
         unchanged: true,
       })
     }
-    
+
     // ============================================
     // STEP 6: Apply Permanent Print Layout via Microsoft Graph API
     // ============================================
     const fileExt = file.name.split('.').pop()?.toLowerCase() || 'xlsx'
     const isWordFile = fileExt === 'docx' || fileExt === 'doc'
-    
+
     let finalBuffer: Buffer
     let worksheetsCount = 0
-    
+
     if (isWordFile) {
       // Skip print layout for Word files - use file buffer directly
       console.log(`📄 [Sync] Word file detected (${fileExt}), skipping print layout step`)
       finalBuffer = newFileBuffer
     } else {
       console.log(`📐 [Sync] Applying permanent print layout via Microsoft Graph API...`)
-      
+
       try {
         const layoutResult = await applyPermanentPrintLayout(file.name, newFileBuffer)
-        
+
         finalBuffer = layoutResult.modifiedBuffer
         worksheetsCount = layoutResult.worksheetsCount
         cleanup = layoutResult.cleanup
-        
+
         console.log(`✅ [Sync] Print layout applied to ${worksheetsCount} worksheets`)
         console.log(`📊 [Sync] Modified file size: ${finalBuffer.length} bytes`)
-        
+
       } catch (layoutError) {
         console.error('❌ [Sync] Failed to apply print layout:', layoutError)
-        
+
         // Jika gagal di salah satu step, jangan overwrite R2
         return NextResponse.json({
           success: false,
@@ -224,16 +224,16 @@ export async function POST(request: NextRequest) {
         }, { status: 500 })
       }
     }
-    
+
     // ============================================
     // STEP 7: Upload to R2 (Overwrite)
     // ============================================
     const contentType = CONTENT_TYPES[fileExt] || CONTENT_TYPES.xlsx
-    
+
     console.log(`📤 [Sync] Uploading to R2: ${existingSession.objectKey}`)
-    
+
     const finalHash = calculateHash(finalBuffer)
-    
+
     try {
       await uploadToR2(finalBuffer, file.name, contentType, {
         key: existingSession.objectKey, // Same key = overwrite
@@ -247,7 +247,7 @@ export async function POST(request: NextRequest) {
         }
       })
       console.log(`✅ [Sync] File uploaded successfully${isWordFile ? '' : ' with permanent print layout'}`)
-      
+
       // Update SopFile updatedAt timestamp
       if (existingSession.sopFileId) {
         try {
@@ -256,6 +256,28 @@ export async function POST(request: NextRequest) {
             data: { updatedAt: new Date() }
           })
           console.log(`✅ [Sync] Updated SopFile timestamp`)
+
+          // Trigger FILE_UPDATED notification to all users (Async)
+          const sopFile = await db.sopFile.findUnique({
+            where: { id: existingSession.sopFileId },
+            select: { nomorSop: true, judul: true }
+          })
+
+          if (sopFile) {
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://e-katalog-sop.cloud';
+            fetch(`${appUrl}/api/send-email`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'FILE_UPDATED',
+                data: {
+                  nomorSop: sopFile.nomorSop,
+                  judul: sopFile.judul,
+                  updatedBy: user.name || 'Admin'
+                }
+              })
+            }).catch(err => console.warn('⚠️ [Background] Update notification trigger failed:', err));
+          }
         } catch (updateError) {
           console.warn('⚠️ [Sync] Failed to update SopFile timestamp:', updateError)
         }
@@ -268,12 +290,12 @@ export async function POST(request: NextRequest) {
         details: uploadError instanceof Error ? uploadError.message : 'Unknown error',
       }, { status: 500 })
     }
-    
+
     // ============================================
     // STEP 8: Complete Session
     // ============================================
     await completeSession(sessionId, finalHash)
-    
+
     // ============================================
     // STEP 9: Log Activity
     // ============================================
@@ -299,9 +321,9 @@ export async function POST(request: NextRequest) {
     } catch (logError) {
       console.warn('⚠️ Failed to create log:', logError)
     }
-    
+
     console.log(`✅ [Sync] Complete in ${Date.now() - startTime}ms`)
-    
+
     // ============================================
     // STEP 10: Cleanup temp files from OneDrive
     // ============================================
@@ -313,10 +335,10 @@ export async function POST(request: NextRequest) {
         console.warn('⚠️ [Sync] Failed to cleanup OneDrive temp file (non-critical):', cleanupError)
       }
     }
-    
+
     // Get last editor for response
     const lastEditor = await getLastEditor(existingSession.objectKey)
-    
+
     return NextResponse.json({
       success: true,
       message: 'File berhasil disinkronkan dan print layout diperbarui',
@@ -335,10 +357,10 @@ export async function POST(request: NextRequest) {
         } : null,
       }
     })
-    
+
   } catch (error) {
     console.error('❌ [Sync] Error:', error)
-    
+
     // Cleanup on error
     if (cleanup) {
       try {
@@ -347,7 +369,7 @@ export async function POST(request: NextRequest) {
         // Ignore cleanup errors
       }
     }
-    
+
     return NextResponse.json({
       success: false,
       error: 'Gagal menyinkronkan file',

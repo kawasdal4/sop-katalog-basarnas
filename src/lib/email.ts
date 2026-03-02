@@ -1,62 +1,27 @@
 /**
- * Email Service
+ * Email Service (Resend Implementation)
  * 
  * Handles email notifications for the SOP Katalog system
- * Using Brevo (Sendinblue) SMTP
+ * Using Resend SDK for better delivery and reliability on Vercel
  */
 
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 import { db } from '@/lib/db'
 
-// Email configuration - Brevo SMTP
-const SMTP_HOST = process.env.SMTP_HOST || 'smtp-relay.brevo.com'
-const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587')
-const SMTP_USER = process.env.SMTP_USER
-const SMTP_PASS = process.env.SMTP_PASS
-const EMAIL_FROM = process.env.EMAIL_FROM || 'noreply@sop-katalog.basarnas.go.id'
-const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME || 'E-Katalog SOP Direktorat Kesiapsiagaan'
-
-// Debug logging
-console.log('[Email Service] Configuration:', {
-  smtpHost: SMTP_HOST,
-  smtpPort: SMTP_PORT,
-  hasSmtpUser: !!SMTP_USER,
-  hasSmtpPass: !!SMTP_PASS,
-  emailFrom: EMAIL_FROM,
-  fromName: EMAIL_FROM_NAME
-})
-
-// Create transporter
-function createTransporter() {
-  if (!SMTP_USER || !SMTP_PASS) {
-    console.warn('⚠️ [Email] SMTP credentials not configured')
-    return null
-  }
-
-  console.log('[Email Service] Creating transporter')
-  
-  return nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: false, // use STARTTLS
-    auth: {
-      user: SMTP_USER,
-      pass: SMTP_PASS
-    }
-  })
-}
+// Resend Configuration
+const resend = new Resend(process.env.RESEND_API_KEY)
+const EMAIL_FROM = process.env.EMAIL_FROM || 'notifikasi@e-katalog-sop.cloud'
+const EMAIL_FROM_NAME = 'SOP Katalog'
+const APP_URL = 'https://e-katalog-sop.cloud'
 
 // Email types
-export type EmailTemplate = 
+export type EmailTemplateType =
+  | 'SOP_PUBLISHED'      // New SOP published - notify all users
   | 'SOP_SUBMITTED'      // Public submission - notify admins
-  | 'SOP_APPROVED'       // Submission approved - notify submitter
+  | 'FILE_UPDATED'       // SOP updated via Edit & Sync - notify relevant users
   | 'SOP_REJECTED'       // Submission rejected - notify submitter
-  | 'SOP_UPLOADED'       // New SOP uploaded - notify relevant users
-  | 'SOP_UPDATED'        // SOP updated - notify relevant users
-  | 'SOP_EXPIRING'       // SOP expiring soon - notify admins
-  | 'FILE_EDIT_LOCK'     // File locked for editing - notify admins
-  | 'FILE_EDIT_CONFLICT' // Edit conflict detected
-  | 'USER_LOGIN_NEW'     // New login from unknown device
+  | 'SOP_APPROVED'       // Submission approved - notify submitter
+  | 'FORGOT_PASSWORD'    // Password reset request
   | 'PASSWORD_CHANGED'   // Password changed notification
 
 export interface EmailRecipient {
@@ -65,63 +30,53 @@ export interface EmailRecipient {
 }
 
 export interface EmailOptions {
-  to: EmailRecipient | EmailRecipient[]
+  to: string | string[]
   subject: string
   html: string
   text?: string
-  attachments?: Array<{
-    filename: string
-    content: Buffer | string
-    contentType?: string
-  }>
+  from?: string
 }
 
 /**
- * Send email using nodemailer
+ * Send email using Resend
  */
-export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
-  const transporter = createTransporter()
-  
-  if (!transporter) {
-    console.warn('⚠️ [Email] Cannot send email - transporter not configured')
-    return { success: false, error: 'Email service not configured' }
-  }
-
+export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; data?: any; error?: any }> {
   try {
-    const recipients = Array.isArray(options.to) ? options.to : [options.to]
-    const toList = recipients.map(r => r.name ? `"${r.name}" <${r.email}>` : r.email)
+    const from = options.from || `${EMAIL_FROM_NAME} <${EMAIL_FROM}>`
 
-    console.log('[Email] Preparing to send email:', {
-      from: `"${EMAIL_FROM_NAME}" <${EMAIL_FROM}>`,
-      to: toList.join(', '),
-      subject: options.subject
-    })
-
-    const mailOptions = {
-      from: `"${EMAIL_FROM_NAME}" <${EMAIL_FROM}>`,
-      to: toList.join(', '),
+    const { data, error } = await resend.emails.send({
+      from,
+      to: options.to,
       subject: options.subject,
       html: options.html,
-      text: options.text,
-      attachments: options.attachments
+      text: options.text || '',
+    })
+
+    if (error) {
+      console.error('❌ [Resend] Error sending email:', error)
+      return { success: false, error }
     }
 
-    const info = await transporter.sendMail(mailOptions)
-    console.log(`✅ [Email] Sent successfully:`, {
-      messageId: info.messageId,
-      response: info.response
+    console.log(`✅ [Resend] Email sent successfully: ${data?.id}`)
+    return { success: true, data }
+  } catch (error) {
+    console.error('❌ [Resend] Critical error:', error)
+    return { success: false, error }
+  }
+}
+
+/**
+ * Get all active users for notifications
+ */
+export async function getAllActiveUsers(): Promise<EmailRecipient[]> {
+  try {
+    return await db.user.findMany({
+      where: { email: { not: '' } },
+      select: { email: true, name: true }
     })
-    
-    return { success: true }
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    const errorCode = (error as { code?: string })?.code
-    console.error('❌ [Email] Failed to send email:', {
-      error: errorMessage,
-      code: errorCode,
-      stack: error instanceof Error ? error.stack : undefined
-    })
-    return { success: false, error: errorMessage }
+  } catch (error) {
+    console.error('❌ [Email] Failed to get users:', error)
+    return []
   }
 }
 
@@ -130,692 +85,248 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
  */
 export async function getAdminUsers(): Promise<EmailRecipient[]> {
   try {
-    const admins = await db.user.findMany({
-      where: {
-        role: { in: ['ADMIN', 'DEVELOPER'] }
-      },
-      select: {
-        email: true,
-        name: true
-      }
+    return await db.user.findMany({
+      where: { role: { in: ['ADMIN', 'DEVELOPER'] } },
+      select: { email: true, name: true }
     })
-    return admins
   } catch (error) {
-    console.error('❌ [Email] Failed to get admin users:', error)
+    console.error('❌ [Email] Failed to get admins:', error)
     return []
   }
 }
 
+// ============================================================================
+// EMAIL TEMPLATES (Modern, Professional, Responsive)
+// ============================================================================
+
+const BASE_STYLE = `
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; background-color: #f8fafc; margin: 0; padding: 0; }
+  .wrapper { width: 100%; background-color: #f8fafc; padding: 40px 0; }
+  .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+  .header { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); padding: 32px; text-align: center; }
+  .header h1 { color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.025em; }
+  .content { padding: 40px; }
+  .badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 16px; }
+  .badge-blue { background-color: #dbeafe; color: #1e40af; }
+  .badge-orange { background-color: #ffedd5; color: #9a3412; }
+  .badge-green { background-color: #dcfce7; color: #166534; }
+  .badge-red { background-color: #fee2e2; color: #991b1b; }
+  h2 { color: #0f172a; margin-top: 0; margin-bottom: 16px; font-size: 20px; font-weight: 700; }
+  p { margin-bottom: 24px; color: #475569; }
+  .details-box { background-color: #f1f5f9; border-radius: 8px; padding: 20px; margin-bottom: 32px; }
+  .detail-row { display: flex; margin-bottom: 8px; font-size: 14px; }
+  .detail-label { color: #64748b; width: 120px; flex-shrink: 0; font-weight: 500; }
+  .detail-value { color: #1e293b; font-weight: 600; }
+  .btn { display: inline-block; background-color: #f97316; color: #ffffff !important; font-weight: 700; padding: 12px 32px; border-radius: 8px; text-decoration: none; transition: background-color 0.2s; }
+  .footer { padding: 32px; text-align: center; border-top: 1px solid #f1f5f9; }
+  .footer p { margin: 0; font-size: 12px; color: #94a3b8; }
+`
+
+function wrapTemplate(content: string) {
+  return `
+    <!DOCTYPE html>
+    <html lang="id">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>${BASE_STYLE}</style>
+    </head>
+    <body>
+      <div class="wrapper">
+        <div class="container">
+          ${content}
+          <div class="footer">
+            <p>© ${new Date().getFullYear()} E-Katalog SOP - Direktorat Kesiapsiagaan</p>
+            <p style="margin-top: 8px;">Badan Nasional Pencarian dan Pertolongan (BASARNAS)</p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+}
+
 /**
- * Get all developer users for CC notifications
+ * 1. Publish SOP Baru
  */
-export async function getDeveloperUsers(): Promise<EmailRecipient[]> {
-  try {
-    const developers = await db.user.findMany({
-      where: {
-        role: 'DEVELOPER'
-      },
-      select: {
-        email: true,
-        name: true
-      }
-    })
-    return developers
-  } catch (error) {
-    console.error('❌ [Email] Failed to get developer users:', error)
-    return []
-  }
+export function generateSopPublishedEmail(data: {
+  nomorSop: string
+  judul: string
+  jenis: string
+  kategori: string
+}) {
+  const content = `
+    <div class="header"><h1>SOP TERBIT</h1></div>
+    <div class="content">
+      <div class="badge badge-orange">Publikasi Baru</div>
+      <h2>Dokumen SOP Baru Telah Terbit</h2>
+      <p>Halo, ada dokumen SOP baru yang telah dipublikasikan dan dapat Anda akses sekarang melalui E-Katalog SOP.</p>
+      <div class="details-box">
+        <div class="detail-row"><div class="detail-label">Nomor</div><div class="detail-value">${data.nomorSop}</div></div>
+        <div class="detail-row"><div class="detail-label">Judul</div><div class="detail-value">${data.judul}</div></div>
+        <div class="detail-row"><div class="detail-label">Jenis</div><div class="detail-value">${data.jenis}</div></div>
+        <div class="detail-row"><div class="detail-label">Kategori</div><div class="detail-value">${data.kategori}</div></div>
+      </div>
+      <div style="text-align: center;">
+        <a href="${APP_URL}" class="btn">Lihat Dokumen</a>
+      </div>
+    </div>
+  `
+  return wrapTemplate(content)
 }
 
-// ============================================================================
-// EMAIL TEMPLATES
-// ============================================================================
-
 /**
- * SOP Submission Notification (for Admins)
+ * 2. Pengajuan SOP Baru (Admin Notification)
  */
 export function generateSopSubmittedEmail(data: {
   nomorSop: string
   judul: string
-  kategori: string
-  jenis: string
-  submitterName?: string | null
-  submitterEmail?: string | null
-  keterangan?: string | null
-  submittedAt: Date
-}): { subject: string; html: string; text: string } {
-  const { nomorSop, judul, kategori, jenis, submitterName, submitterEmail, keterangan, submittedAt } = data
-
-  const subject = `[Pengajuan Baru] ${nomorSop} - ${judul}`
-  
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #1e40af; color: white; padding: 20px; text-align: center; }
-        .content { padding: 20px; background: #f9f9f9; }
-        .info-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-        .info-table td { padding: 8px; border-bottom: 1px solid #ddd; }
-        .info-table td:first-child { font-weight: bold; width: 150px; }
-        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-        .btn { display: inline-block; padding: 10px 20px; background: #1e40af; color: white; text-decoration: none; border-radius: 5px; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h2>📋 Pengajuan SOP/IK Baru</h2>
-        </div>
-        <div class="content">
-          <p>Ada pengajuan SOP/IK baru yang memerlukan verifikasi:</p>
-          
-          <table class="info-table">
-            <tr><td>Nomor</td><td>${nomorSop}</td></tr>
-            <tr><td>Judul</td><td>${judul}</td></tr>
-            <tr><td>Jenis</td><td>${jenis}</td></tr>
-            <tr><td>Kategori</td><td>${kategori}</td></tr>
-            <tr><td>Tanggal Pengajuan</td><td>${submittedAt.toLocaleDateString('id-ID', { dateStyle: 'full' })}</td></tr>
-            ${submitterName ? `<tr><td>Nama Pengaju</td><td>${submitterName}</td></tr>` : ''}
-            ${submitterEmail ? `<tr><td>Email Pengaju</td><td>${submitterEmail}</td></tr>` : ''}
-            ${keterangan ? `<tr><td>Keterangan</td><td>${keterangan}</td></tr>` : ''}
-          </table>
-          
-          <p>Silakan login ke sistem E-Katalog SOP untuk melakukan verifikasi.</p>
-          
-          <p style="text-align: center; margin-top: 30px;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://sop-katalog-basarnas.vercel.app'}" class="btn">Buka E-Katalog SOP</a>
-          </p>
-        </div>
-        <div class="footer">
-          Email ini dikirim otomatis oleh Sistem E-Katalog SOP Direktorat Kesiapsiagaan BASARNAS
-        </div>
+  submitter: string
+}) {
+  const content = `
+    <div class="header" style="background: #1e293b;"><h1>PENGAJUAN BARU</h1></div>
+    <div class="content">
+      <div class="badge badge-blue">Perlu Verifikasi</div>
+      <h2>Ada Pengajuan SOP Baru</h2>
+      <p>Seseorang telah mengajukan dokumen baru melalui sistem publik. Silakan periksa detail pengajuan di bawah ini:</p>
+      <div class="details-box">
+        <div class="detail-row"><div class="detail-label">Nomor</div><div class="detail-value">${data.nomorSop}</div></div>
+        <div class="detail-row"><div class="detail-label">Judul</div><div class="detail-value">${data.judul}</div></div>
+        <div class="detail-row"><div class="detail-label">Pengaju</div><div class="detail-value">${data.submitter}</div></div>
       </div>
-    </body>
-    </html>
+      <div style="text-align: center;">
+        <a href="${APP_URL}" class="btn">Buka Dashboard Admin</a>
+      </div>
+    </div>
   `
-
-  const text = `
-Pengajuan SOP/IK Baru
-
-Nomor: ${nomorSop}
-Judul: ${judul}
-Jenis: ${jenis}
-Kategori: ${kategori}
-Tanggal Pengajuan: ${submittedAt.toLocaleDateString('id-ID')}
-${submitterName ? `Nama Pengaju: ${submitterName}` : ''}
-${submitterEmail ? `Email Pengaju: ${submitterEmail}` : ''}
-${keterangan ? `Keterangan: ${keterangan}` : ''}
-
-Silakan login ke sistem E-Katalog SOP untuk melakukan verifikasi.
-  `.trim()
-
-  return { subject, html, text }
+  return wrapTemplate(content)
 }
 
 /**
- * SOP Approved Notification (for Submitter)
+ * 3. Update File (Edit & Sync)
  */
-export function generateSopApprovedEmail(data: {
+export function generateFileUpdatedEmail(data: {
   nomorSop: string
   judul: string
-  jenis: string
-  verifiedBy?: string
-  verifiedAt: Date
-}): { subject: string; html: string; text: string } {
-  const { nomorSop, judul, jenis, verifiedBy, verifiedAt } = data
-
-  const subject = `✅ ${nomorSop} telah disetujui`
-  
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #059669; color: white; padding: 20px; text-align: center; }
-        .content { padding: 20px; background: #f9f9f9; }
-        .info-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-        .info-table td { padding: 8px; border-bottom: 1px solid #ddd; }
-        .info-table td:first-child { font-weight: bold; width: 150px; }
-        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-        .btn { display: inline-block; padding: 10px 20px; background: #059669; color: white; text-decoration: none; border-radius: 5px; }
-        .success-icon { font-size: 48px; text-align: center; margin: 20px 0; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h2>✅ Pengajuan Disetujui</h2>
-        </div>
-        <div class="content">
-          <div class="success-icon">🎉</div>
-          
-          <p>Selamat! Pengajuan ${jenis} Anda telah disetujui dan dipublikasikan:</p>
-          
-          <table class="info-table">
-            <tr><td>Nomor</td><td>${nomorSop}</td></tr>
-            <tr><td>Judul</td><td>${judul}</td></tr>
-            <tr><td>Jenis</td><td>${jenis}</td></tr>
-            <tr><td>Tanggal Verifikasi</td><td>${verifiedAt.toLocaleDateString('id-ID', { dateStyle: 'full' })}</td></tr>
-            ${verifiedBy ? `<tr><td>Diverifikasi oleh</td><td>Admin</td></tr>` : ''}
-          </table>
-          
-          <p>Terima kasih atas kontribusi Anda dalam pengembangan SOP/IK di BASARNAS.</p>
-          
-          <p style="text-align: center; margin-top: 30px;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://sop-katalog-basarnas.vercel.app'}" class="btn">Lihat di E-Katalog SOP</a>
-          </p>
-        </div>
-        <div class="footer">
-          Email ini dikirim otomatis oleh Sistem E-Katalog SOP Direktorat Kesiapsiagaan BASARNAS
-        </div>
+  updatedBy: string
+}) {
+  const content = `
+    <div class="header"><h1>UPDATE DOKUMEN</h1></div>
+    <div class="content">
+      <div class="badge badge-blue">Revisi</div>
+      <h2>File SOP Telah Diperbarui</h2>
+      <p>File dokumen berikut telah diperbarui melalui fitur Edit & Sync.</p>
+      <div class="details-box">
+        <div class="detail-row"><div class="detail-label">Nomor</div><div class="detail-value">${data.nomorSop}</div></div>
+        <div class="detail-row"><div class="detail-label">Judul</div><div class="detail-value">${data.judul}</div></div>
+        <div class="detail-row"><div class="detail-label">Diperbarui</div><div class="detail-value">${data.updatedBy}</div></div>
       </div>
-    </body>
-    </html>
+      <div style="text-align: center;">
+        <a href="${APP_URL}" class="btn">Lihat Perubahan</a>
+      </div>
+    </div>
   `
-
-  const text = `
-Pengajuan Disetujui ✅
-
-Selamat! Pengajuan ${jenis} Anda telah disetujui:
-
-Nomor: ${nomorSop}
-Judul: ${judul}
-Jenis: ${jenis}
-Tanggal Verifikasi: ${verifiedAt.toLocaleDateString('id-ID')}
-${verifiedBy ? 'Diverifikasi oleh: Admin' : ''}
-
-Terima kasih atas kontribusi Anda.
-  `.trim()
-
-  return { subject, html, text }
+  return wrapTemplate(content)
 }
 
 /**
- * SOP Rejected Notification (for Submitter)
+ * 4. Pengajuan Ditolak
  */
 export function generateSopRejectedEmail(data: {
   nomorSop: string
   judul: string
-  jenis: string
-  rejectionReason?: string | null
-  verifiedAt: Date
-}): { subject: string; html: string; text: string } {
-  const { nomorSop, judul, jenis, rejectionReason, verifiedAt } = data
-
-  const subject = `❌ ${nomorSop} ditolak`
-  
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #dc2626; color: white; padding: 20px; text-align: center; }
-        .content { padding: 20px; background: #f9f9f9; }
-        .info-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-        .info-table td { padding: 8px; border-bottom: 1px solid #ddd; }
-        .info-table td:first-child { font-weight: bold; width: 150px; }
-        .reason-box { background: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin: 15px 0; }
-        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h2>❌ Pengajuan Ditolak</h2>
-        </div>
-        <div class="content">
-          <p>Mohon maaf, pengajuan ${jenis} Anda tidak dapat disetujui:</p>
-          
-          <table class="info-table">
-            <tr><td>Nomor</td><td>${nomorSop}</td></tr>
-            <tr><td>Judul</td><td>${judul}</td></tr>
-            <tr><td>Jenis</td><td>${jenis}</td></tr>
-            <tr><td>Tanggal</td><td>${verifiedAt.toLocaleDateString('id-ID', { dateStyle: 'full' })}</td></tr>
-          </table>
-          
-          ${rejectionReason ? `
-          <div class="reason-box">
-            <strong>Alasan Penolakan:</strong><br>
-            ${rejectionReason}
-          </div>
-          ` : ''}
-          
-          <p>Anda dapat mengajukan ulang dengan perbaikan yang diperlukan atau menghubungi admin untuk informasi lebih lanjut.</p>
-        </div>
-        <div class="footer">
-          Email ini dikirim otomatis oleh Sistem E-Katalog SOP Direktorat Kesiapsiagaan BASARNAS
-        </div>
+  reason: string
+}) {
+  const content = `
+    <div class="header" style="background: #ef4444;"><h1>PENGAJUAN DITOLAK</h1></div>
+    <div class="content">
+      <div class="badge badge-red">Ditolak</div>
+      <h2>Status Pengajuan SOP</h2>
+      <p>Mohon maaf, pengajuan dokumen Anda belum dapat disetujui karena alasan berikut:</p>
+      <div class="details-box" style="border-left: 4px solid #ef4444;">
+        <p style="margin: 0; font-weight: 600; color: #991b1b;">"${data.reason}"</p>
       </div>
-    </body>
-    </html>
+      <div class="details-box">
+        <div class="detail-row"><div class="detail-label">Nomor</div><div class="detail-value">${data.nomorSop}</div></div>
+        <div class="detail-row"><div class="detail-label">Judul</div><div class="detail-value">${data.judul}</div></div>
+      </div>
+      <p>Anda dapat mengunggah kembali dokumen setelah melakukan perbaikan.</p>
+      <div style="text-align: center;">
+        <a href="${APP_URL}" class="btn" style="background-color: #334155;">Buka Dashboard</a>
+      </div>
+    </div>
   `
-
-  const text = `
-Pengajuan Ditolak ❌
-
-Mohon maaf, pengajuan ${jenis} Anda tidak dapat disetujui:
-
-Nomor: ${nomorSop}
-Judul: ${judul}
-Jenis: ${jenis}
-Tanggal: ${verifiedAt.toLocaleDateString('id-ID')}
-
-${rejectionReason ? `Alasan Penolakan: ${rejectionReason}` : ''}
-
-Anda dapat mengajukan ulang dengan perbaikan yang diperlukan.
-  `.trim()
-
-  return { subject, html, text }
+  return wrapTemplate(content)
 }
 
 /**
- * New SOP Uploaded Notification
+ * 5. Pengajuan Disetujui
  */
-export function generateSopUploadedEmail(data: {
+export function generateSopApprovedEmail(data: {
   nomorSop: string
   judul: string
-  jenis: string
-  kategori: string
-  tahun: number
-  uploadedBy: string
-  uploadedAt: Date
-}): { subject: string; html: string; text: string } {
-  const { nomorSop, judul, jenis, kategori, tahun, uploadedBy, uploadedAt } = data
-
-  const subject = `📄 ${jenis} Baru: ${nomorSop} - ${judul}`
-  
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #1e40af; color: white; padding: 20px; text-align: center; }
-        .content { padding: 20px; background: #f9f9f9; }
-        .info-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-        .info-table td { padding: 8px; border-bottom: 1px solid #ddd; }
-        .info-table td:first-child { font-weight: bold; width: 150px; }
-        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-        .btn { display: inline-block; padding: 10px 20px; background: #1e40af; color: white; text-decoration: none; border-radius: 5px; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h2>📄 ${jenis} Baru Diunggah</h2>
-        </div>
-        <div class="content">
-          <p>Ada ${jenis} baru yang telah diunggah ke sistem:</p>
-          
-          <table class="info-table">
-            <tr><td>Nomor</td><td>${nomorSop}</td></tr>
-            <tr><td>Judul</td><td>${judul}</td></tr>
-            <tr><td>Jenis</td><td>${jenis}</td></tr>
-            <tr><td>Kategori</td><td>${kategori}</td></tr>
-            <tr><td>Tahun</td><td>${tahun}</td></tr>
-            <tr><td>Tanggal Upload</td><td>${uploadedAt.toLocaleDateString('id-ID', { dateStyle: 'full' })}</td></tr>
-            <tr><td>Diupload oleh</td><td>${uploadedBy}</td></tr>
-          </table>
-          
-          <p style="text-align: center; margin-top: 30px;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://sop-katalog-basarnas.vercel.app'}" class="btn">Lihat di E-Katalog SOP</a>
-          </p>
-        </div>
-        <div class="footer">
-          Email ini dikirim otomatis oleh Sistem E-Katalog SOP Direktorat Kesiapsiagaan BASARNAS
-        </div>
+}) {
+  const content = `
+    <div class="header" style="background: #10b981;"><h1>PENGAJUAN DISETUJUI</h1></div>
+    <div class="content">
+      <div class="badge badge-green">Disetujui</div>
+      <h2>Kabar Baik! Pengajuan SOP Anda Diterima</h2>
+      <p>Selamat, pengajuan dokumen Anda telah diverifikasi oleh tim admin dan kini telah terbit di sistem.</p>
+      <div class="details-box">
+        <div class="detail-row"><div class="detail-label">Nomor</div><div class="detail-value">${data.nomorSop}</div></div>
+        <div class="detail-row"><div class="detail-label">Judul</div><div class="detail-value">${data.judul}</div></div>
       </div>
-    </body>
-    </html>
+      <div style="text-align: center;">
+        <a href="${APP_URL}" class="btn" style="background-color: #10b981;">Buka E-Katalog SOP</a>
+      </div>
+    </div>
   `
-
-  const text = `
-${jenis} Baru Diunggah
-
-Nomor: ${nomorSop}
-Judul: ${judul}
-Jenis: ${jenis}
-Kategori: ${kategori}
-Tahun: ${tahun}
-Tanggal Upload: ${uploadedAt.toLocaleDateString('id-ID')}
-Diupload oleh: ${uploadedBy}
-  `.trim()
-
-  return { subject, html, text }
+  return wrapTemplate(content)
 }
 
 /**
- * Password Changed Notification
+ * 6. Forgot Password
+ */
+export function generateForgotPasswordEmail(data: {
+  name: string
+  resetLink: string
+}) {
+  const content = `
+    <div class="header" style="background: #6366f1;"><h1>RESET PASSWORD</h1></div>
+    <div class="content">
+      <h2>Permintaan Reset Password</h2>
+      <p>Halo ${data.name}, Kami menerima permintaan untuk mereset password akun Anda di E-Katalog SOP.</p>
+      <p>Klik tombol di bawah ini untuk melanjutkan proses reset password. Link ini akan kedaluwarsa dalam waktu 1 jam.</p>
+      <div style="text-align: center; margin: 40px 0;">
+        <a href="${data.resetLink}" class="btn" style="background-color: #6366f1;">Reset Password Saya</a>
+      </div>
+      <p style="font-size: 13px; color: #94a3b8;">Jika Anda tidak merasa melakukan permintaan ini, silakan abaikan email ini.</p>
+    </div>
+  `
+  return wrapTemplate(content)
+}
+
+/**
+ * 7. Password Changed Notification
  */
 export function generatePasswordChangedEmail(data: {
-  userName: string
-  changedAt: Date
-}): { subject: string; html: string; text: string } {
-  const { userName, changedAt } = data
-
-  const subject = `🔐 Password Anda telah diubah`
-  
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #7c3aed; color: white; padding: 20px; text-align: center; }
-        .content { padding: 20px; background: #f9f9f9; }
-        .warning-box { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 15px 0; }
-        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h2>🔐 Password Diubah</h2>
-        </div>
-        <div class="content">
-          <p>Halo ${userName},</p>
-          
-          <p>Password akun Anda di E-Katalog SOP telah berhasil diubah pada:</p>
-          
-          <p><strong>${changedAt.toLocaleDateString('id-ID', { dateStyle: 'full', timeStyle: 'long' })}</strong></p>
-          
-          <div class="warning-box">
-            <strong>⚠️ Perhatian:</strong><br>
-            Jika Anda tidak merasa mengubah password, segera hubungi administrator untuk mengamankan akun Anda.
-          </div>
-          
-          <p>Terima kasih.</p>
-        </div>
-        <div class="footer">
-          Email ini dikirim otomatis oleh Sistem E-Katalog SOP Direktorat Kesiapsiagaan BASARNAS
-        </div>
+  name: string
+}) {
+  const content = `
+    <div class="header" style="background: #1e293b;"><h1>KEAMANAN AKUN</h1></div>
+    <div class="content">
+      <div class="badge badge-blue">Berhasil</div>
+      <h2>Password Anda Telah Diubah</h2>
+      <p>Halo ${data.name}, ini adalah notifikasi bahwa password akun Anda baru saja berhasil diubah.</p>
+      <div class="details-box">
+        <div class="detail-row"><div class="detail-label">Kejadian</div><div class="detail-value">Perubahan Password</div></div>
+        <div class="detail-row"><div class="detail-label">Waktu</div><div class="detail-value">${new Date().toLocaleString('id-ID')}</div></div>
       </div>
-    </body>
-    </html>
-  `
-
-  const text = `
-Password Diubah
-
-Halo ${userName},
-
-Password akun Anda di E-Katalog SOP telah berhasil diubah pada:
-${changedAt.toLocaleDateString('id-ID', { dateStyle: 'full', timeStyle: 'long' })}
-
-PERHATIAN: Jika Anda tidak merasa mengubah password, segera hubungi administrator.
-  `.trim()
-
-  return { subject, html, text }
-}
-
-/**
- * File Lock Conflict Notification
- */
-export function generateFileConflictEmail(data: {
-  fileName: string
-  lockedBy: { name: string | null; email: string }
-  lockedAt: Date
-  attemptedBy: { name: string | null; email: string }
-  attemptedAt: Date
-}): { subject: string; html: string; text: string } {
-  const { fileName, lockedBy, lockedAt, attemptedBy, attemptedAt } = data
-
-  const subject = `⚠️ Konflik Edit File: ${fileName}`
-  
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #ea580c; color: white; padding: 20px; text-align: center; }
-        .content { padding: 20px; background: #f9f9f9; }
-        .info-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-        .info-table td { padding: 8px; border-bottom: 1px solid #ddd; }
-        .info-table td:first-child { font-weight: bold; width: 150px; }
-        .warning-box { background: #fef2f2; border-left: 4px solid #ea580c; padding: 15px; margin: 15px 0; }
-        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h2>⚠️ Konflik Edit File</h2>
-        </div>
-        <div class="content">
-          <p>Ada percobaan akses ke file yang sedang dikunci:</p>
-          
-          <table class="info-table">
-            <tr><td>File</td><td>${fileName}</td></tr>
-            <tr><td>Dikunci oleh</td><td>${lockedBy.name || lockedBy.email}</td></tr>
-            <tr><td>Sejak</td><td>${lockedAt.toLocaleDateString('id-ID', { dateStyle: 'full', timeStyle: 'short' })}</td></tr>
-          </table>
-          
-          <div class="warning-box">
-            <strong>Percobaan Akses:</strong><br>
-            User ${attemptedBy.name || attemptedBy.email} mencoba mengakses file ini pada ${attemptedAt.toLocaleDateString('id-ID', { dateStyle: 'full', timeStyle: 'short' })}.
-          </div>
-          
-          <p>File akan tersedia setelah sesi edit selesai atau Anda dapat melakukan force sync jika diperlukan.</p>
-        </div>
-        <div class="footer">
-          Email ini dikirim otomatis oleh Sistem E-Katalog SOP Direktorat Kesiapsiagaan BASARNAS
-        </div>
+      <p>Jika Anda tidak merasa melakukan perubahan ini, segera hubungi tim IT kami.</p>
+      <div style="text-align: center;">
+        <a href="${APP_URL}" class="btn">Login ke Akun</a>
       </div>
-    </body>
-    </html>
+    </div>
   `
-
-  const text = `
-Konflik Edit File
-
-File: ${fileName}
-Dikunci oleh: ${lockedBy.name || lockedBy.email}
-Sejak: ${lockedAt.toLocaleDateString('id-ID')}
-
-Percobaan Akses: User ${attemptedBy.name || attemptedBy.email} mencoba mengakses file ini pada ${attemptedAt.toLocaleDateString('id-ID')}.
-
-File akan tersedia setelah sesi edit selesai.
-  `.trim()
-
-  return { subject, html, text }
-}
-
-// ============================================================================
-// NOTIFICATION HELPER FUNCTIONS
-// ============================================================================
-
-/**
- * Notify admins about new SOP submission
- */
-export async function notifyAdminsNewSubmission(sopData: {
-  nomorSop: string
-  judul: string
-  kategori: string
-  jenis: string
-  submitterName?: string | null
-  submitterEmail?: string | null
-  keterangan?: string | null
-  submittedAt: Date
-}): Promise<void> {
-  try {
-    const admins = await getAdminUsers()
-    if (admins.length === 0) {
-      console.warn('⚠️ [Email] No admin users to notify')
-      return
-    }
-
-    const { subject, html, text } = generateSopSubmittedEmail(sopData)
-    
-    await sendEmail({
-      to: admins,
-      subject,
-      html,
-      text
-    })
-    
-    console.log(`📧 [Email] Notified ${admins.length} admins about new submission: ${sopData.nomorSop}`)
-  } catch (error) {
-    console.error('❌ [Email] Failed to notify admins:', error)
-  }
-}
-
-/**
- * Notify submitter about approval (with CC to DEVELOPER)
- */
-export async function notifySubmitterApproved(
-  submitterEmail: string,
-  submitterName: string | null,
-  sopData: {
-    nomorSop: string
-    judul: string
-    jenis: string
-    verifiedBy?: string
-    verifiedAt: Date
-  }
-): Promise<void> {
-  try {
-    const { subject, html, text } = generateSopApprovedEmail(sopData)
-    
-    // Get developers for CC
-    const developers = await getDeveloperUsers()
-    
-    // Build recipient list: submitter + developers
-    const recipients: EmailRecipient[] = [
-      { email: submitterEmail, name: submitterName }
-    ]
-    
-    // Add developers to recipients (they get all notifications)
-    for (const dev of developers) {
-      if (dev.email !== submitterEmail) { // Avoid duplicate
-        recipients.push(dev)
-      }
-    }
-    
-    await sendEmail({
-      to: recipients,
-      subject,
-      html,
-      text
-    })
-    
-    console.log(`📧 [Email] Notified submitter + ${developers.length} developers about approval: ${sopData.nomorSop}`)
-  } catch (error) {
-    console.error('❌ [Email] Failed to notify submitter:', error)
-  }
-}
-
-/**
- * Notify submitter about rejection (with CC to DEVELOPER)
- */
-export async function notifySubmitterRejected(
-  submitterEmail: string,
-  submitterName: string | null,
-  sopData: {
-    nomorSop: string
-    judul: string
-    jenis: string
-    rejectionReason?: string | null
-    verifiedAt: Date
-  }
-): Promise<void> {
-  try {
-    const { subject, html, text } = generateSopRejectedEmail(sopData)
-    
-    // Get developers for CC
-    const developers = await getDeveloperUsers()
-    
-    // Build recipient list: submitter + developers
-    const recipients: EmailRecipient[] = [
-      { email: submitterEmail, name: submitterName }
-    ]
-    
-    // Add developers to recipients (they get all notifications)
-    for (const dev of developers) {
-      if (dev.email !== submitterEmail) { // Avoid duplicate
-        recipients.push(dev)
-      }
-    }
-    
-    await sendEmail({
-      to: recipients,
-      subject,
-      html,
-      text
-    })
-    
-    console.log(`📧 [Email] Notified submitter + ${developers.length} developers about rejection: ${sopData.nomorSop}`)
-  } catch (error) {
-    console.error('❌ [Email] Failed to notify submitter:', error)
-  }
-}
-
-/**
- * Notify admins about new SOP upload
- */
-export async function notifyAdminsNewUpload(sopData: {
-  nomorSop: string
-  judul: string
-  jenis: string
-  kategori: string
-  tahun: number
-  uploadedBy: string
-  uploadedAt: Date
-}): Promise<void> {
-  try {
-    const admins = await getAdminUsers()
-    if (admins.length === 0) {
-      console.warn('⚠️ [Email] No admin users to notify')
-      return
-    }
-
-    const { subject, html, text } = generateSopUploadedEmail(sopData)
-    
-    await sendEmail({
-      to: admins,
-      subject,
-      html,
-      text
-    })
-    
-    console.log(`📧 [Email] Notified ${admins.length} admins about new upload: ${sopData.nomorSop}`)
-  } catch (error) {
-    console.error('❌ [Email] Failed to notify admins:', error)
-  }
-}
-
-/**
- * Notify user about password change
- */
-export async function notifyPasswordChanged(
-  userEmail: string,
-  userName: string
-): Promise<void> {
-  try {
-    const { subject, html, text } = generatePasswordChangedEmail({
-      userName,
-      changedAt: new Date()
-    })
-    
-    await sendEmail({
-      to: { email: userEmail, name: userName },
-      subject,
-      html,
-      text
-    })
-    
-    console.log(`📧 [Email] Notified user about password change: ${userEmail}`)
-  } catch (error) {
-    console.error('❌ [Email] Failed to notify user:', error)
-  }
+  return wrapTemplate(content)
 }

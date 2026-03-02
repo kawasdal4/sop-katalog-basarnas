@@ -192,20 +192,20 @@ export async function PUT(request: NextRequest) {
 
         // Generate new nomorSop (incremental)
         const nomorSop = `${prefix}${String(nextNumber).padStart(4, '0')}`
-        
+
         // Check if this nomorSop already exists
         const existing = await db.sopFile.findUnique({
           where: { nomorSop },
           select: { id: true }
         })
-        
+
         if (!existing) {
           return nomorSop
         }
-        
+
         console.log(`⚠️ Nomor ${nomorSop} already exists, retrying... (attempt ${attempt + 1})`)
       }
-      
+
       // If all retries fail, use timestamp-based number as fallback
       const fallbackNumber = Date.now().toString().slice(-6)
       return `${prefix}${fallbackNumber}`
@@ -264,6 +264,24 @@ export async function PUT(request: NextRequest) {
           verificationStatus: isPublicSubmission ? 'MENUNGGU' : null
         }
       })
+
+      // Trigger NEW_SUBMISSION notification to Admin (Async)
+      if (isPublicSubmission) {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://e-katalog-sop.cloud';
+        fetch(`${appUrl}/api/send-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'NEW_SUBMISSION',
+            data: {
+              nomorSop,
+              judul,
+              submitterName: submitterName || 'Anonim',
+              submitterEmail: submitterEmail || '-'
+            }
+          })
+        }).catch(err => console.warn('⚠️ [Background] Submission notification trigger failed:', err));
+      }
     } catch (dbError: unknown) {
       console.error('❌ Database error:', dbError)
       const prismaError = dbError as { code?: string; meta?: { target?: string[] } }

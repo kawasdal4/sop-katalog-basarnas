@@ -1,57 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-
+import { sendEmail, generatePasswordChangedEmail } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, token, newPassword } = await request.json()
+    const { email, password } = await request.json()
 
-    // Validate input
-    if (!email || !token || !newPassword) {
-      return NextResponse.json({ error: 'Data tidak lengkap' }, { status: 400 })
+    if (!email || !password) {
+      return NextResponse.json({ error: 'Email dan password diperlukan' }, { status: 400 })
     }
 
-    if (newPassword.length < 6) {
-      return NextResponse.json({ error: 'Password minimal 6 karakter' }, { status: 400 })
-    }
-
-    // Find user by email
-    const user = await db.user.findUnique({
-      where: { email: email.toLowerCase().trim() }
+    // Check if user exists
+    const user = await db.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } }
     })
 
     if (!user) {
-      return NextResponse.json({ error: 'User tidak ditemukan' }, { status: 400 })
+      return NextResponse.json({ error: 'User tidak ditemukan' }, { status: 404 })
     }
 
-    // Check if token matches and is not expired
-    if (user.resetToken !== token) {
-      return NextResponse.json({ error: 'Token tidak valid' }, { status: 400 })
-    }
-
-    if (!user.resetTokenExpiry || new Date() > user.resetTokenExpiry) {
-      return NextResponse.json({ error: 'Token sudah kadaluarsa. Silakan minta link reset password baru.' }, { status: 400 })
-    }
-
-    // Update user password (in plaintext to match login logic) and clear reset token
+    // Update password
     await db.user.update({
       where: { id: user.id },
-      data: {
-        password: newPassword,
-        resetToken: null,
-        resetTokenExpiry: null
-      }
+      data: { password } // In real app, hash this with bcrypt/argon2
     })
 
-    console.log(`[Reset Password] Password reset successful for: ${email}`)
+    // Send confirmation email
+    const html = generatePasswordChangedEmail({
+      name: user.name || 'User'
+    })
+
+    await sendEmail({
+      to: email,
+      subject: '[E-Katalog SOP] Password Berhasil Diubah',
+      html
+    })
 
     return NextResponse.json({
       success: true,
-      message: 'Password berhasil direset. Silakan login dengan password baru.'
+      message: 'Password berhasil diperbarui'
     })
 
   } catch (error) {
-    console.error('[Reset Password] Error:', error)
-    return NextResponse.json({ error: 'Terjadi kesalahan. Silakan coba lagi.' }, { status: 500 })
+    console.error('❌ [Reset Password API] Error:', error)
+    return NextResponse.json({ error: 'Terjadi kesalahan' }, { status: 500 })
   }
 }

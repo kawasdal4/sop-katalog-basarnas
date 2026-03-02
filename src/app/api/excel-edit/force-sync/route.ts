@@ -51,33 +51,33 @@ const CONTENT_TYPES: Record<string, string> = {
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
   let cleanup: (() => Promise<void>) | null = null
-  
+
   try {
     // ============================================
     // STEP 1: Authentication Check
     // ============================================
     const cookieStore = await cookies()
     const userId = cookieStore.get('userId')?.value
-    
+
     if (!userId) {
       return NextResponse.json({
         success: false,
         error: 'Unauthorized - Silakan login terlebih dahulu',
       }, { status: 401 })
     }
-    
+
     const user = await db.user.findUnique({
       where: { id: userId },
       select: { role: true, name: true, email: true },
     })
-    
+
     if (!user || user.role !== 'ADMIN' && user.role !== 'DEVELOPER') {
       return NextResponse.json({
         success: false,
         error: 'Forbidden - Hanya admin yang dapat melakukan force sync',
       }, { status: 403 })
     }
-    
+
     // ============================================
     // STEP 2: Parse Request
     // ============================================
@@ -85,45 +85,45 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File | null
     const sessionId = formData.get('sessionId') as string | null
     const confirmed = formData.get('confirmed') === 'true'
-    
+
     if (!file) {
       return NextResponse.json({
         success: false,
         error: 'File tidak ditemukan dalam request',
       }, { status: 400 })
     }
-    
+
     if (!sessionId) {
       return NextResponse.json({
         success: false,
         error: 'Session ID diperlukan',
       }, { status: 400 })
     }
-    
+
     if (!confirmed) {
       return NextResponse.json({
         success: false,
         error: 'Konfirmasi diperlukan untuk force sync. Kirim confirmed=true',
       }, { status: 400 })
     }
-    
+
     console.log(`⚠️ [ForceSync] Starting force sync for session: ${sessionId}`)
     console.log(`⚠️ [ForceSync] File: ${file.name}, Size: ${file.size} bytes`)
-    
+
     // ============================================
     // STEP 3: Validate Session
     // ============================================
     const session = await db.fileEditSession.findUnique({
       where: { id: sessionId }
     })
-    
+
     if (!session) {
       return NextResponse.json({
         success: false,
         error: 'Session tidak ditemukan',
       }, { status: 404 })
     }
-    
+
     // Check ownership
     if (session.editorUserId !== userId) {
       return NextResponse.json({
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
         error: 'Session ini bukan milik Anda',
       }, { status: 403 })
     }
-    
+
     // Check status
     if (session.status !== 'active') {
       return NextResponse.json({
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
         error: `Session sudah ${session.status}`,
       }, { status: 400 })
     }
-    
+
     // Check expiry
     if (session.expiresAt < new Date()) {
       return NextResponse.json({
@@ -147,38 +147,38 @@ export async function POST(request: NextRequest) {
         error: 'Session sudah kadaluarsa',
       }, { status: 400 })
     }
-    
+
     // ============================================
     // STEP 4: Calculate New Hash
     // ============================================
     const fileArrayBuffer = await file.arrayBuffer()
     const newFileBuffer = Buffer.from(fileArrayBuffer)
     const newHash = calculateHash(newFileBuffer)
-    
+
     console.log(`🔐 [ForceSync] New file hash: ${newHash.slice(0, 16)}...`)
     console.log(`🔐 [ForceSync] Original hash: ${session.originalHash.slice(0, 16)}...`)
-    
+
     // ============================================
     // STEP 5: Apply Permanent Print Layout via Microsoft Graph API
     // ============================================
     console.log(`📐 [ForceSync] Applying permanent print layout via Microsoft Graph API...`)
-    
+
     let finalBuffer: Buffer
     let worksheetsCount = 0
-    
+
     try {
       const layoutResult = await applyPermanentPrintLayout(file.name, newFileBuffer)
-      
+
       finalBuffer = layoutResult.modifiedBuffer
       worksheetsCount = layoutResult.worksheetsCount
       cleanup = layoutResult.cleanup
-      
+
       console.log(`✅ [ForceSync] Print layout applied to ${worksheetsCount} worksheets`)
       console.log(`📊 [ForceSync] Modified file size: ${finalBuffer.length} bytes`)
-      
+
     } catch (layoutError) {
       console.error('❌ [ForceSync] Failed to apply print layout:', layoutError)
-      
+
       // Jika gagal di salah satu step, jangan overwrite R2
       return NextResponse.json({
         success: false,
@@ -187,17 +187,17 @@ export async function POST(request: NextRequest) {
         hint: 'Pastikan koneksi ke Microsoft Graph API tersedia dan file dalam format Excel yang valid',
       }, { status: 500 })
     }
-    
+
     // ============================================
     // STEP 6: Upload to R2 (Force Overwrite)
     // ============================================
     const fileExt = file.name.split('.').pop()?.toLowerCase() || 'xlsx'
     const contentType = CONTENT_TYPES[fileExt] || CONTENT_TYPES.xlsx
-    
+
     const finalHash = calculateHash(finalBuffer)
-    
+
     console.log(`⚠️ [ForceSync] Force uploading to R2: ${session.objectKey}`)
-    
+
     const putCommand = new PutObjectCommand({
       Bucket: R2_BUCKET_NAME,
       Key: session.objectKey, // Same key = overwrite
@@ -213,15 +213,49 @@ export async function POST(request: NextRequest) {
         'worksheets-count': worksheetsCount.toString(),
       }
     })
-    
+
     await r2Client.send(putCommand)
     console.log(`✅ [ForceSync] File force uploaded successfully with permanent print layout`)
-    
+
     // ============================================
     // STEP 7: Complete Session (Force)
     // ============================================
     await forceCompleteSession(sessionId, finalHash)
-    
+
+    // Trigger FILE_UPDATED notification to all users (Async)
+    if (session.sopFileId) {
+      try {
+        const sopFile = await db.sopFile.findUnique({
+          where: { id: session.sopFileId },
+          select: { nomorSop: true, judul: true }
+        })
+
+        if (sopFile) {
+          // Update timestamp
+          await db.sopFile.update({
+            where: { id: session.sopFileId },
+            data: { updatedAt: new Date() }
+          })
+
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://e-katalog-sop.cloud';
+          fetch(`${appUrl}/api/send-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'FILE_UPDATED',
+              data: {
+                nomorSop: sopFile.nomorSop,
+                judul: sopFile.judul,
+                updatedBy: user.name ?? 'Admin (Force Sync)'
+              }
+            })
+          }).catch(err => console.warn('⚠️ [Background] Force sync notification trigger failed:', err));
+        }
+      } catch (err) {
+        console.warn('⚠️ [Background] Failed to trigger force sync notification:', err)
+      }
+    }
+
     // ============================================
     // STEP 8: Log Activity
     // ============================================
@@ -230,8 +264,8 @@ export async function POST(request: NextRequest) {
         data: {
           userId,
           aktivitas: 'EXCEL_EDIT_FORCE_SYNC',
-          deskripsi: `Force Sync Excel: ${session.objectKey} (${file.size} bytes) - Print layout applied to ${worksheetsCount} worksheets - ME TIMPA PERUBAHAN USER LAIN`,
-          fileId: session.sopFileId || undefined,
+          deskripsi: `Force Sync Excel: ${session.objectKey} (${file.size} bytes) - Print layout applied to ${worksheetsCount} worksheets - MENIMPA PERUBAHAN USER LAIN`,
+          fileId: (session.sopFileId as string | undefined),
           metadata: JSON.stringify({
             objectKey: session.objectKey,
             sessionId: sessionId,
@@ -248,9 +282,9 @@ export async function POST(request: NextRequest) {
     } catch (logError) {
       console.warn('⚠️ Failed to create log:', logError)
     }
-    
+
     console.log(`✅ [ForceSync] Complete in ${Date.now() - startTime}ms`)
-    
+
     // ============================================
     // STEP 9: Cleanup temp files from OneDrive
     // ============================================
@@ -262,7 +296,7 @@ export async function POST(request: NextRequest) {
         console.warn('⚠️ [ForceSync] Failed to cleanup OneDrive temp file (non-critical):', cleanupError)
       }
     }
-    
+
     return NextResponse.json({
       success: true,
       message: 'File berhasil disinkronkan dan print layout diperbarui',
@@ -277,10 +311,10 @@ export async function POST(request: NextRequest) {
         worksheetsCount: worksheetsCount,
       }
     })
-    
+
   } catch (error) {
     console.error('❌ [ForceSync] Error:', error)
-    
+
     // Cleanup on error
     if (cleanup) {
       try {
@@ -289,7 +323,7 @@ export async function POST(request: NextRequest) {
         // Ignore cleanup errors
       }
     }
-    
+
     return NextResponse.json({
       success: false,
       error: 'Gagal melakukan force sync',
