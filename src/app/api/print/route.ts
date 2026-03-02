@@ -353,9 +353,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'File ID diperlukan' }, { status: 400 })
     }
 
-    // Get file from database
+    // Get file from database with uploader info
     const sopFile = await db.sopFile.findUnique({
-      where: { id: targetFileId }
+      where: { id: targetFileId },
+      include: { user: { select: { name: true } } }
     })
 
     if (!sopFile) {
@@ -444,8 +445,8 @@ export async function GET(request: NextRequest) {
 
     // Step 4: Add footer to PDF
     console.log(`📄 [Print] Step 8: Adding footer to PDF...`)
-    console.log(`   Footer: Printed by: ${userName}`)
-    const pdfWithFooter = await addPdfFooter(pdfBuffer, userName)
+    console.log(`   Footer: Printed by: ${userName}, Upload by: ${sopFile.user?.name || 'System'}`)
+    const pdfWithFooter = await addPdfFooter(pdfBuffer, userName, sopFile.user?.name)
     console.log(`✅ [Print] Footer added, new size: ${pdfWithFooter.byteLength} bytes`)
 
     // Log print activity

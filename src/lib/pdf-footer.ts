@@ -3,7 +3,7 @@
  *
  * Adds dynamic footer to PDF files for print output.
  * Footer format (bottom right):
- * Line 1: Compiled by: E-Katalog SOP/IK | Printed by: {userName} | {date} | Direktorat Kesiapsiagaan – BASARNAS
+ * Line 1: Compiled by: E-Katalog SOP/IK | Printed by: {userName} | Upload by: {uploaderName} | {date} | Direktorat Kesiapsiagaan – BASARNAS
  * Line 2: Halaman X dari Y
  *
  * Generated server-side to avoid hydration errors.
@@ -41,9 +41,10 @@ function formatIndonesianDate(date: Date): string {
  * Build footer text line 1
  * Single line, no line breaks
  */
-function buildFooterText(userName: string): string {
+function buildFooterText(userName: string, uploaderName?: string): string {
   const currentDate = formatIndonesianDate(new Date())
-  return `Compiled by: E-Katalog SOP/IK | Printed by: ${userName} | ${currentDate} | Direktorat Kesiapsiagaan – BASARNAS`
+  const uploaderText = uploaderName ? ` | Upload by: ${uploaderName}` : ''
+  return `Compiled by: E-Katalog SOP/IK | Printed by: ${userName}${uploaderText} | ${currentDate} | Direktorat Kesiapsiagaan – BASARNAS`
 }
 
 /**
@@ -58,15 +59,16 @@ function buildPageNumberText(currentPage: number, totalPages: number): string {
  * Add footer to PDF on every page
  *
  * Specifications:
- * - Position: bottom right corner
- * - Font: Helvetica-Oblique 8px (italic, not bold)
+ * - Position: bottom right corner, 0.3cm from paper edge
+ * - Font: Helvetica-Oblique 6px (italic, not bold) - 2 levels smaller
  * - Color: dark gray (#4D4D4D)
  * - Line 1: Footer info
  * - Line 2: Page number
  */
 export async function addPdfFooter(
   pdfBuffer: Buffer | ArrayBuffer,
-  userName: string
+  userName: string,
+  uploaderName?: string
 ): Promise<Uint8Array> {
   try {
     // Load the PDF document
@@ -76,10 +78,10 @@ export async function addPdfFooter(
     const font = await pdfDoc.embedFont(StandardFonts.HelveticaOblique)
 
     // Build footer text
-    const footerText = buildFooterText(userName)
+    const footerText = buildFooterText(userName, uploaderName)
 
-    // Font settings
-    const fontSize = 8
+    // Font settings - 2 levels smaller (from 8 to 6)
+    const fontSize = 6
     // Dark gray color: #4D4D4D = rgb(77, 77, 77) = rgb(0.302, 0.302, 0.302)
     const textColor = rgb(0.302, 0.302, 0.302)
 
@@ -99,18 +101,18 @@ export async function addPdfFooter(
       const footerTextWidth = font.widthOfTextAtSize(footerText, fontSize)
       const pageNumberTextWidth = font.widthOfTextAtSize(pageNumberText, fontSize)
 
-      // Right margin
-      const rightMargin = 30
+      // Right margin - 0.3cm from paper edge (approximately 8.5 points)
+      const rightMargin = 8.5
 
       // Position at bottom right
       const footerX = width - footerTextWidth - rightMargin
       const pageNumberX = width - pageNumberTextWidth - rightMargin
 
       // Line spacing
-      const lineHeight = 12
+      const lineHeight = 9
 
-      // Position at bottom (25 units from bottom edge for last line)
-      const pageNumberY = 25
+      // Position at bottom (0.3cm = ~8.5 points from bottom edge for last line)
+      const pageNumberY = 8.5
       const footerY = pageNumberY + lineHeight
 
       // Draw the footer text (Line 1)
@@ -154,11 +156,12 @@ export async function addPdfFooter(
  *
  * Input:
  *   userName: "Ahmad Fauzi"
+ *   uploaderName: "Budi Santoso"
  *   date: new Date('2026-02-28T07:32:00Z')
  *   totalPages: 3
  *   currentPage: 1
  *
- * Output footer (bottom right):
- *   Line 1: "Compiled by: E-Katalog SOP/IK | Printed by: Ahmad Fauzi | 28 Februari 2026 14:32 WIB | Direktorat Kesiapsiagaan – BASARNAS"
+ * Output footer (bottom right, 0.3cm from edge):
+ *   Line 1: "Compiled by: E-Katalog SOP/IK | Printed by: Ahmad Fauzi | Upload by: Budi Santoso | 28 Februari 2026 14:32 WIB | Direktorat Kesiapsiagaan – BASARNAS"
  *   Line 2: "Halaman 1 dari 3"
  */
