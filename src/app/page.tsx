@@ -2996,6 +2996,7 @@ export default function ESOPApp() {
         setDesktopSyncFile(null)
         setDesktopEditSessionToken(null)
         setDesktopEditOriginalHash(null)
+        setExcelEditData(null)
 
         // Clear persistence
         localStorage.removeItem('desktopEditSessionToken')
@@ -3057,6 +3058,7 @@ export default function ESOPApp() {
         setDesktopSyncFile(null)
         setDesktopEditSessionToken(null)
         setDesktopEditOriginalHash(null)
+        setExcelEditData(null)
 
         // Clear persistence
         localStorage.removeItem('desktopEditSessionToken')
@@ -3097,6 +3099,7 @@ export default function ESOPApp() {
     setDesktopSyncFile(null)
     setDesktopEditSessionToken(null)
     setDesktopEditOriginalHash(null)
+    setExcelEditData(null)
 
     // Clear persistence
     localStorage.removeItem('desktopEditSessionToken')
