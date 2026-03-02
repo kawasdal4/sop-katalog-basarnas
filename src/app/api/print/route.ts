@@ -111,75 +111,45 @@ async function deleteFromOneDrive(token: string, driveItemId: string): Promise<v
 }
 
 /**
- * Method 1: ConvertAPI Conversion
- * High-fidelity conversion preserving Excel's native F4 and print layout.
+ * Method 1: Microsoft Graph API Conversion
+ * Uses Microsoft's native cloud service to convert files to PDF.
  */
-async function convertWithConvertAPI(fileBuffer: Buffer, fileName: string, ext: string): Promise<Buffer> {
-  console.log(`📄 [Print] Method 1: ConvertAPI conversion...`)
+async function convertWithGraphAPI(fileBuffer: Buffer, fileName: string, ext: string): Promise<Buffer> {
+  console.log(`📄 [Print] Method 1: Graph API conversion...`)
 
-  const secret = process.env.CONVERTAPI_SECRET
-  if (!secret) throw new Error('CONVERTAPI_SECRET is missing in environment variables. Harap masukkan Secret Key ConvertAPI ke .env')
+  const token = await getAzureAccessToken()
+  await ensurePrintTempFolder(token)
 
-  // Gunakan parameter layout paksa untuk menyesuaikan kertas F4
-  // Peringatan: ConvertAPI tidak mendukung 'PageSize: custom'. Setelan ukuran harus
-  // dilewatkan dan akan dibaca otomatis dari file bawaan.
-  // Untuk fix margin yang kosong, kita aktifkan 'AutoColumnFit'
-  const payload = {
-    Parameters: [
-      {
-        Name: 'File',
-        FileValue: {
-          Name: fileName,
-          Data: fileBuffer.toString('base64'),
-        }
-      },
-      {
-        Name: 'StoreFile',
-        Value: false
-      },
-      // Optimasi Layout F4 Khusus ConvertAPI
-      {
-        Name: 'AutoColumnFit',
-        Value: true
-      },
-      {
-        Name: 'AutoPageFit',
-        Value: true
-      }
-    ]
-  }
+  const contentType = CONTENT_TYPES[ext] || 'application/octet-stream'
+  const { id } = await uploadToOneDrive(token, fileName, fileBuffer, contentType)
 
-  let lastError: Error | null = null
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const res = await fetch(`https://v2.convertapi.com/convert/${ext}/to/pdf?Secret=${secret}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
+  tempFilesCleanup.set(id, { deleteAt: Date.now() + 5 * 60 * 1000, fileName })
 
-      if (!res.ok) {
-        const err = await res.text()
-        throw new Error(`ConvertAPI failed: ${res.status} ${err}`)
-      }
+  try {
+    const sa = getServiceAccount()
+    console.log(`   Waiting for Graph API conversion...`)
 
-      const data = await res.json()
-      if (data.Files && data.Files.length > 0) {
-        const fileData = data.Files[0].FileData
-        const buffer = Buffer.from(fileData, 'base64')
-        console.log(`✅ [Print] ConvertAPI success: ${buffer.length} bytes`)
-        return buffer
-      }
-      throw new Error('No files returned from ConvertAPI')
+    // Request PDF format
+    const res = await fetch(`https://graph.microsoft.com/v1.0/users/${sa}/drive/items/${id}/content?format=pdf`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
 
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err))
-      console.warn(`⚠️ [Print] ConvertAPI attempt ${attempt} failed:`, lastError.message)
-      if (attempt < 3) await new Promise(r => setTimeout(r, 3000 * attempt))
+    if (!res.ok) {
+      const errText = await res.text()
+      throw new Error(`Graph API conversion failed: ${res.status} ${errText}`)
     }
-  }
 
-  throw lastError || new Error('ConvertAPI conversion failed')
+    const pdfBuffer = await res.arrayBuffer()
+    console.log(`✅ [Print] Graph API success: ${pdfBuffer.byteLength} bytes`)
+
+    // Clean up immediately if successful
+    await deleteFromOneDrive(token, id)
+
+    return Buffer.from(pdfBuffer)
+  } catch (error) {
+    console.warn(`⚠️ [Print] Graph API failed:`, error instanceof Error ? error.message : error)
+    throw error
+  }
 }
 
 /**
@@ -333,17 +303,17 @@ export async function GET(request: NextRequest) {
       pdfBuffer = fileBuffer
       conversionMethod = 'direct'
     } else {
-      // Try Method 1: ConvertAPI
-      let convertApiSuccess = false
+      // Try Method 1: Graph API
+      let graphApiSuccess = false
 
       try {
-        console.log(`\n📄 [Print] Trying ConvertAPI...`)
-        pdfBuffer = await convertWithConvertAPI(fileBuffer, sopFile.fileName, ext)
-        convertApiSuccess = true
-        conversionMethod = 'ConvertAPI'
+        console.log(`\n📄 [Print] Trying Graph API...`)
+        pdfBuffer = await convertWithGraphAPI(fileBuffer, sopFile.fileName, ext)
+        graphApiSuccess = true
+        conversionMethod = 'Graph API'
 
       } catch (graphError) {
-        console.warn(`⚠️ [Print] ConvertAPI failed:`, graphError instanceof Error ? graphError.message : graphError)
+        console.warn(`⚠️ [Print] Graph API failed:`, graphError instanceof Error ? graphError.message : graphError)
 
         // Try Method 2: LibreOffice (fallback)
         console.log(`\n📄 [Print] Falling back to LibreOffice...`)
