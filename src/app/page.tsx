@@ -6394,7 +6394,7 @@ export default function ESOPApp() {
 
                   {/* Edit SOP Dialog */}
                   <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-                    <DialogContent className="sm:max-w-md bg-white border-0 shadow-2xl overflow-hidden p-0 rounded-2xl" aria-describedby={undefined}>
+                    <DialogContent className="sm:max-w-md bg-white border-0 shadow-2xl p-0 rounded-2xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
                       {/* Header with Basarnas theme */}
                       <div className="relative bg-gradient-to-br from-orange-500 via-orange-600 to-red-700 p-5 text-white overflow-hidden">
                         {/* Animated background */}
@@ -6562,7 +6562,7 @@ export default function ESOPApp() {
 
                   {/* Excel Edit Dialog - Microsoft 365 (No User Login Required) */}
                   <Dialog open={showExcelEditDialog} onOpenChange={setShowExcelEditDialog}>
-                    <DialogContent className="sm:max-w-lg p-0 overflow-hidden border-0 shadow-2xl bg-gray-950" style={{ borderRadius: '1.25rem' }} aria-describedby={undefined}>
+                    <DialogContent className="sm:max-w-lg p-0 border-0 shadow-2xl bg-gray-950 max-h-[90vh] overflow-y-auto" style={{ borderRadius: '1.25rem' }} aria-describedby={undefined}>
                       {/* Gradient Header */}
                       <div className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #1a2744 0%, #0f172a 50%, #1a1a2e 100%)', padding: '28px 28px 24px' }}>
                         {/* Animated background orbs */}
@@ -6691,7 +6691,7 @@ export default function ESOPApp() {
 
                   {/* Desktop Sync Dialog - Upload edited file */}
                   <Dialog open={showDesktopSyncDialog} onOpenChange={setShowDesktopSyncDialog}>
-                    <DialogContent className="sm:max-w-md p-0 overflow-hidden border-0 shadow-2xl bg-gray-950" style={{ borderRadius: '1.25rem' }} aria-describedby={undefined}>
+                    <DialogContent className="sm:max-w-md p-0 border-0 shadow-2xl bg-gray-950 max-h-[90vh] overflow-y-auto" style={{ borderRadius: '1.25rem' }} aria-describedby={undefined}>
                       {/* Gradient Header */}
                       <div className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #1c1f3a 0%, #0f172a 50%, #1a1a2e 100%)', padding: '28px 28px 24px' }}>
                         <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -6784,7 +6784,7 @@ export default function ESOPApp() {
 
                   {/* Conflict Dialog - When file changed during edit session */}
                   <Dialog open={showConflictDialog} onOpenChange={setShowConflictDialog}>
-                    <DialogContent className="sm:max-w-lg bg-white border-2 border-red-300 shadow-xl" aria-describedby={undefined}>
+                    <DialogContent className="sm:max-w-lg bg-white border-2 border-red-300 shadow-xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
                       <DialogHeader>
                         <DialogTitle className="text-xl font-bold text-red-800 flex items-center gap-2">
                           <AlertTriangle className="w-6 h-6 text-red-600" />
