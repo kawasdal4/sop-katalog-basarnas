@@ -6,7 +6,7 @@
     "sin1"
   ],
   "functions": {
-    "src/app/api/**/*.ts": {
+    "src/app/api/**/route.ts": {
       "maxDuration": 60
     }
   },
