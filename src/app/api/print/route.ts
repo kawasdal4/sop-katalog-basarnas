@@ -121,8 +121,9 @@ async function convertWithConvertAPI(fileBuffer: Buffer, fileName: string, ext: 
   if (!secret) throw new Error('CONVERTAPI_SECRET is missing in environment variables. Harap masukkan Secret Key ConvertAPI ke .env')
 
   // Gunakan parameter layout paksa untuk menyesuaikan kertas F4
-  // Berdasarkan standar: F4 = 215mm x 330mm (approx. 8.5 x 13 inches)
-  // ConvertAPI bisa memaksakan layout ini jika layout bawaan gagal
+  // Peringatan: ConvertAPI tidak mendukung 'PageSize: custom'. Setelan ukuran harus
+  // dilewatkan dan akan dibaca otomatis dari file bawaan.
+  // Untuk fix margin yang kosong, kita aktifkan 'AutoColumnFit'
   const payload = {
     Parameters: [
       {
@@ -138,24 +139,8 @@ async function convertWithConvertAPI(fileBuffer: Buffer, fileName: string, ext: 
       },
       // Optimasi Layout F4 Khusus ConvertAPI
       {
-        Name: 'PageSize',
-        Value: 'custom'
-      },
-      {
-        Name: 'PageWidth',
-        Value: '215'
-      },
-      {
-        Name: 'PageHeight',
-        Value: '330'
-      },
-      {
         Name: 'AutoColumnFit',
         Value: true
-      },
-      {
-        Name: 'PageOrientation',
-        Value: 'landscape'
       }
     ]
   }
