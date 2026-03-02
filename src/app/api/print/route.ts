@@ -65,9 +65,9 @@ function startCleanupWorker() {
               headers: { 'Authorization': `Bearer ${token}` }
             })
             tempFilesCleanup.delete(id)
-          } catch {}
+          } catch { }
         }
-      } catch {}
+      } catch { }
     }
   }, 60000)
 }
@@ -107,7 +107,7 @@ async function deleteFromOneDrive(token: string, driveItemId: string): Promise<v
       headers: { 'Authorization': `Bearer ${token}` }
     })
     tempFilesCleanup.delete(driveItemId)
-  } catch {}
+  } catch { }
 }
 
 /**
@@ -116,11 +116,13 @@ async function deleteFromOneDrive(token: string, driveItemId: string): Promise<v
  */
 async function convertWithConvertAPI(fileBuffer: Buffer, fileName: string, ext: string): Promise<Buffer> {
   console.log(`📄 [Print] Method 1: ConvertAPI conversion...`)
-  
+
   const secret = process.env.CONVERTAPI_SECRET
   if (!secret) throw new Error('CONVERTAPI_SECRET is missing in environment variables. Harap masukkan Secret Key ConvertAPI ke .env')
 
-  // Use JSON payload with Base64 encoding for safe file transfer to ConvertAPI
+  // Gunakan parameter layout paksa untuk menyesuaikan kertas F4
+  // Berdasarkan standar: F4 = 215mm x 330mm (approx. 8.5 x 13 inches)
+  // ConvertAPI bisa memaksakan layout ini jika layout bawaan gagal
   const payload = {
     Parameters: [
       {
@@ -133,6 +135,27 @@ async function convertWithConvertAPI(fileBuffer: Buffer, fileName: string, ext: 
       {
         Name: 'StoreFile',
         Value: false
+      },
+      // Optimasi Layout F4 Khusus ConvertAPI
+      {
+        Name: 'PageSize',
+        Value: 'custom'
+      },
+      {
+        Name: 'PageWidth',
+        Value: '215'
+      },
+      {
+        Name: 'PageHeight',
+        Value: '330'
+      },
+      {
+        Name: 'AutoColumnFit',
+        Value: true
+      },
+      {
+        Name: 'PageOrientation',
+        Value: 'landscape'
       }
     ]
   }
@@ -159,7 +182,7 @@ async function convertWithConvertAPI(fileBuffer: Buffer, fileName: string, ext: 
         return buffer
       }
       throw new Error('No files returned from ConvertAPI')
-      
+
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err))
       console.warn(`⚠️ [Print] ConvertAPI attempt ${attempt} failed:`, lastError.message)
@@ -206,12 +229,12 @@ async function convertWithLibreOffice(fileBuffer: Buffer, originalFileName: stri
     console.log(`✅ [Print] LibreOffice success: ${pdfBuffer.length} bytes`)
 
     // Cleanup
-    try { await unlink(inputFile); await unlink(pdfPath); await rmdir(tempDir) } catch {}
+    try { await unlink(inputFile); await unlink(pdfPath); await rmdir(tempDir) } catch { }
 
     return pdfBuffer
 
   } catch (err) {
-    try { await unlink(inputFile).catch(() => {}); await rmdir(tempDir).catch(() => {}) } catch {}
+    try { await unlink(inputFile).catch(() => { }); await rmdir(tempDir).catch(() => { }) } catch { }
     throw err
   }
 }
@@ -365,7 +388,7 @@ export async function GET(request: NextRequest) {
           fileId: sopFile.id
         }
       })
-    } catch {}
+    } catch { }
 
     // Generate filename
     const sanitize = (n: string) => n.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
