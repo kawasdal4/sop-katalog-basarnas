@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
     for (const [key, value] of Object.entries(uploadParameters)) {
       formData.append(key, String(value))
     }
-    const blob = new Blob([fileBuffer])
+    const blob = new Blob([new Uint8Array(fileBuffer)])
     formData.append('file', blob, sopFile.fileName)
 
     const uploadRes = await fetch(uploadUrl, {
