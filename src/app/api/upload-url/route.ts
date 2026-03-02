@@ -1,0 +1,383 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getR2PresignedUploadUrl, isR2Configured, uploadToR2 } from '@/lib/r2-storage'
+import { db } from '@/lib/db'
+import { cookies } from 'next/headers'
+
+// Set runtime and max duration for Vercel
+export const runtime = 'nodejs'
+export const maxDuration = 60
+
+// MIME types for different file extensions
+const MIME_TYPES: Record<string, string> = {
+  pdf: 'application/pdf',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  xls: 'application/vnd.ms-excel',
+  xlsm: 'application/vnd.ms-excel.sheet.macroEnabled.12',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  doc: 'application/msword',
+}
+
+/**
+ * POST /api/upload-url
+ * 
+ * Generate presigned URL for direct upload to R2 (Primary Storage)
+ * 
+ * Request body:
+ * - fileName: Original file name
+ * - fileSize: File size in bytes
+ * - jenis: 'SOP' | 'IK' | 'LAINNYA' (for generating SOP number)
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const { fileName, fileSize, jenis, isPublicSubmission } = await request.json()
+
+    if (!fileName || !fileSize) {
+      return NextResponse.json({ error: 'fileName dan fileSize diperlukan' }, { status: 400 })
+    }
+
+    // Check if R2 is configured
+    if (!isR2Configured()) {
+      return NextResponse.json({
+        error: 'Cloudflare R2 tidak terkonfigurasi. Hubungi administrator.'
+      }, { status: 500 })
+    }
+
+    console.log(`📤 Creating R2 presigned upload URL for: ${fileName} (${(fileSize / 1024 / 1024).toFixed(2)} MB)`)
+
+    // Get user session - only required for non-public submissions
+    const cookieStore = await cookies()
+    const userId = cookieStore.get('userId')?.value
+
+    // For public submissions, allow without authentication
+    if (!isPublicSubmission) {
+      if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized - silakan login terlebih dahulu' }, { status: 401 })
+      }
+
+      // Verify user exists
+      const user = await db.user.findUnique({ where: { id: userId } })
+      if (!user) {
+        return NextResponse.json({ error: 'User tidak valid. Silakan login ulang.' }, { status: 401 })
+      }
+    }
+
+    // Determine content type from file extension
+    const fileExt = fileName.split('.').pop()?.toLowerCase() || 'pdf'
+    const mimeType = MIME_TYPES[fileExt] || 'application/octet-stream'
+
+    // Generate a unique key for the file (temporary)
+    const timestamp = Date.now()
+    const randomId = Math.random().toString(36).substring(2, 8)
+    const tempKey = `uploads/temp-${timestamp}-${randomId}/${fileName}`
+
+    // Generate presigned upload URL (valid for 1 hour)
+    const uploadUrl = await getR2PresignedUploadUrl(tempKey, mimeType, 3600)
+
+    console.log(`✅ R2 presigned upload URL created: ${tempKey}`)
+
+    return NextResponse.json({
+      success: true,
+      uploadUrl,
+      uploadKey: tempKey,
+      fileName,
+      mimeType,
+      expiresIn: 3600,
+      message: 'Upload URL berhasil dibuat. Upload file ke URL ini menggunakan method PUT.'
+    })
+
+  } catch (error) {
+    console.error('Create upload URL error:', error)
+    return NextResponse.json({
+      error: 'Terjadi kesalahan saat membuat upload URL',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
+}
+
+/**
+ * PUT /api/upload-url
+ * 
+ * Confirm upload and create SOP record after file is uploaded to R2
+ * This is called after frontend successfully uploads to R2
+ */
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const {
+      uploadKey,      // The temporary key returned from POST
+      fileName,       // Original file name
+      judul,          // SOP title
+      kategori,       // SIAGA | LATIHAN | LAINNYA
+      jenis,          // SOP | IK | LAINNYA
+      lingkup,        // Scope
+      tahun,          // Year
+      status,         // AKTIF | REVIEW | KADALUARSA
+      isPublicSubmission,
+      submitterName,
+      submitterEmail,
+      keterangan
+    } = body
+
+    if (!uploadKey || !fileName || !judul || !kategori || !jenis || !tahun) {
+      return NextResponse.json({
+        error: 'Data tidak lengkap. Semua field harus diisi.'
+      }, { status: 400 })
+    }
+
+    // Check R2 configuration
+    if (!isR2Configured()) {
+      return NextResponse.json({ error: 'R2 tidak terkonfigurasi' }, { status: 500 })
+    }
+
+    // Get user
+    let userId: string
+    if (isPublicSubmission) {
+      let systemUser = await db.user.findUnique({ where: { email: 'system@sop.go.id' } })
+      if (!systemUser) {
+        systemUser = await db.user.create({
+          data: {
+            email: 'system@sop.go.id',
+            password: 'system',
+            name: 'System (Public Submission)',
+            role: 'STAF'
+          }
+        })
+      }
+      userId = systemUser.id
+    } else {
+      const cookieStore = await cookies()
+      const userIdCookie = cookieStore.get('userId')?.value
+      if (!userIdCookie) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+      userId = userIdCookie
+    }
+
+    console.log(`📤 Confirming upload: ${uploadKey}`)
+
+    // ============================================
+    // AUTO-GENERATE SOP NUMBER
+    // Format: SOP-0001, IK-0001, LAINNYA-0001
+    // ============================================
+    const getPrefix = (jenis: string) => {
+      if (jenis === 'SOP') return 'SOP-'
+      if (jenis === 'IK') return 'IK-'
+      return 'LAINNYA-'
+    }
+
+    const prefix = getPrefix(jenis)
+
+    // Function to generate unique nomorSop with retry
+    const generateUniqueNomorSop = async (maxRetries = 5): Promise<string> => {
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        // Get the latest SOP of the same jenis to determine the next number
+        const lastSop = await db.sopFile.findFirst({
+          where: { jenis },
+          orderBy: { nomorSop: 'desc' },
+          select: { nomorSop: true }
+        })
+
+        let nextNumber = 1
+        if (lastSop && lastSop.nomorSop) {
+          // Extract the numeric part (e.g., from "SOP-0012" extract "0012")
+          const matches = lastSop.nomorSop.match(/\d+$/)
+          if (matches) {
+            nextNumber = parseInt(matches[0], 10) + 1 + attempt
+          } else {
+            // Fallback if parsing fails
+            const existingCount = await db.sopFile.count({ where: { jenis } })
+            nextNumber = existingCount + 1 + attempt
+          }
+        }
+
+        // Generate new nomorSop (incremental)
+        const nomorSop = `${prefix}${String(nextNumber).padStart(4, '0')}`
+        
+        // Check if this nomorSop already exists
+        const existing = await db.sopFile.findUnique({
+          where: { nomorSop },
+          select: { id: true }
+        })
+        
+        if (!existing) {
+          return nomorSop
+        }
+        
+        console.log(`⚠️ Nomor ${nomorSop} already exists, retrying... (attempt ${attempt + 1})`)
+      }
+      
+      // If all retries fail, use timestamp-based number as fallback
+      const fallbackNumber = Date.now().toString().slice(-6)
+      return `${prefix}${fallbackNumber}`
+    }
+
+    const nomorSop = await generateUniqueNomorSop()
+    console.log(`📝 Generated nomor: ${nomorSop}`)
+
+    // Generate file name from judul and tahun
+    // Format: [judul] - [tahun].[extension]
+    const fileExt = fileName.split('.').pop()?.toLowerCase() || 'pdf'
+    const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
+    const finalFileName = `${sanitizeFileName(judul)} - ${tahun}.${fileExt}`
+    const finalKey = `sop-files/${finalFileName}`
+
+    // Move file from temp location to final location in R2
+    // We need to copy the file to the new location and delete the temp file
+    const { copyR2Object, deleteFromR2 } = await import('@/lib/r2-storage')
+
+    try {
+      await copyR2Object(uploadKey, finalKey)
+      console.log(`✅ File moved: ${uploadKey} → ${finalKey}`)
+
+      // DO NOT delete temp file immediately - let background job or scheduled task handle it
+      // if we delete it here, sometimes S3 copies are eventually consistent and we get a miss
+      // await deleteFromR2(uploadKey)
+      // console.log(`🗑️ Temp file deleted: ${uploadKey}`)
+    } catch (moveError) {
+      console.error('❌ Failed to move file:', moveError)
+      return NextResponse.json({
+        error: 'Gagal memindahkan file. Upload mungkin tidak berhasil.'
+      }, { status: 500 })
+    }
+
+    // Create SOP record
+    let sopFile
+    try {
+      sopFile = await db.sopFile.create({
+        data: {
+          nomorSop,
+          judul,
+          tahun: parseInt(tahun),
+          kategori,
+          jenis,
+          lingkup,
+          status: status || 'AKTIF',
+          fileName: finalFileName,
+          filePath: finalKey,
+          fileType: fileExt,
+          driveFileId: null, // Will be set when backup completes
+          uploadedBy: userId,
+          isPublicSubmission: isPublicSubmission || false,
+          submitterName,
+          submitterEmail,
+          keterangan,
+          verificationStatus: isPublicSubmission ? 'MENUNGGU' : null
+        }
+      })
+    } catch (dbError: unknown) {
+      console.error('❌ Database error:', dbError)
+      const prismaError = dbError as { code?: string; meta?: { target?: string[] } }
+      if (prismaError.code === 'P2002') {
+        const target = prismaError.meta?.target?.join(', ') || 'field'
+        return NextResponse.json({
+          error: `Data dengan ${target} yang sama sudah ada. Silakan coba lagi.`,
+          code: prismaError.code
+        }, { status: 400 })
+      }
+      throw dbError
+    }
+
+    // Create FileSync record
+    try {
+      await db.fileSync.create({
+        data: {
+          filename: finalFileName,
+          mimeType: MIME_TYPES[fileExt] || 'application/octet-stream',
+          fileSize: 0,
+          r2Key: finalKey,
+          source: 'r2',
+          syncStatus: 'pending',
+          r2ModifiedAt: new Date(),
+        }
+      })
+    } catch (syncError) {
+      console.warn('⚠️ Failed to create FileSync record:', syncError)
+    }
+
+    // ============================================
+    // BACKGROUND: Backup to Google Drive (async, no await)
+    // ============================================
+    import('@/lib/google-drive').then(async (gd) => {
+      if (gd.isGoogleDriveConfigured()) {
+        try {
+          console.log(`📤 [Background] Starting backup to Google Drive: ${finalFileName}`)
+
+          // Download from R2
+          const r2 = await import('@/lib/r2-storage')
+          const { buffer } = await r2.downloadFromR2(finalKey)
+
+          // Upload to Google Drive
+          const driveResult = await gd.uploadFileToDriveFolder(
+            buffer,
+            finalFileName,
+            MIME_TYPES[fileExt] || 'application/octet-stream'
+          )
+
+          // Update SOP record with driveFileId
+          await db.sopFile.update({
+            where: { id: sopFile.id },
+            data: { driveFileId: driveResult.id }
+          })
+
+          // Update FileSync record
+          await db.fileSync.updateMany({
+            where: { r2Key: finalKey },
+            data: {
+              driveFileId: driveResult.id,
+              source: 'both',
+              syncStatus: 'synced',
+              driveModifiedAt: new Date(),
+              lastSyncedAt: new Date(),
+              fileSize: buffer.length,
+            }
+          })
+
+          console.log(`✅ [Background] Backup to Google Drive completed: ${driveResult.id}`)
+
+        } catch (backupError) {
+          console.warn('⚠️ [Background] Backup to Google Drive failed:', backupError)
+        }
+      }
+    }).catch(err => {
+      console.warn('⚠️ [Background] Failed to start backup:', err)
+    })
+
+    // Create log
+    try {
+      await db.log.create({
+        data: {
+          userId,
+          aktivitas: 'UPLOAD',
+          deskripsi: `${isPublicSubmission ? 'Submit publik' : 'Upload'} ${jenis}: ${judul} [R2 Primary]`,
+          fileId: sopFile.id
+        }
+      })
+    } catch (logError) {
+      console.warn('⚠️ Failed to create log:', logError)
+    }
+
+    console.log('========================================')
+    console.log('✅ UPLOAD SUCCESS (R2 Primary)')
+    console.log(`   ID: ${sopFile.id}`)
+    console.log(`   R2 Key: ${finalKey}`)
+    console.log(`   GDrive Backup: Background`)
+    console.log('========================================')
+
+    return NextResponse.json({
+      success: true,
+      data: sopFile,
+      r2Key: finalKey,
+      syncStatus: {
+        r2: 'synced',
+        googleDrive: 'pending'
+      }
+    })
+
+  } catch (error) {
+    console.error('Confirm upload error:', error)
+    return NextResponse.json({
+      error: 'Terjadi kesalahan saat konfirmasi upload',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
+}
