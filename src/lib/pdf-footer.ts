@@ -59,7 +59,7 @@ function buildPageNumberText(currentPage: number, totalPages: number): string {
  * Add footer to PDF on every page
  *
  * Specifications:
- * - Position: bottom right corner, 0.3cm from paper edge
+ * - Position: bottom right corner, 0.2cm from paper edge
  * - Font: Helvetica-Oblique 6px (italic, not bold) - 2 levels smaller
  * - Color: dark gray (#4D4D4D)
  * - Line 1: Footer info
@@ -101,8 +101,8 @@ export async function addPdfFooter(
       const footerTextWidth = font.widthOfTextAtSize(footerText, fontSize)
       const pageNumberTextWidth = font.widthOfTextAtSize(pageNumberText, fontSize)
 
-      // Right margin - 0.3cm from paper edge (approximately 8.5 points)
-      const rightMargin = 8.5
+      // Right margin - 0.2cm from paper edge (approximately 5.7 points)
+      const rightMargin = 5.7
 
       // Position at bottom right
       const footerX = width - footerTextWidth - rightMargin
@@ -111,8 +111,8 @@ export async function addPdfFooter(
       // Line spacing
       const lineHeight = 9
 
-      // Position at bottom (0.3cm = ~8.5 points from bottom edge for last line)
-      const pageNumberY = 8.5
+      // Position at bottom (0.2cm = ~5.7 points from bottom edge for last line)
+      const pageNumberY = 5.7
       const footerY = pageNumberY + lineHeight
 
       // Draw the footer text (Line 1)
