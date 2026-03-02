@@ -6399,7 +6399,7 @@ export default function ESOPApp() {
 
                   {/* Edit SOP Dialog */}
                   <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-                    <DialogContent className="sm:max-w-2xl bg-white border-0 shadow-2xl p-0 rounded-2xl max-h-[95vh] overflow-y-auto scrollbar-hide" aria-describedby={undefined}>
+                    <DialogContent className="sm:max-w-fit w-auto max-w-[95vw] bg-white border-0 shadow-2xl p-0 rounded-2xl" aria-describedby={undefined}>
                       {/* Header with Basarnas theme */}
                       <div className="relative bg-gradient-to-br from-orange-500 via-orange-600 to-red-700 p-6 text-white overflow-hidden">
                         {/* Animated background */}
@@ -6593,7 +6593,7 @@ export default function ESOPApp() {
 
                   {/* Excel Edit Dialog - Microsoft 365 (No User Login Required) */}
                   <Dialog open={showExcelEditDialog} onOpenChange={setShowExcelEditDialog}>
-                    <DialogContent className="sm:max-w-xl p-0 border-0 shadow-2xl bg-slate-950 max-h-[90vh] overflow-y-auto" style={{ borderRadius: '1.5rem' }} aria-describedby={undefined}>
+                    <DialogContent className="sm:max-w-fit w-auto max-w-[95vw] p-0 border-0 shadow-2xl bg-slate-950" style={{ borderRadius: '1.5rem' }} aria-describedby={undefined}>
                       {/* Gradient Header */}
                       <div className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', padding: '32px' }}>
                         {/* Animated background orbs */}
@@ -8193,7 +8193,7 @@ export default function ESOPApp() {
 
                     {/* Desktop Sync Dialog - Upload edited file */}
                     <Dialog open={showDesktopSyncDialog} onOpenChange={setShowDesktopSyncDialog}>
-                      <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
+                      <DialogContent className="sm:max-w-fit w-auto max-w-[95vw] bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
                         <DialogHeader>
                           <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
                             <RefreshCw className="w-5 h-5 text-orange-600" />
