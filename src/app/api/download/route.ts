@@ -58,9 +58,10 @@ export async function GET(request: NextRequest) {
 
     // Extract file extension
     const fileExt = sop.fileName.split('.').pop()?.toLowerCase() || 'pdf'
-    
-    // Generate custom filename from judul
-    const customFileName = `${sanitizeFileName(sop.judul)}.${fileExt}`
+
+    // Generate custom filename from judul and tahun
+    // Format: {judul} - {tahun}.{extension}
+    const customFileName = `${sanitizeFileName(sop.judul)} - ${sop.tahun}.${fileExt}`
     
     console.log(`📥 [Download] Request: ${sop.judul}`)
     console.log(`📁 [Download] R2 key: ${sop.filePath}`)

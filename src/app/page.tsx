@@ -2215,9 +2215,10 @@ export default function ESOPApp() {
 
     try {
       // Generate custom filename for display
+      // Format: {judul} - {tahun}.{extension}
       const fileExt = sop.fileName.split('.').pop()?.toLowerCase() || 'pdf'
       const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
-      const customFileName = `${sanitizeFileName(sop.judul)}.${fileExt}`
+      const customFileName = `${sanitizeFileName(sop.judul)} - ${sop.tahun}.${fileExt}`
 
       // Fetch file from our download API (avoids CORS issues)
       const res = await fetch(`/api/download?id=${id}`)
@@ -2354,7 +2355,8 @@ export default function ESOPApp() {
         console.log('📋 [Preview] Response:', { success: data.success, viewerUrl: data.viewerUrl?.substring(0, 100) })
 
         if (!data.success) {
-          throw new Error(data.error || 'Gagal mempersiapkan preview')
+          console.error('[Preview Office] API returned error:', data)
+          throw new Error(data.details || data.error || 'Gagal mempersiapkan preview')
         }
 
         // Open in Office Online viewer
@@ -2442,9 +2444,11 @@ export default function ESOPApp() {
     setDownloadLoading(id) // Start loading animation
 
     try {
+      // Generate custom filename for display
+      // Format: {judul} - {tahun}.{extension}
       const fileExt = sop.fileName.split('.').pop()?.toLowerCase() || 'pdf'
       const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
-      const customFileName = `${sanitizeFileName(sop.judul)}.${fileExt}`
+      const customFileName = `${sanitizeFileName(sop.judul)} - ${sop.tahun}.${fileExt}`
 
       // Fetch file from our download API (avoids CORS issues)
       const res = await fetch(`/api/download?id=${id}`)
@@ -2580,7 +2584,8 @@ export default function ESOPApp() {
         console.log('📋 [Preview Publik] Response:', { success: data.success, viewerUrl: data.viewerUrl?.substring(0, 100) })
 
         if (!data.success) {
-          throw new Error(data.error || 'Gagal mempersiapkan preview publik')
+          console.error('[Preview Office Publik] API returned error:', data)
+          throw new Error(data.details || data.error || 'Gagal mempersiapkan preview publik')
         }
 
         if (data.viewerUrl) {
@@ -9644,29 +9649,42 @@ export default function ESOPApp() {
         circularCrop={true}
       />
 
-      {/* Duplicate File Warning Dialog */}
+      {/* Duplicate File Warning Dialog - NO OVERWRITE ALLOWED */}
       <Dialog open={showDuplicateFileDialog} onOpenChange={setShowDuplicateFileDialog}>
-        <DialogContent className="sm:max-w-md bg-gradient-to-b from-slate-900 to-slate-950 border border-amber-500/30 shadow-2xl shadow-amber-500/10 p-0 gap-0 overflow-hidden" aria-describedby={undefined}>
-          {/* Header with animated background */}
-          <div className="relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 via-orange-500/10 to-red-500/20">
-              <motion.div
-                className="absolute inset-0"
-                animate={{
-                  backgroundPosition: ['0% 0%', '100% 100%'],
-                }}
-                transition={{
-                  duration: 3,
-                  repeat: Infinity,
-                  repeatType: 'reverse',
-                }}
-                style={{
-                  backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(251, 191, 36, 0.1) 0%, transparent 50%)',
-                  backgroundSize: '200% 200%',
-                }}
-              />
-            </div>
+        <DialogContent className="sm:max-w-md bg-gradient-to-b from-slate-900 to-slate-950 border border-red-500/40 shadow-2xl shadow-red-500/20 p-0 gap-0 overflow-hidden" aria-describedby={undefined}>
+          {/* Animated background effect */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {/* Pulsing red circles */}
+            <motion.div
+              className="absolute -top-20 -right-20 w-40 h-40 rounded-full bg-red-500/10"
+              animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.3, 0.5, 0.3],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: 'easeInOut',
+              }}
+            />
+            <motion.div
+              className="absolute -bottom-10 -left-10 w-32 h-32 rounded-full bg-orange-500/10"
+              animate={{
+                scale: [1, 1.3, 1],
+                opacity: [0.2, 0.4, 0.2],
+              }}
+              transition={{
+                duration: 4,
+                repeat: Infinity,
+                ease: 'easeInOut',
+                delay: 0.5,
+              }}
+            />
+          </div>
 
+          {/* Header */}
+          <div className="relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-red-500/20 via-red-600/10 to-orange-500/20" />
             <DialogHeader className="relative p-6 pb-4">
               <motion.div
                 className="flex flex-col items-center text-center"
@@ -9674,26 +9692,36 @@ export default function ESOPApp() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4 }}
               >
-                {/* Animated warning icon */}
+                {/* Animated blocked icon */}
                 <motion.div
                   className="relative mb-4"
                   animate={{
-                    scale: [1, 1.05, 1],
+                    scale: [1, 1.08, 1],
+                    rotate: [0, -3, 3, 0],
                   }}
                   transition={{
-                    duration: 1.5,
+                    duration: 2,
                     repeat: Infinity,
                     ease: 'easeInOut',
                   }}
                 >
-                  <div className="absolute inset-0 rounded-full bg-amber-500/30 blur-xl" />
-                  <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/40">
-                    <AlertTriangle className="w-10 h-10 text-white" />
+                  {/* Glow effect */}
+                  <div className="absolute inset-0 rounded-full bg-red-500/40 blur-2xl" />
+                  <motion.div
+                    className="absolute inset-0 rounded-full"
+                    style={{
+                      background: 'conic-gradient(from 0deg, rgba(239,68,68,0.3), rgba(239,68,68,0.1), rgba(239,68,68,0.3))',
+                    }}
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
+                  />
+                  <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-2xl shadow-red-500/50 border-2 border-red-400/50">
+                    <XCircle className="w-12 h-12 text-white" />
                   </div>
                 </motion.div>
 
-                <DialogTitle className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-300 to-amber-400">
-                  File Duplikat Terdeteksi!
+                <DialogTitle className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-red-300 to-orange-400">
+                  Upload Ditolak!
                 </DialogTitle>
 
                 <DialogDescription className="text-gray-400 text-sm mt-2">
@@ -9704,89 +9732,85 @@ export default function ESOPApp() {
           </div>
 
           {/* Content */}
-          <div className="p-6 pt-2 space-y-4">
+          <div className="relative p-6 pt-2 space-y-4">
             {/* File name display */}
             <motion.div
-              className="bg-slate-800/50 border border-amber-500/20 rounded-xl p-4"
+              className="bg-slate-800/60 border border-red-500/30 rounded-xl p-4 backdrop-blur-sm"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2 }}
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                  <FileIcon className="w-5 h-5 text-amber-400" />
+                <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center border border-red-500/30">
+                  <FileIcon className="w-6 h-6 text-red-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-0.5">Nama File</p>
-                  <p className="text-white font-medium truncate">{duplicateFileName}</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-0.5">Nama File Duplikat</p>
+                  <p className="text-white font-semibold truncate text-sm">{duplicateFileName}</p>
                 </div>
               </div>
             </motion.div>
 
-            {/* Warning message */}
+            {/* Blocked message */}
             <motion.div
-              className="bg-red-500/10 border border-red-500/30 rounded-xl p-4"
+              className="bg-red-500/15 border border-red-500/40 rounded-xl p-4 backdrop-blur-sm"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
               <div className="flex items-start gap-3">
-                <XCircle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
+                <div className="w-8 h-8 rounded-lg bg-red-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <XCircle className="w-4 h-4 text-red-400" />
+                </div>
                 <div>
-                  <p className="text-red-300 font-medium text-sm">Peringatan</p>
-                  <p className="text-gray-400 text-xs mt-1">
-                    File dengan nama yang sama sudah ada di katalog. Upload file baru akan <span className="text-red-400 font-semibold">menimpa (overwrite)</span> file yang ada.
+                  <p className="text-red-300 font-semibold text-sm">Upload Diblokir</p>
+                  <p className="text-gray-400 text-xs mt-1 leading-relaxed">
+                    File dengan nama yang sama sudah ada di katalog. <span className="text-red-400 font-semibold">Overwrite tidak diizinkan</span> untuk menjaga integritas data.
                   </p>
                 </div>
               </div>
             </motion.div>
 
-            {/* Recommendations */}
+            {/* Solutions */}
             <motion.div
-              className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4"
+              className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl p-4 backdrop-blur-sm"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
             >
               <div className="flex items-start gap-3">
-                <CheckCircle className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                <div className="w-8 h-8 rounded-lg bg-amber-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <CheckCircle className="w-4 h-4 text-amber-400" />
+                </div>
                 <div>
-                  <p className="text-emerald-300 font-medium text-sm">Rekomendasi</p>
-                  <p className="text-gray-400 text-xs mt-1">
-                    Untuk menghindari overwrite, rename file Anda terlebih dahulu atau gunakan fitur <span className="text-emerald-400">Edit</span> pada file yang ada.
-                  </p>
+                  <p className="text-amber-300 font-semibold text-sm">Solusi</p>
+                  <ul className="text-gray-400 text-xs mt-2 space-y-2">
+                    <li className="flex items-start gap-2">
+                      <span className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-[10px] font-bold flex-shrink-0 mt-0.5">1</span>
+                      <span>Rename file Anda dengan nama yang berbeda, lalu upload kembali</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-[10px] font-bold flex-shrink-0 mt-0.5">2</span>
+                      <span>Gunakan fitur <span className="text-amber-400 font-medium">Edit</span> pada file yang ada jika ingin memperbarui konten</span>
+                    </li>
+                  </ul>
                 </div>
               </div>
             </motion.div>
           </div>
 
-          {/* Actions */}
-          <div className="p-6 pt-2 flex gap-3">
+          {/* Actions - Only Cancel Button */}
+          <div className="relative p-6 pt-2">
             <Button
-              variant="outline"
               onClick={() => {
                 setShowDuplicateFileDialog(false)
                 setPendingUploadForm(null)
                 setDuplicateFileName('')
               }}
-              className="flex-1 border-slate-600 text-gray-300 hover:bg-slate-800 hover:text-white rounded-xl h-11"
+              className="w-full bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500 text-white rounded-xl h-12 font-semibold border border-slate-500/50 shadow-lg"
             >
-              <X className="w-4 h-4 mr-2" />
-              Batal
-            </Button>
-            <Button
-              onClick={() => {
-                setShowDuplicateFileDialog(false)
-                if (pendingUploadForm) {
-                  proceedWithUpload(pendingUploadForm, pendingIsPublic)
-                }
-                setPendingUploadForm(null)
-                setDuplicateFileName('')
-              }}
-              className="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl h-11 font-semibold shadow-lg shadow-amber-500/20"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Upload Tetap
+              <X className="w-5 h-5 mr-2" />
+              Tutup
             </Button>
           </div>
         </DialogContent>

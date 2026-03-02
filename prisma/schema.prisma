@@ -1,7 +1,3 @@
-// Local Development Schema - SQLite
-// Use this for local development only
-// To use: cp prisma/schema.local.prisma prisma/schema.prisma
-
 generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
@@ -12,190 +8,160 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// User model with role-based access
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      String   @default("STAF") // ADMIN, STAF, or DEVELOPER
-  profilePhoto String? // URL to profile photo in R2
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  lastLoginAt DateTime? // Last login timestamp
-  lastArsipVisitAt DateTime? // Last time the user visited the Arsip page
-  
-  // Password reset fields
-  resetToken       String?  // Token for password reset
-  resetTokenExpiry DateTime? // When the reset token expires
-
-  // Relations
-  logs     Log[]
-  sopFiles SopFile[]
+  id               String    @id @default(cuid())
+  email            String    @unique
+  password         String
+  name             String
+  role             String    @default("STAF")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  lastLoginAt      DateTime?
+  lastArsipVisitAt DateTime?
+  profilePhoto     String?
+  resetToken       String?
+  resetTokenExpiry DateTime?
+  logs             Log[]
+  sopFiles         SopFile[]
 }
 
-// SOP/IK File model
 model SopFile {
-  id           String   @id @default(cuid())
-  nomorSop     String   @unique // SOP-0001, IK-0001, etc
-  judul        String
-  tahun        Int
-  kategori     String   // SIAGA, LATIHAN, LAINNYA
-  jenis        String   // SOP or IK
-  status       String   @default("AKTIF") // AKTIF, REVIEW, KADALUARSA
-  
-  // File info
-  fileName     String
-  filePath     String
-  fileType     String   // xlsx or pdf
-  driveFileId  String?  // Google Drive file ID
-  lingkup      String?  // BCC, Dit. Siaga, Basarnas, Kantor SAR, Antar Instansi, Internasional
-  
-  // PDF Preview
-  pdfPreviewPath       String?
-  pdfPreviewDriveId    String?
+  id                    String    @id @default(cuid())
+  nomorSop              String    @unique
+  judul                 String
+  tahun                 Int
+  kategori              String
+  jenis                 String
+  status                String    @default("AKTIF")
+  fileName              String
+  filePath              String
+  fileType              String
+  driveFileId           String?
+  lingkup               String?
+  pdfPreviewPath        String?
+  pdfPreviewDriveId     String?
   pdfPreviewGeneratedAt DateTime?
-  
-  // Statistics
-  previewCount  Int @default(0)
-  downloadCount Int @default(0)
-  currentVersion Int @default(1)
-  
-  // Upload info
-  uploadedBy   String
-  uploadedAt   DateTime @default(now())
-  
-  // For public submissions
-  isPublicSubmission Boolean   @default(false)
-  submitterName      String?
-  submitterEmail     String?
-  keterangan         String?  // Keterangan/catatan dari pengaju
-  verificationStatus String?   @default("MENUNGGU") // MENUNGGU, DISETUJUI, DITOLAK
-  verifiedBy         String?
-  verifiedAt         DateTime?
-  rejectionReason    String?  // Alasan penolakan
-  arsipFolder        String?  // Folder di arsip (e.g., 'Publik-Ditolak')
-  
-  // Relations
-  user     User     @relation(fields: [uploadedBy], references: [id])
-  logs     Log[]
-  
-  updatedAt DateTime @updatedAt
+  previewCount          Int       @default(0)
+  downloadCount         Int       @default(0)
+  currentVersion        Int       @default(1)
+  uploadedBy            String
+  uploadedAt            DateTime  @default(now())
+  isPublicSubmission    Boolean   @default(false)
+  submitterName         String?
+  submitterEmail        String?
+  keterangan            String?
+  verificationStatus    String?   @default("MENUNGGU")
+  verifiedBy            String?
+  verifiedAt            DateTime?
+  rejectionReason       String?
+  arsipFolder           String?
+  updatedAt             DateTime  @updatedAt
+  logs                  Log[]
+  user                  User      @relation(fields: [uploadedBy], references: [id])
 }
 
-// Activity Log model
 model Log {
-  id          String   @id @default(cuid())
-  userId      String
-  aktivitas   String   // UPLOAD, DOWNLOAD, PREVIEW, EDIT_STATUS, VERIFIKASI, LOGIN
-  deskripsi   String
-  fileId      String?
-  metadata    String?  // JSON string for additional data
-  createdAt   DateTime @default(now())
-  
-  // Relations
-  user    User     @relation(fields: [userId], references: [id])
-  sopFile SopFile? @relation(fields: [fileId], references: [id])
+  id        String   @id @default(cuid())
+  userId    String
+  aktivitas String
+  deskripsi String
+  fileId    String?
+  metadata  String?
+  createdAt DateTime @default(now())
+  sopFile   SopFile? @relation(fields: [fileId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 }
 
-// Counter for auto-generate nomor SOP
 model Counter {
-  id        String @id @default("counter")
-  sopCount  Int    @default(0)
-  ikCount   Int    @default(0)
+  id       String @id @default("counter")
+  sopCount Int    @default(0)
+  ikCount  Int    @default(0)
 }
 
-// File Sync model for tracking sync between Drive and R2
 model FileSync {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   filename        String
   mimeType        String
   fileSize        Int
-  driveFileId     String?  @unique
-  r2Key           String?  @unique
+  driveFileId     String?   @unique
+  r2Key           String?   @unique
   checksum        String?
-  source          String   @default("drive") // drive, r2, both
-  syncStatus      String   @default("pending") // pending, synced, error, conflict
+  source          String    @default("drive")
+  syncStatus      String    @default("pending")
   lastError       String?
   driveModifiedAt DateTime?
   r2ModifiedAt    DateTime?
   lastSyncedAt    DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
-// Sync Log model for tracking sync operations
 model SyncLog {
   id        String   @id @default(cuid())
-  operation String   // migrate, sync, backup
+  operation String
   filename  String
-  status    String   // success, error
+  status    String
   message   String?
-  details   String?  // JSON string for additional data
+  details   String?
   createdAt DateTime @default(now())
 }
 
-// File Edit Session model for desktop Excel editing
 model FileEditSession {
-  id            String   @id @default(cuid())
-  objectKey     String   // R2 object key
-  sopFileId     String?  // Link to SOP file
-  editorUserId  String
-  editorEmail   String
-  editorName    String?
-  originalHash  String   // Hash of file when edit started
-  lockedAt      DateTime @default(now())
-  expiresAt     DateTime
-  status        String   @default("active") // active, completed, expired
-  lastSyncedAt  DateTime?
-  completedAt   DateTime?
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String    @id @default(cuid())
+  objectKey    String
+  sopFileId    String?
+  editorUserId String
+  editorEmail  String
+  editorName   String?
+  originalHash String
+  lockedAt     DateTime  @default(now())
+  expiresAt    DateTime
+  status       String    @default("active")
+  lastSyncedAt DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
-// File Edit Log model for tracking edit actions
 model FileEditLog {
   id           String   @id @default(cuid())
   objectKey    String
   editorUserId String
   editorEmail  String
   editorName   String?
-  action       String   // started, synced, expired, force_overwrite, cancelled
+  action       String
   sessionId    String?
-  details      String?  // JSON string for additional data
+  details      String?
   timestamp    DateTime @default(now())
 }
 
-// File Print Cache model for caching converted PDFs
 model FilePrintCache {
-  id              String   @id @default(cuid())
-  sopFileId       String   @unique // Link to SOP file
-  r2LastModified  DateTime // Last modified time of source Excel
-  fileHash        String   // SHA-256 hash of source Excel
-  cachedPdfPath   String   // R2 path for cached PDF
-  cachedPdfSize   Int      // PDF file size in bytes
-  conversionTime  Int      // Time taken for conversion in ms
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
+  id             String   @id @default(cuid())
+  sopFileId      String   @unique
+  r2LastModified DateTime
+  fileHash       String
+  cachedPdfPath  String
+  cachedPdfSize  Int
+  conversionTime Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
   @@index([sopFileId])
   @@index([fileHash])
 }
 
-// Error Log model for tracking system errors
 model ErrorLog {
-  id          String   @id @default(cuid())
-  errorType   String   // API_ERROR, DB_ERROR, AUTH_ERROR, FILE_ERROR, SYNC_ERROR, etc.
-  message     String
-  stack       String?  // Stack trace
-  context     String?  // JSON string with additional context (userId, fileId, etc.)
-  severity    String   @default("error") // info, warning, error, critical
-  resolved    Boolean  @default(false)
-  resolvedAt  DateTime?
-  resolvedBy  String?  // User ID who resolved it
-  createdAt   DateTime @default(now())
-  
+  id         String    @id @default(cuid())
+  errorType  String
+  message    String
+  stack      String?
+  context    String?
+  severity   String    @default("error")
+  resolved   Boolean   @default(false)
+  resolvedAt DateTime?
+  resolvedBy String?
+  createdAt  DateTime  @default(now())
+
   @@index([errorType])
   @@index([severity])
   @@index([resolved])

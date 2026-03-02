@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { cookies } from 'next/headers'
-import { downloadFromR2, isR2Configured } from '@/lib/r2-storage'
+import { downloadFromR2, isR2Configured, checkR2FileExists } from '@/lib/r2-storage'
 import { getAzureAccessToken, getServiceAccount } from '@/lib/azure-auth'
 
 export const dynamic = 'force-dynamic'
@@ -321,6 +321,21 @@ export async function POST(request: NextRequest) {
     }
     
     console.log(`👁️ [Preview-Office] Starting preview for: ${sopFile.judul}`)
+    console.log(`   File name in DB: ${sopFile.fileName}`)
+    console.log(`   File path in DB: ${sopFile.filePath}`)
+    
+    // Check if file exists in R2 before attempting download
+    const fileExists = await checkR2FileExists(sopFile.filePath)
+    
+    if (!fileExists) {
+      console.error(`❌ [Preview-Office] File not found in R2: ${sopFile.filePath}`)
+      return NextResponse.json({ 
+        error: 'File tidak ditemukan di storage',
+        details: `File dengan path "${sopFile.filePath}" tidak ditemukan di R2. File mungkin telah dihapus atau dipindahkan.`,
+        filePath: sopFile.filePath,
+        fileName: sopFile.fileName
+      }, { status: 404 })
+    }
     
     // Download from R2
     console.log(`📥 [Preview-Office] Downloading from R2: ${sopFile.filePath}`)

@@ -133,16 +133,17 @@ export async function GET(request: NextRequest) {
     const fileBuffer = result.buffer
     const contentType = CONTENT_TYPES[fileExtension] || 'application/octet-stream'
 
-    // Sanitize filename for header
-    const sanitizedFileName = document.fileName.replace(/[^\w\-.]/g, '_')
-    const encodedFileName = encodeURIComponent(document.fileName)
+    // Generate filename with format: {judul} - {tahun}.{extension}
+    const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
+    const customFileName = `${sanitizeFileName(document.judul)} - ${document.tahun}.${fileExtension}`
+    const encodedFileName = encodeURIComponent(customFileName)
 
     // Return PDF file directly for preview
     return new NextResponse(fileBuffer, {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Content-Disposition': `inline; filename="${sanitizedFileName}"; filename*=UTF-8''${encodedFileName}`,
+        'Content-Disposition': `inline; filename="${customFileName}"; filename*=UTF-8''${encodedFileName}`,
         'Content-Length': fileBuffer.length.toString(),
         'Cache-Control': 'public, max-age=3600',
         // CORS headers for cross-origin access

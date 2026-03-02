@@ -206,7 +206,8 @@ export async function POST(request: NextRequest) {
     // Prepare file
     const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'pdf'
     const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
-    const fileName = `${sanitizeFileName(judul)}.${fileExtension}`
+    // Format: [judul] - [tahun].[extension]
+    const fileName = `${sanitizeFileName(judul)} - ${tahun}.${fileExtension}`
 
     console.log(`📄 Processing file: ${fileName} (${(file.size / 1024 / 1024).toFixed(2)} MB)`)
 
@@ -714,28 +715,35 @@ export async function PUT(request: NextRequest) {
       let newFilePath: string | null = null
       let newFileName: string | null = null
 
-      // Auto-rename file when judul changes
-      if (judul && judul !== existingSop.judul && existingSop.filePath && isR2Configured()) {
-        const fileExtension = existingSop.fileName.split('.').pop()?.toLowerCase() || 'pdf'
-        const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
-        newFileName = `${sanitizeFileName(judul)}.${fileExtension}`
+      // Determine new judul and tahun for filename
+      const newJudul = judul || existingSop.judul
+      const newTahun = tahun || existingSop.tahun
 
-        // Get folder path from existing file
-        const folderPath = existingSop.filePath.substring(0, existingSop.filePath.lastIndexOf('/'))
-        newFilePath = folderPath ? `${folderPath}/${newFileName}` : newFileName
+      // Auto-rename file when judul or tahun changes
+      if ((judul && judul !== existingSop.judul) || (tahun && tahun !== existingSop.tahun)) {
+        if (existingSop.filePath && isR2Configured()) {
+          const fileExtension = existingSop.fileName.split('.').pop()?.toLowerCase() || 'pdf'
+          const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
+          // Format: [judul] - [tahun].[extension]
+          newFileName = `${sanitizeFileName(newJudul)} - ${newTahun}.${fileExtension}`
 
-        // Move file in R2 to new name
-        try {
-          console.log(`🔄 Auto-renaming file: ${existingSop.filePath} → ${newFilePath}`)
-          await moveR2Object(existingSop.filePath, newFilePath)
-          updateData.fileName = newFileName
-          updateData.filePath = newFilePath
-          console.log(`✅ File renamed successfully: ${newFileName}`)
-        } catch (renameError) {
-          console.warn('⚠️ Failed to rename file in R2:', renameError)
-          // Continue with metadata update even if rename fails
-          newFilePath = null
-          newFileName = null
+          // Get folder path from existing file
+          const folderPath = existingSop.filePath.substring(0, existingSop.filePath.lastIndexOf('/'))
+          newFilePath = folderPath ? `${folderPath}/${newFileName}` : newFileName
+
+          // Move file in R2 to new name
+          try {
+            console.log(`🔄 Auto-renaming file: ${existingSop.filePath} → ${newFilePath}`)
+            await moveR2Object(existingSop.filePath, newFilePath)
+            updateData.fileName = newFileName
+            updateData.filePath = newFilePath
+            console.log(`✅ File renamed successfully: ${newFileName}`)
+          } catch (renameError) {
+            console.warn('⚠️ Failed to rename file in R2:', renameError)
+            // Continue with metadata update even if rename fails
+            newFilePath = null
+            newFileName = null
+          }
         }
       }
 
@@ -758,13 +766,13 @@ export async function PUT(request: NextRequest) {
         const changes: string[] = []
         if (judul && judul !== existingSop.judul) {
           changes.push(`judul: "${existingSop.judul}" → "${judul}"`)
-          if (newFileName) changes.push(`file renamed: "${existingSop.fileName}" → "${newFileName}"`)
         }
         if (kategori && kategori !== existingSop.kategori) changes.push(`kategori: ${existingSop.kategori} → ${kategori}`)
         if (jenis && jenis !== existingSop.jenis) changes.push(`jenis: ${existingSop.jenis} → ${jenis}`)
         if (lingkup !== undefined && lingkup !== existingSop.lingkup) changes.push(`lingkup: ${existingSop.lingkup || '-'} → ${lingkup || '-'}`)
         if (tahun && tahun !== existingSop.tahun) changes.push(`tahun: ${existingSop.tahun} → ${tahun}`)
         if (status && status !== existingSop.status) changes.push(`status: ${existingSop.status} → ${status}`)
+        if (newFileName) changes.push(`file renamed: "${existingSop.fileName}" → "${newFileName}"`)
 
         await db.log.create({
           data: {

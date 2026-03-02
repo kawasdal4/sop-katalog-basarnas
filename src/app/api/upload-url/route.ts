@@ -214,10 +214,11 @@ export async function PUT(request: NextRequest) {
     const nomorSop = await generateUniqueNomorSop()
     console.log(`📝 Generated nomor: ${nomorSop}`)
 
-    // Generate file name from judul
+    // Generate file name from judul and tahun
+    // Format: [judul] - [tahun].[extension]
     const fileExt = fileName.split('.').pop()?.toLowerCase() || 'pdf'
     const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
-    const finalFileName = `${sanitizeFileName(judul)}.${fileExt}`
+    const finalFileName = `${sanitizeFileName(judul)} - ${tahun}.${fileExt}`
     const finalKey = `sop-files/${finalFileName}`
 
     // Move file from temp location to final location in R2

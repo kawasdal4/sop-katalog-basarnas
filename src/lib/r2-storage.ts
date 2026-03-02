@@ -177,27 +177,71 @@ export async function downloadFromR2(key: string): Promise<{
   const client = createR2Client()
 
   console.log(`📥 Downloading from R2: ${key}`)
+  console.log(`   Bucket: ${config.bucketName}`)
 
-  const command = new GetObjectCommand({
-    Bucket: config.bucketName,
-    Key: key,
-  })
+  try {
+    const command = new GetObjectCommand({
+      Bucket: config.bucketName,
+      Key: key,
+    })
 
-  const response = await client.send(command)
+    const response = await client.send(command)
 
-  if (!response.Body) {
-    throw new Error('No file content')
+    if (!response.Body) {
+      throw new Error('No file content')
+    }
+
+    const buffer = Buffer.from(await response.Body.transformToByteArray())
+
+    console.log(`✅ Downloaded from R2: ${key} (${buffer.length} bytes)`)
+
+    return {
+      buffer,
+      contentType: response.ContentType || 'application/octet-stream',
+      metadata: response.Metadata,
+    }
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorCode = (error as { Code?: string; name?: string })?.Code || (error as { name?: string })?.name || ''
+    
+    console.error(`❌ Failed to download from R2: ${key}`)
+    console.error(`   Error: ${errorMessage}`)
+    console.error(`   Code: ${errorCode}`)
+    
+    // Provide more helpful error message
+    if (errorCode === 'NoSuchKey' || errorMessage.includes('does not exist')) {
+      throw new Error(`File tidak ditemukan di R2: ${key}. File mungkin telah dihapus atau dipindahkan.`)
+    }
+    
+    throw error
   }
+}
 
-  const buffer = Buffer.from(await response.Body.transformToByteArray())
-
-  console.log(`✅ Downloaded from R2: ${key} (${buffer.length} bytes)`)
-
-  return {
-    buffer,
-    contentType: response.ContentType || 'application/octet-stream',
-    metadata: response.Metadata,
+/**
+ * Check if file exists in R2
+ */
+export async function checkR2FileExists(key: string): Promise<boolean> {
+  try {
+    const config = getR2Config()
+    const client = createR2Client()
+    
+    await client.send(new HeadObjectCommand({
+      Bucket: config.bucketName,
+      Key: key,
+    }))
+    
+    return true
+  } catch {
+    return false
   }
+}
+
+/**
+ * List all keys in R2 bucket with a given prefix (useful for finding similar files)
+ */
+export async function listR2FilesByPrefix(prefix: string): Promise<string[]> {
+  const objects = await listR2Objects(prefix)
+  return objects.map(obj => obj.key)
 }
 
 /**
