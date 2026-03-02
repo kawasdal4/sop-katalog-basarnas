@@ -85,7 +85,9 @@ import {
   User,
   Mail,
   Key,
-  Trash
+  Trash,
+  Tag,
+  Calendar
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { StorageStatus } from '@/components/storage'
@@ -7178,14 +7180,29 @@ export default function ESOPApp() {
                             sopFiles.map((sop) => (
                               <TableRow
                                 key={sop.id}
-                                className="hover:bg-orange-50 border-b border-gray-200"
+                                className={`hover:bg-orange-50 border-b border-gray-200 transition-all duration-700 ${excelEditData?.id === sop.id ? 'bg-orange-50/80 relative active-edit-row' : ''}`}
                               >
                                 <TableCell>
                                   <div className="flex items-center gap-2">
                                     <FileTypeIcon fileName={sop.fileName} className="w-5 h-5 flex-shrink-0" />
                                     <div>
                                       <div className="text-xs text-orange-500 font-medium">No. SOP : {sop.nomorSop || '...'}</div>
-                                      <div className="text-gray-800">{sop.judul}</div>
+                                      <div className="flex items-center gap-2">
+                                        <div className="text-gray-800 font-semibold">{sop.judul}</div>
+                                        {excelEditData?.id === sop.id && (
+                                          <motion.div
+                                            initial={{ opacity: 0, scale: 0.8 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-orange-500 to-red-600 text-[10px] font-bold text-white shadow-lg shadow-orange-500/20"
+                                          >
+                                            <span className="relative flex h-2 w-2">
+                                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                                              <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                                            </span>
+                                            SESI AKTIF
+                                          </motion.div>
+                                        )}
+                                      </div>
                                       <div className="text-xs text-gray-500 mt-0.5">
                                         <span className="text-gray-400">Upload:</span> {new Date(sop.uploadedAt).toLocaleString('id-ID', {
                                           day: 'numeric',
@@ -7304,7 +7321,7 @@ export default function ESOPApp() {
                                         )}
                                       </Button>
                                     )}
-                                    {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && desktopEditSessionToken && (
+                                    {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && excelEditData?.id === sop.id && (
                                       <Button
                                         size="icon"
                                         variant="ghost"
@@ -9851,6 +9868,24 @@ export default function ESOPApp() {
         fileType={printDialogFileType}
         onComplete={handlePrintComplete}
       />
-    </div >
+
+      {/* Custom Highlight Animation CSS */}
+      <style jsx global>{`
+        @keyframes aesthetic-row-glow {
+          0% { box-shadow: 0 0 5px rgba(249, 115, 22, 0.1); background-color: rgba(249, 115, 22, 0.02); }
+          50% { box-shadow: inset 0 0 25px rgba(249, 115, 22, 0.15); background-color: rgba(249, 115, 22, 0.06); }
+          100% { box-shadow: 0 0 5px rgba(249, 115, 22, 0.1); background-color: rgba(249, 115, 22, 0.02); }
+        }
+        .active-edit-row {
+          animation: aesthetic-row-glow 3s infinite ease-in-out;
+          border-left: 4px solid #f97316 !important;
+          position: relative;
+          z-index: 10;
+        }
+        .active-edit-row td {
+          border-bottom: 1px solid rgba(249, 115, 22, 0.2) !important;
+        }
+      `}</style>
+    </div>
   )
 }
