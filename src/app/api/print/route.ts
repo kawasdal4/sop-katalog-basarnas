@@ -182,42 +182,116 @@ async function uploadToTempFolder(
 }
 
 /**
- * Convert Office file to PDF using Graph API
- * This preserves the print settings (page layout, margins, print area, etc.)
+ * Convert Office file to PDF using LibreOffice (for accurate print settings)
+ * Falls back to Graph API if LibreOffice is not available
+ * 
+ * LibreOffice respects all Excel print settings:
+ * - Page breaks
+ * - Print area
+ * - Scaling (fit to pages or actual size)
+ * - Margins
+ * - Headers/Footers
  */
 async function convertToPdf(
   token: string,
   driveItemId: string,
-  originalFileName: string
+  originalFileName: string,
+  fileBuffer?: Buffer
 ): Promise<ArrayBuffer> {
   const serviceAccount = getServiceAccount()
+  const fileExtension = originalFileName.toLowerCase().split('.').pop() || ''
 
-  console.log(`📄 [Print] Converting ${originalFileName} to PDF via Graph API...`)
+  console.log(`📄 [Print] Converting ${originalFileName} to PDF...`)
 
-  // Wait a moment for file to be processed by OneDrive
-  await new Promise(resolve => setTimeout(resolve, 2000))
-
-  // Convert to PDF using Graph API
-  // This endpoint uses Microsoft's rendering engine which preserves print settings
-  const pdfRes = await fetch(
-    `https://graph.microsoft.com/v1.0/users/${serviceAccount}/drive/items/${driveItemId}/content?format=pdf`,
-    {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/pdf'
+  // Try LibreOffice first for accurate print settings (only works if LibreOffice is installed)
+  // On Vercel, this will fail and fall back to Graph API
+  if (fileBuffer && ['xlsx', 'xls', 'xlsm', 'docx', 'doc'].includes(fileExtension)) {
+    try {
+      console.log(`🔧 [Print] Attempting LibreOffice conversion for accurate print settings...`)
+      const libreOfficePdf = await convertWithLibreOffice(fileBuffer, originalFileName)
+      if (libreOfficePdf) {
+        console.log(`✅ [Print] LibreOffice conversion successful: ${libreOfficePdf.byteLength} bytes`)
+        return libreOfficePdf
       }
+    } catch (error) {
+      console.log(`⚠️ [Print] LibreOffice not available, falling back to Graph API`)
     }
-  )
-
-  if (!pdfRes.ok) {
-    const error = await pdfRes.text()
-    throw new Error(`PDF conversion failed: ${pdfRes.status} ${error}`)
   }
 
-  const pdfBuffer = await pdfRes.arrayBuffer()
-  console.log(`✅ [Print] Converted to PDF: ${pdfBuffer.byteLength} bytes`)
+  // Fall back to Graph API
+  console.log(`📄 [Print] Using Graph API conversion...`)
 
-  return pdfBuffer
+  // Wait for file to be fully processed by OneDrive
+  console.log(`⏳ [Print] Waiting 5 seconds for OneDrive to process file...`)
+  await new Promise(resolve => setTimeout(resolve, 5000))
+
+  // Try conversion with retry mechanism
+  let lastError: Error | null = null
+  const maxRetries = 3
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`📄 [Print] Graph API conversion attempt ${attempt}/${maxRetries}...`)
+      
+      // Convert to PDF using Graph API
+      // Note: This uses "Save as PDF" which may not fully respect all print settings
+      const pdfRes = await fetch(
+        `https://graph.microsoft.com/v1.0/users/${serviceAccount}/drive/items/${driveItemId}/content?format=pdf`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/pdf'
+          }
+        }
+      )
+
+      if (!pdfRes.ok) {
+        const error = await pdfRes.text()
+        throw new Error(`PDF conversion failed: ${pdfRes.status} ${error}`)
+      }
+
+      const pdfBuffer = await pdfRes.arrayBuffer()
+      console.log(`✅ [Print] Graph API conversion successful: ${pdfBuffer.byteLength} bytes`)
+      
+      return pdfBuffer
+      
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      console.warn(`⚠️ [Print] Attempt ${attempt} failed:`, lastError.message)
+      
+      if (attempt < maxRetries) {
+        const waitTime = attempt * 3000
+        console.log(`⏳ [Print] Waiting ${waitTime/1000}s before retry...`)
+        await new Promise(resolve => setTimeout(resolve, waitTime))
+      }
+    }
+  }
+
+  throw lastError || new Error('PDF conversion failed after all retries')
+}
+
+/**
+ * Convert file to PDF using LibreOffice
+ * This respects all print settings from the source file
+ */
+async function convertWithLibreOffice(fileBuffer: Buffer, originalFileName: string): Promise<ArrayBuffer | null> {
+  try {
+    // Dynamic import to avoid errors if not available
+    const libreofficeConvert = await import('libreoffice-convert').then(m => m.default || m)
+    
+    return new Promise((resolve, reject) => {
+      libreofficeConvert.convert(fileBuffer, '.pdf', undefined, (err: Error | null, result: Buffer) => {
+        if (err) {
+          reject(err)
+        } else {
+          resolve(result.buffer.slice(0) as ArrayBuffer)
+        }
+      })
+    })
+  } catch (error) {
+    // LibreOffice not available on this system
+    return null
+  }
 }
 
 /**
@@ -432,11 +506,10 @@ export async function GET(request: NextRequest) {
         fileName: sopFile.fileName
       })
 
-      // Convert to PDF using Graph API
-      // This uses Microsoft's rendering engine which preserves Excel/Word print settings
-      console.log(`📄 [Print] Step 6: Converting to PDF using Graph API...`)
-      console.log(`   (PDF akan mengikuti print settings dari Office: page layout, margins, print area, dll)`)
-      pdfBuffer = await convertToPdf(graphToken, driveItemId, sopFile.fileName)
+      // Convert to PDF - try LibreOffice first for accurate print settings, then Graph API
+      console.log(`📄 [Print] Step 6: Converting to PDF...`)
+      console.log(`   (Prioritaskan print settings dari file sumber)`)
+      pdfBuffer = await convertToPdf(graphToken, driveItemId, sopFile.fileName, fileBuffer)
 
       // Cleanup - delete temp file from OneDrive
       console.log(`🧹 [Print] Step 7: Cleaning up temp file...`)
