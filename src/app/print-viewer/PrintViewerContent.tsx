@@ -15,7 +15,6 @@ export default function PrintViewerContent() {
   const [fileType, setFileType] = useState<string | null>(null)
   const [fileTitle, setFileTitle] = useState<string | null>(null)
   const [printToken, setPrintToken] = useState<string | null>(null)
-  const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const hasTriggeredPrint = useRef(false)
   const isMounted = useRef(true)
 
@@ -32,14 +31,16 @@ export default function PrintViewerContent() {
       if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
         e.preventDefault()
         try {
-          if (iframeRef.current && iframeRef.current.contentWindow) {
-            iframeRef.current.contentWindow.print()
+          // Instead of printing, download the file if token is available
+          // We achieve this by looking for the download button and clicking it
+          const downloadBtn = document.querySelector('button:has(svg.lucide-printer)') as HTMLButtonElement
+          if (downloadBtn) {
+            downloadBtn.click()
           } else {
-            window.print()
+            console.warn('Download button not found for Ctrl+P shortcut')
           }
         } catch (err) {
-          console.error('Print blocked', err)
-          window.print() // Fallback
+          console.error('Download blocked', err)
         }
       }
     }
@@ -354,18 +355,20 @@ export default function PrintViewerContent() {
             <div className="flex gap-2">
               <motion.button
                 onClick={() => {
-                  if (iframeRef.current && iframeRef.current.contentWindow) {
-                    iframeRef.current.contentWindow.print()
-                  } else {
-                    window.print()
-                  }
+                  if (!printToken) return;
+                  const link = document.createElement('a');
+                  link.href = printToken;
+                  link.download = (fileTitle || 'Dokumen').replace(/\.[^.]+$/, '') + '.pdf';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
                 }}
                 className="px-4 py-2 bg-white text-orange-600 rounded-lg hover:bg-orange-50 flex items-center gap-2 font-medium shadow-lg"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
                 <Printer className="w-4 h-4" />
-                Print (Ctrl+P)
+                Unduh PDF (Ctrl+P)
               </motion.button>
               <motion.button
                 onClick={() => window.close()}
@@ -391,29 +394,19 @@ export default function PrintViewerContent() {
         >
           {/* We use an <object> tag with a base64 data URI. This is the most robust way to force inline PDF display without triggering arbitrary browser downloads. */}
           {printToken && (
-            <>
-              <object
-                data={`${printToken}#toolbar=1&navpanes=0&scrollbar=1`}
-                type="application/pdf"
-                className="w-full h-full rounded-lg border-0"
-                style={{ minHeight: 'calc(100vh - 180px)' }}
-                title="PDF Preview"
-              >
-                <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-gray-50">
-                  <AlertTriangle className="w-12 h-12 text-orange-500 mb-4" />
-                  <h3 className="text-lg font-bold text-gray-800 mb-2">Browser Tidak Mendukung PDF Inline</h3>
-                  <p className="text-gray-600 mb-4">Silakan gunakan tombol Print di atas atau tekan Ctrl+P.</p>
-                </div>
-              </object>
-
-              {/* Hidden iframe specifically for native printing via Ctrl+P */}
-              <iframe
-                ref={iframeRef}
-                src={printToken}
-                style={{ display: 'none' }}
-                title="Print Frame"
-              />
-            </>
+            <object
+              data={`${printToken}#toolbar=1&navpanes=0&scrollbar=1`}
+              type="application/pdf"
+              className="w-full h-full rounded-lg border-0"
+              style={{ minHeight: 'calc(100vh - 180px)' }}
+              title="PDF Preview"
+            >
+              <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-gray-50">
+                <AlertTriangle className="w-12 h-12 text-orange-500 mb-4" />
+                <h3 className="text-lg font-bold text-gray-800 mb-2">Browser Tidak Mendukung PDF Inline</h3>
+                <p className="text-gray-600 mb-4">Silakan gunakan tombol Unduh di atas.</p>
+              </div>
+            </object>
           )}
         </motion.div>
       </div>
