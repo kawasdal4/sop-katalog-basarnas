@@ -141,6 +141,10 @@ async function convertWithConvertAPI(fileBuffer: Buffer, fileName: string, ext: 
       {
         Name: 'AutoColumnFit',
         Value: true
+      },
+      {
+        Name: 'AutoPageFit',
+        Value: true
       }
     ]
   }
