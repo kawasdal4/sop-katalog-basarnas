@@ -6399,7 +6399,7 @@ export default function ESOPApp() {
 
                   {/* Edit SOP Dialog */}
                   <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-                    <DialogContent className="sm:max-w-fit w-auto max-w-[95vw] bg-white border-0 shadow-2xl p-0 rounded-2xl" aria-describedby={undefined}>
+                    <DialogContent className="sm:max-w-none w-fit max-w-[95vw] bg-white border-0 shadow-2xl p-0 rounded-2xl overflow-visible" aria-describedby={undefined}>
                       {/* Header with Basarnas theme */}
                       <div className="relative bg-gradient-to-br from-orange-500 via-orange-600 to-red-700 p-6 text-white overflow-hidden">
                         {/* Animated background */}
@@ -6425,13 +6425,13 @@ export default function ESOPApp() {
                               <Edit className="w-4 h-4 text-orange-600" />
                             </div>
                           </motion.div>
-                          <div>
+                          <div className="flex-1 min-w-0">
                             <DialogTitle className="text-lg font-bold text-white">
                               Edit Data SOP
                             </DialogTitle>
-                            <DialogDescription className="text-orange-100/80 text-sm mt-0.5">
-                              Perbarui informasi dokumen
-                            </DialogDescription>
+                            <div className="text-orange-100/90 text-sm mt-1.5 font-medium leading-relaxed whitespace-nowrap min-w-0">
+                              {editForm.judul}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -6593,7 +6593,7 @@ export default function ESOPApp() {
 
                   {/* Excel Edit Dialog - Microsoft 365 (No User Login Required) */}
                   <Dialog open={showExcelEditDialog} onOpenChange={setShowExcelEditDialog}>
-                    <DialogContent className="sm:max-w-fit w-auto max-w-[95vw] p-0 border-0 shadow-2xl bg-slate-950" style={{ borderRadius: '1.5rem' }} aria-describedby={undefined}>
+                    <DialogContent className="sm:max-w-none w-fit max-w-[95vw] p-0 border-0 shadow-2xl bg-slate-950 overflow-visible" style={{ borderRadius: '1.5rem' }} aria-describedby={undefined}>
                       {/* Gradient Header */}
                       <div className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', padding: '32px' }}>
                         {/* Animated background orbs */}
@@ -6606,9 +6606,9 @@ export default function ESOPApp() {
                           <motion.div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl" style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)', boxShadow: '0 0 30px rgba(34,197,94,0.4)' }} initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}>
                             <FileSpreadsheet className="w-7 h-7 text-white" />
                           </motion.div>
-                          <div>
-                            <DialogTitle className="text-xl font-black text-white tracking-tight">Edit Excel Online</DialogTitle>
-                            <DialogDescription className="text-green-400/80 text-sm mt-0.5 font-medium">Microsoft 365 — Tanpa Login</DialogDescription>
+                          <div className="flex-1 min-w-0">
+                            <DialogTitle className="text-xl font-black text-white tracking-tight whitespace-nowrap">Edit Excel Online</DialogTitle>
+                            <div className="text-green-400/80 text-sm mt-0.5 font-medium whitespace-nowrap">{excelEditData?.judul}</div>
                           </div>
                         </div>
                       </div>
@@ -6722,7 +6722,7 @@ export default function ESOPApp() {
 
                   {/* Desktop Sync Dialog - Upload edited file */}
                   <Dialog open={showDesktopSyncDialog} onOpenChange={setShowDesktopSyncDialog}>
-                    <DialogContent className="sm:max-w-xl p-0 border-0 shadow-2xl bg-slate-950 max-h-[90vh] overflow-y-auto" style={{ borderRadius: '1.5rem' }} aria-describedby={undefined}>
+                    <DialogContent className="sm:max-w-none w-fit max-w-[95vw] p-0 border-0 shadow-2xl bg-slate-950 overflow-visible" style={{ borderRadius: '1.5rem' }} aria-describedby={undefined}>
                       {/* Gradient Header */}
                       <div className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', padding: '32px' }}>
                         <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -6733,9 +6733,9 @@ export default function ESOPApp() {
                           <motion.div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ef4444)', boxShadow: '0 0 30px rgba(249,115,22,0.4)' }} initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}>
                             <RefreshCw className="w-7 h-7 text-white" />
                           </motion.div>
-                          <div>
-                            <DialogTitle className="text-xl font-black text-white tracking-tight">Selesai Edit &amp; Sync</DialogTitle>
-                            <DialogDescription className="text-orange-400/80 text-sm mt-0.5 font-medium">Upload file hasil edit ke storage</DialogDescription>
+                          <div className="flex-1 min-w-0">
+                            <DialogTitle className="text-xl font-black text-white tracking-tight whitespace-nowrap">Selesai Edit &amp; Sync</DialogTitle>
+                            <div className="text-orange-400/80 text-sm mt-0.5 font-medium whitespace-nowrap">{excelEditData?.judul}</div>
                           </div>
                         </div>
                       </div>
@@ -6750,8 +6750,8 @@ export default function ESOPApp() {
                                 {['docx', 'doc'].includes(excelEditData.fileType || '') ? <FileText className="w-6 h-6 text-white" /> : <FileSpreadsheet className="w-6 h-6 text-white" />}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="font-bold text-white truncate text-sm">{excelEditData.fileName}</p>
-                                <p className="text-xs text-gray-400 truncate mt-0.5">{excelEditData.judul}</p>
+                                <p className="font-bold text-white whitespace-nowrap text-sm">{excelEditData.fileName}</p>
+                                <p className="text-xs text-gray-400 whitespace-nowrap mt-0.5">{excelEditData.judul}</p>
                                 {desktopEditSessionToken && (
                                   <p className="text-[10px] text-indigo-400 mt-1 font-mono">🔐 Session aktif • Hash: {desktopEditOriginalHash?.slice(0, 12)}...</p>
                                 )}
@@ -6815,7 +6815,7 @@ export default function ESOPApp() {
 
                   {/* Conflict Dialog - When file changed during edit session */}
                   <Dialog open={showConflictDialog} onOpenChange={setShowConflictDialog}>
-                    <DialogContent className="sm:max-w-lg bg-white border-2 border-red-300 shadow-xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+                    <DialogContent className="sm:max-w-none w-fit max-w-[95vw] bg-white border-2 border-red-300 shadow-xl overflow-visible" aria-describedby={undefined}>
                       <DialogHeader>
                         <DialogTitle className="text-xl font-bold text-red-800 flex items-center gap-2">
                           <AlertTriangle className="w-6 h-6 text-red-600" />
@@ -6859,8 +6859,8 @@ export default function ESOPApp() {
                               </div>
                               <div>
                                 <p className="text-gray-500 text-xs">Hash Saat Ini (R2)</p>
-                                <p className="font-mono text-xs text-red-600 truncate">
-                                  {conflictData.currentHash?.slice(0, 20)}...
+                                <p className="font-mono text-xs text-red-600 whitespace-nowrap">
+                                  {conflictData.currentHash?.slice(0, 24)}...
                                 </p>
                               </div>
                             </div>
@@ -6906,7 +6906,7 @@ export default function ESOPApp() {
 
                   {/* Excel Edit Diagnostic Dialog */}
                   <Dialog open={showDiagnosticDialog} onOpenChange={setShowDiagnosticDialog}>
-                    <DialogContent className="sm:max-w-2xl bg-white border-2 border-orange-200 shadow-xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+                    <DialogContent className="sm:max-w-none w-fit max-w-[95vw] bg-white border-2 border-orange-200 shadow-xl overflow-visible" aria-describedby={undefined}>
                       <DialogHeader>
                         <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
                           <Activity className="w-5 h-5 text-orange-600" />
@@ -7654,7 +7654,7 @@ export default function ESOPApp() {
                                             setRejectReason('')
                                           }
                                         }}>
-                                          <DialogContent className="sm:max-w-md bg-gradient-to-b from-slate-900 to-slate-800 border-2 border-orange-500 shadow-2xl" aria-describedby={undefined}>
+                                          <DialogContent className="sm:max-w-none w-fit max-w-[95vw] bg-gradient-to-b from-slate-900 to-slate-800 border-2 border-orange-500 shadow-2xl overflow-visible" aria-describedby={undefined}>
                                             <DialogHeader>
                                               <DialogTitle className="text-xl font-bold text-white flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg">
@@ -8193,7 +8193,7 @@ export default function ESOPApp() {
 
                     {/* Desktop Sync Dialog - Upload edited file */}
                     <Dialog open={showDesktopSyncDialog} onOpenChange={setShowDesktopSyncDialog}>
-                      <DialogContent className="sm:max-w-fit w-auto max-w-[95vw] bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
+                      <DialogContent className="sm:max-w-none w-fit max-w-[95vw] bg-white border-2 border-orange-200 shadow-xl overflow-visible" aria-describedby={undefined}>
                         <DialogHeader>
                           <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
                             <RefreshCw className="w-5 h-5 text-orange-600" />
@@ -8214,9 +8214,9 @@ export default function ESOPApp() {
                                 ) : (
                                   <FileSpreadsheet className="w-10 h-10 text-green-600 mt-1" />
                                 )}
-                                <div>
-                                  <p className="font-bold text-gray-900">{excelEditData.fileName}</p>
-                                  <p className="text-sm text-gray-600">{excelEditData.judul}</p>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-bold text-gray-900 whitespace-nowrap">{excelEditData.fileName}</p>
+                                  <p className="text-sm text-gray-600 font-medium whitespace-nowrap">{excelEditData.judul}</p>
                                 </div>
                               </div>
                             </div>
@@ -8313,7 +8313,7 @@ export default function ESOPApp() {
 
                     {/* Excel Edit Diagnostic Dialog */}
                     <Dialog open={showDiagnosticDialog} onOpenChange={setShowDiagnosticDialog}>
-                      <DialogContent className="sm:max-w-2xl bg-white border-2 border-orange-200 shadow-xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+                      <DialogContent className="sm:max-w-none w-fit max-w-[95vw] bg-white border-2 border-orange-200 shadow-xl overflow-visible" aria-describedby={undefined}>
                         <DialogHeader>
                           <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
                             <Activity className="w-5 h-5 text-orange-600" />
@@ -9433,7 +9433,7 @@ export default function ESOPApp() {
 
       {/* User Activity Dialog */}
       < Dialog open={showUserActivityDialog} onOpenChange={setShowUserActivityDialog} >
-        <DialogContent className="sm:max-w-2xl bg-white border-2 border-cyan-200 shadow-xl max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogContent className="sm:max-w-none w-fit max-w-[95vw] bg-white border-2 border-cyan-200 shadow-xl overflow-visible" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
               <History className="w-5 h-5 text-cyan-600" />
