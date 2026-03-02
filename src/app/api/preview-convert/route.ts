@@ -8,6 +8,8 @@ const CLOUDCONVERT_API = 'https://api.cloudconvert.com/v2'
 // File types that need conversion to PDF
 const CONVERTIBLE_TYPES = ['xlsx', 'xls', 'docx', 'doc', 'pptx', 'ppt']
 
+export const maxDuration = 60
+
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies()

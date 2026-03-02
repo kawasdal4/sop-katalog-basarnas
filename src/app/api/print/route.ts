@@ -19,6 +19,7 @@ import { addPdfFooter } from '@/lib/pdf-footer'
 import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 // Temp folder name for print files
 const PRINT_TEMP_FOLDER = 'R2-Print-Temp'

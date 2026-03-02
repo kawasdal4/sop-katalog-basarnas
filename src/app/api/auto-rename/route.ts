@@ -10,6 +10,7 @@ import { db } from '@/lib/db'
 import { renameR2Object, isR2Configured } from '@/lib/r2-storage'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 interface RenameResult {
   id: string
@@ -27,16 +28,16 @@ interface RenameResult {
  */
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
-  
+
   try {
     // Check R2 configuration
     if (!isR2Configured()) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'R2 storage tidak terkonfigurasi',
-        renamed: 0 
+        renamed: 0
       }, { status: 500 })
     }
-    
+
     // Get all SOP files
     const sopFiles = await db.sopFile.findMany({
       select: {
@@ -47,25 +48,25 @@ export async function POST(request: NextRequest) {
         fileType: true
       }
     })
-    
+
     console.log(`🔄 [Auto-Rename] Checking ${sopFiles.length} files...`)
-    
+
     const results: RenameResult[] = []
     let renamedCount = 0
     let errorCount = 0
-    
+
     for (const sop of sopFiles) {
       try {
         // Generate expected filename from judul
-        const sanitizeFileName = (name: string) => 
+        const sanitizeFileName = (name: string) =>
           name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
-        
+
         // Get file extension
         const fileExt = sop.fileName.split('.').pop()?.toLowerCase() || 'pdf'
-        
+
         // Expected filename
         const expectedFileName = `${sanitizeFileName(sop.judul)}.${fileExt}`
-        
+
         // Check if rename is needed
         if (sop.fileName !== expectedFileName) {
           console.log(`📝 [Auto-Rename] Rename needed:`)
@@ -73,15 +74,15 @@ export async function POST(request: NextRequest) {
           console.log(`   Judul: ${sop.judul}`)
           console.log(`   Old: ${sop.fileName}`)
           console.log(`   New: ${expectedFileName}`)
-          
+
           // Generate new R2 key
           const oldKey = sop.filePath
           const newKey = oldKey.replace(/[^/]+$/, expectedFileName)
-          
+
           // Rename in R2
           if (oldKey !== newKey) {
             const renameResult = await renameR2Object(oldKey, newKey)
-            
+
             if (renameResult.success) {
               // Update database
               await db.sopFile.update({
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest) {
                   filePath: newKey
                 }
               })
-              
+
               results.push({
                 id: sop.id,
                 judul: sop.judul,
@@ -99,7 +100,7 @@ export async function POST(request: NextRequest) {
                 newFileName: expectedFileName,
                 renamed: true
               })
-              
+
               renamedCount++
               console.log(`   ✅ Renamed successfully`)
             } else {
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
                 renamed: false,
                 error: renameResult.error || 'R2 rename failed'
               })
-              
+
               errorCount++
               console.log(`   ❌ Rename failed: ${renameResult.error}`)
             }
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
               where: { id: sop.id },
               data: { fileName: expectedFileName }
             })
-            
+
             results.push({
               id: sop.id,
               judul: sop.judul,
@@ -129,7 +130,7 @@ export async function POST(request: NextRequest) {
               newFileName: expectedFileName,
               renamed: true
             })
-            
+
             renamedCount++
             console.log(`   ✅ Database updated (R2 key already correct)`)
           }
@@ -156,11 +157,11 @@ export async function POST(request: NextRequest) {
         errorCount++
       }
     }
-    
+
     const duration = Date.now() - startTime
     console.log(`\n✅ [Auto-Rename] Complete in ${duration}ms`)
     console.log(`   Total: ${sopFiles.length}, Renamed: ${renamedCount}, Errors: ${errorCount}\n`)
-    
+
     return NextResponse.json({
       success: true,
       message: `Auto-rename complete: ${renamedCount} files renamed, ${errorCount} errors`,
@@ -169,7 +170,7 @@ export async function POST(request: NextRequest) {
       errors: errorCount,
       results: results.filter(r => r.renamed || r.error)
     })
-    
+
   } catch (error) {
     console.error('[Auto-Rename] Error:', error)
     return NextResponse.json({

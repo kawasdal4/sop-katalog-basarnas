@@ -5,11 +5,6 @@
   "regions": [
     "sin1"
   ],
-  "functions": {
-    "api/**/route.ts": {
-      "maxDuration": 60
-    }
-  },
   "headers": [
     {
       "source": "/api/(.*)",
