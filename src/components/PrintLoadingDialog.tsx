@@ -221,21 +221,36 @@ export default function PrintLoadingDialog({
       const blob = await pdfRes.blob()
       const blobUrl = URL.createObjectURL(blob)
 
-      // Download langsung tanpa buka tab baru
-      const link = document.createElement('a')
-      link.href = blobUrl
-      link.download = fileName.replace(/\.[^.]+$/, '') + '.pdf'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      // Bersihkan blob URL setelah download
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
+      // Print langsung menggunakan hidden iframe untuk print dialog native (menjaga paper size asli)
+      const iframe = document.createElement('iframe')
+      iframe.style.display = 'none'
+      iframe.src = blobUrl
+      document.body.appendChild(iframe)
 
-      await new Promise(r => setTimeout(r, 500))
-      setSteps(prev => prev.map((s, i) => i === readyIndex ? { ...s, status: 'completed' } : s))
+      let printed = false
+      const finishPrint = () => {
+        if (printed) return
+        printed = true
 
-      if (onComplete) onComplete()
-      setTimeout(() => { onClose() }, 800)
+        setTimeout(() => {
+          if (iframe.contentWindow) {
+            iframe.contentWindow.print()
+          }
+          setSteps(prev => prev.map((s, i) => i === readyIndex ? { ...s, status: 'completed' } : s))
+          if (onComplete) onComplete()
+          setTimeout(() => { onClose() }, 800)
+        }, 500)
+
+        // Bersihkan iframe dan object URL setelah dialog print ditutup
+        setTimeout(() => {
+          try { document.body.removeChild(iframe) } catch (e) { }
+          URL.revokeObjectURL(blobUrl)
+        }, 120000) // Waktu tunggu agak lama agar print dialog tidak corrupt
+      }
+
+      iframe.onload = finishPrint
+      // Fallback jika iframe.onload tidak trigger (misal PDF cache)
+      setTimeout(finishPrint, 2000)
 
     } catch (err) {
       console.error('Print error:', err)

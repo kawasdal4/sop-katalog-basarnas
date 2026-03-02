@@ -391,19 +391,29 @@ export default function PrintViewerContent() {
         >
           {/* We use an <object> tag with a base64 data URI. This is the most robust way to force inline PDF display without triggering arbitrary browser downloads. */}
           {printToken && (
-            <object
-              data={`${printToken}#toolbar=1&navpanes=0&scrollbar=1`}
-              type="application/pdf"
-              className="w-full h-full rounded-lg border-0"
-              style={{ minHeight: 'calc(100vh - 180px)' }}
-              title="PDF Preview"
-            >
-              <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-gray-50">
-                <AlertTriangle className="w-12 h-12 text-orange-500 mb-4" />
-                <h3 className="text-lg font-bold text-gray-800 mb-2">Browser Tidak Mendukung PDF Inline</h3>
-                <p className="text-gray-600 mb-4">Silakan gunakan tombol Print di atas atau tekan Ctrl+P.</p>
-              </div>
-            </object>
+            <>
+              <object
+                data={`${printToken}#toolbar=1&navpanes=0&scrollbar=1`}
+                type="application/pdf"
+                className="w-full h-full rounded-lg border-0"
+                style={{ minHeight: 'calc(100vh - 180px)' }}
+                title="PDF Preview"
+              >
+                <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-gray-50">
+                  <AlertTriangle className="w-12 h-12 text-orange-500 mb-4" />
+                  <h3 className="text-lg font-bold text-gray-800 mb-2">Browser Tidak Mendukung PDF Inline</h3>
+                  <p className="text-gray-600 mb-4">Silakan gunakan tombol Print di atas atau tekan Ctrl+P.</p>
+                </div>
+              </object>
+
+              {/* Hidden iframe specifically for native printing via Ctrl+P */}
+              <iframe
+                ref={iframeRef}
+                src={printToken}
+                style={{ display: 'none' }}
+                title="Print Frame"
+              />
+            </>
           )}
         </motion.div>
       </div>
