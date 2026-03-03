@@ -30,7 +30,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
   PieChart,
@@ -39,6 +39,12 @@ import {
   Area,
   AreaChart
 } from 'recharts'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import {
   LayoutDashboard,
   FileText,
@@ -91,7 +97,9 @@ import {
   Tag,
   Calendar,
   PieChartIcon,
-  BarChart2
+  BarChart2,
+  Hash,
+  Edit3
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { StorageStatus } from '@/components/storage'
@@ -6362,7 +6370,7 @@ export default function ESOPApp() {
                                       <Cell key={`cell-${index}`} fill={`url(#pieGradient-${index % COLORS.length})`} />
                                     ))}
                                   </Pie>
-                                  <Tooltip
+                                  <RechartsTooltip
                                     wrapperStyle={{ zIndex: 50 }}
                                     content={({ active, payload }) => {
                                       if (active && payload && payload.length) {
@@ -6532,7 +6540,7 @@ export default function ESOPApp() {
                                         <Cell key={`cell-${index}`} fill={`url(#lingkupGradient-${index % LINGKUP_COLORS.length})`} />
                                       ))}
                                     </Pie>
-                                    <Tooltip
+                                    <RechartsTooltip
                                       wrapperStyle={{ zIndex: 50 }}
                                       content={({ active, payload }) => {
                                         if (active && payload && payload.length) {
@@ -6717,27 +6725,45 @@ export default function ESOPApp() {
                         </CardHeader>
                         <CardContent>
                           {stats.topViewed && stats.topViewed.length > 0 ? (
-                            <div className="space-y-3">
+                            <div className="space-y-3.5">
                               {stats.topViewed.map((sop, index) => (
                                 <motion.div
                                   key={sop.id}
-                                  className="flex items-center gap-3 p-3 bg-cyan-50 rounded-lg"
-                                  initial={{ opacity: 0, y: 10 }}
-                                  animate={{ opacity: 1, y: 0 }}
+                                  className="group flex items-center gap-4 p-3.5 rounded-2xl cursor-default transition-all duration-300 relative overflow-hidden active:scale-[0.98]"
+                                  style={{ 
+                                    background: 'rgba(236,254,255,0.4)', 
+                                    border: '1px solid rgba(6,182,212,0.15)',
+                                    backdropFilter: 'blur(8px)'
+                                  }}
+                                  initial={{ opacity: 0, x: -20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  whileHover={{ 
+                                    scale: 1.01, 
+                                    backgroundColor: 'rgba(236,254,255,0.8)',
+                                    borderColor: 'rgba(6,182,212,0.3)',
+                                    boxShadow: '0 10px 25px -5px rgba(6,182,212,0.1)'
+                                  }}
                                   transition={{ delay: index * 0.1 }}
                                 >
-                                  <div className="w-8 h-8 bg-gradient-to-r from-cyan-500 to-cyan-600 text-white rounded-full flex items-center justify-center font-bold text-sm">
+                                  {/* Glass rank badge */}
+                                  <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 text-white rounded-xl flex items-center justify-center font-black text-sm shadow-lg shadow-cyan-500/20 relative shrink-0">
+                                    <div className="absolute inset-0 rounded-xl border border-white/20" />
                                     {index + 1}
                                   </div>
-                                  <div className="flex items-center gap-2 flex-1">
-                                    <FileTypeIcon fileName={sop.fileName} className="w-4 h-4 flex-shrink-0" />
-                                    <div>
-                                      <p className="font-medium text-blue-900 truncate">{sop.judul}</p>
+                                  
+                                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                                    <div className="w-10 h-10 rounded-xl bg-white/50 border border-white flex items-center justify-center shrink-0 shadow-sm">
+                                      <FileTypeIcon fileName={sop.fileName} className="w-5 h-5" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="font-bold text-blue-900 truncate text-[13.5px] tracking-tight">{sop.judul}</p>
+                                      <p className="text-[10px] font-bold text-cyan-600/70 uppercase tracking-widest mt-0.5">{sop.kategori || 'SOP'}</p>
                                     </div>
                                   </div>
-                                  <div className="text-right">
-                                    <p className="font-bold text-cyan-600">{sop.previewCount || 0}</p>
-                                    <p className="text-xs text-gray-500">views</p>
+                                  
+                                  <div className="text-right shrink-0 bg-white/40 px-3 py-1.5 rounded-xl border border-white shadow-sm">
+                                    <p className="font-black text-cyan-600 text-lg leading-tight">{sop.previewCount || 0}</p>
+                                    <p className="text-[9px] font-black text-cyan-500/60 uppercase tracking-tighter">views</p>
                                   </div>
                                 </motion.div>
                               ))}
@@ -6757,27 +6783,45 @@ export default function ESOPApp() {
                         </CardHeader>
                         <CardContent>
                           {stats.topDownloaded && stats.topDownloaded.length > 0 ? (
-                            <div className="space-y-3">
+                            <div className="space-y-3.5">
                               {stats.topDownloaded.map((sop, index) => (
                                 <motion.div
                                   key={sop.id}
-                                  className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg"
-                                  initial={{ opacity: 0, y: 10 }}
-                                  animate={{ opacity: 1, y: 0 }}
+                                  className="group flex items-center gap-4 p-3.5 rounded-2xl cursor-default transition-all duration-300 relative overflow-hidden active:scale-[0.98]"
+                                  style={{ 
+                                    background: 'rgba(250,245,255,0.4)', 
+                                    border: '1px solid rgba(168,85,247,0.15)',
+                                    backdropFilter: 'blur(8px)'
+                                  }}
+                                  initial={{ opacity: 0, x: -20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  whileHover={{ 
+                                    scale: 1.01, 
+                                    backgroundColor: 'rgba(250,245,255,0.8)',
+                                    borderColor: 'rgba(168,85,247,0.3)',
+                                    boxShadow: '0 10px 25px -5px rgba(168,85,247,0.1)'
+                                  }}
                                   transition={{ delay: index * 0.1 }}
                                 >
-                                  <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-full flex items-center justify-center font-bold text-sm">
+                                  {/* Glass rank badge */}
+                                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 text-white rounded-xl flex items-center justify-center font-black text-sm shadow-lg shadow-purple-500/20 relative shrink-0">
+                                    <div className="absolute inset-0 rounded-xl border border-white/20" />
                                     {index + 1}
                                   </div>
-                                  <div className="flex items-center gap-2 flex-1">
-                                    <FileTypeIcon fileName={sop.fileName} className="w-4 h-4 flex-shrink-0" />
-                                    <div>
-                                      <p className="font-medium text-blue-900 truncate">{sop.judul}</p>
+
+                                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                                    <div className="w-10 h-10 rounded-xl bg-white/50 border border-white flex items-center justify-center shrink-0 shadow-sm">
+                                      <FileTypeIcon fileName={sop.fileName} className="w-5 h-5" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="font-bold text-blue-900 truncate text-[13.5px] tracking-tight">{sop.judul}</p>
+                                      <p className="text-[10px] font-bold text-purple-600/70 uppercase tracking-widest mt-0.5">{sop.kategori || 'SOP'}</p>
                                     </div>
                                   </div>
-                                  <div className="text-right">
-                                    <p className="font-bold text-purple-600">{sop.downloadCount || 0}</p>
-                                    <p className="text-xs text-gray-500">downloads</p>
+
+                                  <div className="text-right shrink-0 bg-white/40 px-3 py-1.5 rounded-xl border border-white shadow-sm">
+                                    <p className="font-black text-purple-600 text-lg leading-tight">{sop.downloadCount || 0}</p>
+                                    <p className="text-[9px] font-black text-purple-500/60 uppercase tracking-tighter">downloads</p>
                                   </div>
                                 </motion.div>
                               ))}
@@ -7806,381 +7850,302 @@ export default function ESOPApp() {
                 </div>
 
 
-                {/* Table */}
-                {/* Table */}
-                <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden relative">
-                  <CardContent className="p-0">
-                    {/* Aesthetic Loading Overlay */}
-                    <AnimatePresence>
-                      {katalogLoading && (
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.3 }}
-                          className="absolute inset-0 z-20 flex items-center justify-center"
-                        >
-                          {/* Glassmorphism Background */}
-                          <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 via-white/80 to-yellow-500/10 backdrop-blur-sm" />
-
-                          {/* Decorative SAR Elements */}
-                          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                            {/* Floating rescue icons */}
-                            {[...Array(6)].map((_, i) => (
-                              <motion.div
-                                key={i}
-                                className="absolute"
-                                initial={{
-                                  x: Math.random() * 100 + "%",
-                                  y: Math.random() * 100 + "%",
-                                  scale: 0.3 + Math.random() * 0.4,
-                                  opacity: 0.1
-                                }}
-                                animate={{
-                                  y: [null, Math.random() * -50 - 20],
-                                  opacity: [0.1, 0.2, 0.1],
-                                  rotate: [0, Math.random() * 20 - 10]
-                                }}
-                                transition={{
-                                  duration: 3 + Math.random() * 2,
-                                  repeat: Infinity,
-                                  repeatType: "reverse",
-                                  delay: i * 0.3
-                                }}
-                              >
-                                {i % 3 === 0 ? (
-                                  <svg className="w-8 h-8 text-orange-400" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M12 2L4 7v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V7l-8-5zm0 2.18l6 3.72v5.1c0 4.5-3.08 8.4-6 9.69V4.18z" />
-                                  </svg>
-                                ) : i % 3 === 1 ? (
-                                  <svg className="w-8 h-8 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-                                  </svg>
-                                ) : (
-                                  <svg className="w-8 h-8 text-red-400" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5h3V8h4v4h3l-5 5z" />
-                                  </svg>
-                                )}
-                              </motion.div>
-                            ))}
-                          </div>
-
-                          {/* Main Loading Content */}
-                          <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.95, opacity: 0 }}
-                            transition={{ duration: 0.3, delay: 0.1 }}
-                            className="relative z-10 flex flex-col items-center gap-4"
-                          >
-                            {/* SAR Helicopter Animation */}
-                            <div className="relative w-24 h-24">
-                              {/* Main helicopter body */}
-                              <motion.div
-                                animate={{ y: [0, -8, 0] }}
-                                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                                className="absolute inset-0 flex items-center justify-center"
-                              >
-                                <svg className="w-20 h-20 text-orange-500 drop-shadow-lg" viewBox="0 0 64 64" fill="currentColor">
-                                  <ellipse cx="32" cy="38" rx="16" ry="10" className="text-orange-500" />
-                                  <ellipse cx="32" cy="38" rx="12" ry="7" className="text-orange-400" />
-                                  <rect x="46" y="36" width="14" height="4" rx="2" className="text-orange-600" />
-                                  <path d="M28 28 L32 18 L36 28" className="text-orange-600" />
-                                  <ellipse cx="32" cy="48" rx="4" ry="2" className="text-orange-300" />
-                                </svg>
-                              </motion.div>
-                              {/* Rotor blade */}
-                              <motion.div
-                                animate={{ rotate: 360 }}
-                                transition={{ duration: 0.5, repeat: Infinity, ease: "linear" }}
-                                className="absolute top-4 left-1/2 -translate-x-1/2 origin-center"
-                              >
-                                <div className="w-24 h-1 bg-gradient-to-r from-transparent via-orange-400 to-transparent rounded-full shadow-lg" />
-                                <div className="w-24 h-1 bg-gradient-to-r from-transparent via-orange-300 to-transparent rounded-full -rotate-90 absolute top-0" />
-                              </motion.div>
-                              {/* Search light beam */}
-                              <motion.div
-                                animate={{ opacity: [0.3, 0.6, 0.3] }}
-                                transition={{ duration: 1, repeat: Infinity }}
-                                className="absolute top-12 left-1/2 -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-t-16 border-l-transparent border-r-transparent border-t-yellow-300/40"
-                              />
-                            </div>
-
-                            {/* Glass Card with Text */}
-                            <motion.div
-                              initial={{ y: 10, opacity: 0 }}
-                              animate={{ y: 0, opacity: 1 }}
-                              transition={{ delay: 0.2 }}
-                              className="relative px-8 py-4 rounded-2xl overflow-hidden"
-                            >
-                              {/* Glass background */}
-                              <div className="absolute inset-0 bg-white/70 backdrop-blur-md border border-white/50 shadow-xl" />
-                              <div className="absolute inset-0 bg-gradient-to-r from-orange-500/10 via-transparent to-yellow-500/10" />
-
-                              {/* Content */}
-                              <div className="relative flex items-center gap-3">
-                                {/* Animated dots */}
-                                <div className="flex gap-1">
-                                  {[0, 1, 2].map((i) => (
-                                    <motion.div
-                                      key={i}
-                                      animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
-                                      transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.15 }}
-                                      className="w-2 h-2 rounded-full bg-gradient-to-r from-orange-500 to-yellow-500"
-                                    />
-                                  ))}
-                                </div>
-                                <span className="text-gray-700 font-semibold text-lg tracking-wide">Memuat Data</span>
-                              </div>
-                            </motion.div>
-
-                            {/* Progress bar */}
-                            <motion.div
-                              initial={{ width: 0, opacity: 0 }}
-                              animate={{ width: 200, opacity: 1 }}
-                              transition={{ delay: 0.3 }}
-                              className="h-1.5 bg-gray-200 rounded-full overflow-hidden shadow-inner"
-                            >
-                              <motion.div
-                                animate={{ x: [-200, 200] }}
-                                transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-                                className="w-1/2 h-full bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-400 rounded-full"
-                              />
-                            </motion.div>
-                          </motion.div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-
-                    {/* Progress bar at top */}
+                {/* Redesigned Katalog List (Stunning Glassmorphism) */}
+                <div className="relative">
+                  {/* Aesthetic Loading Overlay */}
+                  <AnimatePresence>
                     {katalogLoading && (
-                      <div className="absolute top-0 inset-x-0 h-1 z-30 overflow-hidden">
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl overflow-hidden"
+                      >
+                        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" />
                         <motion.div
-                          initial={{ x: "-100%" }}
-                          animate={{ x: "100%" }}
-                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                          className="w-1/2 h-full bg-gradient-to-r from-orange-400 via-yellow-300 to-orange-400"
-                        />
-                      </div>
+                          className="relative z-10 flex flex-col items-center gap-4"
+                          initial={{ scale: 0.8 }}
+                          animate={{ scale: 1 }}
+                        >
+                          <div className="w-16 h-16 relative">
+                            <motion.div
+                              className="absolute inset-0 border-4 border-orange-500/20 rounded-full"
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                            />
+                            <motion.div
+                              className="absolute inset-0 border-4 border-t-orange-500 rounded-full shadow-[0_0_15px_rgba(249,115,22,0.5)]"
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <RefreshCw className="w-6 h-6 text-orange-400 animate-pulse" />
+                            </div>
+                          </div>
+                          <span className="text-white font-bold tracking-wider text-sm bg-orange-500/10 px-4 py-1.5 rounded-full border border-orange-500/20">MEMUAT DATA...</span>
+                        </motion.div>
+                      </motion.div>
                     )}
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader className="bg-slate-50/80">
-                          <TableRow className="hover:bg-transparent border-slate-200">
-                            <TableHead className="w-[80px] text-blue-900 font-bold">Judul</TableHead>
-                            <TableHead className="text-blue-900 font-bold">Tahun</TableHead>
-                            <TableHead className="text-blue-900 font-bold">Kategori</TableHead>
-                            <TableHead className="text-blue-900 font-bold">Lingkup</TableHead>
-                            <TableHead className="text-blue-900 font-bold">Jenis</TableHead>
-                            <TableHead className="text-blue-900 font-bold">Status</TableHead>
-                            <TableHead className="text-right text-blue-900 font-bold">Aksi</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          <AnimatePresence mode="popLayout" initial={false}>
-                            {sopFiles.length === 0 ? (
-                              <motion.tr
-                                key="empty"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                              >
-                                <TableCell colSpan={7} className="h-64 text-center">
-                                  <div className="flex flex-col items-center justify-center text-slate-400">
-                                    <FileText className="w-12 h-12 mb-2 opacity-20" />
-                                    <p className="text-sm font-medium">Tidak ada data ditemukan</p>
-                                  </div>
-                                </TableCell>
-                              </motion.tr>
-                            ) : (
-                              sopFiles.map((sop, index) => (
-                                <motion.tr
-                                  key={sop.id}
-                                  initial={{ opacity: 0, y: 10 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, x: -10 }}
-                                  transition={{ duration: 0.2, delay: index * 0.03 }}
-                                  className={`group hover:bg-orange-50/50 transition-colors border-slate-100 ${excelEditData?.id === sop.id ? 'bg-orange-50/80' : ''}`}
-                                >
-                                  <TableCell>
-                                    <div className="flex items-center gap-2">
-                                      <FileTypeIcon fileName={sop.fileName} className="w-5 h-5 flex-shrink-0" />
-                                      <div>
-                                        <div className="text-xs text-orange-500 font-medium">No. SOP : {sop.nomorSop || '...'}</div>
-                                        <div className="flex items-center gap-2">
-                                          <div className="text-gray-800 font-semibold">{sop.judul}</div>
-                                          {excelEditData?.id === sop.id && (
-                                            <motion.div
-                                              initial={{ opacity: 0, scale: 0.8 }}
-                                              animate={{ opacity: 1, scale: 1 }}
-                                              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-orange-500 to-red-600 text-[10px] font-bold text-white shadow-lg shadow-orange-500/20"
-                                            >
-                                              <span className="relative flex h-2 w-2">
-                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
-                                              </span>
-                                              SESI AKTIF
-                                            </motion.div>
+                  </AnimatePresence>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    <AnimatePresence mode="popLayout">
+                      {sopFiles.length === 0 && !katalogLoading ? (
+                        <motion.div
+                          key="empty"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="flex flex-col items-center justify-center py-20 bg-slate-900/30 backdrop-blur-sm border-2 border-dashed border-slate-800 rounded-3xl"
+                        >
+                          <div className="relative">
+                            <div className="absolute inset-0 bg-orange-500/10 blur-3xl rounded-full" />
+                            <FileText className="w-20 h-20 text-slate-700 relative z-10" />
+                          </div>
+                          <p className="mt-4 text-slate-400 font-bold tracking-wide uppercase text-xs">Katalog Kosong</p>
+                          <p className="text-slate-500 text-sm mt-1">Gunakan filter lain atau tambah dokumen baru</p>
+                        </motion.div>
+                      ) : (
+                        sopFiles.map((sop, index) => (
+                          <motion.div
+                            key={sop.id}
+                            layout
+                            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            transition={{
+                              duration: 0.4,
+                              delay: index * 0.05,
+                              type: "spring",
+                              stiffness: 100,
+                              damping: 15
+                            }}
+                            className="group relative"
+                          >
+                            {/* Card Body */}
+                            <div className={`relative overflow-hidden rounded-2xl border transition-all duration-500 ${excelEditData?.id === sop.id
+                              ? 'bg-orange-600/10 border-orange-500/50 shadow-[0_0_30px_rgba(249,115,22,0.15)] ring-2 ring-orange-500/20'
+                              : 'bg-slate-900/40 hover:bg-slate-900/60 border-slate-800 hover:border-orange-500/30 backdrop-blur-sm hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)]'
+                              }`}>
+
+                              {/* Glowing Accent Line */}
+                              <div className={`absolute top-0 left-0 bottom-0 w-1.5 transition-all duration-500 ${sop.jenis === 'SOP' ? 'bg-orange-500' : 'bg-yellow-500'
+                                } group-hover:w-2`} />
+
+                              <div className="p-5 pl-8">
+                                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+
+                                  {/* Left Content: Title & Info */}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-3 mb-2">
+                                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-800/80 border border-slate-700">
+                                        <Hash className="w-3 h-3 text-orange-400" />
+                                        <span className="text-[10px] font-bold text-slate-300 tracking-wider font-mono">
+                                          {sop.nomorSop || 'BELUM ADA NO'}
+                                        </span>
+                                      </div>
+                                      <span className="text-[10px] font-black text-slate-500">•</span>
+                                      <div className="flex items-center gap-1.5 group/year">
+                                        <Calendar className="w-3 h-3 text-slate-500 group-hover/year:text-orange-400 transition-colors" />
+                                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">{sop.tahun}</span>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-start gap-4">
+                                      <div className="mt-1 relative flex-shrink-0">
+                                        <div className="absolute inset-0 bg-white/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <FileTypeIcon fileName={sop.fileName} className="w-10 h-10 relative z-10 drop-shadow-lg transform group-hover:scale-110 transition-transform" />
+                                      </div>
+
+                                      <div className="flex-1 min-w-0">
+                                        <h3 className={`text-lg font-black tracking-tight leading-tight group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r transition-all duration-300 ${excelEditData?.id === sop.id
+                                          ? 'text-orange-400 bg-gradient-to-r from-orange-400 to-red-400'
+                                          : 'text-white group-hover:from-white group-hover:to-orange-200'
+                                          }`}>
+                                          {sop.judul}
+                                        </h3>
+
+                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 text-[11px] font-medium text-slate-500">
+                                          <div className="flex items-center gap-1.5">
+                                            <div className="w-5 h-5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
+                                              <User className="w-2.5 h-2.5 text-slate-400" />
+                                            </div>
+                                            <span>Oleh <span className="text-orange-400/80 group-hover:text-orange-400 transition-colors">{sop.user?.name || 'System'}</span></span>
+                                          </div>
+                                          <div className="flex items-center gap-1.5">
+                                            <Clock className="w-3 h-3 text-slate-600" />
+                                            <span>{new Date(sop.uploadedAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                          </div>
+                                          {sop.updatedAt && new Date(sop.updatedAt).getTime() !== new Date(sop.uploadedAt).getTime() && (
+                                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/5 border border-amber-500/10 text-amber-500/80">
+                                              <Edit3 className="w-2.5 h-2.5" />
+                                              <span>Update {new Date(sop.updatedAt).toLocaleString('id-ID', { day: 'numeric', month: 'short' })}</span>
+                                            </div>
                                           )}
-                                        </div>
-                                        <div className="text-xs text-gray-500 mt-0.5">
-                                          <span className="text-gray-400">Upload:</span> {new Date(sop.uploadedAt).toLocaleString('id-ID', {
-                                            day: 'numeric',
-                                            month: 'short',
-                                            year: 'numeric',
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                          })}
-                                          <span className="text-gray-400"> | Upload by:</span> <span className="text-orange-600 font-medium">{sop.user?.name || 'System'}</span>
-                                        </div>
-                                        <div className="text-xs text-amber-600 mt-0.5">
-                                          <span className="text-amber-500">Terakhir diubah:</span>{' '}
-                                          {sop.updatedAt && new Date(sop.updatedAt).getTime() !== new Date(sop.uploadedAt).getTime()
-                                            ? new Date(sop.updatedAt).toLocaleString('id-ID', {
-                                              day: 'numeric',
-                                              month: 'short',
-                                              year: 'numeric',
-                                              hour: '2-digit',
-                                              minute: '2-digit'
-                                            })
-                                            : '-'
-                                          }
-                                          <span className="text-gray-400"> | </span>
-                                          <span className="text-amber-500">Last edited by:</span>{' '}
-                                          <span className="text-amber-600 font-medium">{sop.updatedByUser?.name || '-'}</span>
                                         </div>
                                       </div>
                                     </div>
-                                  </TableCell>
-                                  <TableCell className="text-gray-600">{sop.tahun}</TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline" className="border-orange-500 bg-orange-50 text-orange-700">{sop.kategori}</Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline" className="border-blue-500 bg-blue-50 text-blue-700">{sop.lingkup || '-'}</Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge className={sop.jenis === 'SOP' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white'}>
+                                  </div>
+
+                                  {/* Center: Badges */}
+                                  <div className="flex flex-wrap items-center gap-2 lg:justify-center">
+                                    <Badge variant="outline" className="h-7 border-slate-700 bg-slate-800/40 text-slate-300 font-bold tracking-wide rounded-lg px-3">
+                                      {sop.kategori}
+                                    </Badge>
+                                    <Badge variant="outline" className="h-7 border-indigo-500/20 bg-indigo-500/5 text-indigo-400 font-bold tracking-wide rounded-lg px-3">
+                                      {sop.lingkup || '-'}
+                                    </Badge>
+                                    <div className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider shadow-lg ${sop.jenis === 'SOP'
+                                      ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-orange-500/20'
+                                      : 'bg-gradient-to-br from-yellow-500 to-yellow-600 text-white shadow-yellow-500/20'
+                                      }`}>
                                       {sop.jenis}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline" className={STATUS_COLORS[sop.status]}>
+                                    </div>
+                                    <div className={`px-2 py-1 rounded-md text-[9px] font-bold border ${STATUS_COLORS[sop.status]}`}>
                                       {sop.status}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="flex items-center justify-end gap-1">
-                                      <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} title="Preview" className="hover:bg-cyan-500/20" disabled={previewLoading === sop.id}>
-                                        {previewLoading === sop.id ? (
-                                          <div className="relative">
-                                            <motion.div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
-                                            <motion.div className="absolute inset-0 w-4 h-4 border-2 border-yellow-400 border-b-transparent rounded-full" animate={{ rotate: -360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
-                                          </div>
-                                        ) : (
-                                          <Eye className="w-4 h-4 text-cyan-400" />
+                                    </div>
+                                  </div>
+
+                                  {/* Right: Actions */}
+                                  <div className="flex items-center gap-2 lg:pl-6 lg:border-l lg:border-slate-800/50">
+                                    {/* Action Group */}
+                                    <div className="flex items-center p-1.5 rounded-xl bg-slate-800/40 border border-slate-700/50 group-hover:border-orange-500/20 transition-all shadow-inner">
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} disabled={previewLoading === sop.id} className="w-9 h-9 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-400 text-slate-400 transition-all">
+                                              {previewLoading === sop.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent className="bg-slate-800 border-slate-700 text-cyan-400 font-bold">Preview</TooltipContent>
+                                        </Tooltip>
+
+                                        {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && (
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button size="icon" variant="ghost" onClick={() => handleOpenEdit(sop.id)} className="w-9 h-9 rounded-lg hover:bg-orange-500/10 hover:text-orange-400 text-slate-400 transition-all">
+                                                <Edit className="w-4 h-4" />
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent className="bg-slate-800 border-slate-700 text-orange-400 font-bold">Edit Info</TooltipContent>
+                                          </Tooltip>
                                         )}
-                                      </Button>
-                                      {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && (
-                                        <Button size="icon" variant="ghost" onClick={() => handleOpenEdit(sop.id)} title="Edit" className="hover:bg-orange-500/20">
-                                          <Edit className="w-4 h-4 text-orange-400" />
-                                        </Button>
-                                      )}
-                                      <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-500/20" disabled={downloadLoading === sop.id}>
-                                        {downloadLoading === sop.id ? (
-                                          <div className="relative">
-                                            <motion.div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
-                                            <motion.div className="absolute inset-0 w-4 h-4 border-2 border-orange-400 border-b-transparent rounded-full" animate={{ rotate: -360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
-                                          </div>
-                                        ) : (
-                                          <Download className="w-4 h-4 text-green-400" />
+
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} disabled={downloadLoading === sop.id} className="w-9 h-9 rounded-lg hover:bg-green-500/10 hover:text-green-400 text-slate-400 transition-all">
+                                              {downloadLoading === sop.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent className="bg-slate-800 border-slate-700 text-green-400 font-bold">Download</TooltipContent>
+                                        </Tooltip>
+
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button size="icon" variant="ghost" onClick={() => handlePrint(sop.id)} disabled={printLoading === sop.id} className="w-9 h-9 rounded-lg hover:bg-slate-400/10 hover:text-slate-100 text-slate-400 transition-all">
+                                              {printLoading === sop.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent className="bg-slate-800 border-slate-700 text-white font-bold">Cetak</TooltipContent>
+                                        </Tooltip>
+
+                                        {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && (
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                onClick={() => handleDesktopEdit(sop.id)}
+                                                className={`w-9 h-9 rounded-lg transition-all ${['xlsx', 'xls', 'xlsm'].includes(sop.fileType || '')
+                                                  ? 'hover:bg-green-500/10 hover:text-green-400'
+                                                  : ['docx', 'doc'].includes(sop.fileType || '')
+                                                    ? 'hover:bg-blue-500/10 hover:text-blue-400'
+                                                    : 'hover:bg-red-500/10 hover:text-red-400'
+                                                  } text-slate-400`}
+                                              >
+                                                {['docx', 'doc'].includes(sop.fileType || '') ? <FileText className="w-4 h-4" /> : ['xlsx', 'xls', 'xlsm'].includes(sop.fileType || '') ? <FileSpreadsheet className="w-4 h-4" /> : <FileIcon className="w-4 h-4" />}
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent className="bg-slate-800 border-slate-700 font-bold">Edit Desktop</TooltipContent>
+                                          </Tooltip>
                                         )}
-                                      </Button>
-                                      <Button size="icon" variant="ghost" onClick={() => handlePrint(sop.id)} title="Print" className="hover:bg-gray-500/20" disabled={printLoading === sop.id}>
-                                        {printLoading === sop.id ? (
-                                          <div className="relative">
-                                            <motion.div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
-                                            <motion.div className="absolute inset-0 w-4 h-4 border-2 border-orange-400 border-b-transparent rounded-full" animate={{ rotate: -360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
-                                          </div>
-                                        ) : (
-                                          <Printer className="w-4 h-4 text-gray-400" />
+
+                                        {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && (
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button size="icon" variant="ghost" onClick={() => handleDeleteSop(sop.id, sop.fileName)} className="w-9 h-9 rounded-lg hover:bg-red-500/10 hover:text-red-500 text-slate-400 transition-all">
+                                                <Trash2 className="w-4 h-4" />
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent className="bg-slate-900 border-red-900 text-red-500 font-bold">Hapus</TooltipContent>
+                                          </Tooltip>
                                         )}
-                                      </Button>
-                                      {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && ['xlsx', 'xls', 'xlsm', 'docx', 'doc', 'pdf'].includes(sop.fileType || '') && (
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          className={`hover:${sop.fileType === 'pdf' ? 'bg-red-100' : 'bg-green-100'} `}
-                                          onClick={() => handleDesktopEdit(sop.id)}
-                                          title={sop.fileType === 'pdf' ? 'Edit Desktop (PDF tidak bisa di-edit)' : `Edit di Desktop(${sop.fileType?.toUpperCase() || 'File'})`}
-                                        >
-                                          {sop.fileType === 'pdf' ? (
-                                            <FileIcon className="w-4 h-4 text-red-500" />
-                                          ) : ['docx', 'doc'].includes(sop.fileType || '') ? (
-                                            <FileText className="w-4 h-4 text-blue-600" />
-                                          ) : (
-                                            <FileSpreadsheet className="w-4 h-4 text-green-600" />
-                                          )}
-                                        </Button>
-                                      )}
+                                      </TooltipProvider>
+
+                                      {/* Session Sync Shortcut */}
                                       {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && excelEditData?.id === sop.id && (
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          className="hover:bg-orange-100"
-                                          onClick={handleOpenDesktopSync}
-                                          title="Selesai Edit & Sync"
+                                        <motion.div
+                                          animate={{ x: [0, 2, 0] }}
+                                          transition={{ duration: 1.5, repeat: Infinity }}
                                         >
-                                          <RefreshCw className="w-4 h-4 text-orange-600" />
-                                        </Button>
-                                      )}
-                                      {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && (
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          className="hover:bg-red-100"
-                                          onClick={() => handleDeleteSop(sop.id, sop.fileName)}
-                                          title="Hapus File"
-                                        >
-                                          <Trash2 className="w-4 h-4 text-red-500" />
-                                        </Button>
+                                          <Button size="icon" variant="ghost" onClick={handleOpenDesktopSync} className="w-9 h-9 rounded-lg bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white ml-1">
+                                            <RefreshCw className="w-4 h-4" />
+                                          </Button>
+                                        </motion.div>
                                       )}
                                     </div>
-                                  </TableCell>
-                                </motion.tr>
-                              ))
-                            )}
-                          </AnimatePresence>
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
+                                  </div>
 
-                {/* Pagination */}
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-400">
-                    Menampilkan {sopFiles.length} dari {sopPagination.total} data
-                  </p>
-                  <div className="flex items-center gap-2">
+                                </div>
+                              </div>
+
+                              {/* Decorative corner element */}
+                              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-white/[0.03] to-transparent pointer-events-none" />
+                            </div>
+                          </motion.div>
+                        ))
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+
+                {/* Styled Pagination */}
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4 px-4 py-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                    <p className="text-xs font-bold text-slate-500 tracking-wide uppercase">
+                      Total Data: <span className="text-slate-300 ml-1">{sopPagination.total}</span>
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-4 bg-slate-900/60 backdrop-blur-sm p-1.5 rounded-2xl border border-slate-800 shadow-xl">
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
                       disabled={sopPagination.page <= 1 || katalogLoading}
                       onClick={() => setSopPagination(p => ({ ...p, page: p.page - 1 }))}
-                      className="border-orange-500/30 text-orange-400 hover:bg-orange-500/10 disabled:opacity-50"
+                      className="h-10 w-10 p-0 rounded-xl hover:bg-orange-500/10 text-slate-400 hover:text-orange-400 disabled:opacity-20 transition-all"
                     >
-                      <ChevronLeft className="w-4 h-4" />
+                      <ChevronLeft className="w-5 h-5" />
                     </Button>
-                    <span className="text-sm text-gray-400">Halaman {sopPagination.page} dari {sopPagination.totalPages || 1}</span>
+
+                    <div className="flex items-center gap-2 group cursor-default">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-orange-500/10 text-orange-400 font-black text-sm border border-orange-500/20 group-hover:bg-orange-500 group-hover:text-white transition-all">
+                        {sopPagination.page}
+                      </div>
+                      <span className="text-slate-600 font-bold text-xs uppercase tracking-widest">DR</span>
+                      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 text-slate-400 font-black text-sm border border-slate-700">
+                        {sopPagination.totalPages || 1}
+                      </div>
+                    </div>
+
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
                       disabled={sopPagination.page >= sopPagination.totalPages || katalogLoading}
                       onClick={() => setSopPagination(p => ({ ...p, page: p.page + 1 }))}
-                      className="border-orange-500/30 text-orange-400 hover:bg-orange-500/10 disabled:opacity-50"
+                      className="h-10 w-10 p-0 rounded-xl hover:bg-orange-500/10 text-slate-400 hover:text-orange-400 disabled:opacity-20 transition-all"
                     >
-                      <ChevronRight className="w-4 h-4" />
+                      <ChevronRight className="w-5 h-5" />
                     </Button>
                   </div>
                 </div>
