@@ -337,7 +337,9 @@ function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
     lg: 'w-16 h-16'
   }
 
-  const logoUrl = 'https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/logo.png'
+  // Default to local logo for reliability, but keep the R2 URL as a fallback/comment
+  const logoUrl = '/logo.png'
+  // const r2LogoUrl = 'https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/logo.png'
 
   return (
     <motion.div
@@ -430,9 +432,6 @@ function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
         alt="BASARNAS Logo"
         className="relative z-20 w-full h-full object-contain"
         style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.3))' }}
-        onError={(e) => {
-          (e.currentTarget as HTMLImageElement).src = '/logo.png'
-        }}
       />
     </motion.div>
   )
@@ -5598,28 +5597,12 @@ export default function ESOPApp() {
                 {/* User Info Header */}
                 <div className="px-3 py-3 mb-2 border-b border-white/10">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg overflow-hidden">
-                      {user?.profilePhotoUrl ? (
-                        <img
-                          key={`profile-dropdown-${user.photoUpdatedAt || Date.now()}`}
-                          src={user.profilePhotoUrl}
-                          alt="Profile"
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).style.display = 'none';
-                            const parent = (e.currentTarget as HTMLImageElement).parentElement;
-                            if (parent) {
-                              const fallback = document.createElement('span');
-                              fallback.className = 'text-white text-base font-bold';
-                              fallback.innerText = user?.name?.charAt(0)?.toUpperCase() || '?';
-                              parent.appendChild(fallback);
-                            }
-                          }}
-                        />
-                      ) : (
-                        <span className="text-white text-base font-bold">{user?.name?.charAt(0)?.toUpperCase()}</span>
-                      )}
-                    </div>
+                    <UserAvatar
+                      src={user?.profilePhotoUrl}
+                      name={user?.name}
+                      size="md"
+                      className="rounded-xl shadow-lg"
+                    />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-white truncate">{user?.name}</p>
                       <p className="text-xs text-gray-400 truncate">{user?.email}</p>

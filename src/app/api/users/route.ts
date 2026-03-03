@@ -56,9 +56,11 @@ export async function GET() {
         password: includePassword ? user.password : undefined,
         profilePhoto: user.profilePhoto,
         profilePhotoUrl: user.profilePhoto
-          ? (getR2PublicUrl(user.profilePhoto)
-            ? `${getR2PublicUrl(user.profilePhoto)}?v=${cacheBuster}`
-            : `/api/users/photo?key=${encodeURIComponent(user.profilePhoto)}&v=${cacheBuster}`)
+          ? (user.profilePhoto.startsWith('http')
+            ? user.profilePhoto
+            : (getR2PublicUrl(user.profilePhoto)
+              ? `${getR2PublicUrl(user.profilePhoto)}?v=${cacheBuster}`
+              : `/api/users/photo?key=${encodeURIComponent(user.profilePhoto)}&v=${cacheBuster}`))
           : null,
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt,

@@ -199,18 +199,18 @@ export async function PUT(request: NextRequest) {
     })
 
     // Get profile photo URL if exists
-    let profilePhotoUrl = null
+    let profilePhotoUrl: string | null = null
     if (updatedUser.profilePhoto) {
-      const r2Url = getR2PublicUrl(updatedUser.profilePhoto)
-      console.log('[Profile API] R2 Public URL result:', { r2Url, profilePhoto: updatedUser.profilePhoto })
-      if (r2Url) {
-        // Add cache-busting parameter based on updatedAt
-        const cacheBuster = updatedUser.updatedAt ? new Date(updatedUser.updatedAt).getTime() : Date.now()
-        profilePhotoUrl = `${r2Url}?v=${cacheBuster}`
+      if (updatedUser.profilePhoto.startsWith('http')) {
+        profilePhotoUrl = updatedUser.profilePhoto
       } else {
-        // Fallback to proxy route
+        const r2Url = getR2PublicUrl(updatedUser.profilePhoto)
         const cacheBuster = updatedUser.updatedAt ? new Date(updatedUser.updatedAt).getTime() : Date.now()
-        profilePhotoUrl = `/api/users/photo?key=${encodeURIComponent(updatedUser.profilePhoto)}&v=${cacheBuster}`
+        if (r2Url) {
+          profilePhotoUrl = `${r2Url}?v=${cacheBuster}`
+        } else {
+          profilePhotoUrl = `/api/users/photo?key=${encodeURIComponent(updatedUser.profilePhoto)}&v=${cacheBuster}`
+        }
       }
     }
 
