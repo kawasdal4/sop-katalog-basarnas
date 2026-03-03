@@ -6332,6 +6332,7 @@ export default function ESOPApp() {
                                     ))}
                                   </Pie>
                                   <Tooltip
+                                    wrapperStyle={{ zIndex: 50 }}
                                     content={({ active, payload }) => {
                                       if (active && payload && payload.length) {
                                         const data = payload[0].payload
@@ -6365,7 +6366,7 @@ export default function ESOPApp() {
                                 </PieChart>
                               </ResponsiveContainer>
                               {/* Center Label Overlay */}
-                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ paddingBottom: '20px' }}>
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ paddingBottom: '20px', zIndex: 1 }}>
                                 <motion.div
                                   animate={{ boxShadow: ['0 0 30px rgba(168,85,247,0.15)', '0 0 50px rgba(168,85,247,0.25)', '0 0 30px rgba(168,85,247,0.15)'] }}
                                   transition={{ duration: 3, repeat: Infinity }}
@@ -6501,6 +6502,7 @@ export default function ESOPApp() {
                                       ))}
                                     </Pie>
                                     <Tooltip
+                                      wrapperStyle={{ zIndex: 50 }}
                                       content={({ active, payload }) => {
                                         if (active && payload && payload.length) {
                                           const data = payload[0].payload
@@ -6534,7 +6536,7 @@ export default function ESOPApp() {
                                   </PieChart>
                                 </ResponsiveContainer>
                                 {/* Center Label Overlay */}
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 1 }}>
                                   <motion.div
                                     animate={{ boxShadow: ['0 0 30px rgba(6,182,212,0.15)', '0 0 50px rgba(6,182,212,0.25)', '0 0 30px rgba(6,182,212,0.15)'] }}
                                     transition={{ duration: 3, repeat: Infinity }}
