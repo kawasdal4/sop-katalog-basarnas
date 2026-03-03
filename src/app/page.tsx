@@ -303,11 +303,11 @@ const fadeInUp = {
   exit: { opacity: 1 }
 }
 
-// Fast fade for page transitions (minimal animation)
+// Fast fade for page transitions (no dim)
 const pageTransition = {
-  initial: { opacity: 0.5 },
+  initial: { opacity: 1 },
   animate: { opacity: 1 },
-  exit: { opacity: 0.5 }
+  exit: { opacity: 1 }
 }
 
 const staggerContainer = {
@@ -2082,13 +2082,9 @@ export default function ESOPApp() {
         setLoginSuccessPhoto(data.user?.profilePhotoUrl || null)
         setShowLoginSuccess(true)
 
-        // After login success animation, show dashboard loading overlay
+        // After login success animation, hide the success screen
         setTimeout(() => {
           setShowLoginSuccess(false)
-          // Show dashboard loading overlay
-          setDashboardLoadMessage('Selamat Datang, ' + (data.user?.name || 'User'))
-          setDashboardLoadSubmessage('Memuat data dashboard...')
-          setShowDashboardLoading(true)
         }, 2500)
 
         // Fetch data immediately after login
