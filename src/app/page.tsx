@@ -4057,31 +4057,11 @@ export default function ESOPApp() {
         </Dialog>
 
         {/* Public Content - Optimized Premium Layout (Zero Scrolling) */}
-        <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-2 sm:p-4 lg:p-6 max-h-screen overflow-hidden">
-          {/* Animated Hero Section - Compressed */}
-          <motion.div
-            className="w-full max-w-4xl mb-4 text-center"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <motion.div
-              className="inline-block mb-2"
-              animate={{
-                scale: [1, 1.03, 1],
-                filter: ['drop-shadow(0 0 8px rgba(249, 115, 22, 0.4))', 'drop-shadow(0 0 18px rgba(249, 115, 22, 0.7))', 'drop-shadow(0 0 8px rgba(249, 115, 22, 0.4))']
-              }}
-              transition={{ duration: 3, repeat: Infinity }}
-            >
-              <SARLogo size="sm" />
-            </motion.div>
-            <h1 className="text-2xl font-black tracking-widest text-white drop-shadow-lg mb-1">E-KATALOG BASARNAS</h1>
-            <p className="text-orange-400/80 text-[10px] tracking-[0.4em] font-bold uppercase">Direktorat Kesiapsiagaan</p>
-          </motion.div>
+        <main className="relative z-10 flex-1 flex flex-col items-center justify-start pt-4 p-2 sm:p-4 lg:p-6 max-h-screen overflow-hidden">
 
-          {/* Main Form Container - Compressed Gap */}
+          {/* Main Form Container */}
           <motion.div
-            className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-4 items-center"
+            className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-4 items-start"
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.1, duration: 0.5 }}
