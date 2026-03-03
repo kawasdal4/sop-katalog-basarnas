@@ -6144,7 +6144,7 @@ export default function ESOPApp() {
                           </CardHeader>
                           <CardContent className="relative">
                             <ResponsiveContainer width="100%" height={300}>
-                              <BarChart data={stats.byTahun} barCategoryGap="20%">
+                              <BarChart data={stats.byTahun || []} barCategoryGap="20%">
                                 <defs>
                                   <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="0%" stopColor="#fb923c" stopOpacity={1} />
@@ -6176,7 +6176,7 @@ export default function ESOPApp() {
                                 <Tooltip
                                   content={({ active, payload, label }) => {
                                     if (active && payload && payload.length) {
-                                      const maxCount = Math.max(...stats.byTahun.map(d => d.count))
+                                      const maxCount = Math.max(...(stats.byTahun || []).map(d => d.count))
                                       const pct = maxCount > 0 ? Math.round(((payload[0].value as number) / maxCount) * 100) : 0
                                       return (
                                         <div className="border rounded-2xl shadow-2xl p-4 min-w-[180px]" style={{ background: 'linear-gradient(135deg, rgba(15,15,30,0.95), rgba(22,33,62,0.95))', borderColor: 'rgba(249,115,22,0.4)', backdropFilter: 'blur(12px)' }}>
@@ -6210,7 +6210,7 @@ export default function ESOPApp() {
                                   filter="url(#barShadow)"
                                   maxBarSize={55}
                                 >
-                                  {stats.byTahun.map((_, index) => (
+                                  {(stats.byTahun || []).map((_, index) => (
                                     <Cell key={`cell-${index}`} />
                                   ))}
                                 </Bar>
@@ -6218,7 +6218,7 @@ export default function ESOPApp() {
                             </ResponsiveContainer>
                             {/* Summary Footer */}
                             <div className="flex items-center justify-center gap-6 mt-5 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                              {stats.byTahun.slice(-3).reverse().map((item, idx) => (
+                              {(stats.byTahun || []).slice(-3).reverse().map((item, idx) => (
                                 <motion.div
                                   key={item.tahun}
                                   initial={{ opacity: 0, y: 10 }}
@@ -6287,7 +6287,7 @@ export default function ESOPApp() {
                                   </filter>
                                 </defs>
                                 <Pie
-                                  data={stats.byKategori}
+                                  data={stats.byKategori || []}
                                   dataKey="count"
                                   nameKey="kategori"
                                   cx="50%"
@@ -6299,7 +6299,7 @@ export default function ESOPApp() {
                                   strokeWidth={2}
                                   filter="url(#pieShadow)"
                                 >
-                                  {stats.byKategori.map((_, index) => (
+                                  {(stats.byKategori || []).map((_, index) => (
                                     <Cell key={`cell-${index}`} fill={`url(#pieGradient-${index % COLORS.length})`} />
                                   ))}
                                 </Pie>
@@ -6307,9 +6307,9 @@ export default function ESOPApp() {
                                   content={({ active, payload }) => {
                                     if (active && payload && payload.length) {
                                       const data = payload[0].payload
-                                      const total = stats.byKategori.reduce((sum, item) => sum + item.count, 0)
+                                      const total = (stats.byKategori || []).reduce((sum, item) => sum + item.count, 0)
                                       const percentage = total > 0 ? Math.round((data.count / total) * 100) : 0
-                                      const colorIdx = stats.byKategori.indexOf(data) % COLORS.length
+                                      const colorIdx = (stats.byKategori || []).indexOf(data) % COLORS.length
                                       return (
                                         <div className="border rounded-2xl shadow-2xl p-4 min-w-[180px]" style={{ background: 'linear-gradient(135deg, rgba(26,10,46,0.95), rgba(45,27,78,0.95))', borderColor: 'rgba(168,85,247,0.4)', backdropFilter: 'blur(12px)' }}>
                                           <div className="flex items-center gap-2 mb-3">
@@ -6338,8 +6338,8 @@ export default function ESOPApp() {
                             </ResponsiveContainer>
                             {/* Premium Legend */}
                             <div className="flex flex-wrap justify-center gap-2 mt-3">
-                              {stats.byKategori.slice(0, 5).map((item, index) => {
-                                const total = stats.byKategori.reduce((sum, i) => sum + i.count, 0)
+                              {(stats.byKategori || []).slice(0, 5).map((item, index) => {
+                                const total = (stats.byKategori || []).reduce((sum, i) => sum + i.count, 0)
                                 const pct = total > 0 ? Math.round((item.count / total) * 100) : 0
                                 return (
                                   <motion.div
@@ -8411,7 +8411,14 @@ export default function ESOPApp() {
                         </TableBody>
                       </Table> */}
                         <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm min-h-[400px]">
-                          <TableLoadingOverlay visible={verifikasiLoading} />
+                          {verifikasiLoading && (
+                            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 backdrop-blur-sm">
+                              <div className="flex flex-col items-center gap-2">
+                                <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                <span className="text-sm text-gray-500 font-medium">Memuat data...</span>
+                              </div>
+                            </div>
+                          )}
                           <Table>
                             <TableHeader className="bg-slate-50">
                               <TableRow>
