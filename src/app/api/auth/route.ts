@@ -23,7 +23,7 @@ export async function GET() {
     }
 
     // Get profile photo URL if exists
-    let profilePhotoUrl = null
+    let profilePhotoUrl: string | null = null
     if (user.profilePhoto) {
       if (user.profilePhoto.startsWith('http')) {
         profilePhotoUrl = user.profilePhoto
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Get profile photo URL if exists
-    let profilePhotoUrl = null
+    let profilePhotoUrl: string | null = null
     if (user.profilePhoto) {
       if (user.profilePhoto.startsWith('http')) {
         profilePhotoUrl = user.profilePhoto
