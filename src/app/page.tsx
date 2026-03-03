@@ -10036,980 +10036,985 @@ export default function ESOPApp() {
             <div className="absolute top-4 right-8 w-20 h-20 rounded-full bg-white/10 blur-xl" />
             <div className="absolute bottom-2 left-12 w-16 h-16 rounded-full bg-yellow-300/20 blur-lg" />
 
-            <UserAvatar
-              src={profilePhoto}
-              name={user?.name}
-              size="xl"
-              className="ring-4 ring-white/30"
-            />
-            <label className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white text-orange-600 flex items-center justify-center cursor-pointer shadow-xl hover:scale-110 transition-transform ring-2 ring-orange-100">
-              <Camera className="w-4 h-4" />
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) {
-                    if (file.size > 5 * 1024 * 1024) {
-                      toast({ title: 'Error', description: 'Ukuran foto maksimal 5MB', variant: 'destructive' })
+            <div className="relative px-8 py-6 flex items-center gap-5">
+              {/* Avatar with glow */}
+              <div className="relative">
+                <div className="absolute -inset-1 rounded-full bg-white/30 blur-md" />
+                <UserAvatar
+                  src={profilePhoto}
+                  name={user?.name}
+                  size="xl"
+                  className="ring-4 ring-white/30"
+                />
+                <label className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white text-orange-600 flex items-center justify-center cursor-pointer shadow-xl hover:scale-110 transition-transform ring-2 ring-orange-100">
+                  <Camera className="w-4 h-4" />
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        if (file.size > 5 * 1024 * 1024) {
+                          toast({ title: 'Error', description: 'Ukuran foto maksimal 5MB', variant: 'destructive' })
+                          return
+                        }
+                        // Open cropper instead of directly setting photo
+                        setPhotoToCrop(file)
+                        setShowImageCropper(true)
+                      }
+                      // Reset input
+                      e.target.value = ''
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="flex-1">
+              <DialogTitle className="text-lg font-bold text-white drop-shadow-sm">
+                {profileForm.name || user?.name}
+              </DialogTitle>
+              <p className="text-white/80 text-xs mt-1">{profileForm.email || user?.email}</p>
+              <div className="flex items-center gap-2 mt-2">
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/20 text-white backdrop-blur-sm">
+                  {user?.role}
+                </span>
+                {profilePhoto && (
+                  <button
+                    onClick={() => {
+                      setProfilePhoto(null)
+                      setSelectedPhotoFile(null)
+                    }}
+                    className="px-3 py-1 rounded-full text-xs font-medium bg-red-500/30 text-red-100 hover:bg-red-500/50 transition-colors"
+                  >
+                    Hapus Foto
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex border-b border-gray-100 bg-gray-50/50">
+          <button
+            onClick={() => setSettingsTab('profile')}
+            className={`flex-1 py-4 px-4 text-sm font-semibold flex items-center justify-center gap-2 border-b-2 transition-all duration-200 ${settingsTab === 'profile'
+              ? 'border-orange-500 text-orange-600 bg-white'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+              }`}
+          >
+            <User className="w-4 h-4" />
+            Edit Profil
+          </button>
+          <button
+            onClick={() => setSettingsTab('password')}
+            className={`flex-1 py-4 px-4 text-sm font-semibold flex items-center justify-center gap-2 border-b-2 transition-all duration-200 ${settingsTab === 'password'
+              ? 'border-orange-500 text-orange-600 bg-white'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+              }`}
+          >
+            <Key className="w-4 h-4" />
+            Ganti Password
+          </button>
+        </div>
+
+        <div className="p-8">
+          {/* Profile Tab */}
+          {settingsTab === 'profile' && (
+            <div className="space-y-6">
+              {/* Form Card */}
+              <div className="bg-gradient-to-br from-gray-50 to-orange-50/30 rounded-2xl p-6 border border-gray-100">
+                <div className="flex items-center gap-2 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-lg shadow-orange-200">
+                    <User className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-800">Informasi Pribadi</h3>
+                    <p className="text-xs text-gray-500">Perbarui data profil Anda</p>
+                  </div>
+                </div>
+
+                <div className="space-y-5">
+                  {/* Name Field */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-md bg-blue-100 flex items-center justify-center">
+                        <User className="w-3 h-3 text-blue-600" />
+                      </span>
+                      Nama Lengkap
+                    </label>
+                    <Input
+                      value={profileForm.name}
+                      onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                      className="border-2 border-gray-200 bg-white text-gray-900 h-12 rounded-xl focus:border-orange-400 focus:ring-4 focus:ring-orange-100 transition-all text-base"
+                      placeholder="Masukkan nama lengkap"
+                    />
+                  </div>
+
+                  {/* Email Field */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-md bg-green-100 flex items-center justify-center">
+                        <Mail className="w-3 h-3 text-green-600" />
+                      </span>
+                      Email
+                    </label>
+                    <Input
+                      type="email"
+                      value={profileForm.email}
+                      onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                      className="border-2 border-gray-200 bg-white text-gray-900 h-12 rounded-xl focus:border-orange-400 focus:ring-4 focus:ring-orange-100 transition-all text-base"
+                      placeholder="email@example.com"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Change Indicator */}
+              {(profileForm.name !== originalProfileForm.name ||
+                profileForm.email !== originalProfileForm.email ||
+                selectedPhotoFile !== null ||
+                (profilePhoto === null && originalProfilePhoto !== null)) && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl"
+                  >
+                    <div className="w-3 h-3 rounded-full bg-amber-500 animate-pulse" />
+                    <span className="text-sm text-amber-700 font-medium">Ada perubahan yang belum disimpan</span>
+                  </motion.div>
+                )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowSettingsDialog(false)}
+                  className="border-2 border-gray-200 text-gray-600 hover:bg-gray-50 rounded-xl px-8 h-11 font-semibold"
+                >
+                  Batal
+                </Button>
+                <Button
+                  type="button"
+                  disabled={profileLoading}
+                  onClick={async () => {
+                    const hasNameChange = profileForm.name !== originalProfileForm.name
+                    const hasEmailChange = profileForm.email !== originalProfileForm.email
+                    const hasPhotoChange = selectedPhotoFile !== null || (profilePhoto === null && originalProfilePhoto !== null)
+
+                    if (!hasNameChange && !hasEmailChange && !hasPhotoChange) {
+                      toast({ title: 'ℹ️ Info', description: 'Tidak ada perubahan untuk disimpan' })
                       return
                     }
-                    // Open cropper instead of directly setting photo
-                    setPhotoToCrop(file)
-                    setShowImageCropper(true)
-                  }
-                  // Reset input
-                  e.target.value = ''
-                }}
-              />
-            </label>
-          </div>
 
-          <div className="flex-1">
-            <DialogTitle className="text-lg font-bold text-white drop-shadow-sm">
-              {profileForm.name || user?.name}
-            </DialogTitle>
-            <p className="text-white/80 text-xs mt-1">{profileForm.email || user?.email}</p>
-            <div className="flex items-center gap-2 mt-2">
-              <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/20 text-white backdrop-blur-sm">
-                {user?.role}
-              </span>
-              {profilePhoto && (
-                <button
-                  onClick={() => {
-                    setProfilePhoto(null)
-                    setSelectedPhotoFile(null)
+                    if (!profileForm.name || profileForm.name.trim().length < 2) {
+                      toast({ title: 'Error', description: 'Nama minimal 2 karakter', variant: 'destructive' })
+                      return
+                    }
+
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+                    if (!emailRegex.test(profileForm.email)) {
+                      toast({ title: 'Error', description: 'Format email tidak valid', variant: 'destructive' })
+                      return
+                    }
+
+                    setProfileLoading(true)
+                    try {
+                      const formData = new FormData()
+                      formData.append('name', profileForm.name)
+                      formData.append('email', profileForm.email)
+
+                      if (selectedPhotoFile) {
+                        formData.append('photo', selectedPhotoFile)
+                      } else if (!profilePhoto && user?.profilePhoto) {
+                        formData.append('removePhoto', 'true')
+                      }
+
+                      const res = await fetch('/api/users/profile', {
+                        method: 'PUT',
+                        body: formData
+                      })
+                      const data = await res.json()
+
+                      if (data.error) {
+                        toast({ title: 'Error', description: data.error, variant: 'destructive' })
+                      } else {
+                        toast({ title: '✅ Berhasil', description: data.message || 'Profil berhasil diperbarui!' })
+                        if (data.user) {
+                          // Add cache-busting parameter to force refresh
+                          const timestamp = Date.now()
+                          const photoUrlWithCache = data.user.profilePhotoUrl
+                            ? `${data.user.profilePhotoUrl}${data.user.profilePhotoUrl.includes('?') ? '&' : '?'}t=${timestamp}`
+                            : null
+
+                          setUser(prev => prev ? {
+                            ...prev,
+                            name: data.user.name,
+                            email: data.user.email,
+                            profilePhoto: data.user.profilePhoto,
+                            profilePhotoUrl: photoUrlWithCache,
+                            photoUpdatedAt: timestamp
+                          } : null)
+                          setOriginalProfileForm({ name: data.user.name, email: data.user.email })
+                          setOriginalProfilePhoto(photoUrlWithCache)
+
+                          // Also update the user in the users list if it exists
+                          setUsers(prev => prev.map(u =>
+                            u.id === data.user.id
+                              ? { ...u, name: data.user.name, email: data.user.email, profilePhoto: data.user.profilePhoto, profilePhotoUrl: photoUrlWithCache }
+                              : u
+                          ))
+                        }
+                        setSelectedPhotoFile(null)
+                        setShowSettingsDialog(false)
+                      }
+                    } catch (error) {
+                      toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
+                    } finally {
+                      setProfileLoading(false)
+                    }
                   }}
-                  className="px-3 py-1 rounded-full text-xs font-medium bg-red-500/30 text-red-100 hover:bg-red-500/50 transition-colors"
+                  className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl px-8 h-11 font-semibold shadow-lg shadow-orange-200"
                 >
-                  Hapus Foto
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-    </div>
-
-          {/* Tab Navigation */ }
-          <div className="flex border-b border-gray-100 bg-gray-50/50">
-            <button
-              onClick={() => setSettingsTab('profile')}
-              className={`flex-1 py-4 px-4 text-sm font-semibold flex items-center justify-center gap-2 border-b-2 transition-all duration-200 ${settingsTab === 'profile'
-                ? 'border-orange-500 text-orange-600 bg-white'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                }`}
-            >
-              <User className="w-4 h-4" />
-              Edit Profil
-            </button>
-            <button
-              onClick={() => setSettingsTab('password')}
-              className={`flex-1 py-4 px-4 text-sm font-semibold flex items-center justify-center gap-2 border-b-2 transition-all duration-200 ${settingsTab === 'password'
-                ? 'border-orange-500 text-orange-600 bg-white'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                }`}
-            >
-              <Key className="w-4 h-4" />
-              Ganti Password
-            </button>
-          </div>
-
-          <div className="p-8">
-            {/* Profile Tab */}
-            {settingsTab === 'profile' && (
-              <div className="space-y-6">
-                {/* Form Card */}
-                <div className="bg-gradient-to-br from-gray-50 to-orange-50/30 rounded-2xl p-6 border border-gray-100">
-                  <div className="flex items-center gap-2 mb-6">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-lg shadow-orange-200">
-                      <User className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-gray-800">Informasi Pribadi</h3>
-                      <p className="text-xs text-gray-500">Perbarui data profil Anda</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-5">
-                    {/* Name Field */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-md bg-blue-100 flex items-center justify-center">
-                          <User className="w-3 h-3 text-blue-600" />
-                        </span>
-                        Nama Lengkap
-                      </label>
-                      <Input
-                        value={profileForm.name}
-                        onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                        className="border-2 border-gray-200 bg-white text-gray-900 h-12 rounded-xl focus:border-orange-400 focus:ring-4 focus:ring-orange-100 transition-all text-base"
-                        placeholder="Masukkan nama lengkap"
-                      />
-                    </div>
-
-                    {/* Email Field */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-md bg-green-100 flex items-center justify-center">
-                          <Mail className="w-3 h-3 text-green-600" />
-                        </span>
-                        Email
-                      </label>
-                      <Input
-                        type="email"
-                        value={profileForm.email}
-                        onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                        className="border-2 border-gray-200 bg-white text-gray-900 h-12 rounded-xl focus:border-orange-400 focus:ring-4 focus:ring-orange-100 transition-all text-base"
-                        placeholder="email@example.com"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Change Indicator */}
-                {(profileForm.name !== originalProfileForm.name ||
-                  profileForm.email !== originalProfileForm.email ||
-                  selectedPhotoFile !== null ||
-                  (profilePhoto === null && originalProfilePhoto !== null)) && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl"
-                    >
-                      <div className="w-3 h-3 rounded-full bg-amber-500 animate-pulse" />
-                      <span className="text-sm text-amber-700 font-medium">Ada perubahan yang belum disimpan</span>
-                    </motion.div>
+                  {profileLoading ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</>
+                  ) : (
+                    'Simpan Perubahan'
                   )}
-
-                {/* Action Buttons */}
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowSettingsDialog(false)}
-                    className="border-2 border-gray-200 text-gray-600 hover:bg-gray-50 rounded-xl px-8 h-11 font-semibold"
-                  >
-                    Batal
-                  </Button>
-                  <Button
-                    type="button"
-                    disabled={profileLoading}
-                    onClick={async () => {
-                      const hasNameChange = profileForm.name !== originalProfileForm.name
-                      const hasEmailChange = profileForm.email !== originalProfileForm.email
-                      const hasPhotoChange = selectedPhotoFile !== null || (profilePhoto === null && originalProfilePhoto !== null)
-
-                      if (!hasNameChange && !hasEmailChange && !hasPhotoChange) {
-                        toast({ title: 'ℹ️ Info', description: 'Tidak ada perubahan untuk disimpan' })
-                        return
-                      }
-
-                      if (!profileForm.name || profileForm.name.trim().length < 2) {
-                        toast({ title: 'Error', description: 'Nama minimal 2 karakter', variant: 'destructive' })
-                        return
-                      }
-
-                      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-                      if (!emailRegex.test(profileForm.email)) {
-                        toast({ title: 'Error', description: 'Format email tidak valid', variant: 'destructive' })
-                        return
-                      }
-
-                      setProfileLoading(true)
-                      try {
-                        const formData = new FormData()
-                        formData.append('name', profileForm.name)
-                        formData.append('email', profileForm.email)
-
-                        if (selectedPhotoFile) {
-                          formData.append('photo', selectedPhotoFile)
-                        } else if (!profilePhoto && user?.profilePhoto) {
-                          formData.append('removePhoto', 'true')
-                        }
-
-                        const res = await fetch('/api/users/profile', {
-                          method: 'PUT',
-                          body: formData
-                        })
-                        const data = await res.json()
-
-                        if (data.error) {
-                          toast({ title: 'Error', description: data.error, variant: 'destructive' })
-                        } else {
-                          toast({ title: '✅ Berhasil', description: data.message || 'Profil berhasil diperbarui!' })
-                          if (data.user) {
-                            // Add cache-busting parameter to force refresh
-                            const timestamp = Date.now()
-                            const photoUrlWithCache = data.user.profilePhotoUrl
-                              ? `${data.user.profilePhotoUrl}${data.user.profilePhotoUrl.includes('?') ? '&' : '?'}t=${timestamp}`
-                              : null
-
-                            setUser(prev => prev ? {
-                              ...prev,
-                              name: data.user.name,
-                              email: data.user.email,
-                              profilePhoto: data.user.profilePhoto,
-                              profilePhotoUrl: photoUrlWithCache,
-                              photoUpdatedAt: timestamp
-                            } : null)
-                            setOriginalProfileForm({ name: data.user.name, email: data.user.email })
-                            setOriginalProfilePhoto(photoUrlWithCache)
-
-                            // Also update the user in the users list if it exists
-                            setUsers(prev => prev.map(u =>
-                              u.id === data.user.id
-                                ? { ...u, name: data.user.name, email: data.user.email, profilePhoto: data.user.profilePhoto, profilePhotoUrl: photoUrlWithCache }
-                                : u
-                            ))
-                          }
-                          setSelectedPhotoFile(null)
-                          setShowSettingsDialog(false)
-                        }
-                      } catch (error) {
-                        toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
-                      } finally {
-                        setProfileLoading(false)
-                      }
-                    }}
-                    className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl px-8 h-11 font-semibold shadow-lg shadow-orange-200"
-                  >
-                    {profileLoading ? (
-                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</>
-                    ) : (
-                      'Simpan Perubahan'
-                    )}
-                  </Button>
-                </div>
+                </Button>
               </div>
-            )}
-
-            {/* Password Tab */}
-            {settingsTab === 'password' && (
-              <div className="space-y-6">
-                {/* Security Info Card */}
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-5 border border-blue-100">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center shadow-lg flex-shrink-0">
-                      <Shield className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-blue-900">Keamanan Akun</h3>
-                      <p className="text-sm text-blue-700 mt-1">Password minimal 4 karakter. Gunakan kombinasi huruf dan angka untuk keamanan lebih baik.</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Form Card */}
-                <div className="bg-gradient-to-br from-gray-50 to-orange-50/30 rounded-2xl p-6 border border-gray-100">
-                  <div className="flex items-center gap-2 mb-6">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center shadow-lg shadow-red-200">
-                      <Key className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-gray-800">Ubah Password</h3>
-                      <p className="text-xs text-gray-500">Masukkan password lama dan baru</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    {/* Current Password */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-md bg-red-100 flex items-center justify-center">
-                          <Key className="w-3 h-3 text-red-600" />
-                        </span>
-                        Password Lama
-                      </label>
-                      <Input
-                        type="password"
-                        value={passwordChangeForm.currentPassword}
-                        onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, currentPassword: e.target.value })}
-                        className="border-2 border-gray-200 bg-white text-gray-900 h-12 rounded-xl focus:border-orange-400 focus:ring-4 focus:ring-orange-100 transition-all"
-                        placeholder="Masukkan password lama"
-                      />
-                    </div>
-
-                    {/* New Password */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-md bg-orange-100 flex items-center justify-center">
-                          <Shield className="w-3 h-3 text-orange-600" />
-                        </span>
-                        Password Baru
-                      </label>
-                      <Input
-                        type="password"
-                        value={passwordChangeForm.newPassword}
-                        onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, newPassword: e.target.value })}
-                        className="border-2 border-gray-200 bg-white text-gray-900 h-12 rounded-xl focus:border-orange-400 focus:ring-4 focus:ring-orange-100 transition-all"
-                        placeholder="Masukkan password baru"
-                      />
-                    </div>
-
-                    {/* Confirm Password */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-md bg-green-100 flex items-center justify-center">
-                          <Check className="w-3 h-3 text-green-600" />
-                        </span>
-                        Konfirmasi Password
-                      </label>
-                      <Input
-                        type="password"
-                        value={passwordChangeForm.confirmPassword}
-                        onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, confirmPassword: e.target.value })}
-                        className={`border-2 bg-white text-gray-900 h-12 rounded-xl focus:ring-4 transition-all ${passwordChangeForm.confirmPassword && passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword
-                          ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
-                          : passwordChangeForm.confirmPassword && passwordChangeForm.newPassword === passwordChangeForm.confirmPassword
-                            ? 'border-green-400 focus:border-green-500 focus:ring-green-100'
-                            : 'border-gray-200 focus:border-orange-400 focus:ring-orange-100'
-                          }`}
-                        placeholder="Konfirmasi password baru"
-                      />
-                      {passwordChangeForm.confirmPassword && passwordChangeForm.newPassword === passwordChangeForm.confirmPassword && (
-                        <motion.p
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="text-sm text-green-600 flex items-center gap-1 font-medium"
-                        >
-                          <Check className="w-4 h-4" /> Password cocok!
-                        </motion.p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowSettingsDialog(false)}
-                    className="border-2 border-gray-200 text-gray-600 hover:bg-gray-50 rounded-xl px-8 h-11 font-semibold"
-                  >
-                    Batal
-                  </Button>
-                  <Button
-                    type="button"
-                    disabled={passwordChangeLoading}
-                    onClick={async () => {
-                      if (!passwordChangeForm.currentPassword || !passwordChangeForm.newPassword || !passwordChangeForm.confirmPassword) {
-                        toast({ title: 'Error', description: 'Semua field harus diisi', variant: 'destructive' })
-                        return
-                      }
-                      if (passwordChangeForm.newPassword.length < 4) {
-                        toast({ title: 'Error', description: 'Password baru minimal 4 karakter', variant: 'destructive' })
-                        return
-                      }
-                      if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
-                        toast({ title: 'Error', description: 'Konfirmasi password tidak cocok', variant: 'destructive' })
-                        return
-                      }
-
-                      setPasswordChangeLoading(true)
-                      try {
-                        const res = await fetch('/api/users/password', {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            currentPassword: passwordChangeForm.currentPassword,
-                            newPassword: passwordChangeForm.newPassword
-                          })
-                        })
-                        const data = await res.json()
-                        if (data.error) {
-                          toast({ title: 'Error', description: data.error, variant: 'destructive' })
-                        } else {
-                          toast({ title: '✅ Berhasil', description: 'Password berhasil diubah!' })
-                          setPasswordChangeForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
-                          setShowSettingsDialog(false)
-                        }
-                      } catch (error) {
-                        toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
-                      } finally {
-                        setPasswordChangeLoading(false)
-                      }
-                    }}
-                    className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl px-8 h-11 font-semibold shadow-lg shadow-orange-200"
-                  >
-                    {passwordChangeLoading ? (
-                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</>
-                    ) : (
-                      'Ubah Password'
-                    )}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </DialogContent >
-      </Dialog >
-
-    {/* Password Change Dialog */ }
-    < Dialog open = { showPasswordChangeDialog } onOpenChange = { setShowPasswordChangeDialog } >
-      <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Shield className="w-5 h-5 text-orange-600" />
-            Ganti Password
-          </DialogTitle>
-          <DialogDescription className="text-gray-600">
-            Ubah password akun Anda
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label className="font-medium text-gray-700">Password Lama</Label>
-            <Input
-              type="password"
-              value={passwordChangeForm.currentPassword}
-              onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, currentPassword: e.target.value })}
-              className="border-gray-300 bg-white text-gray-900"
-              placeholder="Masukkan password lama"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label className="font-medium text-gray-700">Password Baru</Label>
-            <Input
-              type="password"
-              value={passwordChangeForm.newPassword}
-              onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, newPassword: e.target.value })}
-              className="border-gray-300 bg-white text-gray-900"
-              placeholder="Masukkan password baru (min. 4 karakter)"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label className="font-medium text-gray-700">Konfirmasi Password Baru</Label>
-            <Input
-              type="password"
-              value={passwordChangeForm.confirmPassword}
-              onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, confirmPassword: e.target.value })}
-              className="border-gray-300 bg-white text-gray-900"
-              placeholder="Konfirmasi password baru"
-            />
-          </div>
-        </div>
-        <DialogFooter className="gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setShowPasswordChangeDialog(false)}
-            className="border-gray-300 text-gray-700 hover:bg-gray-100"
-          >
-            Batal
-          </Button>
-          <Button
-            type="button"
-            disabled={passwordChangeLoading}
-            onClick={async () => {
-              // Validation
-              if (!passwordChangeForm.currentPassword || !passwordChangeForm.newPassword || !passwordChangeForm.confirmPassword) {
-                toast({ title: 'Error', description: 'Semua field harus diisi', variant: 'destructive' })
-                return
-              }
-              if (passwordChangeForm.newPassword.length < 4) {
-                toast({ title: 'Error', description: 'Password baru minimal 4 karakter', variant: 'destructive' })
-                return
-              }
-              if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
-                toast({ title: 'Error', description: 'Konfirmasi password tidak cocok', variant: 'destructive' })
-                return
-              }
-
-              setPasswordChangeLoading(true)
-              try {
-                const res = await fetch('/api/users/password', {
-                  method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    currentPassword: passwordChangeForm.currentPassword,
-                    newPassword: passwordChangeForm.newPassword
-                  })
-                })
-                const data = await res.json()
-                if (data.error) {
-                  toast({ title: 'Error', description: data.error, variant: 'destructive' })
-                } else {
-                  toast({ title: '✅ Berhasil', description: 'Password berhasil diubah!' })
-                  setShowPasswordChangeDialog(false)
-                }
-              } catch (error) {
-                toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
-              } finally {
-                setPasswordChangeLoading(false)
-              }
-            }}
-            className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
-          >
-            {passwordChangeLoading ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</>
-            ) : (
-              'Simpan Password'
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-      </Dialog >
-
-    {/* User Activity Dialog - Compact & Aesthetic */ }
-    < Dialog open = { showUserActivityDialog } onOpenChange = { setShowUserActivityDialog } >
-      <DialogContent className="sm:max-w-md bg-white border-2 border-cyan-200 shadow-xl" aria-describedby={undefined}>
-        <DialogHeader className="pb-2">
-          <DialogTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <motion.div
-              animate={{ rotate: [0, 360] }}
-              transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-            >
-              <History className="w-5 h-5 text-cyan-600" />
-            </motion.div>
-            Riwayat Aktivitas
-          </DialogTitle>
-          <DialogDescription className="text-gray-500 text-sm">
-            {selectedUserForActivity?.name} • {selectedUserForActivity?.email}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="py-2">
-          {userActivityLogs.length === 0 ? (
-            <div className="text-center text-gray-400 py-8">
-              <History className="w-10 h-10 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">Belum ada aktivitas</p>
             </div>
-          ) : (
-            <ScrollArea className="h-[320px] pr-2">
-              <div className="space-y-2">
-                {userActivityLogs.map((log, index) => (
-                  <motion.div
-                    key={log.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.03 }}
-                    className="flex items-start gap-2 p-2.5 bg-gradient-to-r from-gray-50 to-cyan-50/30 rounded-lg border border-gray-100 hover:border-cyan-200 transition-colors"
-                  >
-                    <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-cyan-400 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <Badge variant="outline" className={
-                          log.aktivitas === 'LOGIN' ? 'bg-blue-50 text-blue-600 border-blue-200 text-[10px] px-1.5 py-0' :
-                            log.aktivitas === 'UPLOAD' ? 'bg-green-50 text-green-600 border-green-200 text-[10px] px-1.5 py-0' :
-                              log.aktivitas === 'DOWNLOAD' ? 'bg-purple-50 text-purple-600 border-purple-200 text-[10px] px-1.5 py-0' :
-                                log.aktivitas === 'PREVIEW' ? 'bg-cyan-50 text-cyan-600 border-cyan-200 text-[10px] px-1.5 py-0' :
-                                  log.aktivitas === 'VERIFIKASI' ? 'bg-orange-50 text-orange-600 border-orange-200 text-[10px] px-1.5 py-0' :
-                                    'bg-gray-50 text-gray-600 border-gray-200 text-[10px] px-1.5 py-0'
-                        }>
-                          {log.aktivitas}
-                        </Badge>
-                        <span className="text-[10px] text-gray-400">
-                          {new Date(log.createdAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-600 mt-0.5 line-clamp-1">{log.deskripsi}</p>
-                      {log.sopFile && (
-                        <p className="text-[10px] text-orange-500 mt-0.5 truncate">{log.sopFile.judul}</p>
-                      )}
-                    </div>
-                  </motion.div>
-                ))}
+          )}
+
+          {/* Password Tab */}
+          {settingsTab === 'password' && (
+            <div className="space-y-6">
+              {/* Security Info Card */}
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-5 border border-blue-100">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center shadow-lg flex-shrink-0">
+                    <Shield className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-blue-900">Keamanan Akun</h3>
+                    <p className="text-sm text-blue-700 mt-1">Password minimal 4 karakter. Gunakan kombinasi huruf dan angka untuk keamanan lebih baik.</p>
+                  </div>
+                </div>
               </div>
-            </ScrollArea>
+
+              {/* Form Card */}
+              <div className="bg-gradient-to-br from-gray-50 to-orange-50/30 rounded-2xl p-6 border border-gray-100">
+                <div className="flex items-center gap-2 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center shadow-lg shadow-red-200">
+                    <Key className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-800">Ubah Password</h3>
+                    <p className="text-xs text-gray-500">Masukkan password lama dan baru</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Current Password */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-md bg-red-100 flex items-center justify-center">
+                        <Key className="w-3 h-3 text-red-600" />
+                      </span>
+                      Password Lama
+                    </label>
+                    <Input
+                      type="password"
+                      value={passwordChangeForm.currentPassword}
+                      onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, currentPassword: e.target.value })}
+                      className="border-2 border-gray-200 bg-white text-gray-900 h-12 rounded-xl focus:border-orange-400 focus:ring-4 focus:ring-orange-100 transition-all"
+                      placeholder="Masukkan password lama"
+                    />
+                  </div>
+
+                  {/* New Password */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-md bg-orange-100 flex items-center justify-center">
+                        <Shield className="w-3 h-3 text-orange-600" />
+                      </span>
+                      Password Baru
+                    </label>
+                    <Input
+                      type="password"
+                      value={passwordChangeForm.newPassword}
+                      onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, newPassword: e.target.value })}
+                      className="border-2 border-gray-200 bg-white text-gray-900 h-12 rounded-xl focus:border-orange-400 focus:ring-4 focus:ring-orange-100 transition-all"
+                      placeholder="Masukkan password baru"
+                    />
+                  </div>
+
+                  {/* Confirm Password */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-md bg-green-100 flex items-center justify-center">
+                        <Check className="w-3 h-3 text-green-600" />
+                      </span>
+                      Konfirmasi Password
+                    </label>
+                    <Input
+                      type="password"
+                      value={passwordChangeForm.confirmPassword}
+                      onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, confirmPassword: e.target.value })}
+                      className={`border-2 bg-white text-gray-900 h-12 rounded-xl focus:ring-4 transition-all ${passwordChangeForm.confirmPassword && passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword
+                        ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+                        : passwordChangeForm.confirmPassword && passwordChangeForm.newPassword === passwordChangeForm.confirmPassword
+                          ? 'border-green-400 focus:border-green-500 focus:ring-green-100'
+                          : 'border-gray-200 focus:border-orange-400 focus:ring-orange-100'
+                        }`}
+                      placeholder="Konfirmasi password baru"
+                    />
+                    {passwordChangeForm.confirmPassword && passwordChangeForm.newPassword === passwordChangeForm.confirmPassword && (
+                      <motion.p
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="text-sm text-green-600 flex items-center gap-1 font-medium"
+                      >
+                        <Check className="w-4 h-4" /> Password cocok!
+                      </motion.p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowSettingsDialog(false)}
+                  className="border-2 border-gray-200 text-gray-600 hover:bg-gray-50 rounded-xl px-8 h-11 font-semibold"
+                >
+                  Batal
+                </Button>
+                <Button
+                  type="button"
+                  disabled={passwordChangeLoading}
+                  onClick={async () => {
+                    if (!passwordChangeForm.currentPassword || !passwordChangeForm.newPassword || !passwordChangeForm.confirmPassword) {
+                      toast({ title: 'Error', description: 'Semua field harus diisi', variant: 'destructive' })
+                      return
+                    }
+                    if (passwordChangeForm.newPassword.length < 4) {
+                      toast({ title: 'Error', description: 'Password baru minimal 4 karakter', variant: 'destructive' })
+                      return
+                    }
+                    if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
+                      toast({ title: 'Error', description: 'Konfirmasi password tidak cocok', variant: 'destructive' })
+                      return
+                    }
+
+                    setPasswordChangeLoading(true)
+                    try {
+                      const res = await fetch('/api/users/password', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          currentPassword: passwordChangeForm.currentPassword,
+                          newPassword: passwordChangeForm.newPassword
+                        })
+                      })
+                      const data = await res.json()
+                      if (data.error) {
+                        toast({ title: 'Error', description: data.error, variant: 'destructive' })
+                      } else {
+                        toast({ title: '✅ Berhasil', description: 'Password berhasil diubah!' })
+                        setPasswordChangeForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+                        setShowSettingsDialog(false)
+                      }
+                    } catch (error) {
+                      toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
+                    } finally {
+                      setPasswordChangeLoading(false)
+                    }
+                  }}
+                  className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl px-8 h-11 font-semibold shadow-lg shadow-orange-200"
+                >
+                  {passwordChangeLoading ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</>
+                  ) : (
+                    'Ubah Password'
+                  )}
+                </Button>
+              </div>
+            </div>
           )}
         </div>
-        <DialogFooter className="pt-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setShowUserActivityDialog(false)}
-            className="border-gray-200 text-gray-600 hover:bg-gray-50"
-          >
-            Tutup
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-      </Dialog >
+      </DialogContent >
+    </Dialog >
 
-    {/* PDF Edit Warning Dialog - Aesthetic Design */ }
-    < Dialog open = { showPdfWarningDialog } onOpenChange = { setShowPdfWarningDialog } >
-      <DialogContent className="sm:max-w-lg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-red-500/50 shadow-2xl overflow-hidden" aria-describedby={undefined}>
-        {/* Animated background effects */}
-        <div className="absolute inset-0 overflow-hidden">
-          {/* Radar sweep */}
-          <motion.div
-            className="absolute -top-20 -right-20 w-60 h-60 rounded-full"
-            style={{
-              background: 'conic-gradient(from 0deg, transparent 0deg, rgba(239, 68, 68, 0.15) 30deg, transparent 60deg)'
-            }}
-            animate={{ rotate: 360 }}
-            transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+    {/* Password Change Dialog */ }
+  < Dialog open={showPasswordChangeDialog} onOpenChange={setShowPasswordChangeDialog} >
+    <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
+      <DialogHeader>
+        <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+          <Shield className="w-5 h-5 text-orange-600" />
+          Ganti Password
+        </DialogTitle>
+        <DialogDescription className="text-gray-600">
+          Ubah password akun Anda
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4 py-4">
+        <div className="space-y-2">
+          <Label className="font-medium text-gray-700">Password Lama</Label>
+          <Input
+            type="password"
+            value={passwordChangeForm.currentPassword}
+            onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, currentPassword: e.target.value })}
+            className="border-gray-300 bg-white text-gray-900"
+            placeholder="Masukkan password lama"
           />
-
-          {/* Floating particles */}
-          {[...Array(6)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-1 h-1 rounded-full bg-red-400/50"
-              style={{
-                left: `${10 + i * 15}% `,
-                top: `${20 + (i % 3) * 25}% `,
-              }}
-              animate={{
-                y: [-10, 10, -10],
-                opacity: [0.3, 0.7, 0.3]
-              }}
-              transition={{
-                duration: 2 + i * 0.3,
-                repeat: Infinity,
-                delay: i * 0.2
-              }}
-            />
-          ))}
         </div>
+        <div className="space-y-2">
+          <Label className="font-medium text-gray-700">Password Baru</Label>
+          <Input
+            type="password"
+            value={passwordChangeForm.newPassword}
+            onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, newPassword: e.target.value })}
+            className="border-gray-300 bg-white text-gray-900"
+            placeholder="Masukkan password baru (min. 4 karakter)"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="font-medium text-gray-700">Konfirmasi Password Baru</Label>
+          <Input
+            type="password"
+            value={passwordChangeForm.confirmPassword}
+            onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, confirmPassword: e.target.value })}
+            className="border-gray-300 bg-white text-gray-900"
+            placeholder="Konfirmasi password baru"
+          />
+        </div>
+      </div>
+      <DialogFooter className="gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setShowPasswordChangeDialog(false)}
+          className="border-gray-300 text-gray-700 hover:bg-gray-100"
+        >
+          Batal
+        </Button>
+        <Button
+          type="button"
+          disabled={passwordChangeLoading}
+          onClick={async () => {
+            // Validation
+            if (!passwordChangeForm.currentPassword || !passwordChangeForm.newPassword || !passwordChangeForm.confirmPassword) {
+              toast({ title: 'Error', description: 'Semua field harus diisi', variant: 'destructive' })
+              return
+            }
+            if (passwordChangeForm.newPassword.length < 4) {
+              toast({ title: 'Error', description: 'Password baru minimal 4 karakter', variant: 'destructive' })
+              return
+            }
+            if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
+              toast({ title: 'Error', description: 'Konfirmasi password tidak cocok', variant: 'destructive' })
+              return
+            }
 
-        <div className="relative z-10">
-          <DialogHeader className="text-center pb-4">
-            {/* Animated warning icon */}
-            <motion.div
-              className="mx-auto mb-4"
-              animate={{
-                scale: [1, 1.1, 1],
-                rotate: [0, 5, -5, 0]
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: 'easeInOut'
-              }}
-            >
-              <div className="relative">
-                {/* Glow ring */}
+            setPasswordChangeLoading(true)
+            try {
+              const res = await fetch('/api/users/password', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  currentPassword: passwordChangeForm.currentPassword,
+                  newPassword: passwordChangeForm.newPassword
+                })
+              })
+              const data = await res.json()
+              if (data.error) {
+                toast({ title: 'Error', description: data.error, variant: 'destructive' })
+              } else {
+                toast({ title: '✅ Berhasil', description: 'Password berhasil diubah!' })
+                setShowPasswordChangeDialog(false)
+              }
+            } catch (error) {
+              toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
+            } finally {
+              setPasswordChangeLoading(false)
+            }
+          }}
+          className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
+        >
+          {passwordChangeLoading ? (
+            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</>
+          ) : (
+            'Simpan Password'
+          )}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog >
+
+  {/* User Activity Dialog - Compact & Aesthetic */ }
+  < Dialog open={showUserActivityDialog} onOpenChange={setShowUserActivityDialog} >
+    <DialogContent className="sm:max-w-md bg-white border-2 border-cyan-200 shadow-xl" aria-describedby={undefined}>
+      <DialogHeader className="pb-2">
+        <DialogTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+          <motion.div
+            animate={{ rotate: [0, 360] }}
+            transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+          >
+            <History className="w-5 h-5 text-cyan-600" />
+          </motion.div>
+          Riwayat Aktivitas
+        </DialogTitle>
+        <DialogDescription className="text-gray-500 text-sm">
+          {selectedUserForActivity?.name} • {selectedUserForActivity?.email}
+        </DialogDescription>
+      </DialogHeader>
+      <div className="py-2">
+        {userActivityLogs.length === 0 ? (
+          <div className="text-center text-gray-400 py-8">
+            <History className="w-10 h-10 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">Belum ada aktivitas</p>
+          </div>
+        ) : (
+          <ScrollArea className="h-[320px] pr-2">
+            <div className="space-y-2">
+              {userActivityLogs.map((log, index) => (
                 <motion.div
-                  className="absolute inset-0 rounded-full bg-red-500/30 blur-xl"
-                  animate={{
-                    scale: [1, 1.3, 1],
-                    opacity: [0.5, 0.8, 0.5]
-                  }}
-                  transition={{
-                    duration: 1.5,
-                    repeat: Infinity
-                  }}
-                />
-
-                {/* Icon container */}
-                <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-lg shadow-red-500/50">
-                  <FileIcon className="w-10 h-10 text-white" />
-                </div>
-
-                {/* X mark overlay */}
-                <motion.div
-                  className="absolute inset-0 flex items-center justify-center"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.3 }}
+                  key={log.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.03 }}
+                  className="flex items-start gap-2 p-2.5 bg-gradient-to-r from-gray-50 to-cyan-50/30 rounded-lg border border-gray-100 hover:border-cyan-200 transition-colors"
                 >
-                  <div className="w-24 h-24 rounded-full border-4 border-red-400 flex items-center justify-center">
-                    <XCircle className="w-12 h-12 text-red-400" />
+                  <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-cyan-400 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Badge variant="outline" className={
+                        log.aktivitas === 'LOGIN' ? 'bg-blue-50 text-blue-600 border-blue-200 text-[10px] px-1.5 py-0' :
+                          log.aktivitas === 'UPLOAD' ? 'bg-green-50 text-green-600 border-green-200 text-[10px] px-1.5 py-0' :
+                            log.aktivitas === 'DOWNLOAD' ? 'bg-purple-50 text-purple-600 border-purple-200 text-[10px] px-1.5 py-0' :
+                              log.aktivitas === 'PREVIEW' ? 'bg-cyan-50 text-cyan-600 border-cyan-200 text-[10px] px-1.5 py-0' :
+                                log.aktivitas === 'VERIFIKASI' ? 'bg-orange-50 text-orange-600 border-orange-200 text-[10px] px-1.5 py-0' :
+                                  'bg-gray-50 text-gray-600 border-gray-200 text-[10px] px-1.5 py-0'
+                      }>
+                        {log.aktivitas}
+                      </Badge>
+                      <span className="text-[10px] text-gray-400">
+                        {new Date(log.createdAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-0.5 line-clamp-1">{log.deskripsi}</p>
+                    {log.sopFile && (
+                      <p className="text-[10px] text-orange-500 mt-0.5 truncate">{log.sopFile.judul}</p>
+                    )}
                   </div>
                 </motion.div>
-              </div>
-            </motion.div>
-
-            <DialogTitle className="text-lg font-bold">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-300 to-red-400">
-                PDF Tidak Bisa Di-edit
-              </span>
-            </DialogTitle>
-
-            <DialogDescription className="text-gray-400 text-xs mt-2">
-              File PDF tidak mendukung fitur edit langsung
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            {/* Main message */}
-            <motion.div
-              className="bg-red-500/10 border border-red-500/30 rounded-xl p-4"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <p className="text-gray-300 text-sm leading-relaxed">
-                Format <span className="text-red-400 font-semibold">PDF (Portable Document Format)</span> didesain untuk distribusi dokumen yang sudah final, bukan untuk editing. Berbeda dengan file Excel atau Word, PDF tidak dapat dimodifikasi secara langsung.
-              </p>
-            </motion.div>
-
-            {/* Solution cards */}
-            <motion.div
-              className="grid grid-cols-2 gap-3"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-            >
-              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <FileSpreadsheet className="w-4 h-4 text-green-400" />
-                  <span className="text-green-400 text-xs font-semibold">EXCEL</span>
-                </div>
-                <p className="text-gray-400 text-xs">
-                  Upload ulang dalam format <span className="text-green-400">.xlsx</span> atau <span className="text-green-400">.xls</span>
-                </p>
-              </div>
-
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <FileText className="w-4 h-4 text-blue-400" />
-                  <span className="text-blue-400 text-xs font-semibold">WORD</span>
-                </div>
-                <p className="text-gray-400 text-xs">
-                  Upload ulang dalam format <span className="text-blue-400">.docx</span> atau <span className="text-blue-400">.doc</span>
-                </p>
-              </div>
-            </motion.div>
-
-            {/* Tip section */}
-            <motion.div
-              className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-            >
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-amber-400 text-xs font-semibold mb-1">TIP</p>
-                  <p className="text-gray-400 text-xs">
-                    Jika Anda memiliki file asli sebelum dikonversi ke PDF, upload file tersebut untuk mengaktifkan fitur edit.
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-
-          <DialogFooter className="pt-4">
-            <motion.div
-              className="w-full"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <Button
-                type="button"
-                onClick={() => setShowPdfWarningDialog(false)}
-                className="w-full bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-red-500/25"
-              >
-                <X className="w-4 h-4 mr-2" />
-                Tutup
-              </Button>
-            </motion.div>
-          </DialogFooter>
-        </div>
-      </DialogContent>
-      </Dialog >
-
-
-    {/* Copyright Popup */ }
-    < CopyrightPopup show = { showCopyrightPopup } onClose = {() => setShowCopyrightPopup(false)
-} />
-
-{/* Image Cropper for Profile Photo */ }
-<ImageCropper
-  isOpen={showImageCropper}
-  onClose={() => {
-    setShowImageCropper(false)
-    setPhotoToCrop(null)
-  }}
-  imageFile={photoToCrop}
-  onCropComplete={(croppedFile) => {
-    setSelectedPhotoFile(croppedFile)
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      setProfilePhoto(e.target?.result as string)
-    }
-    reader.readAsDataURL(croppedFile)
-    setShowImageCropper(false)
-    setPhotoToCrop(null)
-  }}
-  aspectRatio={1}
-  circularCrop={true}
-/>
-
-{/* Duplicate File Warning Dialog - NO OVERWRITE ALLOWED */ }
-<Dialog open={showDuplicateFileDialog} onOpenChange={setShowDuplicateFileDialog}>
-  <DialogContent className="sm:max-w-md bg-gradient-to-b from-slate-900 to-slate-950 border border-red-500/40 shadow-2xl shadow-red-500/20 p-0 gap-0 overflow-hidden" aria-describedby={undefined}>
-    {/* Animated background effect */}
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {/* Pulsing red circles */}
-      <motion.div
-        className="absolute -top-20 -right-20 w-40 h-40 rounded-full bg-red-500/10"
-        animate={{
-          scale: [1, 1.2, 1],
-          opacity: [0.3, 0.5, 0.3],
-        }}
-        transition={{
-          duration: 3,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
-      />
-      <motion.div
-        className="absolute -bottom-10 -left-10 w-32 h-32 rounded-full bg-orange-500/10"
-        animate={{
-          scale: [1, 1.3, 1],
-          opacity: [0.2, 0.4, 0.2],
-        }}
-        transition={{
-          duration: 4,
-          repeat: Infinity,
-          ease: 'easeInOut',
-          delay: 0.5,
-        }}
-      />
-    </div>
-
-    {/* Header */}
-    <div className="relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-red-500/20 via-red-600/10 to-orange-500/20" />
-      <DialogHeader className="relative p-6 pb-4">
-        <motion.div
-          className="flex flex-col items-center text-center"
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+              ))}
+            </div>
+          </ScrollArea>
+        )}
+      </div>
+      <DialogFooter className="pt-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setShowUserActivityDialog(false)}
+          className="border-gray-200 text-gray-600 hover:bg-gray-50"
         >
-          {/* Animated blocked icon */}
+          Tutup
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog >
+
+  {/* PDF Edit Warning Dialog - Aesthetic Design */ }
+  < Dialog open={showPdfWarningDialog} onOpenChange={setShowPdfWarningDialog} >
+    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-red-500/50 shadow-2xl overflow-hidden" aria-describedby={undefined}>
+      {/* Animated background effects */}
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Radar sweep */}
+        <motion.div
+          className="absolute -top-20 -right-20 w-60 h-60 rounded-full"
+          style={{
+            background: 'conic-gradient(from 0deg, transparent 0deg, rgba(239, 68, 68, 0.15) 30deg, transparent 60deg)'
+          }}
+          animate={{ rotate: 360 }}
+          transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+        />
+
+        {/* Floating particles */}
+        {[...Array(6)].map((_, i) => (
           <motion.div
-            className="relative mb-4"
+            key={i}
+            className="absolute w-1 h-1 rounded-full bg-red-400/50"
+            style={{
+              left: `${10 + i * 15}% `,
+              top: `${20 + (i % 3) * 25}% `,
+            }}
             animate={{
-              scale: [1, 1.08, 1],
-              rotate: [0, -3, 3, 0],
+              y: [-10, 10, -10],
+              opacity: [0.3, 0.7, 0.3]
+            }}
+            transition={{
+              duration: 2 + i * 0.3,
+              repeat: Infinity,
+              delay: i * 0.2
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="relative z-10">
+        <DialogHeader className="text-center pb-4">
+          {/* Animated warning icon */}
+          <motion.div
+            className="mx-auto mb-4"
+            animate={{
+              scale: [1, 1.1, 1],
+              rotate: [0, 5, -5, 0]
             }}
             transition={{
               duration: 2,
               repeat: Infinity,
-              ease: 'easeInOut',
+              ease: 'easeInOut'
             }}
           >
-            {/* Glow effect */}
-            <div className="absolute inset-0 rounded-full bg-red-500/40 blur-2xl" />
-            <motion.div
-              className="absolute inset-0 rounded-full"
-              style={{
-                background: 'conic-gradient(from 0deg, rgba(239,68,68,0.3), rgba(239,68,68,0.1), rgba(239,68,68,0.3))',
-              }}
-              animate={{ rotate: 360 }}
-              transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
-            />
-            <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-2xl shadow-red-500/50 border-2 border-red-400/50">
-              <XCircle className="w-12 h-12 text-white" />
+            <div className="relative">
+              {/* Glow ring */}
+              <motion.div
+                className="absolute inset-0 rounded-full bg-red-500/30 blur-xl"
+                animate={{
+                  scale: [1, 1.3, 1],
+                  opacity: [0.5, 0.8, 0.5]
+                }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity
+                }}
+              />
+
+              {/* Icon container */}
+              <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-lg shadow-red-500/50">
+                <FileIcon className="w-10 h-10 text-white" />
+              </div>
+
+              {/* X mark overlay */}
+              <motion.div
+                className="absolute inset-0 flex items-center justify-center"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+              >
+                <div className="w-24 h-24 rounded-full border-4 border-red-400 flex items-center justify-center">
+                  <XCircle className="w-12 h-12 text-red-400" />
+                </div>
+              </motion.div>
             </div>
           </motion.div>
 
-          <DialogTitle className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-red-300 to-orange-400">
-            Upload Ditolak!
+          <DialogTitle className="text-lg font-bold">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-300 to-red-400">
+              PDF Tidak Bisa Di-edit
+            </span>
           </DialogTitle>
 
-          <DialogDescription className="text-gray-400 text-sm mt-2">
-            Nama file sudah ada dalam sistem
+          <DialogDescription className="text-gray-400 text-xs mt-2">
+            File PDF tidak mendukung fitur edit langsung
           </DialogDescription>
-        </motion.div>
-      </DialogHeader>
-    </div>
+        </DialogHeader>
 
-    {/* Content */}
-    <div className="relative p-6 pt-2 space-y-4">
-      {/* File name display */}
-      <motion.div
-        className="bg-slate-800/60 border border-red-500/30 rounded-xl p-4 backdrop-blur-sm"
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.2 }}
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center border border-red-500/30">
-            <FileIcon className="w-6 h-6 text-red-400" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-gray-500 uppercase tracking-wider mb-0.5">Nama File Duplikat</p>
-            <p className="text-white font-semibold truncate text-sm">{duplicateFileName}</p>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Blocked message */}
-      <motion.div
-        className="bg-red-500/15 border border-red-500/40 rounded-xl p-4 backdrop-blur-sm"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-lg bg-red-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <XCircle className="w-4 h-4 text-red-400" />
-          </div>
-          <div>
-            <p className="text-red-300 font-semibold text-sm">Upload Diblokir</p>
-            <p className="text-gray-400 text-xs mt-1 leading-relaxed">
-              File dengan nama yang sama sudah ada di katalog. <span className="text-red-400 font-semibold">Overwrite tidak diizinkan</span> untuk menjaga integritas data.
+        <div className="space-y-4 py-4">
+          {/* Main message */}
+          <motion.div
+            className="bg-red-500/10 border border-red-500/30 rounded-xl p-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <p className="text-gray-300 text-sm leading-relaxed">
+              Format <span className="text-red-400 font-semibold">PDF (Portable Document Format)</span> didesain untuk distribusi dokumen yang sudah final, bukan untuk editing. Berbeda dengan file Excel atau Word, PDF tidak dapat dimodifikasi secara langsung.
             </p>
-          </div>
+          </motion.div>
+
+          {/* Solution cards */}
+          <motion.div
+            className="grid grid-cols-2 gap-3"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <FileSpreadsheet className="w-4 h-4 text-green-400" />
+                <span className="text-green-400 text-xs font-semibold">EXCEL</span>
+              </div>
+              <p className="text-gray-400 text-xs">
+                Upload ulang dalam format <span className="text-green-400">.xlsx</span> atau <span className="text-green-400">.xls</span>
+              </p>
+            </div>
+
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText className="w-4 h-4 text-blue-400" />
+                <span className="text-blue-400 text-xs font-semibold">WORD</span>
+              </div>
+              <p className="text-gray-400 text-xs">
+                Upload ulang dalam format <span className="text-blue-400">.docx</span> atau <span className="text-blue-400">.doc</span>
+              </p>
+            </div>
+          </motion.div>
+
+          {/* Tip section */}
+          <motion.div
+            className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-amber-400 text-xs font-semibold mb-1">TIP</p>
+                <p className="text-gray-400 text-xs">
+                  Jika Anda memiliki file asli sebelum dikonversi ke PDF, upload file tersebut untuk mengaktifkan fitur edit.
+                </p>
+              </div>
+            </div>
+          </motion.div>
         </div>
-      </motion.div>
 
-      {/* Solutions */}
-      <motion.div
-        className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl p-4 backdrop-blur-sm"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-      >
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-lg bg-amber-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <CheckCircle className="w-4 h-4 text-amber-400" />
+        <DialogFooter className="pt-4">
+          <motion.div
+            className="w-full"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <Button
+              type="button"
+              onClick={() => setShowPdfWarningDialog(false)}
+              className="w-full bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-red-500/25"
+            >
+              <X className="w-4 h-4 mr-2" />
+              Tutup
+            </Button>
+          </motion.div>
+        </DialogFooter>
+      </div>
+    </DialogContent>
+  </Dialog >
+
+
+  {/* Copyright Popup */ }
+  < CopyrightPopup show={showCopyrightPopup} onClose={() => setShowCopyrightPopup(false)
+  } />
+
+  {/* Image Cropper for Profile Photo */ }
+  <ImageCropper
+    isOpen={showImageCropper}
+    onClose={() => {
+      setShowImageCropper(false)
+      setPhotoToCrop(null)
+    }}
+    imageFile={photoToCrop}
+    onCropComplete={(croppedFile) => {
+      setSelectedPhotoFile(croppedFile)
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setProfilePhoto(e.target?.result as string)
+      }
+      reader.readAsDataURL(croppedFile)
+      setShowImageCropper(false)
+      setPhotoToCrop(null)
+    }}
+    aspectRatio={1}
+    circularCrop={true}
+  />
+
+  {/* Duplicate File Warning Dialog - NO OVERWRITE ALLOWED */ }
+  <Dialog open={showDuplicateFileDialog} onOpenChange={setShowDuplicateFileDialog}>
+    <DialogContent className="sm:max-w-md bg-gradient-to-b from-slate-900 to-slate-950 border border-red-500/40 shadow-2xl shadow-red-500/20 p-0 gap-0 overflow-hidden" aria-describedby={undefined}>
+      {/* Animated background effect */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Pulsing red circles */}
+        <motion.div
+          className="absolute -top-20 -right-20 w-40 h-40 rounded-full bg-red-500/10"
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.3, 0.5, 0.3],
+          }}
+          transition={{
+            duration: 3,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+        />
+        <motion.div
+          className="absolute -bottom-10 -left-10 w-32 h-32 rounded-full bg-orange-500/10"
+          animate={{
+            scale: [1, 1.3, 1],
+            opacity: [0.2, 0.4, 0.2],
+          }}
+          transition={{
+            duration: 4,
+            repeat: Infinity,
+            ease: 'easeInOut',
+            delay: 0.5,
+          }}
+        />
+      </div>
+
+      {/* Header */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-red-500/20 via-red-600/10 to-orange-500/20" />
+        <DialogHeader className="relative p-6 pb-4">
+          <motion.div
+            className="flex flex-col items-center text-center"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            {/* Animated blocked icon */}
+            <motion.div
+              className="relative mb-4"
+              animate={{
+                scale: [1, 1.08, 1],
+                rotate: [0, -3, 3, 0],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                ease: 'easeInOut',
+              }}
+            >
+              {/* Glow effect */}
+              <div className="absolute inset-0 rounded-full bg-red-500/40 blur-2xl" />
+              <motion.div
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background: 'conic-gradient(from 0deg, rgba(239,68,68,0.3), rgba(239,68,68,0.1), rgba(239,68,68,0.3))',
+                }}
+                animate={{ rotate: 360 }}
+                transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
+              />
+              <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-2xl shadow-red-500/50 border-2 border-red-400/50">
+                <XCircle className="w-12 h-12 text-white" />
+              </div>
+            </motion.div>
+
+            <DialogTitle className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-red-300 to-orange-400">
+              Upload Ditolak!
+            </DialogTitle>
+
+            <DialogDescription className="text-gray-400 text-sm mt-2">
+              Nama file sudah ada dalam sistem
+            </DialogDescription>
+          </motion.div>
+        </DialogHeader>
+      </div>
+
+      {/* Content */}
+      <div className="relative p-6 pt-2 space-y-4">
+        {/* File name display */}
+        <motion.div
+          className="bg-slate-800/60 border border-red-500/30 rounded-xl p-4 backdrop-blur-sm"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2 }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center border border-red-500/30">
+              <FileIcon className="w-6 h-6 text-red-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-gray-500 uppercase tracking-wider mb-0.5">Nama File Duplikat</p>
+              <p className="text-white font-semibold truncate text-sm">{duplicateFileName}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-amber-300 font-semibold text-sm">Solusi</p>
-            <ul className="text-gray-400 text-xs mt-2 space-y-2">
-              <li className="flex items-start gap-2">
-                <span className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-[10px] font-bold flex-shrink-0 mt-0.5">1</span>
-                <span>Rename file Anda dengan nama yang berbeda, lalu upload kembali</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-[10px] font-bold flex-shrink-0 mt-0.5">2</span>
-                <span>Gunakan fitur <span className="text-amber-400 font-medium">Edit</span> pada file yang ada jika ingin memperbarui konten</span>
-              </li>
-            </ul>
+        </motion.div>
+
+        {/* Blocked message */}
+        <motion.div
+          className="bg-red-500/15 border border-red-500/40 rounded-xl p-4 backdrop-blur-sm"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-red-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <XCircle className="w-4 h-4 text-red-400" />
+            </div>
+            <div>
+              <p className="text-red-300 font-semibold text-sm">Upload Diblokir</p>
+              <p className="text-gray-400 text-xs mt-1 leading-relaxed">
+                File dengan nama yang sama sudah ada di katalog. <span className="text-red-400 font-semibold">Overwrite tidak diizinkan</span> untuk menjaga integritas data.
+              </p>
+            </div>
           </div>
-        </div>
-      </motion.div>
-    </div>
+        </motion.div>
 
-    {/* Actions - Only Cancel Button */}
-    <div className="relative p-6 pt-2">
-      <Button
-        onClick={() => {
-          setShowDuplicateFileDialog(false)
-          setPendingUploadForm(null)
-          setDuplicateFileName('')
-        }}
-        className="w-full bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500 text-white rounded-xl h-12 font-semibold border border-slate-500/50 shadow-lg"
-      >
-        <X className="w-5 h-5 mr-2" />
-        Tutup
-      </Button>
-    </div>
-  </DialogContent>
-</Dialog>
+        {/* Solutions */}
+        <motion.div
+          className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl p-4 backdrop-blur-sm"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <CheckCircle className="w-4 h-4 text-amber-400" />
+            </div>
+            <div>
+              <p className="text-amber-300 font-semibold text-sm">Solusi</p>
+              <ul className="text-gray-400 text-xs mt-2 space-y-2">
+                <li className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-[10px] font-bold flex-shrink-0 mt-0.5">1</span>
+                  <span>Rename file Anda dengan nama yang berbeda, lalu upload kembali</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-[10px] font-bold flex-shrink-0 mt-0.5">2</span>
+                  <span>Gunakan fitur <span className="text-amber-400 font-medium">Edit</span> pada file yang ada jika ingin memperbarui konten</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </motion.div>
+      </div>
 
-{/* Print Loading Dialog */ }
-<PrintLoadingDialog
-  open={showPrintDialog}
-  onClose={handlePrintDialogClose}
-  fileId={printDialogFileId}
-  fileName={printDialogFileName}
-  fileType={printDialogFileType}
-  onComplete={handlePrintComplete}
-/>
+      {/* Actions - Only Cancel Button */}
+      <div className="relative p-6 pt-2">
+        <Button
+          onClick={() => {
+            setShowDuplicateFileDialog(false)
+            setPendingUploadForm(null)
+            setDuplicateFileName('')
+          }}
+          className="w-full bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500 text-white rounded-xl h-12 font-semibold border border-slate-500/50 shadow-lg"
+        >
+          <X className="w-5 h-5 mr-2" />
+          Tutup
+        </Button>
+      </div>
+    </DialogContent>
+  </Dialog>
 
-{/* Custom Highlight Animation CSS */ }
-<style jsx global>{`
+  {/* Print Loading Dialog */ }
+  <PrintLoadingDialog
+    open={showPrintDialog}
+    onClose={handlePrintDialogClose}
+    fileId={printDialogFileId}
+    fileName={printDialogFileName}
+    fileType={printDialogFileType}
+    onComplete={handlePrintComplete}
+  />
+
+  {/* Custom Highlight Animation CSS */ }
+  <style jsx global>{`
         @keyframes aesthetic-row-glow {
           0% { box-shadow: 0 0 5px rgba(249, 115, 22, 0.1); background-color: rgba(249, 115, 22, 0.02); }
           50% { box-shadow: inset 0 0 25px rgba(249, 115, 22, 0.15); background-color: rgba(249, 115, 22, 0.06); }
