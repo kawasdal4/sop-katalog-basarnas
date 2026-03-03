@@ -39,6 +39,12 @@ export async function GET() {
       }
     }
 
+    console.log('[Profile GET] Data fetched:', {
+      userId: user.id,
+      hasPhoto: !!user.profilePhoto,
+      profilePhotoUrl
+    })
+
     // Return only the fields we need (excluding password)
     return NextResponse.json({
       id: user.id,

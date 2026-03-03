@@ -38,6 +38,12 @@ export async function GET() {
       }
     }
 
+    console.log('[Auth Check] User found:', {
+      userId: user.id,
+      hasPhoto: !!user.profilePhoto,
+      profilePhotoUrl
+    })
+
     return NextResponse.json({
       user: {
         id: user.id,
@@ -107,6 +113,13 @@ export async function POST(request: NextRequest) {
         }
       }
     }
+
+    console.log('[Login] User authenticated:', {
+      userId: user.id,
+      email: user.email,
+      hasPhoto: !!user.profilePhoto,
+      profilePhotoUrl
+    })
 
     // Create response with user data
     const response = NextResponse.json({
