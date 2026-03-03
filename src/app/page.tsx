@@ -337,7 +337,7 @@ function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
     lg: 'w-16 h-16'
   }
 
-  const logoUrl = '/logo.png'
+  const logoUrl = 'https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/logo.png'
 
   return (
     <motion.div

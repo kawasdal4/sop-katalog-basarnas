@@ -22,9 +22,9 @@ export const metadata: Metadata = {
   authors: [{ name: "BASARNAS" }],
   icons: {
     icon: [
-      { url: "/logo.png", type: "image/png" },
+      { url: "https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/logo.png", type: "image/png" },
     ],
-    apple: "/logo.png",
+    apple: "https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/logo.png",
   },
   openGraph: {
     title: "Katalog SOP/IK Direktorat Kesiapsiagaan",
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/logo.png",
+        url: "https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/logo.png",
         width: 512,
         height: 512,
         alt: "BASARNAS Logo",
@@ -45,7 +45,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Katalog SOP/IK Direktorat Kesiapsiagaan",
     description: "Sistem Katalog SOP dan IK Direktorat Kesiapsiagaan BASARNAS",
-    images: ["/logo.png"],
+    images: ["https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/logo.png"],
   },
 };
 
