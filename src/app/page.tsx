@@ -6730,15 +6730,15 @@ export default function ESOPApp() {
                                 <motion.div
                                   key={sop.id}
                                   className="group flex items-center gap-4 p-3.5 rounded-2xl cursor-default transition-all duration-300 relative overflow-hidden active:scale-[0.98]"
-                                  style={{ 
-                                    background: 'rgba(236,254,255,0.4)', 
+                                  style={{
+                                    background: 'rgba(236,254,255,0.4)',
                                     border: '1px solid rgba(6,182,212,0.15)',
                                     backdropFilter: 'blur(8px)'
                                   }}
                                   initial={{ opacity: 0, x: -20 }}
                                   animate={{ opacity: 1, x: 0 }}
-                                  whileHover={{ 
-                                    scale: 1.01, 
+                                  whileHover={{
+                                    scale: 1.01,
                                     backgroundColor: 'rgba(236,254,255,0.8)',
                                     borderColor: 'rgba(6,182,212,0.3)',
                                     boxShadow: '0 10px 25px -5px rgba(6,182,212,0.1)'
@@ -6750,7 +6750,7 @@ export default function ESOPApp() {
                                     <div className="absolute inset-0 rounded-xl border border-white/20" />
                                     {index + 1}
                                   </div>
-                                  
+
                                   <div className="flex items-center gap-3 flex-1 min-w-0">
                                     <div className="w-10 h-10 rounded-xl bg-white/50 border border-white flex items-center justify-center shrink-0 shadow-sm">
                                       <FileTypeIcon fileName={sop.fileName} className="w-5 h-5" />
@@ -6760,7 +6760,7 @@ export default function ESOPApp() {
                                       <p className="text-[10px] font-bold text-cyan-600/70 uppercase tracking-widest mt-0.5">{sop.kategori || 'SOP'}</p>
                                     </div>
                                   </div>
-                                  
+
                                   <div className="text-right shrink-0 bg-white/40 px-3 py-1.5 rounded-xl border border-white shadow-sm">
                                     <p className="font-black text-cyan-600 text-lg leading-tight">{sop.previewCount || 0}</p>
                                     <p className="text-[9px] font-black text-cyan-500/60 uppercase tracking-tighter">views</p>
@@ -6788,15 +6788,15 @@ export default function ESOPApp() {
                                 <motion.div
                                   key={sop.id}
                                   className="group flex items-center gap-4 p-3.5 rounded-2xl cursor-default transition-all duration-300 relative overflow-hidden active:scale-[0.98]"
-                                  style={{ 
-                                    background: 'rgba(250,245,255,0.4)', 
+                                  style={{
+                                    background: 'rgba(250,245,255,0.4)',
                                     border: '1px solid rgba(168,85,247,0.15)',
                                     backdropFilter: 'blur(8px)'
                                   }}
                                   initial={{ opacity: 0, x: -20 }}
                                   animate={{ opacity: 1, x: 0 }}
-                                  whileHover={{ 
-                                    scale: 1.01, 
+                                  whileHover={{
+                                    scale: 1.01,
                                     backgroundColor: 'rgba(250,245,255,0.8)',
                                     borderColor: 'rgba(168,85,247,0.3)',
                                     boxShadow: '0 10px 25px -5px rgba(168,85,247,0.1)'
@@ -7976,9 +7976,14 @@ export default function ESOPApp() {
                                             <span>{new Date(sop.uploadedAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                                           </div>
                                           {sop.updatedAt && new Date(sop.updatedAt).getTime() !== new Date(sop.uploadedAt).getTime() && (
-                                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/5 border border-amber-500/10 text-amber-500/80">
-                                              <Edit3 className="w-2.5 h-2.5" />
-                                              <span>Update {new Date(sop.updatedAt).toLocaleString('id-ID', { day: 'numeric', month: 'short' })}</span>
+                                            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/15 text-amber-400/90">
+                                              <Edit3 className="w-2.5 h-2.5 flex-shrink-0" />
+                                              <span className="truncate max-w-[220px]">
+                                                Diedit oleh&nbsp;
+                                                <span className="font-black text-amber-300">{sop.updatedByUser?.name || sop.updatedBy || 'Admin'}</span>
+                                                &nbsp;·&nbsp;
+                                                {new Date(sop.updatedAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                              </span>
                                             </div>
                                           )}
                                         </div>
