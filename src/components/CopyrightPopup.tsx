@@ -91,7 +91,7 @@ export default function CopyrightPopup({ show, onClose }: CopyrightPopupProps) {
                     >
                       <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-orange-500/50 shadow-lg shadow-orange-500/20">
                         <img
-                          src="/foe.jpg"
+                          src="https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/foe.jpg"
                           alt="Developer"
                           className="w-full h-full object-cover object-[center_30%]"
                         />
