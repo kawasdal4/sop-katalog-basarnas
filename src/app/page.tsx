@@ -194,6 +194,49 @@ const STATUS_COLORS: Record<string, string> = {
   'DITOLAK': 'bg-red-100 text-red-800 border-red-200'
 }
 
+// User Avatar Component with state-based fallback
+function UserAvatar({
+  src,
+  name,
+  size = 'md',
+  className = ""
+}: {
+  src?: string | null;
+  name?: string;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  className?: string;
+}) {
+  const [error, setError] = useState(false);
+
+  const sizeClasses = {
+    sm: 'w-8 h-8 text-xs',
+    md: 'w-9 h-9 text-sm',
+    lg: 'w-10 h-10 text-base',
+    xl: 'w-20 h-20 text-3xl'
+  };
+
+  const initial = name?.charAt(0)?.toUpperCase() || '?';
+
+  if (!src || error) {
+    return (
+      <div className={`rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg overflow-hidden shrink-0 ${sizeClasses[size]} ${className}`}>
+        <span className="text-white font-bold drop-shadow-md">{initial}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`rounded-full bg-gray-200 flex items-center justify-center shadow-lg overflow-hidden shrink-0 ${sizeClasses[size]} ${className}`}>
+      <img
+        src={src}
+        alt={name || "Profile"}
+        className="w-full h-full object-cover"
+        onError={() => setError(true)}
+      />
+    </div>
+  );
+}
+
 // File Type Icon Component
 function FileTypeIcon({ fileName, className = "w-4 h-4" }: { fileName: string; className?: string }) {
   const ext = fileName?.split('.').pop()?.toLowerCase() || ''
@@ -5571,18 +5614,12 @@ export default function ESOPApp() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="text-white hover:bg-white/10 flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 hover:border-white/20 transition-all duration-200">
-                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg overflow-hidden">
-                    {user?.profilePhotoUrl ? (
-                      <img
-                        key={`profile-header-${user.photoUpdatedAt || Date.now()}`}
-                        src={user.profilePhotoUrl}
-                        alt="Profile"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-white text-sm font-bold">{user?.name?.charAt(0)?.toUpperCase()}</span>
-                    )}
-                  </div>
+                  <UserAvatar
+                    src={user?.profilePhotoUrl}
+                    name={user?.name}
+                    size="md"
+                    className="rounded-lg ring-2 ring-white/10"
+                  />
                   <div className="text-left">
                     <p className="text-sm font-medium leading-tight">{user?.name}</p>
                     <p className="text-[10px] text-orange-400 font-medium uppercase tracking-wider">{user?.role}</p>
@@ -9999,83 +10036,62 @@ export default function ESOPApp() {
             <div className="absolute top-4 right-8 w-20 h-20 rounded-full bg-white/10 blur-xl" />
             <div className="absolute bottom-2 left-12 w-16 h-16 rounded-full bg-yellow-300/20 blur-lg" />
 
-            <div className="relative px-8 py-6 flex items-center gap-5">
-              {/* Avatar with glow */}
-              <div className="relative">
-                <div className="absolute -inset-1 rounded-full bg-white/30 blur-md" />
-                <div className="relative w-20 h-20 rounded-full ring-4 ring-white/30 overflow-hidden bg-gradient-to-br from-white/20 to-white/5 flex items-center justify-center">
-                  {profilePhoto ? (
-                    <img
-                      src={profilePhoto}
-                      alt="Profile"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).style.display = 'none';
-                        const parent = (e.currentTarget as HTMLImageElement).parentElement;
-                        if (parent) {
-                          const fallback = document.createElement('span');
-                          fallback.className = 'text-3xl font-black text-white drop-shadow-lg';
-                          fallback.innerText = user?.name?.charAt(0)?.toUpperCase() || '?';
-                          parent.appendChild(fallback);
-                        }
-                      }}
-                    />
-                  ) : (
-                    <span className="text-3xl font-black text-white drop-shadow-lg">
-                      {user?.name?.charAt(0)?.toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                <label className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white text-orange-600 flex items-center justify-center cursor-pointer shadow-xl hover:scale-110 transition-transform ring-2 ring-orange-100">
-                  <Camera className="w-4 h-4" />
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/gif,image/webp"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        if (file.size > 5 * 1024 * 1024) {
-                          toast({ title: 'Error', description: 'Ukuran foto maksimal 5MB', variant: 'destructive' })
-                          return
-                        }
-                        // Open cropper instead of directly setting photo
-                        setPhotoToCrop(file)
-                        setShowImageCropper(true)
-                      }
-                      // Reset input
-                      e.target.value = ''
-                    }}
-                  />
-                </label>
-              </div>
-
-              <div className="flex-1">
-                <DialogTitle className="text-lg font-bold text-white drop-shadow-sm">
-                  {profileForm.name || user?.name}
-                </DialogTitle>
-                <p className="text-white/80 text-xs mt-1">{profileForm.email || user?.email}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/20 text-white backdrop-blur-sm">
-                    {user?.role}
-                  </span>
-                  {profilePhoto && (
-                    <button
-                      onClick={() => {
-                        setProfilePhoto(null)
-                        setSelectedPhotoFile(null)
-                      }}
-                      className="px-3 py-1 rounded-full text-xs font-medium bg-red-500/30 text-red-100 hover:bg-red-500/50 transition-colors"
-                    >
-                      Hapus Foto
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
+            <UserAvatar
+              src={profilePhoto}
+              name={user?.name}
+              size="xl"
+              className="ring-4 ring-white/30"
+            />
+            <label className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white text-orange-600 flex items-center justify-center cursor-pointer shadow-xl hover:scale-110 transition-transform ring-2 ring-orange-100">
+              <Camera className="w-4 h-4" />
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) {
+                    if (file.size > 5 * 1024 * 1024) {
+                      toast({ title: 'Error', description: 'Ukuran foto maksimal 5MB', variant: 'destructive' })
+                      return
+                    }
+                    // Open cropper instead of directly setting photo
+                    setPhotoToCrop(file)
+                    setShowImageCropper(true)
+                  }
+                  // Reset input
+                  e.target.value = ''
+                }}
+              />
+            </label>
           </div>
 
-          {/* Tab Navigation */}
+          <div className="flex-1">
+            <DialogTitle className="text-lg font-bold text-white drop-shadow-sm">
+              {profileForm.name || user?.name}
+            </DialogTitle>
+            <p className="text-white/80 text-xs mt-1">{profileForm.email || user?.email}</p>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/20 text-white backdrop-blur-sm">
+                {user?.role}
+              </span>
+              {profilePhoto && (
+                <button
+                  onClick={() => {
+                    setProfilePhoto(null)
+                    setSelectedPhotoFile(null)
+                  }}
+                  className="px-3 py-1 rounded-full text-xs font-medium bg-red-500/30 text-red-100 hover:bg-red-500/50 transition-colors"
+                >
+                  Hapus Foto
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+    </div>
+
+          {/* Tab Navigation */ }
           <div className="flex border-b border-gray-100 bg-gray-50/50">
             <button
               onClick={() => setSettingsTab('profile')}
@@ -10427,572 +10443,573 @@ export default function ESOPApp() {
               </div>
             )}
           </div>
-        </DialogContent>
+        </DialogContent >
       </Dialog >
 
-      {/* Password Change Dialog */}
-      < Dialog open={showPasswordChangeDialog} onOpenChange={setShowPasswordChangeDialog} >
-        <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Shield className="w-5 h-5 text-orange-600" />
-              Ganti Password
-            </DialogTitle>
-            <DialogDescription className="text-gray-600">
-              Ubah password akun Anda
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label className="font-medium text-gray-700">Password Lama</Label>
-              <Input
-                type="password"
-                value={passwordChangeForm.currentPassword}
-                onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, currentPassword: e.target.value })}
-                className="border-gray-300 bg-white text-gray-900"
-                placeholder="Masukkan password lama"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="font-medium text-gray-700">Password Baru</Label>
-              <Input
-                type="password"
-                value={passwordChangeForm.newPassword}
-                onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, newPassword: e.target.value })}
-                className="border-gray-300 bg-white text-gray-900"
-                placeholder="Masukkan password baru (min. 4 karakter)"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="font-medium text-gray-700">Konfirmasi Password Baru</Label>
-              <Input
-                type="password"
-                value={passwordChangeForm.confirmPassword}
-                onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, confirmPassword: e.target.value })}
-                className="border-gray-300 bg-white text-gray-900"
-                placeholder="Konfirmasi password baru"
-              />
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowPasswordChangeDialog(false)}
-              className="border-gray-300 text-gray-700 hover:bg-gray-100"
-            >
-              Batal
-            </Button>
-            <Button
-              type="button"
-              disabled={passwordChangeLoading}
-              onClick={async () => {
-                // Validation
-                if (!passwordChangeForm.currentPassword || !passwordChangeForm.newPassword || !passwordChangeForm.confirmPassword) {
-                  toast({ title: 'Error', description: 'Semua field harus diisi', variant: 'destructive' })
-                  return
-                }
-                if (passwordChangeForm.newPassword.length < 4) {
-                  toast({ title: 'Error', description: 'Password baru minimal 4 karakter', variant: 'destructive' })
-                  return
-                }
-                if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
-                  toast({ title: 'Error', description: 'Konfirmasi password tidak cocok', variant: 'destructive' })
-                  return
-                }
-
-                setPasswordChangeLoading(true)
-                try {
-                  const res = await fetch('/api/users/password', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      currentPassword: passwordChangeForm.currentPassword,
-                      newPassword: passwordChangeForm.newPassword
-                    })
-                  })
-                  const data = await res.json()
-                  if (data.error) {
-                    toast({ title: 'Error', description: data.error, variant: 'destructive' })
-                  } else {
-                    toast({ title: '✅ Berhasil', description: 'Password berhasil diubah!' })
-                    setShowPasswordChangeDialog(false)
-                  }
-                } catch (error) {
-                  toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
-                } finally {
-                  setPasswordChangeLoading(false)
-                }
-              }}
-              className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
-            >
-              {passwordChangeLoading ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</>
-              ) : (
-                'Simpan Password'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog >
-
-      {/* User Activity Dialog - Compact & Aesthetic */}
-      < Dialog open={showUserActivityDialog} onOpenChange={setShowUserActivityDialog} >
-        <DialogContent className="sm:max-w-md bg-white border-2 border-cyan-200 shadow-xl" aria-describedby={undefined}>
-          <DialogHeader className="pb-2">
-            <DialogTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <motion.div
-                animate={{ rotate: [0, 360] }}
-                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-              >
-                <History className="w-5 h-5 text-cyan-600" />
-              </motion.div>
-              Riwayat Aktivitas
-            </DialogTitle>
-            <DialogDescription className="text-gray-500 text-sm">
-              {selectedUserForActivity?.name} • {selectedUserForActivity?.email}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            {userActivityLogs.length === 0 ? (
-              <div className="text-center text-gray-400 py-8">
-                <History className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">Belum ada aktivitas</p>
-              </div>
-            ) : (
-              <ScrollArea className="h-[320px] pr-2">
-                <div className="space-y-2">
-                  {userActivityLogs.map((log, index) => (
-                    <motion.div
-                      key={log.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.03 }}
-                      className="flex items-start gap-2 p-2.5 bg-gradient-to-r from-gray-50 to-cyan-50/30 rounded-lg border border-gray-100 hover:border-cyan-200 transition-colors"
-                    >
-                      <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-cyan-400 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <Badge variant="outline" className={
-                            log.aktivitas === 'LOGIN' ? 'bg-blue-50 text-blue-600 border-blue-200 text-[10px] px-1.5 py-0' :
-                              log.aktivitas === 'UPLOAD' ? 'bg-green-50 text-green-600 border-green-200 text-[10px] px-1.5 py-0' :
-                                log.aktivitas === 'DOWNLOAD' ? 'bg-purple-50 text-purple-600 border-purple-200 text-[10px] px-1.5 py-0' :
-                                  log.aktivitas === 'PREVIEW' ? 'bg-cyan-50 text-cyan-600 border-cyan-200 text-[10px] px-1.5 py-0' :
-                                    log.aktivitas === 'VERIFIKASI' ? 'bg-orange-50 text-orange-600 border-orange-200 text-[10px] px-1.5 py-0' :
-                                      'bg-gray-50 text-gray-600 border-gray-200 text-[10px] px-1.5 py-0'
-                          }>
-                            {log.aktivitas}
-                          </Badge>
-                          <span className="text-[10px] text-gray-400">
-                            {new Date(log.createdAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-600 mt-0.5 line-clamp-1">{log.deskripsi}</p>
-                        {log.sopFile && (
-                          <p className="text-[10px] text-orange-500 mt-0.5 truncate">{log.sopFile.judul}</p>
-                        )}
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
-          </div>
-          <DialogFooter className="pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowUserActivityDialog(false)}
-              className="border-gray-200 text-gray-600 hover:bg-gray-50"
-            >
-              Tutup
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog >
-
-      {/* PDF Edit Warning Dialog - Aesthetic Design */}
-      < Dialog open={showPdfWarningDialog} onOpenChange={setShowPdfWarningDialog} >
-        <DialogContent className="sm:max-w-lg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-red-500/50 shadow-2xl overflow-hidden" aria-describedby={undefined}>
-          {/* Animated background effects */}
-          <div className="absolute inset-0 overflow-hidden">
-            {/* Radar sweep */}
-            <motion.div
-              className="absolute -top-20 -right-20 w-60 h-60 rounded-full"
-              style={{
-                background: 'conic-gradient(from 0deg, transparent 0deg, rgba(239, 68, 68, 0.15) 30deg, transparent 60deg)'
-              }}
-              animate={{ rotate: 360 }}
-              transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+    {/* Password Change Dialog */ }
+    < Dialog open = { showPasswordChangeDialog } onOpenChange = { setShowPasswordChangeDialog } >
+      <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <Shield className="w-5 h-5 text-orange-600" />
+            Ganti Password
+          </DialogTitle>
+          <DialogDescription className="text-gray-600">
+            Ubah password akun Anda
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label className="font-medium text-gray-700">Password Lama</Label>
+            <Input
+              type="password"
+              value={passwordChangeForm.currentPassword}
+              onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, currentPassword: e.target.value })}
+              className="border-gray-300 bg-white text-gray-900"
+              placeholder="Masukkan password lama"
             />
-
-            {/* Floating particles */}
-            {[...Array(6)].map((_, i) => (
-              <motion.div
-                key={i}
-                className="absolute w-1 h-1 rounded-full bg-red-400/50"
-                style={{
-                  left: `${10 + i * 15}% `,
-                  top: `${20 + (i % 3) * 25}% `,
-                }}
-                animate={{
-                  y: [-10, 10, -10],
-                  opacity: [0.3, 0.7, 0.3]
-                }}
-                transition={{
-                  duration: 2 + i * 0.3,
-                  repeat: Infinity,
-                  delay: i * 0.2
-                }}
-              />
-            ))}
           </div>
+          <div className="space-y-2">
+            <Label className="font-medium text-gray-700">Password Baru</Label>
+            <Input
+              type="password"
+              value={passwordChangeForm.newPassword}
+              onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, newPassword: e.target.value })}
+              className="border-gray-300 bg-white text-gray-900"
+              placeholder="Masukkan password baru (min. 4 karakter)"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="font-medium text-gray-700">Konfirmasi Password Baru</Label>
+            <Input
+              type="password"
+              value={passwordChangeForm.confirmPassword}
+              onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, confirmPassword: e.target.value })}
+              className="border-gray-300 bg-white text-gray-900"
+              placeholder="Konfirmasi password baru"
+            />
+          </div>
+        </div>
+        <DialogFooter className="gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setShowPasswordChangeDialog(false)}
+            className="border-gray-300 text-gray-700 hover:bg-gray-100"
+          >
+            Batal
+          </Button>
+          <Button
+            type="button"
+            disabled={passwordChangeLoading}
+            onClick={async () => {
+              // Validation
+              if (!passwordChangeForm.currentPassword || !passwordChangeForm.newPassword || !passwordChangeForm.confirmPassword) {
+                toast({ title: 'Error', description: 'Semua field harus diisi', variant: 'destructive' })
+                return
+              }
+              if (passwordChangeForm.newPassword.length < 4) {
+                toast({ title: 'Error', description: 'Password baru minimal 4 karakter', variant: 'destructive' })
+                return
+              }
+              if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
+                toast({ title: 'Error', description: 'Konfirmasi password tidak cocok', variant: 'destructive' })
+                return
+              }
 
-          <div className="relative z-10">
-            <DialogHeader className="text-center pb-4">
-              {/* Animated warning icon */}
-              <motion.div
-                className="mx-auto mb-4"
-                animate={{
-                  scale: [1, 1.1, 1],
-                  rotate: [0, 5, -5, 0]
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: 'easeInOut'
-                }}
-              >
-                <div className="relative">
-                  {/* Glow ring */}
+              setPasswordChangeLoading(true)
+              try {
+                const res = await fetch('/api/users/password', {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    currentPassword: passwordChangeForm.currentPassword,
+                    newPassword: passwordChangeForm.newPassword
+                  })
+                })
+                const data = await res.json()
+                if (data.error) {
+                  toast({ title: 'Error', description: data.error, variant: 'destructive' })
+                } else {
+                  toast({ title: '✅ Berhasil', description: 'Password berhasil diubah!' })
+                  setShowPasswordChangeDialog(false)
+                }
+              } catch (error) {
+                toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
+              } finally {
+                setPasswordChangeLoading(false)
+              }
+            }}
+            className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
+          >
+            {passwordChangeLoading ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</>
+            ) : (
+              'Simpan Password'
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+      </Dialog >
+
+    {/* User Activity Dialog - Compact & Aesthetic */ }
+    < Dialog open = { showUserActivityDialog } onOpenChange = { setShowUserActivityDialog } >
+      <DialogContent className="sm:max-w-md bg-white border-2 border-cyan-200 shadow-xl" aria-describedby={undefined}>
+        <DialogHeader className="pb-2">
+          <DialogTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <motion.div
+              animate={{ rotate: [0, 360] }}
+              transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+            >
+              <History className="w-5 h-5 text-cyan-600" />
+            </motion.div>
+            Riwayat Aktivitas
+          </DialogTitle>
+          <DialogDescription className="text-gray-500 text-sm">
+            {selectedUserForActivity?.name} • {selectedUserForActivity?.email}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-2">
+          {userActivityLogs.length === 0 ? (
+            <div className="text-center text-gray-400 py-8">
+              <History className="w-10 h-10 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">Belum ada aktivitas</p>
+            </div>
+          ) : (
+            <ScrollArea className="h-[320px] pr-2">
+              <div className="space-y-2">
+                {userActivityLogs.map((log, index) => (
                   <motion.div
-                    className="absolute inset-0 rounded-full bg-red-500/30 blur-xl"
-                    animate={{
-                      scale: [1, 1.3, 1],
-                      opacity: [0.5, 0.8, 0.5]
-                    }}
-                    transition={{
-                      duration: 1.5,
-                      repeat: Infinity
-                    }}
-                  />
-
-                  {/* Icon container */}
-                  <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-lg shadow-red-500/50">
-                    <FileIcon className="w-10 h-10 text-white" />
-                  </div>
-
-                  {/* X mark overlay */}
-                  <motion.div
-                    className="absolute inset-0 flex items-center justify-center"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3 }}
+                    key={log.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.03 }}
+                    className="flex items-start gap-2 p-2.5 bg-gradient-to-r from-gray-50 to-cyan-50/30 rounded-lg border border-gray-100 hover:border-cyan-200 transition-colors"
                   >
-                    <div className="w-24 h-24 rounded-full border-4 border-red-400 flex items-center justify-center">
-                      <XCircle className="w-12 h-12 text-red-400" />
+                    <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-cyan-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Badge variant="outline" className={
+                          log.aktivitas === 'LOGIN' ? 'bg-blue-50 text-blue-600 border-blue-200 text-[10px] px-1.5 py-0' :
+                            log.aktivitas === 'UPLOAD' ? 'bg-green-50 text-green-600 border-green-200 text-[10px] px-1.5 py-0' :
+                              log.aktivitas === 'DOWNLOAD' ? 'bg-purple-50 text-purple-600 border-purple-200 text-[10px] px-1.5 py-0' :
+                                log.aktivitas === 'PREVIEW' ? 'bg-cyan-50 text-cyan-600 border-cyan-200 text-[10px] px-1.5 py-0' :
+                                  log.aktivitas === 'VERIFIKASI' ? 'bg-orange-50 text-orange-600 border-orange-200 text-[10px] px-1.5 py-0' :
+                                    'bg-gray-50 text-gray-600 border-gray-200 text-[10px] px-1.5 py-0'
+                        }>
+                          {log.aktivitas}
+                        </Badge>
+                        <span className="text-[10px] text-gray-400">
+                          {new Date(log.createdAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-0.5 line-clamp-1">{log.deskripsi}</p>
+                      {log.sopFile && (
+                        <p className="text-[10px] text-orange-500 mt-0.5 truncate">{log.sopFile.judul}</p>
+                      )}
                     </div>
                   </motion.div>
-                </div>
-              </motion.div>
-
-              <DialogTitle className="text-lg font-bold">
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-300 to-red-400">
-                  PDF Tidak Bisa Di-edit
-                </span>
-              </DialogTitle>
-
-              <DialogDescription className="text-gray-400 text-xs mt-2">
-                File PDF tidak mendukung fitur edit langsung
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4 py-4">
-              {/* Main message */}
-              <motion.div
-                className="bg-red-500/10 border border-red-500/30 rounded-xl p-4"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-              >
-                <p className="text-gray-300 text-sm leading-relaxed">
-                  Format <span className="text-red-400 font-semibold">PDF (Portable Document Format)</span> didesain untuk distribusi dokumen yang sudah final, bukan untuk editing. Berbeda dengan file Excel atau Word, PDF tidak dapat dimodifikasi secara langsung.
-                </p>
-              </motion.div>
-
-              {/* Solution cards */}
-              <motion.div
-                className="grid grid-cols-2 gap-3"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-              >
-                <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <FileSpreadsheet className="w-4 h-4 text-green-400" />
-                    <span className="text-green-400 text-xs font-semibold">EXCEL</span>
-                  </div>
-                  <p className="text-gray-400 text-xs">
-                    Upload ulang dalam format <span className="text-green-400">.xlsx</span> atau <span className="text-green-400">.xls</span>
-                  </p>
-                </div>
-
-                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <FileText className="w-4 h-4 text-blue-400" />
-                    <span className="text-blue-400 text-xs font-semibold">WORD</span>
-                  </div>
-                  <p className="text-gray-400 text-xs">
-                    Upload ulang dalam format <span className="text-blue-400">.docx</span> atau <span className="text-blue-400">.doc</span>
-                  </p>
-                </div>
-              </motion.div>
-
-              {/* Tip section */}
-              <motion.div
-                className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-              >
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-amber-400 text-xs font-semibold mb-1">TIP</p>
-                    <p className="text-gray-400 text-xs">
-                      Jika Anda memiliki file asli sebelum dikonversi ke PDF, upload file tersebut untuk mengaktifkan fitur edit.
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            </div>
-
-            <DialogFooter className="pt-4">
-              <motion.div
-                className="w-full"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <Button
-                  type="button"
-                  onClick={() => setShowPdfWarningDialog(false)}
-                  className="w-full bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-red-500/25"
-                >
-                  <X className="w-4 h-4 mr-2" />
-                  Tutup
-                </Button>
-              </motion.div>
-            </DialogFooter>
-          </div>
-        </DialogContent>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </div>
+        <DialogFooter className="pt-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowUserActivityDialog(false)}
+            className="border-gray-200 text-gray-600 hover:bg-gray-50"
+          >
+            Tutup
+          </Button>
+        </DialogFooter>
+      </DialogContent>
       </Dialog >
 
+    {/* PDF Edit Warning Dialog - Aesthetic Design */ }
+    < Dialog open = { showPdfWarningDialog } onOpenChange = { setShowPdfWarningDialog } >
+      <DialogContent className="sm:max-w-lg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-red-500/50 shadow-2xl overflow-hidden" aria-describedby={undefined}>
+        {/* Animated background effects */}
+        <div className="absolute inset-0 overflow-hidden">
+          {/* Radar sweep */}
+          <motion.div
+            className="absolute -top-20 -right-20 w-60 h-60 rounded-full"
+            style={{
+              background: 'conic-gradient(from 0deg, transparent 0deg, rgba(239, 68, 68, 0.15) 30deg, transparent 60deg)'
+            }}
+            animate={{ rotate: 360 }}
+            transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+          />
 
-      {/* Copyright Popup */}
-      < CopyrightPopup show={showCopyrightPopup} onClose={() => setShowCopyrightPopup(false)} />
-
-      {/* Image Cropper for Profile Photo */}
-      <ImageCropper
-        isOpen={showImageCropper}
-        onClose={() => {
-          setShowImageCropper(false)
-          setPhotoToCrop(null)
-        }}
-        imageFile={photoToCrop}
-        onCropComplete={(croppedFile) => {
-          setSelectedPhotoFile(croppedFile)
-          const reader = new FileReader()
-          reader.onload = (e) => {
-            setProfilePhoto(e.target?.result as string)
-          }
-          reader.readAsDataURL(croppedFile)
-          setShowImageCropper(false)
-          setPhotoToCrop(null)
-        }}
-        aspectRatio={1}
-        circularCrop={true}
-      />
-
-      {/* Duplicate File Warning Dialog - NO OVERWRITE ALLOWED */}
-      <Dialog open={showDuplicateFileDialog} onOpenChange={setShowDuplicateFileDialog}>
-        <DialogContent className="sm:max-w-md bg-gradient-to-b from-slate-900 to-slate-950 border border-red-500/40 shadow-2xl shadow-red-500/20 p-0 gap-0 overflow-hidden" aria-describedby={undefined}>
-          {/* Animated background effect */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {/* Pulsing red circles */}
+          {/* Floating particles */}
+          {[...Array(6)].map((_, i) => (
             <motion.div
-              className="absolute -top-20 -right-20 w-40 h-40 rounded-full bg-red-500/10"
+              key={i}
+              className="absolute w-1 h-1 rounded-full bg-red-400/50"
+              style={{
+                left: `${10 + i * 15}% `,
+                top: `${20 + (i % 3) * 25}% `,
+              }}
               animate={{
-                scale: [1, 1.2, 1],
-                opacity: [0.3, 0.5, 0.3],
+                y: [-10, 10, -10],
+                opacity: [0.3, 0.7, 0.3]
               }}
               transition={{
-                duration: 3,
+                duration: 2 + i * 0.3,
                 repeat: Infinity,
-                ease: 'easeInOut',
+                delay: i * 0.2
               }}
             />
+          ))}
+        </div>
+
+        <div className="relative z-10">
+          <DialogHeader className="text-center pb-4">
+            {/* Animated warning icon */}
             <motion.div
-              className="absolute -bottom-10 -left-10 w-32 h-32 rounded-full bg-orange-500/10"
+              className="mx-auto mb-4"
               animate={{
-                scale: [1, 1.3, 1],
-                opacity: [0.2, 0.4, 0.2],
+                scale: [1, 1.1, 1],
+                rotate: [0, 5, -5, 0]
               }}
               transition={{
-                duration: 4,
+                duration: 2,
                 repeat: Infinity,
-                ease: 'easeInOut',
-                delay: 0.5,
+                ease: 'easeInOut'
               }}
-            />
-          </div>
-
-          {/* Header */}
-          <div className="relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-red-500/20 via-red-600/10 to-orange-500/20" />
-            <DialogHeader className="relative p-6 pb-4">
-              <motion.div
-                className="flex flex-col items-center text-center"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-              >
-                {/* Animated blocked icon */}
+            >
+              <div className="relative">
+                {/* Glow ring */}
                 <motion.div
-                  className="relative mb-4"
+                  className="absolute inset-0 rounded-full bg-red-500/30 blur-xl"
                   animate={{
-                    scale: [1, 1.08, 1],
-                    rotate: [0, -3, 3, 0],
+                    scale: [1, 1.3, 1],
+                    opacity: [0.5, 0.8, 0.5]
                   }}
                   transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: 'easeInOut',
+                    duration: 1.5,
+                    repeat: Infinity
                   }}
+                />
+
+                {/* Icon container */}
+                <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-lg shadow-red-500/50">
+                  <FileIcon className="w-10 h-10 text-white" />
+                </div>
+
+                {/* X mark overlay */}
+                <motion.div
+                  className="absolute inset-0 flex items-center justify-center"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3 }}
                 >
-                  {/* Glow effect */}
-                  <div className="absolute inset-0 rounded-full bg-red-500/40 blur-2xl" />
-                  <motion.div
-                    className="absolute inset-0 rounded-full"
-                    style={{
-                      background: 'conic-gradient(from 0deg, rgba(239,68,68,0.3), rgba(239,68,68,0.1), rgba(239,68,68,0.3))',
-                    }}
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
-                  />
-                  <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-2xl shadow-red-500/50 border-2 border-red-400/50">
-                    <XCircle className="w-12 h-12 text-white" />
+                  <div className="w-24 h-24 rounded-full border-4 border-red-400 flex items-center justify-center">
+                    <XCircle className="w-12 h-12 text-red-400" />
                   </div>
                 </motion.div>
+              </div>
+            </motion.div>
 
-                <DialogTitle className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-red-300 to-orange-400">
-                  Upload Ditolak!
-                </DialogTitle>
+            <DialogTitle className="text-lg font-bold">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-300 to-red-400">
+                PDF Tidak Bisa Di-edit
+              </span>
+            </DialogTitle>
 
-                <DialogDescription className="text-gray-400 text-sm mt-2">
-                  Nama file sudah ada dalam sistem
-                </DialogDescription>
-              </motion.div>
-            </DialogHeader>
-          </div>
+            <DialogDescription className="text-gray-400 text-xs mt-2">
+              File PDF tidak mendukung fitur edit langsung
+            </DialogDescription>
+          </DialogHeader>
 
-          {/* Content */}
-          <div className="relative p-6 pt-2 space-y-4">
-            {/* File name display */}
+          <div className="space-y-4 py-4">
+            {/* Main message */}
             <motion.div
-              className="bg-slate-800/60 border border-red-500/30 rounded-xl p-4 backdrop-blur-sm"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
+              className="bg-red-500/10 border border-red-500/30 rounded-xl p-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center border border-red-500/30">
-                  <FileIcon className="w-6 h-6 text-red-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-0.5">Nama File Duplikat</p>
-                  <p className="text-white font-semibold truncate text-sm">{duplicateFileName}</p>
-                </div>
-              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                Format <span className="text-red-400 font-semibold">PDF (Portable Document Format)</span> didesain untuk distribusi dokumen yang sudah final, bukan untuk editing. Berbeda dengan file Excel atau Word, PDF tidak dapat dimodifikasi secara langsung.
+              </p>
             </motion.div>
 
-            {/* Blocked message */}
+            {/* Solution cards */}
             <motion.div
-              className="bg-red-500/15 border border-red-500/40 rounded-xl p-4 backdrop-blur-sm"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-red-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <XCircle className="w-4 h-4 text-red-400" />
-                </div>
-                <div>
-                  <p className="text-red-300 font-semibold text-sm">Upload Diblokir</p>
-                  <p className="text-gray-400 text-xs mt-1 leading-relaxed">
-                    File dengan nama yang sama sudah ada di katalog. <span className="text-red-400 font-semibold">Overwrite tidak diizinkan</span> untuk menjaga integritas data.
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Solutions */}
-            <motion.div
-              className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl p-4 backdrop-blur-sm"
-              initial={{ opacity: 0, y: 10 }}
+              className="grid grid-cols-2 gap-3"
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
             >
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <CheckCircle className="w-4 h-4 text-amber-400" />
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <FileSpreadsheet className="w-4 h-4 text-green-400" />
+                  <span className="text-green-400 text-xs font-semibold">EXCEL</span>
                 </div>
+                <p className="text-gray-400 text-xs">
+                  Upload ulang dalam format <span className="text-green-400">.xlsx</span> atau <span className="text-green-400">.xls</span>
+                </p>
+              </div>
+
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText className="w-4 h-4 text-blue-400" />
+                  <span className="text-blue-400 text-xs font-semibold">WORD</span>
+                </div>
+                <p className="text-gray-400 text-xs">
+                  Upload ulang dalam format <span className="text-blue-400">.docx</span> atau <span className="text-blue-400">.doc</span>
+                </p>
+              </div>
+            </motion.div>
+
+            {/* Tip section */}
+            <motion.div
+              className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+            >
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="text-amber-300 font-semibold text-sm">Solusi</p>
-                  <ul className="text-gray-400 text-xs mt-2 space-y-2">
-                    <li className="flex items-start gap-2">
-                      <span className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-[10px] font-bold flex-shrink-0 mt-0.5">1</span>
-                      <span>Rename file Anda dengan nama yang berbeda, lalu upload kembali</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-[10px] font-bold flex-shrink-0 mt-0.5">2</span>
-                      <span>Gunakan fitur <span className="text-amber-400 font-medium">Edit</span> pada file yang ada jika ingin memperbarui konten</span>
-                    </li>
-                  </ul>
+                  <p className="text-amber-400 text-xs font-semibold mb-1">TIP</p>
+                  <p className="text-gray-400 text-xs">
+                    Jika Anda memiliki file asli sebelum dikonversi ke PDF, upload file tersebut untuk mengaktifkan fitur edit.
+                  </p>
                 </div>
               </div>
             </motion.div>
           </div>
 
-          {/* Actions - Only Cancel Button */}
-          <div className="relative p-6 pt-2">
-            <Button
-              onClick={() => {
-                setShowDuplicateFileDialog(false)
-                setPendingUploadForm(null)
-                setDuplicateFileName('')
-              }}
-              className="w-full bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500 text-white rounded-xl h-12 font-semibold border border-slate-500/50 shadow-lg"
+          <DialogFooter className="pt-4">
+            <motion.div
+              className="w-full"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
             >
-              <X className="w-5 h-5 mr-2" />
-              Tutup
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+              <Button
+                type="button"
+                onClick={() => setShowPdfWarningDialog(false)}
+                className="w-full bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-red-500/25"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Tutup
+              </Button>
+            </motion.div>
+          </DialogFooter>
+        </div>
+      </DialogContent>
+      </Dialog >
 
-      {/* Print Loading Dialog */}
-      <PrintLoadingDialog
-        open={showPrintDialog}
-        onClose={handlePrintDialogClose}
-        fileId={printDialogFileId}
-        fileName={printDialogFileName}
-        fileType={printDialogFileType}
-        onComplete={handlePrintComplete}
+
+    {/* Copyright Popup */ }
+    < CopyrightPopup show = { showCopyrightPopup } onClose = {() => setShowCopyrightPopup(false)
+} />
+
+{/* Image Cropper for Profile Photo */ }
+<ImageCropper
+  isOpen={showImageCropper}
+  onClose={() => {
+    setShowImageCropper(false)
+    setPhotoToCrop(null)
+  }}
+  imageFile={photoToCrop}
+  onCropComplete={(croppedFile) => {
+    setSelectedPhotoFile(croppedFile)
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      setProfilePhoto(e.target?.result as string)
+    }
+    reader.readAsDataURL(croppedFile)
+    setShowImageCropper(false)
+    setPhotoToCrop(null)
+  }}
+  aspectRatio={1}
+  circularCrop={true}
+/>
+
+{/* Duplicate File Warning Dialog - NO OVERWRITE ALLOWED */ }
+<Dialog open={showDuplicateFileDialog} onOpenChange={setShowDuplicateFileDialog}>
+  <DialogContent className="sm:max-w-md bg-gradient-to-b from-slate-900 to-slate-950 border border-red-500/40 shadow-2xl shadow-red-500/20 p-0 gap-0 overflow-hidden" aria-describedby={undefined}>
+    {/* Animated background effect */}
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {/* Pulsing red circles */}
+      <motion.div
+        className="absolute -top-20 -right-20 w-40 h-40 rounded-full bg-red-500/10"
+        animate={{
+          scale: [1, 1.2, 1],
+          opacity: [0.3, 0.5, 0.3],
+        }}
+        transition={{
+          duration: 3,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
       />
+      <motion.div
+        className="absolute -bottom-10 -left-10 w-32 h-32 rounded-full bg-orange-500/10"
+        animate={{
+          scale: [1, 1.3, 1],
+          opacity: [0.2, 0.4, 0.2],
+        }}
+        transition={{
+          duration: 4,
+          repeat: Infinity,
+          ease: 'easeInOut',
+          delay: 0.5,
+        }}
+      />
+    </div>
 
-      {/* Custom Highlight Animation CSS */}
-      <style jsx global>{`
+    {/* Header */}
+    <div className="relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-red-500/20 via-red-600/10 to-orange-500/20" />
+      <DialogHeader className="relative p-6 pb-4">
+        <motion.div
+          className="flex flex-col items-center text-center"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          {/* Animated blocked icon */}
+          <motion.div
+            className="relative mb-4"
+            animate={{
+              scale: [1, 1.08, 1],
+              rotate: [0, -3, 3, 0],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: 'easeInOut',
+            }}
+          >
+            {/* Glow effect */}
+            <div className="absolute inset-0 rounded-full bg-red-500/40 blur-2xl" />
+            <motion.div
+              className="absolute inset-0 rounded-full"
+              style={{
+                background: 'conic-gradient(from 0deg, rgba(239,68,68,0.3), rgba(239,68,68,0.1), rgba(239,68,68,0.3))',
+              }}
+              animate={{ rotate: 360 }}
+              transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
+            />
+            <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-2xl shadow-red-500/50 border-2 border-red-400/50">
+              <XCircle className="w-12 h-12 text-white" />
+            </div>
+          </motion.div>
+
+          <DialogTitle className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-red-300 to-orange-400">
+            Upload Ditolak!
+          </DialogTitle>
+
+          <DialogDescription className="text-gray-400 text-sm mt-2">
+            Nama file sudah ada dalam sistem
+          </DialogDescription>
+        </motion.div>
+      </DialogHeader>
+    </div>
+
+    {/* Content */}
+    <div className="relative p-6 pt-2 space-y-4">
+      {/* File name display */}
+      <motion.div
+        className="bg-slate-800/60 border border-red-500/30 rounded-xl p-4 backdrop-blur-sm"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.2 }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center border border-red-500/30">
+            <FileIcon className="w-6 h-6 text-red-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-0.5">Nama File Duplikat</p>
+            <p className="text-white font-semibold truncate text-sm">{duplicateFileName}</p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Blocked message */}
+      <motion.div
+        className="bg-red-500/15 border border-red-500/40 rounded-xl p-4 backdrop-blur-sm"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-red-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <XCircle className="w-4 h-4 text-red-400" />
+          </div>
+          <div>
+            <p className="text-red-300 font-semibold text-sm">Upload Diblokir</p>
+            <p className="text-gray-400 text-xs mt-1 leading-relaxed">
+              File dengan nama yang sama sudah ada di katalog. <span className="text-red-400 font-semibold">Overwrite tidak diizinkan</span> untuk menjaga integritas data.
+            </p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Solutions */}
+      <motion.div
+        className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl p-4 backdrop-blur-sm"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+      >
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-amber-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <CheckCircle className="w-4 h-4 text-amber-400" />
+          </div>
+          <div>
+            <p className="text-amber-300 font-semibold text-sm">Solusi</p>
+            <ul className="text-gray-400 text-xs mt-2 space-y-2">
+              <li className="flex items-start gap-2">
+                <span className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-[10px] font-bold flex-shrink-0 mt-0.5">1</span>
+                <span>Rename file Anda dengan nama yang berbeda, lalu upload kembali</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-[10px] font-bold flex-shrink-0 mt-0.5">2</span>
+                <span>Gunakan fitur <span className="text-amber-400 font-medium">Edit</span> pada file yang ada jika ingin memperbarui konten</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+
+    {/* Actions - Only Cancel Button */}
+    <div className="relative p-6 pt-2">
+      <Button
+        onClick={() => {
+          setShowDuplicateFileDialog(false)
+          setPendingUploadForm(null)
+          setDuplicateFileName('')
+        }}
+        className="w-full bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500 text-white rounded-xl h-12 font-semibold border border-slate-500/50 shadow-lg"
+      >
+        <X className="w-5 h-5 mr-2" />
+        Tutup
+      </Button>
+    </div>
+  </DialogContent>
+</Dialog>
+
+{/* Print Loading Dialog */ }
+<PrintLoadingDialog
+  open={showPrintDialog}
+  onClose={handlePrintDialogClose}
+  fileId={printDialogFileId}
+  fileName={printDialogFileName}
+  fileType={printDialogFileType}
+  onComplete={handlePrintComplete}
+/>
+
+{/* Custom Highlight Animation CSS */ }
+<style jsx global>{`
         @keyframes aesthetic-row-glow {
           0% { box-shadow: 0 0 5px rgba(249, 115, 22, 0.1); background-color: rgba(249, 115, 22, 0.02); }
           50% { box-shadow: inset 0 0 25px rgba(249, 115, 22, 0.15); background-color: rgba(249, 115, 22, 0.06); }
