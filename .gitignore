@@ -58,3 +58,4 @@ server.log
 /worklog.md// redeploy trigger 1772344137
 
 .env*.local
+.vercel

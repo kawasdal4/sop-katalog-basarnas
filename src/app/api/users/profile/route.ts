@@ -27,13 +27,11 @@ export async function GET() {
     let profilePhotoUrl = null
     if (user.profilePhoto) {
       const r2Url = getR2PublicUrl(user.profilePhoto)
+      const cacheBuster = user.updatedAt ? new Date(user.updatedAt).getTime() : Date.now()
       if (r2Url) {
-        // Add cache-busting parameter based on updatedAt
-        const cacheBuster = user.updatedAt ? new Date(user.updatedAt).getTime() : Date.now()
         profilePhotoUrl = `${r2Url}?v=${cacheBuster}`
       } else {
-        // Fallback to the key itself if public URL is not configured
-        profilePhotoUrl = user.profilePhoto
+        profilePhotoUrl = `/api/users/photo?key=${encodeURIComponent(user.profilePhoto)}&v=${cacheBuster}`
       }
     }
 
