@@ -7074,110 +7074,104 @@ export default function ESOPApp() {
 
                   {/* Edit SOP Dialog */}
                   <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-                    <DialogContent className="sm:max-w-none w-fit max-w-[95vw] bg-white border-0 shadow-2xl p-0 rounded-2xl overflow-visible" aria-describedby={undefined}>
-                      {/* Header with Basarnas theme */}
-                      <div className="relative bg-gradient-to-br from-orange-500 via-orange-600 to-red-700 p-6 text-white overflow-hidden">
-                        {/* Animated background */}
-                        <div className="absolute inset-0 overflow-hidden">
-                          <motion.div
-                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] h-[200px] rounded-full opacity-20"
-                            style={{
-                              background: 'conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.2) 30deg, transparent 60deg)'
-                            }}
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
-                          />
+                    <DialogContent className="sm:max-w-2xl p-0 overflow-hidden border-0 shadow-[0_0_40px_rgba(0,0,0,0.5)] bg-slate-900 rounded-[1.5rem]" aria-describedby={undefined}>
+                      {/* Premium Glassmorphism Header */}
+                      <div className="relative overflow-hidden p-6" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' }}>
+                        <div className="absolute inset-0 pointer-events-none">
+                          <motion.div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-orange-500/10 blur-3xl" animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }} />
+                          <motion.div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full bg-red-500/10 blur-3xl" animate={{ scale: [1.2, 1, 1.2], opacity: [0.4, 0.7, 0.4] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }} />
+                          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.1) 1px, transparent 0)', backgroundSize: '16px 16px' }} />
                         </div>
 
-                        <div className="relative z-10 flex items-center gap-4">
+                        <div className="relative z-10 flex items-center gap-5">
                           <motion.div
-                            className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-xl border border-white/20"
+                            className="w-16 h-16 rounded-2xl flex items-center justify-center relative shadow-2xl"
+                            style={{ background: 'linear-gradient(135deg, rgba(249,115,22,0.9), rgba(220,38,38,0.9))', boxShadow: '0 10px 30px -10px rgba(249,115,22,0.5)' }}
                             initial={{ scale: 0, rotate: -180 }}
                             animate={{ scale: 1, rotate: 0 }}
-                            transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
+                            transition={{ type: 'spring', stiffness: 200, damping: 15 }}
                           >
-                            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center">
-                              <Edit className="w-4 h-4 text-orange-600" />
-                            </div>
+                            <div className="absolute inset-0 rounded-2xl border border-white/20" />
+                            <Edit className="w-8 h-8 text-white drop-shadow-md" />
                           </motion.div>
                           <div className="flex-1 min-w-0">
-                            <DialogTitle className="text-lg font-bold text-white">
+                            <DialogTitle className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-400 tracking-tight">
                               Edit Data SOP
                             </DialogTitle>
-                            <div className="text-orange-100/90 text-sm mt-1.5 font-medium leading-relaxed whitespace-nowrap min-w-0">
+                            <DialogDescription className="text-slate-400 text-xs mt-1 font-medium truncate">
                               {editForm.judul}
-                            </div>
+                            </DialogDescription>
                           </div>
                         </div>
                       </div>
 
-                      {/* Form Content */}
-                      <form onSubmit={(e) => { e.preventDefault(); handleSaveEdit(); }} className="p-6 space-y-6 bg-gradient-to-b from-white via-orange-50/5 to-white">
+                      {/* Form Content inside Glassmorphism container */}
+                      <form onSubmit={(e) => { e.preventDefault(); handleSaveEdit(); }} className="p-6 space-y-6 bg-slate-900 border-t border-slate-800">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="space-y-4 md:col-span-2">
-                            <div className="flex items-center gap-2 pb-2 border-b border-orange-100/50">
+                            <div className="flex items-center gap-2 pb-2 border-b border-orange-500/20">
                               <div className="w-5 h-5 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                                <FileText className="w-3 h-3 text-orange-600" />
+                                <FileText className="w-3 h-3 text-orange-400" />
                               </div>
-                              <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Informasi Utama</span>
+                              <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">Informasi Utama</span>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                               <div className="space-y-1.5 md:col-span-1">
-                                <Label htmlFor="edit-nomor-sop" className="text-[11px] font-bold text-slate-500 uppercase ml-1">No. SOP</Label>
+                                <Label htmlFor="edit-nomor-sop" className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">No. SOP</Label>
                                 <Input
                                   id="edit-nomor-sop"
                                   value={editForm.nomorSop}
                                   onChange={(e) => setEditForm({ ...editForm, nomorSop: e.target.value })}
                                   placeholder="SOP-XXXX"
-                                  className="h-10 border-slate-200 focus:border-orange-500 focus:ring-orange-500/10 rounded-xl bg-slate-50/30"
+                                  className="h-11 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-orange-500 focus:ring-orange-500/20 rounded-xl transition-all font-medium"
                                 />
                               </div>
 
                               <div className="space-y-1.5 md:col-span-2">
-                                <Label htmlFor="edit-judul" className="text-[11px] font-bold text-slate-500 uppercase ml-1">Judul Dokumen <span className="text-red-500">*</span></Label>
+                                <Label htmlFor="edit-judul" className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Judul Dokumen <span className="text-red-500">*</span></Label>
                                 <Input
                                   id="edit-judul"
                                   value={editForm.judul}
                                   onChange={(e) => setEditForm({ ...editForm, judul: e.target.value })}
-                                  className="h-10 border-slate-200 focus:border-orange-500 focus:ring-orange-500/10 rounded-xl"
+                                  className="h-11 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-orange-500 focus:ring-orange-500/20 rounded-xl transition-all font-medium"
                                 />
                               </div>
                             </div>
                           </div>
 
                           <div className="space-y-4">
-                            <div className="flex items-center gap-2 pb-2 border-b border-orange-100/50">
+                            <div className="flex items-center gap-2 pb-2 border-b border-blue-500/20">
                               <div className="w-5 h-5 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                                <Tag className="w-3 h-3 text-blue-600" />
+                                <Tag className="w-3 h-3 text-blue-400" />
                               </div>
-                              <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Klasifikasi</span>
+                              <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">Klasifikasi</span>
                             </div>
 
-                            <div className="space-y-3">
+                            <div className="space-y-4">
                               <div className="space-y-1.5">
-                                <Label className="text-[11px] font-bold text-slate-500 uppercase ml-1">Kategori</Label>
+                                <Label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Kategori</Label>
                                 <Select value={editForm.kategori} onValueChange={(v) => setEditForm({ ...editForm, kategori: v })}>
-                                  <SelectTrigger className="h-10 border-slate-200 focus:border-orange-500 rounded-xl">
+                                  <SelectTrigger className="h-11 bg-slate-800/50 border-slate-700 text-slate-200 focus:border-orange-500 rounded-xl">
                                     <SelectValue />
                                   </SelectTrigger>
-                                  <SelectContent className="rounded-xl">
+                                  <SelectContent className="bg-slate-800 border-slate-700 text-slate-200 rounded-xl">
                                     {KATEGORI_OPTIONS.map(k => (
-                                      <SelectItem key={k} value={k}>{k}</SelectItem>
+                                      <SelectItem key={k} value={k} className="focus:bg-slate-700 focus:text-white">{k}</SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
                               </div>
 
                               <div className="space-y-1.5">
-                                <Label className="text-[11px] font-bold text-slate-500 uppercase ml-1">Lingkup</Label>
+                                <Label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Lingkup</Label>
                                 <Select value={editForm.lingkup} onValueChange={(v) => setEditForm({ ...editForm, lingkup: v })}>
-                                  <SelectTrigger className="h-10 border-slate-200 focus:border-orange-500 rounded-xl">
+                                  <SelectTrigger className="h-11 bg-slate-800/50 border-slate-700 text-slate-200 focus:border-orange-500 rounded-xl">
                                     <SelectValue />
                                   </SelectTrigger>
-                                  <SelectContent className="rounded-xl">
+                                  <SelectContent className="bg-slate-800 border-slate-700 text-slate-200 rounded-xl">
                                     {LINGKUP_OPTIONS.map(l => (
-                                      <SelectItem key={l} value={l}>{l}</SelectItem>
+                                      <SelectItem key={l} value={l} className="focus:bg-slate-700 focus:text-white">{l}</SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
@@ -7186,49 +7180,49 @@ export default function ESOPApp() {
                           </div>
 
                           <div className="space-y-4">
-                            <div className="flex items-center gap-2 pb-2 border-b border-orange-100/50">
+                            <div className="flex items-center gap-2 pb-2 border-b border-green-500/20">
                               <div className="w-5 h-5 rounded-lg bg-green-500/10 flex items-center justify-center">
-                                <Calendar className="w-3 h-3 text-green-600" />
+                                <Calendar className="w-3 h-3 text-green-400" />
                               </div>
-                              <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Metadata</span>
+                              <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">Metadata</span>
                             </div>
 
-                            <div className="space-y-3">
+                            <div className="space-y-4">
                               <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1.5">
-                                  <Label className="text-[11px] font-bold text-slate-500 uppercase ml-1">Jenis</Label>
+                                  <Label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Jenis</Label>
                                   <Select value={editForm.jenis} onValueChange={(v) => setEditForm({ ...editForm, jenis: v })}>
-                                    <SelectTrigger className="h-10 border-slate-200 focus:border-orange-500 rounded-xl">
+                                    <SelectTrigger className="h-11 bg-slate-800/50 border-slate-700 text-slate-200 focus:border-orange-500 rounded-xl">
                                       <SelectValue />
                                     </SelectTrigger>
-                                    <SelectContent className="rounded-xl">
+                                    <SelectContent className="bg-slate-800 border-slate-700 text-slate-200 rounded-xl">
                                       {JENIS_OPTIONS.map(j => (
-                                        <SelectItem key={j} value={j}>{j}</SelectItem>
+                                        <SelectItem key={j} value={j} className="focus:bg-slate-700 focus:text-white">{j}</SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>
                                 </div>
                                 <div className="space-y-1.5">
-                                  <Label className="text-[11px] font-bold text-slate-500 uppercase ml-1">Tahun</Label>
+                                  <Label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Tahun</Label>
                                   <Input
                                     type="number"
                                     value={editForm.tahun || ''}
                                     onChange={(e) => setEditForm({ ...editForm, tahun: parseInt(e.target.value) })}
                                     required
-                                    className="h-10 border-slate-200 focus:border-orange-500 rounded-xl text-center"
+                                    className="h-11 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-orange-500 focus:ring-orange-500/20 rounded-xl text-center font-medium"
                                   />
                                 </div>
                               </div>
 
                               <div className="space-y-1.5">
-                                <Label className="text-[11px] font-bold text-slate-500 uppercase ml-1">Status Dokumen</Label>
+                                <Label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Status Dokumen</Label>
                                 <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
-                                  <SelectTrigger className="h-10 border-slate-200 focus:border-orange-500 rounded-xl">
+                                  <SelectTrigger className="h-11 bg-slate-800/50 border-slate-700 text-slate-200 focus:border-orange-500 rounded-xl">
                                     <SelectValue />
                                   </SelectTrigger>
-                                  <SelectContent className="rounded-xl">
+                                  <SelectContent className="bg-slate-800 border-slate-700 text-slate-200 rounded-xl">
                                     {STATUS_OPTIONS.map(s => (
-                                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                                      <SelectItem key={s} value={s} className="focus:bg-slate-700 focus:text-white">{s}</SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
@@ -7238,26 +7232,26 @@ export default function ESOPApp() {
                         </div>
 
                         {/* Action Buttons */}
-                        <div className="flex gap-4 pt-4 border-t border-slate-100">
+                        <div className="flex gap-3 pt-4 border-t border-slate-800 mt-6 relative">
+                          <div className="absolute -top-6 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-orange-500/20 to-transparent" />
                           <Button
                             type="button"
-                            variant="outline"
                             onClick={() => setShowEditDialog(false)}
-                            className="flex-1 h-10 border-2 border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl font-medium"
+                            className="w-1/3 h-12 bg-slate-800 hover:bg-slate-700 text-white border-0 rounded-xl font-bold transition-colors"
                           >
                             Batal
                           </Button>
                           <Button
                             type="submit"
-                            className="flex-1 h-10 bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 hover:from-orange-600 hover:via-orange-700 hover:to-red-700 text-white shadow-lg shadow-orange-500/30 rounded-xl font-bold relative overflow-hidden"
+                            className="flex-1 h-12 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white border-0 shadow-[0_0_20px_rgba(249,115,22,0.3)] hover:shadow-[0_0_25px_rgba(249,115,22,0.5)] rounded-xl font-bold relative overflow-hidden transition-all"
                           >
                             <motion.div
                               className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                              animate={{ x: ['-100%', '100%'] }}
-                              transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                              animate={{ x: ['-200%', '200%'] }}
+                              transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
                             />
                             <span className="relative z-10 flex items-center justify-center gap-2">
-                              <Check className="w-4 h-4" />
+                              <Check className="w-5 h-5" />
                               Simpan Perubahan
                             </span>
                           </Button>
