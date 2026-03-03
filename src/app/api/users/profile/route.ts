@@ -149,21 +149,35 @@ export async function PUT(request: NextRequest) {
       }
 
       // Upload new photo
-      const photoBuffer = Buffer.from(await photo.arrayBuffer())
-      const fileExt = photo.name.split('.').pop() || 'jpg'
-      const photoKey = `profile-photos/${userId}-${Date.now()}.${fileExt}`
+      try {
+        const photoBuffer = Buffer.from(await photo.arrayBuffer())
+        const fileExt = photo.name.split('.').pop() || 'jpg'
+        const photoKey = `profile-photos/${userId}-${Date.now()}.${fileExt}`
+        const contentType = photo.type || 'image/jpeg'
 
-      console.log('[Profile API] Uploading photo:', {
-        photoKey,
-        bufferSize: photoBuffer.length,
-        fileType: photo.type
-      })
+        console.log('[Profile API] Starting R2 upload:', {
+          photoKey,
+          bufferSize: photoBuffer.length,
+          contentType
+        })
 
-      // Don't pass folder option since photoKey already includes the folder prefix
-      await uploadToR2(photoBuffer, photoKey, photo.type)
+        // Don't pass folder option since photoKey already includes the folder prefix
+        const uploadResult = await uploadToR2(photoBuffer, photoKey, contentType)
 
-      console.log('[Profile API] Photo uploaded successfully:', photoKey)
-      updateData.profilePhoto = photoKey
+        console.log('[Profile API] R2 upload successful result:', {
+          key: uploadResult.key,
+          publicUrl: uploadResult.publicUrl,
+          hasUrl: !!uploadResult.url
+        })
+
+        updateData.profilePhoto = photoKey
+      } catch (uploadError) {
+        console.error('[Profile API] R2 upload FAILED:', uploadError)
+        return NextResponse.json({
+          error: 'Gagal mengunggah foto ke penyimpanan awan',
+          details: uploadError instanceof Error ? uploadError.message : String(uploadError)
+        }, { status: 500 })
+      }
     }
 
     // Only update if there are changes

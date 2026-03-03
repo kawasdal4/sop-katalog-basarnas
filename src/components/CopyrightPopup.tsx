@@ -94,6 +94,9 @@ export default function CopyrightPopup({ show, onClose }: CopyrightPopupProps) {
                           src="https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/foe.jpg"
                           alt="Developer"
                           className="w-full h-full object-cover object-[center_30%]"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = '/foe.jpg'
+                          }}
                         />
                       </div>
                       {/* Online indicator */}

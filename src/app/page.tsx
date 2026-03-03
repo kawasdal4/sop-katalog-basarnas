@@ -430,6 +430,9 @@ function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
         alt="BASARNAS Logo"
         className="relative z-20 w-full h-full object-contain"
         style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.3))' }}
+        onError={(e) => {
+          (e.currentTarget as HTMLImageElement).src = '/logo.png'
+        }}
       />
     </motion.div>
   )
