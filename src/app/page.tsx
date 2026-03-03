@@ -1211,17 +1211,18 @@ export default function ESOPApp() {
   }, [])
 
   const fetchStats = useCallback(async () => {
+    // Safety net: always close overlay after 5s max, even if the request fails silently
+    const safetyTimer = setTimeout(() => setShowDashboardLoading(false), 5000)
     try {
       const res = await fetch('/api/stats')
       const data = await res.json()
       if (!data.error) {
         setStats(data)
-        // Hide dashboard loading overlay after stats are loaded
-        setShowDashboardLoading(false)
       }
     } catch (error) {
       console.error('Stats error:', error)
-      // Also hide loading on error
+    } finally {
+      clearTimeout(safetyTimer)
       setShowDashboardLoading(false)
     }
   }, [])
@@ -1905,17 +1906,15 @@ export default function ESOPApp() {
     }
   }, [user?.id])
 
-  // Show dashboard loading on initial auth
-  useEffect(() => {
-    if (isAuthenticated && user && currentPage === 'dashboard') {
-      // Show loading overlay when navigating to dashboard (initial load)
-      if (!stats) {
-        setDashboardLoadMessage('Memuat Dashboard')
-        setDashboardLoadSubmessage('Mengambil data statistik...')
-        setShowDashboardLoading(true)
-      }
-    }
-  }, [isAuthenticated, user, currentPage, stats])
+  // Deliberately disabled: do NOT auto-show dashboard loading overlay.
+  // Enabling it caused a race condition where the overlay got stuck permanently.
+  // useEffect(() => {
+  //   if (isAuthenticated && user && currentPage === 'dashboard') {
+  //     if (!stats) {
+  //       setShowDashboardLoading(true)
+  //     }
+  //   }
+  // }, [isAuthenticated, user, currentPage, stats])
 
   // Fetch data when authenticated
   useEffect(() => {
