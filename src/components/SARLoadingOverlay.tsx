@@ -73,9 +73,6 @@ function SARAnimatedLogo() {
         alt="BASARNAS Logo"
         className="relative z-10 w-full h-full object-contain"
         style={{ filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.4))' }}
-        onError={(e) => {
-          (e.currentTarget as HTMLImageElement).src = '/logo.png'
-        }}
       />
 
       {/* Shimmer effect */}

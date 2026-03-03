@@ -380,9 +380,7 @@ function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
     lg: 'w-16 h-16'
   }
 
-  // Default to local logo for reliability, but keep the R2 URL as a fallback/comment
-  const logoUrl = '/logo.png'
-  // const r2LogoUrl = 'https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/logo.png'
+  const logoUrl = 'https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/logo.png'
 
   return (
     <motion.div

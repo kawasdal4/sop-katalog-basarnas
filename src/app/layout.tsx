@@ -23,11 +23,9 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/logo.png", type: "image/png" },
-      { url: "/logo.png", type: "image/png" },
     ],
     apple: [
       { url: "https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/logo.png" },
-      { url: "/logo.png" },
     ],
   },
   openGraph: {
