@@ -38,9 +38,17 @@ export async function GET(request: NextRequest) {
                     'Cache-Control': `public, max-age=${maxAge}, stale-while-revalidate=600`,
                 },
             })
-        } catch (e) {
-            console.error(`[Photo Proxy] Error fetching image ${key}:`, e)
-            return NextResponse.json({ error: 'Image not found or accessible' }, { status: 404 })
+        } catch (e: any) {
+            console.error(`[Photo Proxy] Error fetching image "${key}":`, {
+                message: e.message,
+                code: e.Code || e.name,
+                stack: e.stack
+            })
+            return NextResponse.json({
+                error: 'Image not found or accessible',
+                details: e.message,
+                code: e.Code || e.name
+            }, { status: 404 })
         }
 
     } catch (error) {

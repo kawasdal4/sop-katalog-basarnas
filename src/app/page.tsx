@@ -5605,6 +5605,16 @@ export default function ESOPApp() {
                           src={user.profilePhotoUrl}
                           alt="Profile"
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = 'none';
+                            const parent = (e.currentTarget as HTMLImageElement).parentElement;
+                            if (parent) {
+                              const fallback = document.createElement('span');
+                              fallback.className = 'text-white text-base font-bold';
+                              fallback.innerText = user?.name?.charAt(0)?.toUpperCase() || '?';
+                              parent.appendChild(fallback);
+                            }
+                          }}
                         />
                       ) : (
                         <span className="text-white text-base font-bold">{user?.name?.charAt(0)?.toUpperCase()}</span>
@@ -10012,7 +10022,21 @@ export default function ESOPApp() {
                 <div className="absolute -inset-1 rounded-full bg-white/30 blur-md" />
                 <div className="relative w-20 h-20 rounded-full ring-4 ring-white/30 overflow-hidden bg-gradient-to-br from-white/20 to-white/5 flex items-center justify-center">
                   {profilePhoto ? (
-                    <img src={profilePhoto} alt="Profile" className="w-full h-full object-cover" />
+                    <img
+                      src={profilePhoto}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                        const parent = (e.currentTarget as HTMLImageElement).parentElement;
+                        if (parent) {
+                          const fallback = document.createElement('span');
+                          fallback.className = 'text-3xl font-black text-white drop-shadow-lg';
+                          fallback.innerText = user?.name?.charAt(0)?.toUpperCase() || '?';
+                          parent.appendChild(fallback);
+                        }
+                      }}
+                    />
                   ) : (
                     <span className="text-3xl font-black text-white drop-shadow-lg">
                       {user?.name?.charAt(0)?.toUpperCase()}
