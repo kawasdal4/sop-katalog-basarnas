@@ -435,7 +435,7 @@ function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
   )
 }
 
-// Animated Stat Card Component - Redesigned
+
 function StatCard({
   title,
   value,
@@ -848,6 +848,7 @@ export default function ESOPApp() {
   const [katalogLoading, setKatalogLoading] = useState(false)
   const [verifikasiLoading, setVerifikasiLoading] = useState(false)
   const [arsipLoading, setArsipLoading] = useState(false)
+  const [logsLoading, setLogsLoading] = useState(false)
 
   // Pagination debounce - prevents rapid clicks and double-fetching
   const isPaginationLoadingRef = useRef(false)
@@ -1748,10 +1749,12 @@ export default function ESOPApp() {
     }
   }, [arsipPagination.page, arsipPagination.limit])
 
-  const fetchLogs = useCallback(async () => {
+  const fetchLogs = useCallback(async (pageOverride?: number) => {
+    setLogsLoading(true)
     try {
+      const page = pageOverride ?? logsPagination.page
       const params = new URLSearchParams({
-        page: logsPagination.page.toString(),
+        page: page.toString(),
         limit: logsPagination.limit.toString()
       })
 
@@ -1770,10 +1773,12 @@ export default function ESOPApp() {
       const data = await res.json()
       if (!data.error) {
         setLogs(data.data)
-        setLogsPagination(p => ({ ...p, total: data.pagination.total, totalPages: data.pagination.totalPages }))
+        setLogsPagination(p => ({ ...p, total: data.pagination.total, totalPages: data.pagination.totalPages, page }))
       }
     } catch (error) {
       console.error('Fetch logs error:', error)
+    } finally {
+      setLogsLoading(false)
     }
   }, [logsPagination.page, logsPagination.limit, logsTimeFilter, logsUserFilter, logsActivityFilter])
 
@@ -1869,8 +1874,6 @@ export default function ESOPApp() {
       fetchR2Status()
       fetchSyncStatus()
 
-      if (currentPage === 'logs') fetchLogs()
-
       // Debug logging for users page
       console.log('🔍 Checking users page condition:', {
         currentPage,
@@ -1883,7 +1886,13 @@ export default function ESOPApp() {
         fetchUsers()
       }
     }
-  }, [isAuthenticated, user, currentPage, logsPagination.page, fetchStats, fetchDriveStatus, fetchR2Status, fetchSyncStatus, fetchLogs, fetchUsers])
+  }, [isAuthenticated, user, currentPage, fetchStats, fetchDriveStatus, fetchR2Status, fetchSyncStatus, fetchUsers])
+
+  // Dedicated useEffect for logs - pagination changes only re-fetch logs, not all dashboard data
+  useEffect(() => {
+    if (!isAuthenticated || currentPage !== 'logs') return
+    fetchLogs()
+  }, [isAuthenticated, currentPage, logsPagination.page, logsTimeFilter, logsUserFilter, logsActivityFilter])
 
   // Single useEffect for katalog - handles all fetching including pagination
   useEffect(() => {
@@ -1991,6 +2000,13 @@ export default function ESOPApp() {
     }
   }, [arsipSearch, arsipLingkupFilter, arsipSortBy, isAuthenticated, currentPage])
 
+  // Reset page for logs when filters change
+  useEffect(() => {
+    if (isAuthenticated && currentPage === 'logs') {
+      setLogsPagination(p => ({ ...p, page: 1 }))
+    }
+  }, [logsTimeFilter, logsUserFilter, logsActivityFilter, isAuthenticated, currentPage])
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -2023,18 +2039,6 @@ export default function ESOPApp() {
           setDashboardLoadSubmessage('Memuat data dashboard...')
           setShowDashboardLoading(true)
         }, 2500)
-
-        // Run auto-rename in background (check and rename files that don't match titles)
-        if (data.user?.role === 'ADMIN' || data.user?.role === 'DEVELOPER') {
-          fetch('/api/auto-rename', { method: 'POST' })
-            .then(res => res.json())
-            .then(renameData => {
-              if (renameData.success && renameData.renamed > 0) {
-                console.log(`✅ [Auto-Rename] ${renameData.renamed} files renamed`)
-              }
-            })
-            .catch(err => console.warn('[Auto-Rename] Error:', err))
-        }
 
         // Fetch data immediately after login
         fetchStats()
@@ -4863,7 +4867,7 @@ export default function ESOPApp() {
 
         {/* Copyright Popup */}
         <CopyrightPopup show={showCopyrightPopup} onClose={() => setShowCopyrightPopup(false)} />
-      </div >
+      </div>
     )
   }
 
@@ -5081,7 +5085,7 @@ export default function ESOPApp() {
                 {/* Dorsal fins */}
                 {[...Array(8)].map((_, i) => (
                   <motion.path
-                    key={`fin - ${i} `}
+                    key={`fin-${i}`}
                     d={`M${180 + i * 55},${260 - (i % 2) * 20} L${200 + i * 55},${220 - (i % 2) * 30} L${220 + i * 55},${265 - (i % 2) * 15} `}
                     fill="#FF6B00"
                     animate={{ opacity: [0.7, 1, 0.7] }}
@@ -5112,14 +5116,14 @@ export default function ESOPApp() {
             {/* Golden sparkles */}
             {[...Array(50)].map((_, i) => (
               <motion.div
-                key={`sparkle - ${i} `}
+                key={`sparkle-${i}`}
                 className="absolute"
                 style={{
-                  left: `${Math.random() * 100}% `,
-                  top: `${Math.random() * 100}% `,
-                  width: `${4 + Math.random() * 8} px`,
-                  height: `${4 + Math.random() * 8} px`,
-                  background: `radial - gradient(circle, #FFD700 0 %, #FFA500 50 %, transparent 70 %)`,
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                  width: `${4 + Math.random() * 8}px`,
+                  height: `${4 + Math.random() * 8}px`,
+                  background: 'radial-gradient(circle, #FFD700 0%, #FFA500 50%, transparent 70%)',
                   borderRadius: '50%',
                 }}
                 initial={{ scale: 0, opacity: 0 }}
@@ -5139,11 +5143,11 @@ export default function ESOPApp() {
             {/* Floating golden clouds */}
             {[...Array(6)].map((_, i) => (
               <motion.div
-                key={`cloud - ${i} `}
+                key={`cloud-${i}`}
                 className="absolute opacity-40"
                 style={{
-                  left: `${-20 + i * 25}% `,
-                  top: `${20 + (i % 3) * 25}% `,
+                  left: `${-20 + i * 25}%`,
+                  top: `${20 + (i % 3) * 25}%`,
                   width: '200px',
                   height: '80px',
                   background: 'radial-gradient(ellipse, rgba(255, 215, 0, 0.5) 0%, transparent 70%)',
@@ -5170,11 +5174,11 @@ export default function ESOPApp() {
             >
               {[...Array(16)].map((_, i) => (
                 <div
-                  key={`ray - ${i} `}
+                  key={`ray-${i}`}
                   className="absolute left-1/2 top-1/2 w-1 h-[50vh]"
                   style={{
                     background: 'linear-gradient(to top, transparent, rgba(255, 215, 0, 0.2), transparent)',
-                    transform: `rotate(${i * 22.5}deg) translateX(-50 %)`,
+                    transform: `rotate(${i * 22.5}deg) translateX(-50%)`,
                     transformOrigin: 'center bottom',
                   }}
                 />
@@ -5322,7 +5326,7 @@ export default function ESOPApp() {
             ].map((corner, i) => (
               <motion.div
                 key={i}
-                className={`absolute ${corner.top} ${corner.left} w - 24 h - 24 ${corner.borders} ${corner.rounded} border - amber - 400 / 60`}
+                className={`absolute ${corner.top} ${corner.left} w-24 h-24 ${corner.borders} ${corner.rounded} border-amber-400/60`}
                 initial={{ opacity: 0, x: i % 2 === 0 ? -50 : 50, y: i < 2 ? -50 : 50 }}
                 animate={{ opacity: 1, x: 0, y: 0 }}
                 transition={{ delay: 0.3 }}
@@ -5334,9 +5338,21 @@ export default function ESOPApp() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden"
+            exit={{
+              opacity: 0,
+              scale: 1.5,
+              filter: 'blur(20px)',
+              transition: { duration: 0.8, ease: [0.4, 0, 0.2, 1] }
+            }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden bg-black"
           >
+            {/* White flush portal effect on exit */}
+            <motion.div
+              className="absolute inset-0 z-[100] bg-white pointer-events-none"
+              initial={{ opacity: 0 }}
+              exit={{ opacity: 1 }}
+              transition={{ duration: 0.4, delay: 0.2 }}
+            />
             {/* 1. Full Screen Background Layer */}
             <motion.div
               className={`absolute inset-0 transition-colors duration-700 ${loginSuccessRole === 'ADMIN'
@@ -5872,6 +5888,8 @@ export default function ESOPApp() {
                     <motion.div
                       className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
                       variants={fadeInUp}
+                      initial="initial"
+                      animate="animate"
                     >
                       <ShimmerTitle subtitle="Overview sistem katalog SOP dan IK">Laporan Analitik</ShimmerTitle>
                       <div className="flex flex-wrap items-center gap-3">
@@ -5986,7 +6004,7 @@ export default function ESOPApp() {
                       </motion.div>
                     )}
 
-                    {/* Stats Cards */}
+                    {/* Stats Cards - Row 1: Document Counts */}
                     <motion.div
                       className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
                       variants={staggerContainer}
@@ -5999,6 +6017,7 @@ export default function ESOPApp() {
                         delay={0}
                         subtitle="Standar Operasional Prosedur"
                         total={stats.totalSop + stats.totalIk}
+                        trend={stats.totalSop > 0 ? 'up' : undefined}
                       />
                       <StatCard
                         title="Total IK"
@@ -6015,7 +6034,7 @@ export default function ESOPApp() {
                         icon={Eye}
                         color="cyan"
                         delay={0.2}
-                        subtitle="Dokumen dilihat"
+                        subtitle="Dokumen dilihat oleh pengguna"
                       />
                       <StatCard
                         title="Total Download"
@@ -6023,11 +6042,11 @@ export default function ESOPApp() {
                         icon={Download}
                         color="purple"
                         delay={0.3}
-                        subtitle="Dokumen diunduh"
+                        subtitle="Dokumen diunduh oleh pengguna"
                       />
                     </motion.div>
 
-                    {/* Status Cards */}
+                    {/* Stats Cards - Row 2: Status Breakdown */}
                     <motion.div
                       className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
                       variants={staggerContainer}
@@ -6038,7 +6057,7 @@ export default function ESOPApp() {
                         icon={CheckCircle}
                         color="green"
                         delay={0.4}
-                        subtitle="Dokumen berlaku"
+                        subtitle="Dokumen berlaku & dapat digunakan"
                         total={stats.totalSop + stats.totalIk}
                         trend={stats.totalAktif > stats.totalReview ? 'up' : undefined}
                       />
@@ -6048,8 +6067,9 @@ export default function ESOPApp() {
                         icon={Clock}
                         color="yellow"
                         delay={0.5}
-                        subtitle="Perlu ditinjau"
+                        subtitle="Sedang ditinjau / menunggu persetujuan"
                         total={stats.totalSop + stats.totalIk}
+                        trend={stats.totalReview > 0 ? 'down' : undefined}
                       />
                       <StatCard
                         title="Kadaluarsa"
@@ -6057,8 +6077,9 @@ export default function ESOPApp() {
                         icon={XCircle}
                         color="red"
                         delay={0.6}
-                        subtitle="Tidak berlaku"
+                        subtitle="Dokumen tidak berlaku / perlu diperbarui"
                         total={stats.totalSop + stats.totalIk}
+                        trend={stats.totalKadaluarsa > 0 ? 'down' : undefined}
                       />
                       <StatCard
                         title="Lingkup"
@@ -6066,7 +6087,7 @@ export default function ESOPApp() {
                         icon={Globe}
                         color="blue"
                         delay={0.7}
-                        subtitle="Bidang kerja"
+                        subtitle="Bidang kerja yang tercakup dalam katalog"
                       />
                     </motion.div>
 
@@ -6081,83 +6102,99 @@ export default function ESOPApp() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.3 }}
                       >
-                        <Card className="relative overflow-hidden bg-gradient-to-br from-white via-orange-50/30 to-amber-50/50 border border-orange-100/50 shadow-2xl shadow-orange-200/20">
-                          {/* Decorative Elements */}
-                          <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-orange-400/10 to-transparent rounded-full blur-3xl" />
-                          <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-amber-400/10 to-transparent rounded-full blur-2xl" />
+                        <Card className="relative overflow-hidden border-0 shadow-2xl" style={{ background: 'linear-gradient(145deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)' }}>
+                          {/* Animated glow effects */}
+                          <motion.div
+                            animate={{ opacity: [0.3, 0.6, 0.3], scale: [1, 1.1, 1] }}
+                            transition={{ duration: 4, repeat: Infinity }}
+                            className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-orange-500/20 to-transparent rounded-full blur-3xl"
+                          />
+                          <motion.div
+                            animate={{ opacity: [0.2, 0.5, 0.2] }}
+                            transition={{ duration: 5, repeat: Infinity, delay: 1 }}
+                            className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-amber-500/15 to-transparent rounded-full blur-2xl"
+                          />
+                          {/* Subtle grid overlay */}
+                          <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.3) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
 
                           <CardHeader className="relative pb-2">
                             <div className="flex items-center justify-between">
                               <div>
-                                <div className="flex items-center gap-2 mb-1">
+                                <div className="flex items-center gap-3 mb-1">
                                   <motion.div
                                     animate={{ rotate: [0, 10, -10, 0] }}
                                     transition={{ duration: 4, repeat: Infinity }}
-                                    className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center shadow-lg shadow-orange-200/50"
+                                    className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-400 via-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-500/30 ring-2 ring-orange-400/20"
                                   >
-                                    <BarChart2 className="w-5 h-5 text-white" />
+                                    <BarChart2 className="w-6 h-6 text-white" />
                                   </motion.div>
                                   <div>
-                                    <CardTitle className="text-lg font-bold bg-gradient-to-r from-orange-700 to-amber-600 bg-clip-text text-transparent">
+                                    <CardTitle className="text-lg font-extrabold bg-gradient-to-r from-orange-300 via-amber-200 to-yellow-300 bg-clip-text text-transparent">
                                       Distribusi per Tahun
                                     </CardTitle>
-                                    <p className="text-xs text-gray-500">Jumlah dokumen berdasarkan tahun pembuatan</p>
+                                    <p className="text-xs text-gray-400 mt-0.5">Jumlah dokumen SOP & IK berdasarkan tahun pembuatan</p>
                                   </div>
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <p className="text-2xl font-bold text-orange-600">{stats.byTahun?.length || 0}</p>
-                                <p className="text-xs text-gray-400">Tahun</p>
+                              <div className="text-right px-4 py-2 rounded-xl" style={{ background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.2)' }}>
+                                <p className="text-3xl font-black bg-gradient-to-r from-orange-400 to-amber-300 bg-clip-text text-transparent">{stats.byTahun?.length || 0}</p>
+                                <p className="text-[10px] text-orange-300/60 uppercase tracking-widest font-bold">Tahun</p>
                               </div>
                             </div>
                           </CardHeader>
                           <CardContent className="relative">
-                            <ResponsiveContainer width="100%" height={280}>
-                              <BarChart data={stats.byTahun}>
+                            <ResponsiveContainer width="100%" height={300}>
+                              <BarChart data={stats.byTahun} barCategoryGap="20%">
                                 <defs>
                                   <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#f97316" stopOpacity={1}/>
-                                    <stop offset="50%" stopColor="#ea580c" stopOpacity={1}/>
-                                    <stop offset="100%" stopColor="#c2410c" stopOpacity={1}/>
+                                    <stop offset="0%" stopColor="#fb923c" stopOpacity={1} />
+                                    <stop offset="40%" stopColor="#f97316" stopOpacity={1} />
+                                    <stop offset="100%" stopColor="#c2410c" stopOpacity={0.8} />
                                   </linearGradient>
-                                  <filter id="barShadow" x="-20%" y="-20%" width="140%" height="140%">
-                                    <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#f97316" floodOpacity="0.3"/>
+                                  <linearGradient id="barGlow" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#fbbf24" stopOpacity={0.8} />
+                                    <stop offset="100%" stopColor="#f97316" stopOpacity={0.6} />
+                                  </linearGradient>
+                                  <filter id="barShadow" x="-20%" y="-20%" width="140%" height="150%">
+                                    <feDropShadow dx="0" dy="6" stdDeviation="6" floodColor="#f97316" floodOpacity="0.4" />
                                   </filter>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#fed7aa" strokeOpacity={0.5} vertical={false} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
                                 <XAxis
                                   dataKey="tahun"
-                                  stroke="#fb923c"
-                                  tick={{ fill: '#f97316', fontWeight: 600, fontSize: 12 }}
-                                  axisLine={{ stroke: '#fed7aa' }}
-                                  tickLine={{ stroke: '#fdba74' }}
+                                  stroke="rgba(251,146,60,0.4)"
+                                  tick={{ fill: '#fb923c', fontWeight: 700, fontSize: 12 }}
+                                  axisLine={{ stroke: 'rgba(251,146,60,0.2)' }}
+                                  tickLine={false}
                                 />
                                 <YAxis
-                                  stroke="#fb923c"
-                                  tick={{ fill: '#f97316', fontWeight: 600, fontSize: 12 }}
-                                  axisLine={{ stroke: '#fed7aa' }}
-                                  tickLine={{ stroke: '#fdba74' }}
+                                  stroke="rgba(251,146,60,0.4)"
+                                  tick={{ fill: 'rgba(251,146,60,0.6)', fontWeight: 600, fontSize: 11 }}
+                                  axisLine={{ stroke: 'rgba(251,146,60,0.15)' }}
+                                  tickLine={false}
                                 />
                                 <Tooltip
                                   content={({ active, payload, label }) => {
                                     if (active && payload && payload.length) {
+                                      const maxCount = Math.max(...stats.byTahun.map(d => d.count))
+                                      const pct = maxCount > 0 ? Math.round(((payload[0].value as number) / maxCount) * 100) : 0
                                       return (
-                                        <div className="bg-white/95 backdrop-blur-sm border-2 border-orange-300 rounded-xl shadow-2xl shadow-orange-200/50 p-3">
-                                          <div className="flex items-center gap-2 mb-2">
-                                            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-orange-400 to-amber-500" />
-                                            <span className="font-bold text-gray-700">Tahun {label}</span>
+                                        <div className="border rounded-2xl shadow-2xl p-4 min-w-[180px]" style={{ background: 'linear-gradient(135deg, rgba(15,15,30,0.95), rgba(22,33,62,0.95))', borderColor: 'rgba(249,115,22,0.4)', backdropFilter: 'blur(12px)' }}>
+                                          <div className="flex items-center gap-2 mb-3">
+                                            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-orange-400 to-amber-400 shadow shadow-orange-500/50" />
+                                            <span className="font-bold text-orange-200 text-sm">Tahun {label}</span>
                                           </div>
-                                          <div className="flex items-center gap-2">
-                                            <FileText className="w-4 h-4 text-orange-500" />
-                                            <span className="text-2xl font-bold text-orange-600">{payload[0].value}</span>
-                                            <span className="text-gray-500 text-sm">dokumen</span>
+                                          <div className="flex items-end gap-2 mb-3">
+                                            <span className="text-3xl font-black text-white">{payload[0].value}</span>
+                                            <span className="text-orange-300/60 text-xs pb-1">dokumen</span>
                                           </div>
-                                          <div className="mt-2 pt-2 border-t border-orange-100">
-                                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                              <div
-                                                className="h-full bg-gradient-to-r from-orange-400 to-amber-500 rounded-full"
-                                                style={{ width: `${Math.min(100, ((payload[0].value as number) / Math.max(...stats.byTahun.map(d => d.count))) * 100)}%` }}
-                                              />
+                                          <div className="space-y-1.5">
+                                            <div className="flex justify-between text-[10px]">
+                                              <span className="text-gray-500">Relatif terhadap tertinggi</span>
+                                              <span className="text-orange-400 font-bold">{pct}%</span>
+                                            </div>
+                                            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                              <div className="h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
                                             </div>
                                           </div>
                                         </div>
@@ -6169,9 +6206,9 @@ export default function ESOPApp() {
                                 <Bar
                                   dataKey="count"
                                   fill="url(#barGradient)"
-                                  radius={[8, 8, 0, 0]}
+                                  radius={[10, 10, 0, 0]}
                                   filter="url(#barShadow)"
-                                  maxBarSize={60}
+                                  maxBarSize={55}
                                 >
                                   {stats.byTahun.map((_, index) => (
                                     <Cell key={`cell-${index}`} />
@@ -6179,18 +6216,19 @@ export default function ESOPApp() {
                                 </Bar>
                               </BarChart>
                             </ResponsiveContainer>
-                            {/* Summary */}
-                            <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t border-orange-100">
-                              {stats.byTahun.slice(0, 3).map((item, idx) => (
+                            {/* Summary Footer */}
+                            <div className="flex items-center justify-center gap-6 mt-5 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                              {stats.byTahun.slice(-3).reverse().map((item, idx) => (
                                 <motion.div
                                   key={item.tahun}
                                   initial={{ opacity: 0, y: 10 }}
                                   animate={{ opacity: 1, y: 0 }}
                                   transition={{ delay: 0.5 + idx * 0.1 }}
-                                  className="text-center"
+                                  className="text-center px-4 py-2 rounded-xl" style={{ background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.12)' }}
                                 >
-                                  <p className="text-xs text-gray-400">{item.tahun}</p>
-                                  <p className="text-lg font-bold text-orange-600">{item.count}</p>
+                                  <p className="text-[10px] text-orange-300/50 uppercase tracking-wider font-bold">{item.tahun}</p>
+                                  <p className="text-xl font-black bg-gradient-to-r from-orange-400 to-amber-300 bg-clip-text text-transparent">{item.count}</p>
+                                  <p className="text-[9px] text-gray-500">dokumen</p>
                                 </motion.div>
                               ))}
                             </div>
@@ -6204,48 +6242,48 @@ export default function ESOPApp() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.4 }}
                       >
-                        <Card className="relative overflow-hidden bg-gradient-to-br from-white via-purple-50/30 to-pink-50/50 border border-purple-100/50 shadow-2xl shadow-purple-200/20">
-                          {/* Decorative Elements */}
-                          <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-purple-400/10 to-transparent rounded-full blur-3xl" />
-                          <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-pink-400/10 to-transparent rounded-full blur-2xl" />
+                        <Card className="relative overflow-hidden border-0 shadow-2xl" style={{ background: 'linear-gradient(145deg, #1a0a2e 0%, #2d1b4e 50%, #1a1040 100%)' }}>
+                          <motion.div animate={{ opacity: [0.3, 0.6, 0.3], scale: [1, 1.1, 1] }} transition={{ duration: 4, repeat: Infinity }} className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-purple-500/20 to-transparent rounded-full blur-3xl" />
+                          <motion.div animate={{ opacity: [0.2, 0.5, 0.2] }} transition={{ duration: 5, repeat: Infinity, delay: 1 }} className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-pink-500/15 to-transparent rounded-full blur-2xl" />
+                          <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.3) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
 
                           <CardHeader className="relative pb-2">
                             <div className="flex items-center justify-between">
                               <div>
-                                <div className="flex items-center gap-2 mb-1">
+                                <div className="flex items-center gap-3 mb-1">
                                   <motion.div
-                                    animate={{ scale: [1, 1.1, 1] }}
+                                    animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
                                     transition={{ duration: 3, repeat: Infinity }}
-                                    className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-200/50"
+                                    className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-400 via-purple-500 to-pink-600 flex items-center justify-center shadow-lg shadow-purple-500/30 ring-2 ring-purple-400/20"
                                   >
-                                    <PieChartIcon className="w-5 h-5 text-white" />
+                                    <PieChartIcon className="w-6 h-6 text-white" />
                                   </motion.div>
                                   <div>
-                                    <CardTitle className="text-lg font-bold bg-gradient-to-r from-purple-700 to-pink-600 bg-clip-text text-transparent">
+                                    <CardTitle className="text-lg font-extrabold bg-gradient-to-r from-purple-300 via-pink-200 to-fuchsia-300 bg-clip-text text-transparent">
                                       Distribusi per Kategori
                                     </CardTitle>
-                                    <p className="text-xs text-gray-500">Persebaran dokumen berdasarkan kategori</p>
+                                    <p className="text-xs text-gray-400 mt-0.5">Persebaran dokumen berdasarkan kategori operasional</p>
                                   </div>
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <p className="text-2xl font-bold text-purple-600">{stats.byKategori?.length || 0}</p>
-                                <p className="text-xs text-gray-400">Kategori</p>
+                              <div className="text-right px-4 py-2 rounded-xl" style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.2)' }}>
+                                <p className="text-3xl font-black bg-gradient-to-r from-purple-400 to-pink-300 bg-clip-text text-transparent">{stats.byKategori?.length || 0}</p>
+                                <p className="text-[10px] text-purple-300/60 uppercase tracking-widest font-bold">Kategori</p>
                               </div>
                             </div>
                           </CardHeader>
                           <CardContent className="relative">
-                            <ResponsiveContainer width="100%" height={280}>
+                            <ResponsiveContainer width="100%" height={300}>
                               <PieChart>
                                 <defs>
                                   {COLORS.map((color, index) => (
                                     <linearGradient key={`grad-${index}`} id={`pieGradient-${index}`} x1="0" y1="0" x2="1" y2="1">
-                                      <stop offset="0%" stopColor={color} stopOpacity={1}/>
-                                      <stop offset="100%" stopColor={color} stopOpacity={0.7}/>
+                                      <stop offset="0%" stopColor={color} stopOpacity={1} />
+                                      <stop offset="100%" stopColor={color} stopOpacity={0.7} />
                                     </linearGradient>
                                   ))}
                                   <filter id="pieShadow" x="-50%" y="-50%" width="200%" height="200%">
-                                    <feDropShadow dx="0" dy="8" stdDeviation="8" floodColor="#a855f7" floodOpacity="0.2"/>
+                                    <feDropShadow dx="0" dy="8" stdDeviation="10" floodColor="#a855f7" floodOpacity="0.3" />
                                   </filter>
                                 </defs>
                                 <Pie
@@ -6254,17 +6292,15 @@ export default function ESOPApp() {
                                   nameKey="kategori"
                                   cx="50%"
                                   cy="45%"
-                                  innerRadius={50}
-                                  outerRadius={90}
-                                  paddingAngle={3}
-                                  stroke="none"
+                                  innerRadius={55}
+                                  outerRadius={95}
+                                  paddingAngle={4}
+                                  stroke="rgba(255,255,255,0.1)"
+                                  strokeWidth={2}
                                   filter="url(#pieShadow)"
                                 >
                                   {stats.byKategori.map((_, index) => (
-                                    <Cell
-                                      key={`cell-${index}`}
-                                      fill={`url(#pieGradient-${index % COLORS.length})`}
-                                    />
+                                    <Cell key={`cell-${index}`} fill={`url(#pieGradient-${index % COLORS.length})`} />
                                   ))}
                                 </Pie>
                                 <Tooltip
@@ -6273,23 +6309,24 @@ export default function ESOPApp() {
                                       const data = payload[0].payload
                                       const total = stats.byKategori.reduce((sum, item) => sum + item.count, 0)
                                       const percentage = total > 0 ? Math.round((data.count / total) * 100) : 0
+                                      const colorIdx = stats.byKategori.indexOf(data) % COLORS.length
                                       return (
-                                        <div className="bg-white/95 backdrop-blur-sm border-2 border-purple-300 rounded-xl shadow-2xl shadow-purple-200/50 p-3 min-w-[150px]">
-                                          <div className="flex items-center gap-2 mb-2">
-                                            <div
-                                              className="w-3 h-3 rounded-full"
-                                              style={{ background: `url(#pieGradient-${stats.byKategori.indexOf(data) % COLORS.length})` }}
-                                            />
-                                            <span className="font-bold text-gray-700">{data.kategori}</span>
+                                        <div className="border rounded-2xl shadow-2xl p-4 min-w-[180px]" style={{ background: 'linear-gradient(135deg, rgba(26,10,46,0.95), rgba(45,27,78,0.95))', borderColor: 'rgba(168,85,247,0.4)', backdropFilter: 'blur(12px)' }}>
+                                          <div className="flex items-center gap-2 mb-3">
+                                            <div className="w-3 h-3 rounded-full shadow" style={{ backgroundColor: COLORS[colorIdx] }} />
+                                            <span className="font-bold text-purple-200 text-sm">{data.kategori}</span>
                                           </div>
-                                          <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                              <FolderOpen className="w-4 h-4 text-purple-500" />
-                                              <span className="text-2xl font-bold text-purple-600">{data.count}</span>
+                                          <div className="flex items-end justify-between mb-3">
+                                            <div>
+                                              <span className="text-3xl font-black text-white">{data.count}</span>
+                                              <span className="text-purple-300/60 text-xs ml-1">dokumen</span>
                                             </div>
-                                            <div className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 text-xs font-bold">
+                                            <div className="px-2.5 py-1 rounded-lg text-xs font-black" style={{ background: `${COLORS[colorIdx]}20`, color: COLORS[colorIdx] }}>
                                               {percentage}%
                                             </div>
+                                          </div>
+                                          <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                            <div className="h-full rounded-full" style={{ width: `${percentage}%`, backgroundColor: COLORS[colorIdx] }} />
                                           </div>
                                         </div>
                                       )
@@ -6299,24 +6336,26 @@ export default function ESOPApp() {
                                 />
                               </PieChart>
                             </ResponsiveContainer>
-                            {/* Custom Legend */}
-                            <div className="flex flex-wrap justify-center gap-3 mt-2">
-                              {stats.byKategori.slice(0, 4).map((item, index) => (
-                                <motion.div
-                                  key={item.kategori}
-                                  initial={{ opacity: 0, scale: 0.8 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  transition={{ delay: 0.6 + index * 0.1 }}
-                                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-50/80"
-                                >
-                                  <div
-                                    className="w-2.5 h-2.5 rounded-full"
-                                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                                  />
-                                  <span className="text-xs font-medium text-gray-600">{item.kategori}</span>
-                                  <span className="text-xs font-bold text-gray-800">({item.count})</span>
-                                </motion.div>
-                              ))}
+                            {/* Premium Legend */}
+                            <div className="flex flex-wrap justify-center gap-2 mt-3">
+                              {stats.byKategori.slice(0, 5).map((item, index) => {
+                                const total = stats.byKategori.reduce((sum, i) => sum + i.count, 0)
+                                const pct = total > 0 ? Math.round((item.count / total) * 100) : 0
+                                return (
+                                  <motion.div
+                                    key={item.kategori}
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: 0.6 + index * 0.1 }}
+                                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                                  >
+                                    <div className="w-2.5 h-2.5 rounded-full shadow" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                                    <span className="text-xs font-semibold text-gray-300">{item.kategori}</span>
+                                    <span className="text-[10px] font-black text-gray-500">{item.count}</span>
+                                    <span className="text-[10px] font-bold" style={{ color: COLORS[index % COLORS.length] }}>({pct}%)</span>
+                                  </motion.div>
+                                )
+                              })}
                             </div>
                           </CardContent>
                         </Card>
@@ -6329,50 +6368,50 @@ export default function ESOPApp() {
                         transition={{ delay: 0.5 }}
                         className="lg:col-span-2"
                       >
-                        <Card className="relative overflow-hidden bg-gradient-to-br from-white via-cyan-50/30 to-blue-50/50 border border-cyan-100/50 shadow-2xl shadow-cyan-200/20">
-                          {/* Decorative Elements */}
-                          <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-cyan-400/10 to-transparent rounded-full blur-3xl" />
-                          <div className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-blue-400/10 to-transparent rounded-full blur-2xl" />
+                        <Card className="relative overflow-hidden border-0 shadow-2xl" style={{ background: 'linear-gradient(145deg, #0a1628 0%, #0d2137 50%, #0a1a30 100%)' }}>
+                          <motion.div animate={{ opacity: [0.3, 0.6, 0.3], scale: [1, 1.1, 1] }} transition={{ duration: 4, repeat: Infinity }} className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-cyan-500/15 to-transparent rounded-full blur-3xl" />
+                          <motion.div animate={{ opacity: [0.2, 0.5, 0.2] }} transition={{ duration: 5, repeat: Infinity, delay: 1 }} className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-blue-500/15 to-transparent rounded-full blur-2xl" />
+                          <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.3) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
 
                           <CardHeader className="relative pb-2">
                             <div className="flex items-center justify-between">
                               <div>
-                                <div className="flex items-center gap-2 mb-1">
+                                <div className="flex items-center gap-3 mb-1">
                                   <motion.div
                                     animate={{ rotate: [0, 360] }}
                                     transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                                    className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center shadow-lg shadow-cyan-200/50"
+                                    className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 via-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30 ring-2 ring-cyan-400/20"
                                   >
-                                    <Globe className="w-5 h-5 text-white" />
+                                    <Globe className="w-6 h-6 text-white" />
                                   </motion.div>
                                   <div>
-                                    <CardTitle className="text-lg font-bold bg-gradient-to-r from-cyan-700 to-blue-600 bg-clip-text text-transparent">
+                                    <CardTitle className="text-lg font-extrabold bg-gradient-to-r from-cyan-300 via-blue-200 to-sky-300 bg-clip-text text-transparent">
                                       Distribusi per Lingkup
                                     </CardTitle>
-                                    <p className="text-xs text-gray-500">Persebaran dokumen berdasarkan lingkup kerja</p>
+                                    <p className="text-xs text-gray-400 mt-0.5">Persebaran dokumen berdasarkan ruang lingkup bidang kerja</p>
                                   </div>
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <p className="text-2xl font-bold text-cyan-600">{stats.byLingkup?.length || 0}</p>
-                                <p className="text-xs text-gray-400">Lingkup</p>
+                              <div className="text-right px-4 py-2 rounded-xl" style={{ background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.2)' }}>
+                                <p className="text-3xl font-black bg-gradient-to-r from-cyan-400 to-blue-300 bg-clip-text text-transparent">{stats.byLingkup?.length || 0}</p>
+                                <p className="text-[10px] text-cyan-300/60 uppercase tracking-widest font-bold">Lingkup</p>
                               </div>
                             </div>
                           </CardHeader>
                           <CardContent className="relative">
                             <div className="flex flex-col lg:flex-row gap-6">
                               <div className="flex-1">
-                                <ResponsiveContainer width="100%" height={260}>
+                                <ResponsiveContainer width="100%" height={280}>
                                   <PieChart>
                                     <defs>
                                       {LINGKUP_COLORS.map((color, index) => (
                                         <linearGradient key={`lingkup-grad-${index}`} id={`lingkupGradient-${index}`} x1="0" y1="0" x2="1" y2="1">
-                                          <stop offset="0%" stopColor={color} stopOpacity={1}/>
-                                          <stop offset="100%" stopColor={color} stopOpacity={0.7}/>
+                                          <stop offset="0%" stopColor={color} stopOpacity={1} />
+                                          <stop offset="100%" stopColor={color} stopOpacity={0.7} />
                                         </linearGradient>
                                       ))}
                                       <filter id="lingkupShadow" x="-50%" y="-50%" width="200%" height="200%">
-                                        <feDropShadow dx="0" dy="8" stdDeviation="8" floodColor="#06b6d4" floodOpacity="0.2"/>
+                                        <feDropShadow dx="0" dy="8" stdDeviation="10" floodColor="#06b6d4" floodOpacity="0.3" />
                                       </filter>
                                     </defs>
                                     <Pie
@@ -6381,17 +6420,15 @@ export default function ESOPApp() {
                                       nameKey="lingkup"
                                       cx="50%"
                                       cy="50%"
-                                      innerRadius={45}
-                                      outerRadius={85}
-                                      paddingAngle={2}
-                                      stroke="none"
+                                      innerRadius={50}
+                                      outerRadius={90}
+                                      paddingAngle={3}
+                                      stroke="rgba(255,255,255,0.1)"
+                                      strokeWidth={2}
                                       filter="url(#lingkupShadow)"
                                     >
                                       {(stats.byLingkup || []).map((_, index) => (
-                                        <Cell
-                                          key={`cell-${index}`}
-                                          fill={`url(#lingkupGradient-${index % LINGKUP_COLORS.length})`}
-                                        />
+                                        <Cell key={`cell-${index}`} fill={`url(#lingkupGradient-${index % LINGKUP_COLORS.length})`} />
                                       ))}
                                     </Pie>
                                     <Tooltip
@@ -6400,20 +6437,24 @@ export default function ESOPApp() {
                                           const data = payload[0].payload
                                           const total = (stats.byLingkup || []).reduce((sum, item) => sum + item.count, 0)
                                           const percentage = total > 0 ? Math.round((data.count / total) * 100) : 0
+                                          const colorIdx = (stats.byLingkup || []).indexOf(data) % LINGKUP_COLORS.length
                                           return (
-                                            <div className="bg-white/95 backdrop-blur-sm border-2 border-cyan-300 rounded-xl shadow-2xl shadow-cyan-200/50 p-3 min-w-[150px]">
-                                              <div className="flex items-center gap-2 mb-2">
-                                                <Globe className="w-4 h-4 text-cyan-500" />
-                                                <span className="font-bold text-gray-700">{data.lingkup || 'Tidak Ada'}</span>
+                                            <div className="border rounded-2xl shadow-2xl p-4 min-w-[180px]" style={{ background: 'linear-gradient(135deg, rgba(10,22,40,0.95), rgba(13,33,55,0.95))', borderColor: 'rgba(6,182,212,0.4)', backdropFilter: 'blur(12px)' }}>
+                                              <div className="flex items-center gap-2 mb-3">
+                                                <div className="w-3 h-3 rounded-full shadow" style={{ backgroundColor: LINGKUP_COLORS[colorIdx] }} />
+                                                <span className="font-bold text-cyan-200 text-sm">{data.lingkup || 'Tidak Ada'}</span>
                                               </div>
-                                              <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                  <FileText className="w-4 h-4 text-blue-500" />
-                                                  <span className="text-2xl font-bold text-cyan-600">{data.count}</span>
+                                              <div className="flex items-end justify-between mb-3">
+                                                <div>
+                                                  <span className="text-3xl font-black text-white">{data.count}</span>
+                                                  <span className="text-cyan-300/60 text-xs ml-1">dokumen</span>
                                                 </div>
-                                                <div className="px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 text-xs font-bold">
+                                                <div className="px-2.5 py-1 rounded-lg text-xs font-black" style={{ background: `${LINGKUP_COLORS[colorIdx]}20`, color: LINGKUP_COLORS[colorIdx] }}>
                                                   {percentage}%
                                                 </div>
+                                              </div>
+                                              <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                                <div className="h-full rounded-full" style={{ width: `${percentage}%`, backgroundColor: LINGKUP_COLORS[colorIdx] }} />
                                               </div>
                                             </div>
                                           )
@@ -6424,8 +6465,8 @@ export default function ESOPApp() {
                                   </PieChart>
                                 </ResponsiveContainer>
                               </div>
-                              {/* Custom Legend with Stats */}
-                              <div className="lg:w-64 flex flex-col justify-center">
+                              {/* Premium Legend with Stats */}
+                              <div className="lg:w-72 flex flex-col justify-center">
                                 <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
                                   {(stats.byLingkup || []).slice(0, 6).map((item, index) => {
                                     const total = (stats.byLingkup || []).reduce((sum, i) => sum + i.count, 0)
@@ -6436,16 +6477,13 @@ export default function ESOPApp() {
                                         initial={{ opacity: 0, x: 20 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         transition={{ delay: 0.7 + index * 0.08 }}
-                                        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-gray-50 to-transparent border border-gray-100"
+                                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
                                       >
-                                        <div
-                                          className="w-3 h-3 rounded-full flex-shrink-0"
-                                          style={{ backgroundColor: LINGKUP_COLORS[index % LINGKUP_COLORS.length] }}
-                                        />
+                                        <div className="w-3 h-3 rounded-full flex-shrink-0 shadow" style={{ backgroundColor: LINGKUP_COLORS[index % LINGKUP_COLORS.length] }} />
                                         <div className="flex-1 min-w-0">
-                                          <p className="text-xs font-semibold text-gray-700 truncate">{item.lingkup || 'Tidak Ada'}</p>
-                                          <div className="flex items-center gap-2">
-                                            <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+                                          <p className="text-xs font-semibold text-gray-300 truncate">{item.lingkup || 'Tidak Ada'}</p>
+                                          <div className="flex items-center gap-2 mt-1">
+                                            <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
                                               <motion.div
                                                 initial={{ width: 0 }}
                                                 animate={{ width: `${percentage}%` }}
@@ -6454,7 +6492,7 @@ export default function ESOPApp() {
                                                 style={{ backgroundColor: LINGKUP_COLORS[index % LINGKUP_COLORS.length] }}
                                               />
                                             </div>
-                                            <span className="text-xs font-bold text-gray-500">{item.count}</span>
+                                            <span className="text-xs font-black" style={{ color: LINGKUP_COLORS[index % LINGKUP_COLORS.length] }}>{item.count}</span>
                                           </div>
                                         </div>
                                       </motion.div>
@@ -6517,22 +6555,25 @@ export default function ESOPApp() {
                         <CardContent>
                           <ScrollArea className="h-64">
                             <div className="space-y-3">
-                              {stats.recentLogs.map((log, index) => (
-                                <motion.div
-                                  key={log.id}
-                                  className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg"
-                                  initial={{ opacity: 0, x: -20 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  transition={{ delay: index * 0.1 }}
-                                >
-                                  <div className="w-2 h-2 mt-2 rounded-full bg-orange-500 animate-pulse" />
-                                  <div>
-                                    <p className="text-sm font-medium text-blue-900">{log.user?.name}</p>
-                                    <p className="text-sm text-gray-600">{log.deskripsi}</p>
-                                    <p className="text-xs text-gray-500">{new Date(log.createdAt).toLocaleString('id-ID')}</p>
-                                  </div>
-                                </motion.div>
-                              ))}
+                              <AnimatePresence mode="popLayout">
+                                {stats.recentLogs.map((log, index) => (
+                                  <motion.div
+                                    key={log.id}
+                                    className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg"
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    transition={{ delay: index * 0.05 }}
+                                  >
+                                    <div className="w-2 h-2 mt-2 rounded-full bg-orange-500 animate-pulse" />
+                                    <div>
+                                      <p className="text-sm font-medium text-blue-900">{log.user?.name}</p>
+                                      <p className="text-sm text-gray-600">{log.deskripsi}</p>
+                                      <p className="text-xs text-gray-500">{new Date(log.createdAt).toLocaleString('id-ID')}</p>
+                                    </div>
+                                  </motion.div>
+                                ))}
+                              </AnimatePresence>
                             </div>
                           </ScrollArea>
                         </CardContent>
@@ -7643,8 +7684,9 @@ export default function ESOPApp() {
 
 
                 {/* Table */}
-                <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
-                  <CardContent className="p-0 relative">
+                {/* Table */}
+                <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden relative">
+                  <CardContent className="p-0">
                     {/* Aesthetic Loading Overlay */}
                     <AnimatePresence>
                       {katalogLoading && (
@@ -7685,15 +7727,15 @@ export default function ESOPApp() {
                               >
                                 {i % 3 === 0 ? (
                                   <svg className="w-8 h-8 text-orange-400" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M12 2L4 7v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V7l-8-5zm0 2.18l6 3.72v5.1c0 4.5-3.08 8.4-6 9.69V4.18z"/>
+                                    <path d="M12 2L4 7v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V7l-8-5zm0 2.18l6 3.72v5.1c0 4.5-3.08 8.4-6 9.69V4.18z" />
                                   </svg>
                                 ) : i % 3 === 1 ? (
                                   <svg className="w-8 h-8 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
                                   </svg>
                                 ) : (
                                   <svg className="w-8 h-8 text-red-400" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5h3V8h4v4h3l-5 5z"/>
+                                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5h3V8h4v4h3l-5 5z" />
                                   </svg>
                                 )}
                               </motion.div>
@@ -7798,223 +7840,196 @@ export default function ESOPApp() {
                         />
                       </div>
                     )}
-
                     <div className="overflow-x-auto">
                       <Table>
-                        <TableHeader>
-                          <TableRow className="bg-gradient-to-r from-orange-500 to-yellow-500">
-                            <TableHead className="font-bold text-white">Judul</TableHead>
-                            <TableHead className="font-bold text-white">Tahun</TableHead>
-                            <TableHead className="font-bold text-white">Kategori</TableHead>
-                            <TableHead className="font-bold text-white">Lingkup</TableHead>
-                            <TableHead className="font-bold text-white">Jenis</TableHead>
-                            <TableHead className="font-bold text-white">Status</TableHead>
-                            <TableHead className="font-bold text-white text-center">Aksi</TableHead>
+                        <TableHeader className="bg-slate-50/80">
+                          <TableRow className="hover:bg-transparent border-slate-200">
+                            <TableHead className="w-[80px] text-blue-900 font-bold">Judul</TableHead>
+                            <TableHead className="text-blue-900 font-bold">Tahun</TableHead>
+                            <TableHead className="text-blue-900 font-bold">Kategori</TableHead>
+                            <TableHead className="text-blue-900 font-bold">Lingkup</TableHead>
+                            <TableHead className="text-blue-900 font-bold">Jenis</TableHead>
+                            <TableHead className="text-blue-900 font-bold">Status</TableHead>
+                            <TableHead className="text-right text-blue-900 font-bold">Aksi</TableHead>
                           </TableRow>
                         </TableHeader>
-                        <AnimatePresence mode="wait">
-                          {sopFiles.length === 0 && !katalogLoading ? (
-                            <motion.tbody
-                              key="empty"
-                              data-slot="table-body"
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              exit={{ opacity: 0 }}
-                              className="[&_tr:last-child]:border-0"
-                            >
-                              <TableRow>
-                                <TableCell colSpan={7} className="text-center text-gray-500 py-8">
-                                  Tidak ada data
-                                </TableCell>
-                              </TableRow>
-                            </motion.tbody>
-                          ) : (
-                            <motion.tbody
-                              key={`data-page-${sopPagination.page}`}
-                              data-slot="table-body"
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -10 }}
-                              transition={{ duration: 0.3, ease: "easeOut" }}
-                              className="[&_tr:last-child]:border-0"
-                            >
-                              {sopFiles.map((sop, index) => (
-                              <TableRow
-                                key={sop.id}
-                                className={`hover:bg-orange-50 border-b border-gray-200 transition-all duration-700 ${excelEditData?.id === sop.id ? 'bg-orange-50/80 relative active-edit-row' : ''}`}
+                        <TableBody>
+                          <AnimatePresence mode="popLayout" initial={false}>
+                            {sopFiles.length === 0 ? (
+                              <motion.tr
+                                key="empty"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
                               >
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    <FileTypeIcon fileName={sop.fileName} className="w-5 h-5 flex-shrink-0" />
-                                    <div>
-                                      <div className="text-xs text-orange-500 font-medium">No. SOP : {sop.nomorSop || '...'}</div>
-                                      <div className="flex items-center gap-2">
-                                        <div className="text-gray-800 font-semibold">{sop.judul}</div>
-                                        {excelEditData?.id === sop.id && (
-                                          <motion.div
-                                            initial={{ opacity: 0, scale: 0.8 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-orange-500 to-red-600 text-[10px] font-bold text-white shadow-lg shadow-orange-500/20"
-                                          >
-                                            <span className="relative flex h-2 w-2">
-                                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                                              <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
-                                            </span>
-                                            SESI AKTIF
-                                          </motion.div>
-                                        )}
-                                      </div>
-                                      <div className="text-xs text-gray-500 mt-0.5">
-                                        <span className="text-gray-400">Upload:</span> {new Date(sop.uploadedAt).toLocaleString('id-ID', {
-                                          day: 'numeric',
-                                          month: 'short',
-                                          year: 'numeric',
-                                          hour: '2-digit',
-                                          minute: '2-digit'
-                                        })} <span className="text-gray-400">| Upload by:</span> <span className="text-orange-600 font-medium">{sop.user?.name || 'System'}</span>
-                                      </div>
-                                      {sop.updatedAt && new Date(sop.updatedAt).getTime() !== new Date(sop.uploadedAt).getTime() && (
-                                        <div className="text-xs text-amber-600 mt-0.5">
-                                          <span className="text-amber-500">Terakhir diubah:</span> {new Date(sop.updatedAt).toLocaleString('id-ID', {
+                                <TableCell colSpan={7} className="h-64 text-center">
+                                  <div className="flex flex-col items-center justify-center text-slate-400">
+                                    <FileText className="w-12 h-12 mb-2 opacity-20" />
+                                    <p className="text-sm font-medium">Tidak ada data ditemukan</p>
+                                  </div>
+                                </TableCell>
+                              </motion.tr>
+                            ) : (
+                              sopFiles.map((sop, index) => (
+                                <motion.tr
+                                  key={sop.id}
+                                  initial={{ opacity: 0, y: 10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, x: -10 }}
+                                  transition={{ duration: 0.2, delay: index * 0.03 }}
+                                  className={`group hover:bg-orange-50/50 transition-colors border-slate-100 ${excelEditData?.id === sop.id ? 'bg-orange-50/80' : ''}`}
+                                >
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      <FileTypeIcon fileName={sop.fileName} className="w-5 h-5 flex-shrink-0" />
+                                      <div>
+                                        <div className="text-xs text-orange-500 font-medium">No. SOP : {sop.nomorSop || '...'}</div>
+                                        <div className="flex items-center gap-2">
+                                          <div className="text-gray-800 font-semibold">{sop.judul}</div>
+                                          {excelEditData?.id === sop.id && (
+                                            <motion.div
+                                              initial={{ opacity: 0, scale: 0.8 }}
+                                              animate={{ opacity: 1, scale: 1 }}
+                                              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-orange-500 to-red-600 text-[10px] font-bold text-white shadow-lg shadow-orange-500/20"
+                                            >
+                                              <span className="relative flex h-2 w-2">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                                              </span>
+                                              SESI AKTIF
+                                            </motion.div>
+                                          )}
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-0.5">
+                                          <span className="text-gray-400">Upload:</span> {new Date(sop.uploadedAt).toLocaleString('id-ID', {
                                             day: 'numeric',
                                             month: 'short',
                                             year: 'numeric',
                                             hour: '2-digit',
                                             minute: '2-digit'
                                           })}
-                                          {sop.updatedByUser && (
-                                            <span className="text-gray-400"> | <span className="text-amber-500">Last edited by:</span> <span className="text-amber-600 font-medium">{sop.updatedByUser.name}</span></span>
-                                          )}
+                                          <span className="text-gray-400"> | Upload by:</span> <span className="text-orange-600 font-medium">{sop.user?.name || 'System'}</span>
                                         </div>
-                                      )}
+                                        <div className="text-xs text-amber-600 mt-0.5">
+                                          <span className="text-amber-500">Terakhir diubah:</span>{' '}
+                                          {sop.updatedAt && new Date(sop.updatedAt).getTime() !== new Date(sop.uploadedAt).getTime()
+                                            ? new Date(sop.updatedAt).toLocaleString('id-ID', {
+                                              day: 'numeric',
+                                              month: 'short',
+                                              year: 'numeric',
+                                              hour: '2-digit',
+                                              minute: '2-digit'
+                                            })
+                                            : '-'
+                                          }
+                                          <span className="text-gray-400"> | </span>
+                                          <span className="text-amber-500">Last edited by:</span>{' '}
+                                          <span className="text-amber-600 font-medium">{sop.updatedByUser?.name || '-'}</span>
+                                        </div>
+                                      </div>
                                     </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-gray-600">{sop.tahun}</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className="border-orange-500 bg-orange-50 text-orange-700">{sop.kategori}</Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className="border-blue-500 bg-blue-50 text-blue-700">{sop.lingkup || '-'}</Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge className={sop.jenis === 'SOP' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white'}>
-                                    {sop.jenis}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className={STATUS_COLORS[sop.status]}>
-                                    {sop.status}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center justify-center gap-1">
-                                    <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} title="Preview" className="hover:bg-cyan-500/20" disabled={previewLoading === sop.id}>
-                                      {previewLoading === sop.id ? (
-                                        <div className="relative">
-                                          <motion.div
-                                            className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full"
-                                            animate={{ rotate: 360 }}
-                                            transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
-                                          />
-                                          <motion.div
-                                            className="absolute inset-0 w-4 h-4 border-2 border-yellow-400 border-b-transparent rounded-full"
-                                            animate={{ rotate: -360 }}
-                                            transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
-                                          />
-                                        </div>
-                                      ) : (
-                                        <Eye className="w-4 h-4 text-cyan-400" />
-                                      )}
-                                    </Button>
-                                    {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && (
-                                      <Button size="icon" variant="ghost" onClick={() => handleOpenEdit(sop.id)} title="Edit" className="hover:bg-orange-500/20">
-                                        <Edit className="w-4 h-4 text-orange-400" />
-                                      </Button>
-                                    )}
-                                    <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-500/20" disabled={downloadLoading === sop.id}>
-                                      {downloadLoading === sop.id ? (
-                                        <div className="relative">
-                                          <motion.div
-                                            className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full"
-                                            animate={{ rotate: 360 }}
-                                            transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
-                                          />
-                                          <motion.div
-                                            className="absolute inset-0 w-4 h-4 border-2 border-orange-400 border-b-transparent rounded-full"
-                                            animate={{ rotate: -360 }}
-                                            transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
-                                          />
-                                        </div>
-                                      ) : (
-                                        <Download className="w-4 h-4 text-green-400" />
-                                      )}
-                                    </Button>
-                                    <Button size="icon" variant="ghost" onClick={() => handlePrint(sop.id)} title="Print" className="hover:bg-gray-500/20" disabled={printLoading === sop.id}>
-                                      {printLoading === sop.id ? (
-                                        <div className="relative">
-                                          <motion.div
-                                            className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full"
-                                            animate={{ rotate: 360 }}
-                                            transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
-                                          />
-                                          <motion.div
-                                            className="absolute inset-0 w-4 h-4 border-2 border-orange-400 border-b-transparent rounded-full"
-                                            animate={{ rotate: -360 }}
-                                            transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
-                                          />
-                                        </div>
-                                      ) : (
-                                        <Printer className="w-4 h-4 text-gray-400" />
-                                      )}
-                                    </Button>
-                                    {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && ['xlsx', 'xls', 'xlsm', 'docx', 'doc', 'pdf'].includes(sop.fileType || '') && (
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        className={`hover:${sop.fileType === 'pdf' ? 'bg-red-100' : 'bg-green-100'} `}
-                                        onClick={() => handleDesktopEdit(sop.id)}
-                                        title={sop.fileType === 'pdf' ? 'Edit Desktop (PDF tidak bisa di-edit)' : `Edit di Desktop(${sop.fileType?.toUpperCase() || 'File'})`}
-                                      >
-                                        {sop.fileType === 'pdf' ? (
-                                          <FileIcon className="w-4 h-4 text-red-500" />
-                                        ) : ['docx', 'doc'].includes(sop.fileType || '') ? (
-                                          <FileText className="w-4 h-4 text-blue-600" />
+                                  </TableCell>
+                                  <TableCell className="text-gray-600">{sop.tahun}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="border-orange-500 bg-orange-50 text-orange-700">{sop.kategori}</Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="border-blue-500 bg-blue-50 text-blue-700">{sop.lingkup || '-'}</Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge className={sop.jenis === 'SOP' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white'}>
+                                      {sop.jenis}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className={STATUS_COLORS[sop.status]}>
+                                      {sop.status}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center justify-end gap-1">
+                                      <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} title="Preview" className="hover:bg-cyan-500/20" disabled={previewLoading === sop.id}>
+                                        {previewLoading === sop.id ? (
+                                          <div className="relative">
+                                            <motion.div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
+                                            <motion.div className="absolute inset-0 w-4 h-4 border-2 border-yellow-400 border-b-transparent rounded-full" animate={{ rotate: -360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
+                                          </div>
                                         ) : (
-                                          <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                                          <Eye className="w-4 h-4 text-cyan-400" />
                                         )}
                                       </Button>
-                                    )}
-                                    {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && excelEditData?.id === sop.id && (
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        className="hover:bg-orange-100"
-                                        onClick={handleOpenDesktopSync}
-                                        title="Selesai Edit & Sync"
-                                      >
-                                        <RefreshCw className="w-4 h-4 text-orange-600" />
+                                      {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && (
+                                        <Button size="icon" variant="ghost" onClick={() => handleOpenEdit(sop.id)} title="Edit" className="hover:bg-orange-500/20">
+                                          <Edit className="w-4 h-4 text-orange-400" />
+                                        </Button>
+                                      )}
+                                      <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} title="Download" className="hover:bg-green-500/20" disabled={downloadLoading === sop.id}>
+                                        {downloadLoading === sop.id ? (
+                                          <div className="relative">
+                                            <motion.div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
+                                            <motion.div className="absolute inset-0 w-4 h-4 border-2 border-orange-400 border-b-transparent rounded-full" animate={{ rotate: -360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
+                                          </div>
+                                        ) : (
+                                          <Download className="w-4 h-4 text-green-400" />
+                                        )}
                                       </Button>
-                                    )}
-                                    {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && (
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        className="hover:bg-red-100"
-                                        onClick={() => handleDeleteSop(sop.id, sop.fileName)}
-                                        title="Hapus File"
-                                      >
-                                        <Trash2 className="w-4 h-4 text-red-500" />
+                                      <Button size="icon" variant="ghost" onClick={() => handlePrint(sop.id)} title="Print" className="hover:bg-gray-500/20" disabled={printLoading === sop.id}>
+                                        {printLoading === sop.id ? (
+                                          <div className="relative">
+                                            <motion.div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
+                                            <motion.div className="absolute inset-0 w-4 h-4 border-2 border-orange-400 border-b-transparent rounded-full" animate={{ rotate: -360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
+                                          </div>
+                                        ) : (
+                                          <Printer className="w-4 h-4 text-gray-400" />
+                                        )}
                                       </Button>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                                ))}
-                              </motion.tbody>
+                                      {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && ['xlsx', 'xls', 'xlsm', 'docx', 'doc', 'pdf'].includes(sop.fileType || '') && (
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className={`hover:${sop.fileType === 'pdf' ? 'bg-red-100' : 'bg-green-100'} `}
+                                          onClick={() => handleDesktopEdit(sop.id)}
+                                          title={sop.fileType === 'pdf' ? 'Edit Desktop (PDF tidak bisa di-edit)' : `Edit di Desktop(${sop.fileType?.toUpperCase() || 'File'})`}
+                                        >
+                                          {sop.fileType === 'pdf' ? (
+                                            <FileIcon className="w-4 h-4 text-red-500" />
+                                          ) : ['docx', 'doc'].includes(sop.fileType || '') ? (
+                                            <FileText className="w-4 h-4 text-blue-600" />
+                                          ) : (
+                                            <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                                          )}
+                                        </Button>
+                                      )}
+                                      {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && excelEditData?.id === sop.id && (
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="hover:bg-orange-100"
+                                          onClick={handleOpenDesktopSync}
+                                          title="Selesai Edit & Sync"
+                                        >
+                                          <RefreshCw className="w-4 h-4 text-orange-600" />
+                                        </Button>
+                                      )}
+                                      {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && (
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="hover:bg-red-100"
+                                          onClick={() => handleDeleteSop(sop.id, sop.fileName)}
+                                          title="Hapus File"
+                                        >
+                                          <Trash2 className="w-4 h-4 text-red-500" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </motion.tr>
+                              ))
                             )}
                           </AnimatePresence>
-                        </Table>
+                        </TableBody>
+                      </Table>
                     </div>
                   </CardContent>
                 </Card>
@@ -8050,154 +8065,155 @@ export default function ESOPApp() {
             )}
 
             {/* Other pages - Verifikasi, Arsip, Logs, Users */}
-            {currentPage === 'verifikasi' && (
-              <motion.div
-                key="verifikasi"
-                variants={fadeInUp}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                className="space-y-6"
-              >
-                <div className="flex items-center justify-between">
-                  <ShimmerTitle subtitle="Kelola pengajuan SOP dan IK dari publik">Verifikasi SOP Publik</ShimmerTitle>
-                </div>
-
-                {/* Search and Filter Bar */}
-                <div className="rounded-2xl overflow-hidden shadow-2xl" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)', border: '1px solid rgba(249,115,22,0.25)' }}>
-                  <div className="flex items-center justify-between px-5 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ef4444)' }}><Search className="w-3.5 h-3.5 text-white" /></div>
-                      <span className="text-sm font-bold text-white">Filter &amp; Pencarian</span>
-                    </div>
+            {
+              currentPage === 'verifikasi' && (
+                <motion.div
+                  key="verifikasi"
+                  variants={fadeInUp}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  className="space-y-6"
+                >
+                  <div className="flex items-center justify-between">
+                    <ShimmerTitle subtitle="Kelola pengajuan SOP dan IK dari publik">Verifikasi SOP Publik</ShimmerTitle>
                   </div>
-                  <div className="p-4">
-                    <div className="flex flex-wrap items-end gap-3">
-                      {/* Search */}
-                      <div className="flex-1 min-w-[200px]">
-                        <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Cari</p>
-                        <div className="relative">
-                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#f97316' }} />
-                          <Input
-                            placeholder="Cari judul, nama, email..."
-                            value={verificationSearch}
-                            onChange={(e) => setVerificationSearch(e.target.value)}
-                            className="pl-10 h-10 text-white placeholder:text-gray-500 text-sm rounded-xl"
-                            style={{ background: 'rgba(255,255,255,0.06)', border: verificationSearch ? '1.5px solid rgba(249,115,22,0.6)' : '1.5px solid rgba(255,255,255,0.1)', boxShadow: verificationSearch ? '0 0 10px rgba(249,115,22,0.2)' : 'none' }}
-                          />
+
+                  {/* Search and Filter Bar */}
+                  <div className="rounded-2xl overflow-hidden shadow-2xl" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)', border: '1px solid rgba(249,115,22,0.25)' }}>
+                    <div className="flex items-center justify-between px-5 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ef4444)' }}><Search className="w-3.5 h-3.5 text-white" /></div>
+                        <span className="text-sm font-bold text-white">Filter &amp; Pencarian</span>
+                      </div>
+                    </div>
+                    <div className="p-4">
+                      <div className="flex flex-wrap items-end gap-3">
+                        {/* Search */}
+                        <div className="flex-1 min-w-[200px]">
+                          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Cari</p>
+                          <div className="relative">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#f97316' }} />
+                            <Input
+                              placeholder="Cari judul, nama, email..."
+                              value={verificationSearch}
+                              onChange={(e) => setVerificationSearch(e.target.value)}
+                              className="pl-10 h-10 text-white placeholder:text-gray-500 text-sm rounded-xl"
+                              style={{ background: 'rgba(255,255,255,0.06)', border: verificationSearch ? '1.5px solid rgba(249,115,22,0.6)' : '1.5px solid rgba(255,255,255,0.1)', boxShadow: verificationSearch ? '0 0 10px rgba(249,115,22,0.2)' : 'none' }}
+                            />
+                          </div>
+                        </div>
+                        {/* Status */}
+                        <div className="min-w-[140px]">
+                          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Status</p>
+                          <Select value={verificationFilter} onValueChange={(v) => setVerificationFilter(v)}>
+                            <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: verificationFilter !== 'SEMUA' ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.06)', border: verificationFilter !== 'SEMUA' ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.1)', color: verificationFilter !== 'SEMUA' ? '#fb923c' : '#9ca3af' }}>
+                              <SelectValue placeholder="Filter Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="SEMUA">Semua Status</SelectItem>
+                              <SelectItem value="MENUNGGU">Menunggu</SelectItem>
+                              <SelectItem value="DISETUJUI">Disetujui</SelectItem>
+                              <SelectItem value="DITOLAK">Ditolak</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {/* Lingkup */}
+                        <div className="min-w-[140px]">
+                          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Lingkup</p>
+                          <Select value={verificationLingkupFilter} onValueChange={(v) => setVerificationLingkupFilter(v)}>
+                            <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: verificationLingkupFilter !== 'SEMUA' ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.06)', border: verificationLingkupFilter !== 'SEMUA' ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.1)', color: verificationLingkupFilter !== 'SEMUA' ? '#fb923c' : '#9ca3af' }}>
+                              <SelectValue placeholder="Filter Lingkup" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="SEMUA">Semua Lingkup</SelectItem>
+                              {LINGKUP_OPTIONS.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {/* Sort */}
+                        <div className="min-w-[140px]">
+                          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Urutkan</p>
+                          <Select value={verificationSortBy} onValueChange={(v) => setVerificationSortBy(v as 'uploadedAt-desc' | 'uploadedAt-asc')}>
+                            <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.1)', color: '#9ca3af' }}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="uploadedAt-desc">Terbaru</SelectItem>
+                              <SelectItem value="uploadedAt-asc">Terlama</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
-                      {/* Status */}
-                      <div className="min-w-[140px]">
-                        <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Status</p>
-                        <Select value={verificationFilter} onValueChange={(v) => setVerificationFilter(v)}>
-                          <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: verificationFilter !== 'SEMUA' ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.06)', border: verificationFilter !== 'SEMUA' ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.1)', color: verificationFilter !== 'SEMUA' ? '#fb923c' : '#9ca3af' }}>
-                            <SelectValue placeholder="Filter Status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="SEMUA">Semua Status</SelectItem>
-                            <SelectItem value="MENUNGGU">Menunggu</SelectItem>
-                            <SelectItem value="DISETUJUI">Disetujui</SelectItem>
-                            <SelectItem value="DITOLAK">Ditolak</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {/* Lingkup */}
-                      <div className="min-w-[140px]">
-                        <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Lingkup</p>
-                        <Select value={verificationLingkupFilter} onValueChange={(v) => setVerificationLingkupFilter(v)}>
-                          <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: verificationLingkupFilter !== 'SEMUA' ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.06)', border: verificationLingkupFilter !== 'SEMUA' ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.1)', color: verificationLingkupFilter !== 'SEMUA' ? '#fb923c' : '#9ca3af' }}>
-                            <SelectValue placeholder="Filter Lingkup" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="SEMUA">Semua Lingkup</SelectItem>
-                            {LINGKUP_OPTIONS.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {/* Sort */}
-                      <div className="min-w-[140px]">
-                        <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Urutkan</p>
-                        <Select value={verificationSortBy} onValueChange={(v) => setVerificationSortBy(v as 'uploadedAt-desc' | 'uploadedAt-asc')}>
-                          <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.1)', color: '#9ca3af' }}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="uploadedAt-desc">Terbaru</SelectItem>
-                            <SelectItem value="uploadedAt-asc">Terlama</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
                     </div>
                   </div>
-                </div>
 
 
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <StatCard
-                    title="SOP Aktif"
-                    value={stats?.totalAktif || 0}
-                    icon={CheckCircle}
-                    color="green"
-                    delay={0}
-                    subtitle="Dokumen yang berlaku"
-                    total={(stats?.totalAktif || 0) + (stats?.totalReview || 0) + (stats?.totalKadaluarsa || 0)}
-                  />
-                  <StatCard
-                    title="Menunggu Verifikasi"
-                    value={stats?.totalPublikMenunggu || 0}
-                    icon={Clock}
-                    color="yellow"
-                    delay={0.1}
-                    subtitle="Pengajuan dari publik"
-                    action={user?.role === 'DEVELOPER' ? (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-6 w-6 text-yellow-600 hover:bg-yellow-100 rounded-full"
-                        onClick={() => handleResetStats('MENUNGGU')}
-                        title="Reset Stats (Hapus Semua Menunggu)"
-                      >
-                        <RefreshCw className="h-3 w-3" />
-                      </Button>
-                    ) : undefined}
-                  />
-                  <StatCard
-                    title="Ditolak"
-                    value={stats?.totalPublikDitolak || 0}
-                    icon={XCircle}
-                    color="red"
-                    delay={0.2}
-                    subtitle="Pengajuan ditolak"
-                    action={user?.role === 'DEVELOPER' ? (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-6 w-6 text-red-600 hover:bg-red-100 rounded-full"
-                        onClick={() => handleResetStats('DITOLAK')}
-                        title="Reset Stats (Hapus Semua Arsip)"
-                      >
-                        <RefreshCw className="h-3 w-3" />
-                      </Button>
-                    ) : undefined}
-                  />
-                </div>
+                  {/* Stats Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <StatCard
+                      title="SOP Aktif"
+                      value={stats?.totalAktif || 0}
+                      icon={CheckCircle}
+                      color="green"
+                      delay={0}
+                      subtitle="Dokumen yang berlaku"
+                      total={(stats?.totalAktif || 0) + (stats?.totalReview || 0) + (stats?.totalKadaluarsa || 0)}
+                    />
+                    <StatCard
+                      title="Menunggu Verifikasi"
+                      value={stats?.totalPublikMenunggu || 0}
+                      icon={Clock}
+                      color="yellow"
+                      delay={0.1}
+                      subtitle="Pengajuan dari publik"
+                      action={user?.role === 'DEVELOPER' ? (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 text-yellow-600 hover:bg-yellow-100 rounded-full"
+                          onClick={() => handleResetStats('MENUNGGU')}
+                          title="Reset Stats (Hapus Semua Menunggu)"
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                        </Button>
+                      ) : undefined}
+                    />
+                    <StatCard
+                      title="Ditolak"
+                      value={stats?.totalPublikDitolak || 0}
+                      icon={XCircle}
+                      color="red"
+                      delay={0.2}
+                      subtitle="Pengajuan ditolak"
+                      action={user?.role === 'DEVELOPER' ? (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 text-red-600 hover:bg-red-100 rounded-full"
+                          onClick={() => handleResetStats('DITOLAK')}
+                          title="Reset Stats (Hapus Semua Arsip)"
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                        </Button>
+                      ) : undefined}
+                    />
+                  </div>
 
-                {/* Verification Table */}
-                <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
-                  <CardHeader className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white">
-                    <CardTitle className="text-lg">Daftar Pengajuan Publik</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0 relative">
-                    {/* Loading Overlay */}
-                    {verifikasiLoading && (
+                  {/* Verification Table */}
+                  <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white">
+                      <CardTitle className="text-lg">Daftar Pengajuan Publik</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0 relative">
+                      {/* Loading Overlay */}
+                      {/* {verifikasiLoading && (
                       <div className="absolute top-0 inset-x-0 h-1 z-10 overflow-hidden">
                         <div className="w-full h-full bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-400 animate-sync-progress" />
                       </div>
-                    )}
-                    <div className="overflow-x-auto">
-                      <Table>
+                    )} */}
+                      <div className="overflow-x-auto">
+                        {/* <Table>
                         <TableHeader>
                           <TableRow className="bg-gradient-to-r from-orange-400 to-yellow-400">
                             <TableHead className="font-bold text-white">Pengirim</TableHead>
@@ -8318,7 +8334,6 @@ export default function ESOPApp() {
                                         <Button size="icon" variant="ghost" onClick={() => handleOpenRejectDialog(sop.id)} title="Tolak" className="hover:bg-red-100">
                                           <X className="w-4 h-4 text-red-600" />
                                         </Button>
-                                        {/* Rejection Dialog - Moved inside Verifikasi page */}
                                         <Dialog open={showRejectDialog && rejectTargetId === sop.id} onOpenChange={(open) => {
                                           if (!open) {
                                             setShowRejectDialog(false)
@@ -8394,44 +8409,253 @@ export default function ESOPApp() {
                             ))
                           )}
                         </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
+                      </Table> */}
+                        <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm min-h-[400px]">
+                          <TableLoadingOverlay visible={verifikasiLoading} />
+                          <Table>
+                            <TableHeader className="bg-slate-50">
+                              <TableRow>
+                                <TableHead className="text-blue-900 font-bold">Pengirim</TableHead>
+                                <TableHead className="text-blue-900 font-bold">Judul SOP</TableHead>
+                                <TableHead className="text-blue-900 font-bold">Kategori & Lingkup</TableHead>
+                                <TableHead className="text-blue-900 font-bold">Tahun</TableHead>
+                                <TableHead className="text-blue-900 font-bold">Waktu</TableHead>
+                                <TableHead className="text-right text-blue-900 font-bold">Aksi</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              <AnimatePresence mode="popLayout" initial={false}>
+                                {verificationList.length === 0 ? (
+                                  <motion.tr
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                  >
+                                    <TableCell colSpan={6} className="h-64 text-center text-gray-500">
+                                      Tidak ada pengajuan SOP baru yang perlu diverifikasi.
+                                    </TableCell>
+                                  </motion.tr>
+                                ) : (
+                                  verificationList.map((sop, index) => (
+                                    <motion.tr
+                                      key={sop.id}
+                                      initial={{ opacity: 0, y: 10 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      exit={{ opacity: 0, x: -10 }}
+                                      transition={{ duration: 0.2, delay: index * 0.03 }}
+                                      className="hover:bg-blue-50/50 transition-colors"
+                                    >
+                                      <TableCell>
+                                        <div>
+                                          <p className="font-semibold text-blue-900">{sop.submitterName}</p>
+                                          <p className="text-sm text-gray-600">{sop.submitterEmail}</p>
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="flex items-center gap-2">
+                                          <FileTypeIcon fileName={sop.fileName} className="w-5 h-5 flex-shrink-0" />
+                                          <div>
+                                            <span className="font-semibold text-blue-900">{sop.judul}</span>
+                                            <div className="text-xs text-gray-500 mt-0.5">
+                                              <span className="text-gray-400">Upload:</span> {new Date(sop.uploadedAt).toLocaleString('id-ID', {
+                                                day: 'numeric',
+                                                month: 'short',
+                                                year: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                              })} <span className="text-gray-400">| Upload by:</span> <span className="text-orange-600 font-medium">{sop.user?.name || sop.submitterName || 'System'}</span>
+                                            </div>
+                                            {sop.verifiedAt && (
+                                              <div className={`text - xs mt - 0.5 ${sop.verificationStatus === 'DISETUJUI' ? 'text-green-600' : 'text-red-600'
+                                                } `}>
+                                                <span className={sop.verificationStatus === 'DISETUJUI' ? 'text-green-500' : 'text-red-500'}>
+                                                  {sop.verificationStatus === 'DISETUJUI' ? 'Disetujui:' : 'Ditolak:'}
+                                                </span> {new Date(sop.verifiedAt).toLocaleString('id-ID', {
+                                                  day: 'numeric',
+                                                  month: 'short',
+                                                  year: 'numeric',
+                                                  hour: '2-digit',
+                                                  minute: '2-digit'
+                                                })}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge className={sop.jenis === 'SOP' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white'}>
+                                          {sop.jenis}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge variant="outline" className="border-orange-500 bg-orange-50 text-orange-700">{sop.kategori}</Badge>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge variant="outline" className="border-blue-500 bg-blue-50 text-blue-700">{sop.lingkup || '-'}</Badge>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge className={
+                                          sop.verificationStatus === 'MENUNGGU' ? 'bg-blue-500 text-white' :
+                                            sop.verificationStatus === 'DISETUJUI' ? 'bg-green-500 text-white' :
+                                              'bg-red-500 text-white'
+                                        }>
+                                          {sop.verificationStatus}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell className="text-gray-600 text-sm max-w-[200px]">
+                                        {sop.keterangan && (
+                                          <span className="text-gray-700 block">Catatan: {sop.keterangan}</span>
+                                        )}
+                                        {sop.rejectionReason && (
+                                          <span className="text-red-600 block">Alasan: {sop.rejectionReason}</span>
+                                        )}
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="flex items-center justify-center gap-1">
+                                          <Button size="icon" variant="ghost" onClick={() => handleVerifikasiPreview(sop.id)} title="Preview" className="hover:bg-cyan-100" disabled={previewLoading === sop.id}>
+                                            {previewLoading === sop.id ? (
+                                              <div className="relative">
+                                                <motion.div className="w-4 h-4 border-2 border-cyan-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
+                                                <motion.div className="absolute inset-0 w-4 h-4 border-2 border-blue-400 border-b-transparent rounded-full" animate={{ rotate: -360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
+                                              </div>
+                                            ) : (
+                                              <Eye className="w-4 h-4 text-cyan-600" />
+                                            )}
+                                          </Button>
+                                          <Button size="icon" variant="ghost" onClick={() => handleVerifikasiDownload(sop.id)} title="Download" className="hover:bg-green-100" disabled={downloadLoading === sop.id}>
+                                            {downloadLoading === sop.id ? (
+                                              <div className="relative">
+                                                <motion.div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
+                                                <motion.div className="absolute inset-0 w-4 h-4 border-2 border-emerald-400 border-b-transparent rounded-full" animate={{ rotate: -360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
+                                              </div>
+                                            ) : (
+                                              <Download className="w-4 h-4 text-green-600" />
+                                            )}
+                                          </Button>
+                                          {sop.verificationStatus === 'MENUNGGU' && (
+                                            <>
+                                              <Button size="icon" variant="ghost" onClick={() => handleVerification(sop.id, 'DISETUJUI')} title="Setujui" className="hover:bg-green-100">
+                                                <Check className="w-4 h-4 text-green-600" />
+                                              </Button>
+                                              <Button size="icon" variant="ghost" onClick={() => handleOpenRejectDialog(sop.id)} title="Tolak" className="hover:bg-red-100">
+                                                <X className="w-4 h-4 text-red-600" />
+                                              </Button>
+                                              {/* Rejection Dialog - Moved inside Verifikasi page */}
+                                              <Dialog open={showRejectDialog && rejectTargetId === sop.id} onOpenChange={(open) => {
+                                                if (!open) {
+                                                  setShowRejectDialog(false)
+                                                  setRejectTargetId(null)
+                                                  setRejectReason('')
+                                                }
+                                              }}>
+                                                <DialogContent className="sm:max-w-none w-fit max-w-[95vw] bg-gradient-to-b from-slate-900 to-slate-800 border-2 border-orange-500 shadow-2xl overflow-visible" aria-describedby={undefined}>
+                                                  <DialogHeader>
+                                                    <DialogTitle className="text-xl font-bold text-white flex items-center gap-3">
+                                                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg">
+                                                        <XCircle className="w-6 h-6 text-white" />
+                                                      </div>
+                                                      <div>
+                                                        <span className="bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-400 bg-clip-text text-transparent">
+                                                          Tolak Pengajuan
+                                                        </span>
+                                                        <p className="text-xs text-gray-400 font-normal mt-0.5">BCC - SOP Katalog</p>
+                                                      </div>
+                                                    </DialogTitle>
+                                                    <DialogDescription className="text-gray-300 pt-2">
+                                                      Masukkan alasan penolakan untuk pengajuan ini. Alasan akan ditampilkan kepada pengaju.
+                                                    </DialogDescription>
+                                                  </DialogHeader>
+                                                  <div className="py-4">
+                                                    <Label className="font-medium text-orange-400 mb-2 block flex items-center gap-2">
+                                                      <AlertTriangle className="w-4 h-4" />
+                                                      Alasan Penolakan
+                                                    </Label>
+                                                    <Textarea
+                                                      value={rejectReason}
+                                                      onChange={(e) => setRejectReason(e.target.value)}
+                                                      placeholder="Contoh: Dokumen tidak lengkap, format tidak sesuai, dll..."
+                                                      rows={4}
+                                                      className="border-2 border-orange-500/30 bg-slate-800/50 text-white placeholder:text-gray-500 focus:border-orange-500 focus:ring-orange-500/20 rounded-lg"
+                                                    />
+                                                  </div>
+                                                  <DialogFooter className="gap-2">
+                                                    <Button
+                                                      type="button"
+                                                      variant="outline"
+                                                      onClick={() => {
+                                                        setShowRejectDialog(false)
+                                                        setRejectTargetId(null)
+                                                        setRejectReason('')
+                                                      }}
+                                                      className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
+                                                    >
+                                                      Batal
+                                                    </Button>
+                                                    <Button
+                                                      type="button"
+                                                      onClick={handleConfirmReject}
+                                                      disabled={!rejectReason.trim()}
+                                                      className="bg-gradient-to-r from-orange-500 via-red-500 to-orange-600 hover:from-orange-600 hover:via-red-600 hover:to-orange-700 text-white shadow-lg shadow-orange-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    >
+                                                      <X className="w-4 h-4 mr-2" />
+                                                      Tolak Pengajuan
+                                                    </Button>
+                                                  </DialogFooter>
+                                                </DialogContent>
+                                              </Dialog>
+                                            </>
+                                          )}
+                                          {user?.role === 'DEVELOPER' && (
+                                            <Button size="icon" variant="ghost" onClick={() => handleDeleteSop(sop.id, sop.judul)} title="Hapus Permanen (Dev)" className="hover:bg-red-100">
+                                              <Trash2 className="w-4 h-4 text-red-600" />
+                                            </Button>
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                    </motion.tr>
+                                  ))
+                                )}
+                              </AnimatePresence>
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                {/* Pagination */}
-                <div className="flex items-center justify-between mt-4 bg-orange-50 p-4 rounded-xl border border-orange-100 shadow-sm">
-                  <p className="text-sm text-blue-900 font-medium">
-                    Menampilkan <span className="text-orange-600 font-bold">{verificationList.length}</span> dari <span className="text-orange-600 font-bold">{verificationPagination.total}</span> pengajuan
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={verificationPagination.page === 1 || verifikasiLoading}
-                      onClick={() => setVerificationPagination(p => ({ ...p, page: p.page - 1 }))}
-                      className="border-orange-300 text-orange-600 hover:bg-orange-100 rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      <ChevronLeft className="w-4 h-4 mr-1" /> Prev
-                    </Button>
-                    <div className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-lg border border-orange-200">
-                      <span className="text-sm font-bold text-orange-600">{verificationPagination.page}</span>
-                      <span className="text-xs text-gray-400">/</span>
-                      <span className="text-sm font-medium text-gray-600">{verificationPagination.totalPages || 1}</span>
+                  {/* Pagination */}
+                  <div className="flex items-center justify-between mt-4 bg-orange-50 p-4 rounded-xl border border-orange-100 shadow-sm">
+                    <p className="text-sm text-blue-900 font-medium">
+                      Menampilkan <span className="text-orange-600 font-bold">{verificationList.length}</span> dari <span className="text-orange-600 font-bold">{verificationPagination.total}</span> pengajuan
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={verificationPagination.page === 1 || verifikasiLoading}
+                        onClick={() => setVerificationPagination(p => ({ ...p, page: p.page - 1 }))}
+                        className="border-orange-300 text-orange-600 hover:bg-orange-100 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <ChevronLeft className="w-4 h-4 mr-1" /> Prev
+                      </Button>
+                      <div className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-lg border border-orange-200">
+                        <span className="text-sm font-bold text-orange-600">{verificationPagination.page}</span>
+                        <span className="text-xs text-gray-400">/</span>
+                        <span className="text-sm font-medium text-gray-600">{verificationPagination.totalPages || 1}</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={verificationPagination.page >= verificationPagination.totalPages || verifikasiLoading}
+                        onClick={() => setVerificationPagination(p => ({ ...p, page: p.page + 1 }))}
+                        className="border-orange-300 text-orange-600 hover:bg-orange-100 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        Next <ChevronRight className="w-4 h-4 ml-1" />
+                      </Button>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={verificationPagination.page >= verificationPagination.totalPages || verifikasiLoading}
-                      onClick={() => setVerificationPagination(p => ({ ...p, page: p.page + 1 }))}
-                      className="border-orange-300 text-orange-600 hover:bg-orange-100 rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      Next <ChevronRight className="w-4 h-4 ml-1" />
-                    </Button>
                   </div>
-                </div>
-              </motion.div >
-            )
+                </motion.div>
+              )
             }
 
             {/* Arsip Page */}
@@ -8530,7 +8754,7 @@ export default function ESOPApp() {
                       delay={0.1}
                       subtitle="Folder penyimpanan"
                     />
-                  </div >
+                  </div>
 
                   {/* Arsip Table */}
                   < Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden" >
@@ -8648,7 +8872,7 @@ export default function ESOPApp() {
                         </Table>
                       </div>
                     </CardContent>
-                  </Card >
+                  </Card>
 
                   {/* Pagination */}
                   <div className="flex items-center justify-between mt-4 bg-red-50 p-4 rounded-xl border border-red-100 shadow-sm">
@@ -8681,7 +8905,7 @@ export default function ESOPApp() {
                       </Button>
                     </div>
                   </div>
-                </motion.div >
+                </motion.div>
               )
             }
 
@@ -8783,8 +9007,18 @@ export default function ESOPApp() {
                               <TableHead className="font-bold text-white">File</TableHead>
                             </TableRow>
                           </TableHeader>
-                          <TableBody>
-                            {logs.length === 0 ? (
+                          <TableBody className={logsLoading ? 'opacity-40 transition-opacity duration-200 pointer-events-none' : 'transition-opacity duration-200'}>
+                            {logsLoading ? (
+                              Array.from({ length: 5 }).map((_, idx) => (
+                                <TableRow key={`skeleton-${idx}`}>
+                                  <TableCell><div className="h-4 w-28 bg-gray-200 rounded animate-pulse" /></TableCell>
+                                  <TableCell><div className="h-4 w-24 bg-gray-200 rounded animate-pulse" /></TableCell>
+                                  <TableCell><div className="h-4 w-16 bg-gray-200 rounded animate-pulse" /></TableCell>
+                                  <TableCell><div className="h-4 w-48 bg-gray-200 rounded animate-pulse" /></TableCell>
+                                  <TableCell><div className="h-4 w-32 bg-gray-200 rounded animate-pulse" /></TableCell>
+                                </TableRow>
+                              ))
+                            ) : logs.length === 0 ? (
                               <TableRow>
                                 <TableCell colSpan={5} className="text-center text-gray-500 py-8">
                                   Tidak ada log
@@ -8832,23 +9066,30 @@ export default function ESOPApp() {
                   {/* Pagination */}
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-gray-600">
-                      Menampilkan {logs.length} log
+                      {logsLoading ? (
+                        <span className="inline-flex items-center gap-2">
+                          <span className="w-3 h-3 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
+                          Memuat...
+                        </span>
+                      ) : (
+                        <>Menampilkan {logs.length} dari {logsPagination.total} log</>
+                      )}
                     </p>
                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        disabled={logsPagination.page === 1}
+                        disabled={logsPagination.page === 1 || logsLoading}
                         onClick={() => setLogsPagination(p => ({ ...p, page: p.page - 1 }))}
                         className="border-orange-300 text-orange-600 hover:bg-orange-50"
                       >
                         <ChevronLeft className="w-4 h-4" />
                       </Button>
-                      <span className="text-sm text-gray-600 font-medium">Halaman {logsPagination.page}</span>
+                      <span className="text-sm text-gray-600 font-medium">Halaman {logsPagination.page} dari {logsPagination.totalPages || 1}</span>
                       <Button
                         variant="outline"
                         size="sm"
-                        disabled={logsPagination.page >= logsPagination.totalPages}
+                        disabled={logsPagination.page >= logsPagination.totalPages || logsLoading}
                         onClick={() => setLogsPagination(p => ({ ...p, page: p.page + 1 }))}
                         className="border-orange-300 text-orange-600 hover:bg-orange-50"
                       >
@@ -9335,10 +9576,10 @@ export default function ESOPApp() {
             }
           </AnimatePresence >
         </main >
-      </div >
+      </div>
 
       {/* Edit User Dialog */}
-      < Dialog open={showEditUserDialog} onOpenChange={setShowEditUserDialog} >
+      <Dialog open={showEditUserDialog} onOpenChange={setShowEditUserDialog} >
         <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -9422,7 +9663,7 @@ export default function ESOPApp() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog >
+      </Dialog>
 
       {/* Forgot Password Dialog */}
       <Dialog open={showForgotPassword} onOpenChange={(open) => {
@@ -9649,7 +9890,7 @@ export default function ESOPApp() {
 
 
       {/* Settings Dialog */}
-      <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
+      <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog} >
         <DialogContent className="sm:max-w-2xl bg-white border-0 shadow-2xl overflow-hidden p-0 gap-0" aria-describedby={undefined}>
           {/* Stunning Header with Gradient */}
           <div className="relative overflow-hidden">
@@ -10080,7 +10321,7 @@ export default function ESOPApp() {
       </Dialog>
 
       {/* Password Change Dialog */}
-      < Dialog open={showPasswordChangeDialog} onOpenChange={setShowPasswordChangeDialog} >
+      <Dialog open={showPasswordChangeDialog} onOpenChange={setShowPasswordChangeDialog} >
         <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -10183,10 +10424,10 @@ export default function ESOPApp() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog >
+      </Dialog>
 
       {/* User Activity Dialog - Compact & Aesthetic */}
-      <Dialog open={showUserActivityDialog} onOpenChange={setShowUserActivityDialog}>
+      <Dialog open={showUserActivityDialog} onOpenChange={setShowUserActivityDialog} >
         <DialogContent className="sm:max-w-md bg-white border-2 border-cyan-200 shadow-xl" aria-describedby={undefined}>
           <DialogHeader className="pb-2">
             <DialogTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -10262,7 +10503,7 @@ export default function ESOPApp() {
       </Dialog>
 
       {/* PDF Edit Warning Dialog - Aesthetic Design */}
-      < Dialog open={showPdfWarningDialog} onOpenChange={setShowPdfWarningDialog} >
+      <Dialog open={showPdfWarningDialog} onOpenChange={setShowPdfWarningDialog} >
         <DialogContent className="sm:max-w-lg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-red-500/50 shadow-2xl overflow-hidden" aria-describedby={undefined}>
           {/* Animated background effects */}
           <div className="absolute inset-0 overflow-hidden">
@@ -10435,11 +10676,11 @@ export default function ESOPApp() {
             </DialogFooter>
           </div>
         </DialogContent>
-      </Dialog >
+      </Dialog>
 
 
       {/* Copyright Popup */}
-      <CopyrightPopup show={showCopyrightPopup} onClose={() => setShowCopyrightPopup(false)} />
+      < CopyrightPopup show={showCopyrightPopup} onClose={() => setShowCopyrightPopup(false)} />
 
       {/* Image Cropper for Profile Photo */}
       <ImageCropper
