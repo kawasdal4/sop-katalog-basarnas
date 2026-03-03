@@ -25,12 +25,16 @@ export async function GET() {
     // Get profile photo URL if exists
     let profilePhotoUrl = null
     if (user.profilePhoto) {
-      const r2Url = getR2PublicUrl(user.profilePhoto)
-      const cacheBuster = user.updatedAt ? new Date(user.updatedAt).getTime() : Date.now()
-      if (r2Url) {
-        profilePhotoUrl = `${r2Url}?v=${cacheBuster}`
+      if (user.profilePhoto.startsWith('http')) {
+        profilePhotoUrl = user.profilePhoto
       } else {
-        profilePhotoUrl = `/api/users/photo?key=${encodeURIComponent(user.profilePhoto)}&v=${cacheBuster}`
+        const r2Url = getR2PublicUrl(user.profilePhoto)
+        const cacheBuster = user.updatedAt ? new Date(user.updatedAt).getTime() : Date.now()
+        if (r2Url) {
+          profilePhotoUrl = `${r2Url}?v=${cacheBuster}`
+        } else {
+          profilePhotoUrl = `/api/users/photo?key=${encodeURIComponent(user.profilePhoto)}&v=${cacheBuster}`
+        }
       }
     }
 
@@ -91,12 +95,16 @@ export async function POST(request: NextRequest) {
     // Get profile photo URL if exists
     let profilePhotoUrl = null
     if (user.profilePhoto) {
-      const r2Url = getR2PublicUrl(user.profilePhoto)
-      const cacheBuster = user.updatedAt ? new Date(user.updatedAt).getTime() : Date.now()
-      if (r2Url) {
-        profilePhotoUrl = `${r2Url}?v=${cacheBuster}`
+      if (user.profilePhoto.startsWith('http')) {
+        profilePhotoUrl = user.profilePhoto
       } else {
-        profilePhotoUrl = `/api/users/photo?key=${encodeURIComponent(user.profilePhoto)}&v=${cacheBuster}`
+        const r2Url = getR2PublicUrl(user.profilePhoto)
+        const cacheBuster = user.updatedAt ? new Date(user.updatedAt).getTime() : Date.now()
+        if (r2Url) {
+          profilePhotoUrl = `${r2Url}?v=${cacheBuster}`
+        } else {
+          profilePhotoUrl = `/api/users/photo?key=${encodeURIComponent(user.profilePhoto)}&v=${cacheBuster}`
+        }
       }
     }
 

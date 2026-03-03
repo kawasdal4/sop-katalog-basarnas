@@ -20,15 +20,17 @@ export async function GET(request: NextRequest) {
         }
 
         try {
+            console.log(`[Photo Proxy] Attempting to download photo with key: "${key}"`);
             // Download image from R2
             const result = await downloadFromR2(key)
+            console.log(`[Photo Proxy] Successfully downloaded photo. ContentType: ${result.contentType}, Length: ${result.buffer.length}`);
             const imageBuffer = result.buffer
             const contentType = result.contentType || 'image/jpeg'
 
             // Determine max-age for caching (1 hour)
             const maxAge = 60 * 60
 
-            return new NextResponse(imageBuffer, {
+            return new NextResponse(new Uint8Array(imageBuffer), {
                 status: 200,
                 headers: {
                     'Content-Type': contentType,

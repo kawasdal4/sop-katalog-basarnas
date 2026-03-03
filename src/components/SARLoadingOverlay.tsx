@@ -23,7 +23,7 @@ const SPARKLE_POSITIONS = [
 
 // SAR Logo with animation
 function SARAnimatedLogo() {
-  const logoUrl = 'https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/logo.png'
+  const logoUrl = '/logo.png'
 
   return (
     <motion.div
