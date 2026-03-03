@@ -6243,9 +6243,11 @@ export default function ESOPApp() {
                         transition={{ delay: 0.4 }}
                       >
                         <Card className="relative overflow-hidden border-0 shadow-2xl" style={{ background: 'linear-gradient(145deg, #1a0a2e 0%, #2d1b4e 50%, #1a1040 100%)' }}>
-                          <motion.div animate={{ opacity: [0.3, 0.6, 0.3], scale: [1, 1.1, 1] }} transition={{ duration: 4, repeat: Infinity }} className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-purple-500/20 to-transparent rounded-full blur-3xl" />
-                          <motion.div animate={{ opacity: [0.2, 0.5, 0.2] }} transition={{ duration: 5, repeat: Infinity, delay: 1 }} className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-pink-500/15 to-transparent rounded-full blur-2xl" />
-                          <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.3) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+                          {/* Animated glow orbs */}
+                          <motion.div animate={{ opacity: [0.2, 0.5, 0.2], scale: [1, 1.2, 1] }} transition={{ duration: 4, repeat: Infinity }} className="absolute -top-10 -right-10 w-60 h-60 bg-gradient-to-br from-purple-500/25 via-fuchsia-500/15 to-transparent rounded-full blur-3xl" />
+                          <motion.div animate={{ opacity: [0.15, 0.4, 0.15] }} transition={{ duration: 5, repeat: Infinity, delay: 1.5 }} className="absolute -bottom-8 -left-8 w-48 h-48 bg-gradient-to-tr from-pink-500/20 via-violet-500/10 to-transparent rounded-full blur-3xl" />
+                          <motion.div animate={{ opacity: [0.1, 0.3, 0.1] }} transition={{ duration: 6, repeat: Infinity, delay: 0.5 }} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-gradient-radial from-purple-400/10 to-transparent rounded-full blur-2xl" />
+                          <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.3) 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
 
                           <CardHeader className="relative pb-2">
                             <div className="flex items-center justify-between">
@@ -6254,90 +6256,131 @@ export default function ESOPApp() {
                                   <motion.div
                                     animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
                                     transition={{ duration: 3, repeat: Infinity }}
-                                    className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-400 via-purple-500 to-pink-600 flex items-center justify-center shadow-lg shadow-purple-500/30 ring-2 ring-purple-400/20"
+                                    className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-400 via-purple-500 to-pink-600 flex items-center justify-center shadow-lg shadow-purple-500/40 ring-2 ring-purple-400/30"
                                   >
-                                    <PieChartIcon className="w-6 h-6 text-white" />
+                                    <PieChartIcon className="w-6 h-6 text-white drop-shadow-lg" />
                                   </motion.div>
                                   <div>
-                                    <CardTitle className="text-lg font-extrabold bg-gradient-to-r from-purple-300 via-pink-200 to-fuchsia-300 bg-clip-text text-transparent">
+                                    <CardTitle className="text-lg font-extrabold bg-gradient-to-r from-purple-300 via-pink-200 to-fuchsia-300 bg-clip-text text-transparent drop-shadow-sm">
                                       Distribusi per Kategori
                                     </CardTitle>
-                                    <p className="text-xs text-gray-400 mt-0.5">Persebaran dokumen berdasarkan kategori operasional</p>
+                                    <p className="text-xs text-purple-300/50 mt-0.5">Persebaran dokumen berdasarkan kategori operasional</p>
                                   </div>
                                 </div>
                               </div>
-                              <div className="text-right px-4 py-2 rounded-xl" style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.2)' }}>
-                                <p className="text-3xl font-black bg-gradient-to-r from-purple-400 to-pink-300 bg-clip-text text-transparent">{stats.byKategori?.length || 0}</p>
+                              <motion.div
+                                animate={{ boxShadow: ['0 0 20px rgba(168,85,247,0.15)', '0 0 30px rgba(168,85,247,0.3)', '0 0 20px rgba(168,85,247,0.15)'] }}
+                                transition={{ duration: 3, repeat: Infinity }}
+                                className="text-right px-4 py-2 rounded-xl" style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)' }}
+                              >
+                                <p className="text-3xl font-black bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">{stats.byKategori?.length || 0}</p>
                                 <p className="text-[10px] text-purple-300/60 uppercase tracking-widest font-bold">Kategori</p>
-                              </div>
+                              </motion.div>
                             </div>
                           </CardHeader>
                           <CardContent className="relative">
-                            <ResponsiveContainer width="100%" height={300}>
-                              <PieChart>
-                                <defs>
-                                  {COLORS.map((color, index) => (
-                                    <linearGradient key={`grad-${index}`} id={`pieGradient-${index}`} x1="0" y1="0" x2="1" y2="1">
-                                      <stop offset="0%" stopColor={color} stopOpacity={1} />
-                                      <stop offset="100%" stopColor={color} stopOpacity={0.7} />
-                                    </linearGradient>
-                                  ))}
-                                  <filter id="pieShadow" x="-50%" y="-50%" width="200%" height="200%">
-                                    <feDropShadow dx="0" dy="8" stdDeviation="10" floodColor="#a855f7" floodOpacity="0.3" />
-                                  </filter>
-                                </defs>
-                                <Pie
-                                  data={stats.byKategori || []}
-                                  dataKey="count"
-                                  nameKey="kategori"
-                                  cx="50%"
-                                  cy="45%"
-                                  innerRadius={55}
-                                  outerRadius={95}
-                                  paddingAngle={4}
-                                  stroke="rgba(255,255,255,0.1)"
-                                  strokeWidth={2}
-                                  filter="url(#pieShadow)"
-                                >
-                                  {(stats.byKategori || []).map((_, index) => (
-                                    <Cell key={`cell-${index}`} fill={`url(#pieGradient-${index % COLORS.length})`} />
-                                  ))}
-                                </Pie>
-                                <Tooltip
-                                  content={({ active, payload }) => {
-                                    if (active && payload && payload.length) {
-                                      const data = payload[0].payload
-                                      const total = (stats.byKategori || []).reduce((sum, item) => sum + item.count, 0)
-                                      const percentage = total > 0 ? Math.round((data.count / total) * 100) : 0
-                                      const colorIdx = (stats.byKategori || []).indexOf(data) % COLORS.length
+                            <div className="relative">
+                              <ResponsiveContainer width="100%" height={320}>
+                                <PieChart>
+                                  <defs>
+                                    {COLORS.map((color, index) => (
+                                      <linearGradient key={`grad-${index}`} id={`pieGradient-${index}`} x1="0" y1="0" x2="1" y2="1">
+                                        <stop offset="0%" stopColor={color} stopOpacity={1} />
+                                        <stop offset="50%" stopColor={color} stopOpacity={0.85} />
+                                        <stop offset="100%" stopColor={color} stopOpacity={0.65} />
+                                      </linearGradient>
+                                    ))}
+                                    <filter id="pieShadow" x="-50%" y="-50%" width="200%" height="200%">
+                                      <feGaussianBlur in="SourceAlpha" stdDeviation="6" />
+                                      <feOffset dx="0" dy="4" />
+                                      <feComponentTransfer><feFuncA type="linear" slope="0.25" /></feComponentTransfer>
+                                      <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+                                    </filter>
+                                    <filter id="pieGlow" x="-50%" y="-50%" width="200%" height="200%">
+                                      <feGaussianBlur stdDeviation="4" result="glow" />
+                                      <feMerge><feMergeNode in="glow" /><feMergeNode in="SourceGraphic" /></feMerge>
+                                    </filter>
+                                  </defs>
+                                  <Pie
+                                    data={stats.byKategori || []}
+                                    dataKey="count"
+                                    nameKey="kategori"
+                                    cx="50%"
+                                    cy="48%"
+                                    innerRadius={65}
+                                    outerRadius={110}
+                                    paddingAngle={5}
+                                    stroke="rgba(255,255,255,0.15)"
+                                    strokeWidth={2}
+                                    filter="url(#pieShadow)"
+                                    label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+                                      if (percent < 0.05) return null
+                                      const RADIAN = Math.PI / 180
+                                      const radius = innerRadius + (outerRadius - innerRadius) * 0.55
+                                      const x = cx + radius * Math.cos(-midAngle * RADIAN)
+                                      const y = cy + radius * Math.sin(-midAngle * RADIAN)
                                       return (
-                                        <div className="border rounded-2xl shadow-2xl p-4 min-w-[180px]" style={{ background: 'linear-gradient(135deg, rgba(26,10,46,0.95), rgba(45,27,78,0.95))', borderColor: 'rgba(168,85,247,0.4)', backdropFilter: 'blur(12px)' }}>
-                                          <div className="flex items-center gap-2 mb-3">
-                                            <div className="w-3 h-3 rounded-full shadow" style={{ backgroundColor: COLORS[colorIdx] }} />
-                                            <span className="font-bold text-purple-200 text-sm">{data.kategori}</span>
-                                          </div>
-                                          <div className="flex items-end justify-between mb-3">
-                                            <div>
-                                              <span className="text-3xl font-black text-white">{data.count}</span>
-                                              <span className="text-purple-300/60 text-xs ml-1">dokumen</span>
-                                            </div>
-                                            <div className="px-2.5 py-1 rounded-lg text-xs font-black" style={{ background: `${COLORS[colorIdx]}20`, color: COLORS[colorIdx] }}>
-                                              {percentage}%
-                                            </div>
-                                          </div>
-                                          <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                            <div className="h-full rounded-full" style={{ width: `${percentage}%`, backgroundColor: COLORS[colorIdx] }} />
-                                          </div>
-                                        </div>
+                                        <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={13} fontWeight="900" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.8), 0 0 20px rgba(168,85,247,0.5)' }}>
+                                          {`${(percent * 100).toFixed(0)}%`}
+                                        </text>
                                       )
-                                    }
-                                    return null
-                                  }}
-                                />
-                              </PieChart>
-                            </ResponsiveContainer>
+                                    }}
+                                    labelLine={false}
+                                  >
+                                    {(stats.byKategori || []).map((_, index) => (
+                                      <Cell key={`cell-${index}`} fill={`url(#pieGradient-${index % COLORS.length})`} />
+                                    ))}
+                                  </Pie>
+                                  <Tooltip
+                                    content={({ active, payload }) => {
+                                      if (active && payload && payload.length) {
+                                        const data = payload[0].payload
+                                        const total = (stats.byKategori || []).reduce((sum, item) => sum + item.count, 0)
+                                        const percentage = total > 0 ? Math.round((data.count / total) * 100) : 0
+                                        const colorIdx = (stats.byKategori || []).indexOf(data) % COLORS.length
+                                        return (
+                                          <div className="border rounded-2xl shadow-2xl p-4 min-w-[200px]" style={{ background: 'linear-gradient(135deg, rgba(26,10,46,0.97), rgba(55,20,90,0.97))', borderColor: COLORS[colorIdx] + '60', backdropFilter: 'blur(16px)', boxShadow: `0 8px 32px ${COLORS[colorIdx]}30, 0 0 60px ${COLORS[colorIdx]}10` }}>
+                                            <div className="flex items-center gap-2.5 mb-3">
+                                              <div className="w-4 h-4 rounded-full shadow-lg ring-2 ring-white/20" style={{ backgroundColor: COLORS[colorIdx], boxShadow: `0 0 12px ${COLORS[colorIdx]}80` }} />
+                                              <span className="font-extrabold text-white text-sm tracking-wide">{data.kategori}</span>
+                                            </div>
+                                            <div className="flex items-end justify-between mb-3">
+                                              <div>
+                                                <span className="text-4xl font-black text-white" style={{ textShadow: `0 0 20px ${COLORS[colorIdx]}40` }}>{data.count}</span>
+                                                <span className="text-purple-200/50 text-xs ml-1.5">dokumen</span>
+                                              </div>
+                                              <div className="px-3 py-1.5 rounded-xl text-sm font-black text-white" style={{ background: `linear-gradient(135deg, ${COLORS[colorIdx]}90, ${COLORS[colorIdx]}60)`, boxShadow: `0 4px 12px ${COLORS[colorIdx]}40` }}>
+                                                {percentage}%
+                                              </div>
+                                            </div>
+                                            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                                              <div className="h-full rounded-full transition-all" style={{ width: `${percentage}%`, background: `linear-gradient(90deg, ${COLORS[colorIdx]}, ${COLORS[colorIdx]}99)`, boxShadow: `0 0 10px ${COLORS[colorIdx]}60` }} />
+                                            </div>
+                                          </div>
+                                        )
+                                      }
+                                      return null
+                                    }}
+                                  />
+                                </PieChart>
+                              </ResponsiveContainer>
+                              {/* Center Label Overlay */}
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ paddingBottom: '20px' }}>
+                                <motion.div
+                                  animate={{ boxShadow: ['0 0 30px rgba(168,85,247,0.15)', '0 0 50px rgba(168,85,247,0.25)', '0 0 30px rgba(168,85,247,0.15)'] }}
+                                  transition={{ duration: 3, repeat: Infinity }}
+                                  className="w-[110px] h-[110px] rounded-full flex flex-col items-center justify-center"
+                                  style={{ background: 'radial-gradient(circle, rgba(45,27,78,0.95) 0%, rgba(26,16,64,0.9) 100%)', border: '2px solid rgba(168,85,247,0.2)' }}
+                                >
+                                  <span className="text-3xl font-black text-white" style={{ textShadow: '0 0 20px rgba(168,85,247,0.5)' }}>
+                                    {(stats.byKategori || []).reduce((sum, item) => sum + item.count, 0)}
+                                  </span>
+                                  <span className="text-[9px] text-purple-300/70 uppercase tracking-[0.2em] font-bold mt-0.5">Total</span>
+                                </motion.div>
+                              </div>
+                            </div>
                             {/* Premium Legend */}
-                            <div className="flex flex-wrap justify-center gap-2 mt-3">
+                            <div className="flex flex-wrap justify-center gap-2 mt-2">
                               {(stats.byKategori || []).slice(0, 5).map((item, index) => {
                                 const total = (stats.byKategori || []).reduce((sum, i) => sum + i.count, 0)
                                 const pct = total > 0 ? Math.round((item.count / total) * 100) : 0
@@ -6347,12 +6390,15 @@ export default function ESOPApp() {
                                     initial={{ opacity: 0, scale: 0.8 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     transition={{ delay: 0.6 + index * 0.1 }}
-                                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                                    className="group flex items-center gap-2.5 px-3.5 py-2 rounded-xl cursor-default transition-all duration-300 hover:scale-105"
+                                    style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${COLORS[index % COLORS.length]}20` }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = `${COLORS[index % COLORS.length]}15`; e.currentTarget.style.borderColor = `${COLORS[index % COLORS.length]}40` }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = `${COLORS[index % COLORS.length]}20` }}
                                   >
-                                    <div className="w-2.5 h-2.5 rounded-full shadow" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                                    <span className="text-xs font-semibold text-gray-300">{item.kategori}</span>
-                                    <span className="text-[10px] font-black text-gray-500">{item.count}</span>
-                                    <span className="text-[10px] font-bold" style={{ color: COLORS[index % COLORS.length] }}>({pct}%)</span>
+                                    <div className="w-3 h-3 rounded-full shadow-lg" style={{ backgroundColor: COLORS[index % COLORS.length], boxShadow: `0 0 8px ${COLORS[index % COLORS.length]}60` }} />
+                                    <span className="text-xs font-bold text-white/80">{item.kategori}</span>
+                                    <span className="text-xs font-black text-white/50">{item.count}</span>
+                                    <span className="text-xs font-extrabold" style={{ color: COLORS[index % COLORS.length] }}>({pct}%)</span>
                                   </motion.div>
                                 )
                               })}
@@ -6369,9 +6415,11 @@ export default function ESOPApp() {
                         className="lg:col-span-2"
                       >
                         <Card className="relative overflow-hidden border-0 shadow-2xl" style={{ background: 'linear-gradient(145deg, #0a1628 0%, #0d2137 50%, #0a1a30 100%)' }}>
-                          <motion.div animate={{ opacity: [0.3, 0.6, 0.3], scale: [1, 1.1, 1] }} transition={{ duration: 4, repeat: Infinity }} className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-cyan-500/15 to-transparent rounded-full blur-3xl" />
-                          <motion.div animate={{ opacity: [0.2, 0.5, 0.2] }} transition={{ duration: 5, repeat: Infinity, delay: 1 }} className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-blue-500/15 to-transparent rounded-full blur-2xl" />
-                          <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.3) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+                          {/* Animated glow orbs */}
+                          <motion.div animate={{ opacity: [0.2, 0.5, 0.2], scale: [1, 1.2, 1] }} transition={{ duration: 4, repeat: Infinity }} className="absolute -top-10 -right-10 w-60 h-60 bg-gradient-to-br from-cyan-500/20 via-blue-500/10 to-transparent rounded-full blur-3xl" />
+                          <motion.div animate={{ opacity: [0.15, 0.4, 0.15] }} transition={{ duration: 5, repeat: Infinity, delay: 1.5 }} className="absolute -bottom-8 -left-8 w-48 h-48 bg-gradient-to-tr from-blue-500/20 via-teal-500/10 to-transparent rounded-full blur-3xl" />
+                          <motion.div animate={{ opacity: [0.1, 0.25, 0.1] }} transition={{ duration: 6, repeat: Infinity, delay: 0.5 }} className="absolute top-1/3 right-1/3 w-32 h-32 bg-gradient-radial from-cyan-400/10 to-transparent rounded-full blur-2xl" />
+                          <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.3) 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
 
                           <CardHeader className="relative pb-2">
                             <div className="flex items-center justify-between">
@@ -6380,38 +6428,46 @@ export default function ESOPApp() {
                                   <motion.div
                                     animate={{ rotate: [0, 360] }}
                                     transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                                    className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 via-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30 ring-2 ring-cyan-400/20"
+                                    className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 via-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/40 ring-2 ring-cyan-400/30"
                                   >
-                                    <Globe className="w-6 h-6 text-white" />
+                                    <Globe className="w-6 h-6 text-white drop-shadow-lg" />
                                   </motion.div>
                                   <div>
-                                    <CardTitle className="text-lg font-extrabold bg-gradient-to-r from-cyan-300 via-blue-200 to-sky-300 bg-clip-text text-transparent">
+                                    <CardTitle className="text-lg font-extrabold bg-gradient-to-r from-cyan-300 via-blue-200 to-sky-300 bg-clip-text text-transparent drop-shadow-sm">
                                       Distribusi per Lingkup
                                     </CardTitle>
-                                    <p className="text-xs text-gray-400 mt-0.5">Persebaran dokumen berdasarkan ruang lingkup bidang kerja</p>
+                                    <p className="text-xs text-cyan-300/50 mt-0.5">Persebaran dokumen berdasarkan ruang lingkup bidang kerja</p>
                                   </div>
                                 </div>
                               </div>
-                              <div className="text-right px-4 py-2 rounded-xl" style={{ background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.2)' }}>
-                                <p className="text-3xl font-black bg-gradient-to-r from-cyan-400 to-blue-300 bg-clip-text text-transparent">{stats.byLingkup?.length || 0}</p>
+                              <motion.div
+                                animate={{ boxShadow: ['0 0 20px rgba(6,182,212,0.15)', '0 0 30px rgba(6,182,212,0.3)', '0 0 20px rgba(6,182,212,0.15)'] }}
+                                transition={{ duration: 3, repeat: Infinity }}
+                                className="text-right px-4 py-2 rounded-xl" style={{ background: 'rgba(6,182,212,0.12)', border: '1px solid rgba(6,182,212,0.25)' }}
+                              >
+                                <p className="text-3xl font-black bg-gradient-to-r from-cyan-300 to-blue-300 bg-clip-text text-transparent">{stats.byLingkup?.length || 0}</p>
                                 <p className="text-[10px] text-cyan-300/60 uppercase tracking-widest font-bold">Lingkup</p>
-                              </div>
+                              </motion.div>
                             </div>
                           </CardHeader>
                           <CardContent className="relative">
                             <div className="flex flex-col lg:flex-row gap-6">
-                              <div className="flex-1">
-                                <ResponsiveContainer width="100%" height={280}>
+                              <div className="flex-1 relative">
+                                <ResponsiveContainer width="100%" height={300}>
                                   <PieChart>
                                     <defs>
                                       {LINGKUP_COLORS.map((color, index) => (
                                         <linearGradient key={`lingkup-grad-${index}`} id={`lingkupGradient-${index}`} x1="0" y1="0" x2="1" y2="1">
                                           <stop offset="0%" stopColor={color} stopOpacity={1} />
-                                          <stop offset="100%" stopColor={color} stopOpacity={0.7} />
+                                          <stop offset="50%" stopColor={color} stopOpacity={0.85} />
+                                          <stop offset="100%" stopColor={color} stopOpacity={0.65} />
                                         </linearGradient>
                                       ))}
                                       <filter id="lingkupShadow" x="-50%" y="-50%" width="200%" height="200%">
-                                        <feDropShadow dx="0" dy="8" stdDeviation="10" floodColor="#06b6d4" floodOpacity="0.3" />
+                                        <feGaussianBlur in="SourceAlpha" stdDeviation="6" />
+                                        <feOffset dx="0" dy="4" />
+                                        <feComponentTransfer><feFuncA type="linear" slope="0.25" /></feComponentTransfer>
+                                        <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
                                       </filter>
                                     </defs>
                                     <Pie
@@ -6420,12 +6476,25 @@ export default function ESOPApp() {
                                       nameKey="lingkup"
                                       cx="50%"
                                       cy="50%"
-                                      innerRadius={50}
-                                      outerRadius={90}
-                                      paddingAngle={3}
-                                      stroke="rgba(255,255,255,0.1)"
+                                      innerRadius={60}
+                                      outerRadius={105}
+                                      paddingAngle={4}
+                                      stroke="rgba(255,255,255,0.15)"
                                       strokeWidth={2}
                                       filter="url(#lingkupShadow)"
+                                      label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+                                        if (percent < 0.05) return null
+                                        const RADIAN = Math.PI / 180
+                                        const radius = innerRadius + (outerRadius - innerRadius) * 0.55
+                                        const x = cx + radius * Math.cos(-midAngle * RADIAN)
+                                        const y = cy + radius * Math.sin(-midAngle * RADIAN)
+                                        return (
+                                          <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight="900" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.8), 0 0 20px rgba(6,182,212,0.5)' }}>
+                                            {`${(percent * 100).toFixed(0)}%`}
+                                          </text>
+                                        )
+                                      }}
+                                      labelLine={false}
                                     >
                                       {(stats.byLingkup || []).map((_, index) => (
                                         <Cell key={`cell-${index}`} fill={`url(#lingkupGradient-${index % LINGKUP_COLORS.length})`} />
@@ -6439,22 +6508,22 @@ export default function ESOPApp() {
                                           const percentage = total > 0 ? Math.round((data.count / total) * 100) : 0
                                           const colorIdx = (stats.byLingkup || []).indexOf(data) % LINGKUP_COLORS.length
                                           return (
-                                            <div className="border rounded-2xl shadow-2xl p-4 min-w-[180px]" style={{ background: 'linear-gradient(135deg, rgba(10,22,40,0.95), rgba(13,33,55,0.95))', borderColor: 'rgba(6,182,212,0.4)', backdropFilter: 'blur(12px)' }}>
-                                              <div className="flex items-center gap-2 mb-3">
-                                                <div className="w-3 h-3 rounded-full shadow" style={{ backgroundColor: LINGKUP_COLORS[colorIdx] }} />
-                                                <span className="font-bold text-cyan-200 text-sm">{data.lingkup || 'Tidak Ada'}</span>
+                                            <div className="border rounded-2xl shadow-2xl p-4 min-w-[200px]" style={{ background: 'linear-gradient(135deg, rgba(10,22,40,0.97), rgba(13,40,65,0.97))', borderColor: LINGKUP_COLORS[colorIdx] + '60', backdropFilter: 'blur(16px)', boxShadow: `0 8px 32px ${LINGKUP_COLORS[colorIdx]}30, 0 0 60px ${LINGKUP_COLORS[colorIdx]}10` }}>
+                                              <div className="flex items-center gap-2.5 mb-3">
+                                                <div className="w-4 h-4 rounded-full shadow-lg ring-2 ring-white/20" style={{ backgroundColor: LINGKUP_COLORS[colorIdx], boxShadow: `0 0 12px ${LINGKUP_COLORS[colorIdx]}80` }} />
+                                                <span className="font-extrabold text-white text-sm tracking-wide">{data.lingkup || 'Tidak Ada'}</span>
                                               </div>
                                               <div className="flex items-end justify-between mb-3">
                                                 <div>
-                                                  <span className="text-3xl font-black text-white">{data.count}</span>
-                                                  <span className="text-cyan-300/60 text-xs ml-1">dokumen</span>
+                                                  <span className="text-4xl font-black text-white" style={{ textShadow: `0 0 20px ${LINGKUP_COLORS[colorIdx]}40` }}>{data.count}</span>
+                                                  <span className="text-cyan-200/50 text-xs ml-1.5">dokumen</span>
                                                 </div>
-                                                <div className="px-2.5 py-1 rounded-lg text-xs font-black" style={{ background: `${LINGKUP_COLORS[colorIdx]}20`, color: LINGKUP_COLORS[colorIdx] }}>
+                                                <div className="px-3 py-1.5 rounded-xl text-sm font-black text-white" style={{ background: `linear-gradient(135deg, ${LINGKUP_COLORS[colorIdx]}90, ${LINGKUP_COLORS[colorIdx]}60)`, boxShadow: `0 4px 12px ${LINGKUP_COLORS[colorIdx]}40` }}>
                                                   {percentage}%
                                                 </div>
                                               </div>
-                                              <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                                <div className="h-full rounded-full" style={{ width: `${percentage}%`, backgroundColor: LINGKUP_COLORS[colorIdx] }} />
+                                              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                                                <div className="h-full rounded-full transition-all" style={{ width: `${percentage}%`, background: `linear-gradient(90deg, ${LINGKUP_COLORS[colorIdx]}, ${LINGKUP_COLORS[colorIdx]}99)`, boxShadow: `0 0 10px ${LINGKUP_COLORS[colorIdx]}60` }} />
                                               </div>
                                             </div>
                                           )
@@ -6464,6 +6533,20 @@ export default function ESOPApp() {
                                     />
                                   </PieChart>
                                 </ResponsiveContainer>
+                                {/* Center Label Overlay */}
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                  <motion.div
+                                    animate={{ boxShadow: ['0 0 30px rgba(6,182,212,0.15)', '0 0 50px rgba(6,182,212,0.25)', '0 0 30px rgba(6,182,212,0.15)'] }}
+                                    transition={{ duration: 3, repeat: Infinity }}
+                                    className="w-[100px] h-[100px] rounded-full flex flex-col items-center justify-center"
+                                    style={{ background: 'radial-gradient(circle, rgba(13,33,55,0.95) 0%, rgba(10,26,48,0.9) 100%)', border: '2px solid rgba(6,182,212,0.2)' }}
+                                  >
+                                    <span className="text-3xl font-black text-white" style={{ textShadow: '0 0 20px rgba(6,182,212,0.5)' }}>
+                                      {(stats.byLingkup || []).reduce((sum, item) => sum + item.count, 0)}
+                                    </span>
+                                    <span className="text-[9px] text-cyan-300/70 uppercase tracking-[0.2em] font-bold mt-0.5">Total</span>
+                                  </motion.div>
+                                </div>
                               </div>
                               {/* Premium Legend with Stats */}
                               <div className="lg:w-72 flex flex-col justify-center">
@@ -6477,22 +6560,28 @@ export default function ESOPApp() {
                                         initial={{ opacity: 0, x: 20 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         transition={{ delay: 0.7 + index * 0.08 }}
-                                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-default transition-all duration-300 hover:scale-[1.02]"
+                                        style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${LINGKUP_COLORS[index % LINGKUP_COLORS.length]}15` }}
+                                        onMouseEnter={(e) => { e.currentTarget.style.background = `${LINGKUP_COLORS[index % LINGKUP_COLORS.length]}12`; e.currentTarget.style.borderColor = `${LINGKUP_COLORS[index % LINGKUP_COLORS.length]}35` }}
+                                        onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.borderColor = `${LINGKUP_COLORS[index % LINGKUP_COLORS.length]}15` }}
                                       >
-                                        <div className="w-3 h-3 rounded-full flex-shrink-0 shadow" style={{ backgroundColor: LINGKUP_COLORS[index % LINGKUP_COLORS.length] }} />
+                                        <div className="w-3.5 h-3.5 rounded-full flex-shrink-0 shadow-lg" style={{ backgroundColor: LINGKUP_COLORS[index % LINGKUP_COLORS.length], boxShadow: `0 0 8px ${LINGKUP_COLORS[index % LINGKUP_COLORS.length]}60` }} />
                                         <div className="flex-1 min-w-0">
-                                          <p className="text-xs font-semibold text-gray-300 truncate">{item.lingkup || 'Tidak Ada'}</p>
-                                          <div className="flex items-center gap-2 mt-1">
+                                          <div className="flex items-center justify-between mb-1">
+                                            <p className="text-xs font-bold text-white/80 truncate">{item.lingkup || 'Tidak Ada'}</p>
+                                            <span className="text-xs font-extrabold ml-2" style={{ color: LINGKUP_COLORS[index % LINGKUP_COLORS.length] }}>{percentage}%</span>
+                                          </div>
+                                          <div className="flex items-center gap-2">
                                             <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
                                               <motion.div
                                                 initial={{ width: 0 }}
                                                 animate={{ width: `${percentage}%` }}
                                                 transition={{ delay: 0.8 + index * 0.08, duration: 0.5 }}
                                                 className="h-full rounded-full"
-                                                style={{ backgroundColor: LINGKUP_COLORS[index % LINGKUP_COLORS.length] }}
+                                                style={{ backgroundColor: LINGKUP_COLORS[index % LINGKUP_COLORS.length], boxShadow: `0 0 6px ${LINGKUP_COLORS[index % LINGKUP_COLORS.length]}40` }}
                                               />
                                             </div>
-                                            <span className="text-xs font-black" style={{ color: LINGKUP_COLORS[index % LINGKUP_COLORS.length] }}>{item.count}</span>
+                                            <span className="text-[11px] font-black text-white/60">{item.count}</span>
                                           </div>
                                         </div>
                                       </motion.div>
@@ -6503,6 +6592,7 @@ export default function ESOPApp() {
                             </div>
                           </CardContent>
                         </Card>
+
                       </motion.div>
                     </motion.div>
 
@@ -9583,10 +9673,10 @@ export default function ESOPApp() {
             }
           </AnimatePresence >
         </main >
-      </div>
+      </div >
 
       {/* Edit User Dialog */}
-      <Dialog open={showEditUserDialog} onOpenChange={setShowEditUserDialog} >
+      < Dialog open={showEditUserDialog} onOpenChange={setShowEditUserDialog} >
         <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -9670,15 +9760,16 @@ export default function ESOPApp() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Forgot Password Dialog */}
-      <Dialog open={showForgotPassword} onOpenChange={(open) => {
+      < Dialog open={showForgotPassword} onOpenChange={(open) => {
         setShowForgotPassword(open)
         if (!open) {
           setForgotPasswordSuccess(false)
         }
-      }}>
+      }
+      }>
         <DialogContent className="sm:max-w-md bg-transparent border-0 overflow-visible p-0 shadow-none" aria-describedby={undefined}>
           <DialogTitle className="sr-only">Reset Password</DialogTitle>
 
@@ -9893,11 +9984,11 @@ export default function ESOPApp() {
             </div>
           </motion.div>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
 
       {/* Settings Dialog */}
-      <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog} >
+      < Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog} >
         <DialogContent className="sm:max-w-2xl bg-white border-0 shadow-2xl overflow-hidden p-0 gap-0" aria-describedby={undefined}>
           {/* Stunning Header with Gradient */}
           <div className="relative overflow-hidden">
@@ -10325,10 +10416,10 @@ export default function ESOPApp() {
             )}
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Password Change Dialog */}
-      <Dialog open={showPasswordChangeDialog} onOpenChange={setShowPasswordChangeDialog} >
+      < Dialog open={showPasswordChangeDialog} onOpenChange={setShowPasswordChangeDialog} >
         <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -10431,10 +10522,10 @@ export default function ESOPApp() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* User Activity Dialog - Compact & Aesthetic */}
-      <Dialog open={showUserActivityDialog} onOpenChange={setShowUserActivityDialog} >
+      < Dialog open={showUserActivityDialog} onOpenChange={setShowUserActivityDialog} >
         <DialogContent className="sm:max-w-md bg-white border-2 border-cyan-200 shadow-xl" aria-describedby={undefined}>
           <DialogHeader className="pb-2">
             <DialogTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -10507,10 +10598,10 @@ export default function ESOPApp() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* PDF Edit Warning Dialog - Aesthetic Design */}
-      <Dialog open={showPdfWarningDialog} onOpenChange={setShowPdfWarningDialog} >
+      < Dialog open={showPdfWarningDialog} onOpenChange={setShowPdfWarningDialog} >
         <DialogContent className="sm:max-w-lg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-red-500/50 shadow-2xl overflow-hidden" aria-describedby={undefined}>
           {/* Animated background effects */}
           <div className="absolute inset-0 overflow-hidden">
@@ -10683,7 +10774,7 @@ export default function ESOPApp() {
             </DialogFooter>
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
 
       {/* Copyright Popup */}
@@ -10905,6 +10996,6 @@ export default function ESOPApp() {
           border-bottom: 1px solid rgba(249, 115, 22, 0.2) !important;
         }
       `}</style>
-    </div>
+    </div >
   )
 }
