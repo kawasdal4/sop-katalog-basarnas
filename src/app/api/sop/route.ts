@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { cookies } from 'next/headers'
-import { writeFile, mkdir } from 'fs/promises'
-import path from 'path'
-import { uploadToR2, isR2Configured, deleteFromR2, moveR2Object } from '@/lib/r2-storage'
+import { uploadToR2, isR2Configured, deleteFromR2, moveR2Object, getR2PresignedUrl } from '@/lib/r2-storage'
+import { validateRole } from '@/lib/auth-utils'
+import { v4 as uuidv4 } from 'uuid'
 
 // Set runtime and max duration for Vercel
 export const runtime = 'nodejs'
@@ -176,8 +176,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File diperlukan' }, { status: 400 })
     }
 
-    // Get user ID
+    // Get user ID and Validate Role
     let userId: string
+    let userEmail: string
 
     if (isPublicSubmission) {
       let systemUser = await db.user.findUnique({ where: { email: 'system@sop.go.id' } })
@@ -192,28 +193,35 @@ export async function POST(request: NextRequest) {
         })
       }
       userId = systemUser.id
+      userEmail = systemUser.email
     } else {
-      const cookieStore = await cookies()
-      const userIdCookie = cookieStore.get('userId')?.value
+      const { authenticated, authorized, user, role } = await validateRole(['ADMIN', 'DEVELOPER', 'STAF'])
 
-      if (!userIdCookie) {
-        return NextResponse.json({ error: 'Unauthorized - no session' }, { status: 401 })
+      if (!authenticated) {
+        return NextResponse.json({ error: 'Unauthorized - Silakan login ulang' }, { status: 401 })
       }
 
-      userId = userIdCookie
-      console.log(`🔑 Session user ID: ${userId}`)
-
-      // Verify user exists in database
-      const userExists = await db.user.findUnique({ where: { id: userId } })
-      if (!userExists) {
-        console.error(`❌ User not found: ${userId}`)
-        return NextResponse.json({ error: 'User tidak valid. Silakan login ulang.' }, { status: 401 })
+      if (!authorized) {
+        return NextResponse.json({ error: 'Forbidden - Anda tidak memiliki izin untuk mengupload' }, { status: 403 })
       }
-      console.log(`✅ User verified: ${userExists.email}`)
+
+      userId = user!.id
+      userEmail = user!.email!
+      console.log(`🔑 Validated user: ${userEmail} [${role}]`)
     }
 
-    // Prepare file
+    // File Validation
+    const MAX_SIZE = 50 * 1024 * 1024 // 50MB
+    if (file.size > MAX_SIZE) {
+      return NextResponse.json({ error: `File terlalu besar. Maksimal 50MB.` }, { status: 400 })
+    }
+
     const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'pdf'
+    // Allow standard document types
+    const allowedExtensions = ['pdf', 'xlsx', 'xls', 'xlsm', 'docx', 'doc']
+    if (!allowedExtensions.includes(fileExtension)) {
+      return NextResponse.json({ error: 'Format file tidak didukung.' }, { status: 400 })
+    }
     const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
     // Format: [judul] - [tahun].[extension]
     const fileName = `${sanitizeFileName(judul)} - ${tahun}.${fileExtension}`
@@ -382,8 +390,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create log
+    // Create audit log and legacy log
     try {
+      // New Audit Log (Security)
+      await db.auditLog.create({
+        data: {
+          userId,
+          action: 'upload',
+          details: JSON.stringify({
+            nomorSop,
+            judul,
+            fileName,
+            fileSize: buffer.length,
+            r2Key
+          }),
+          ipAddress: request.headers.get('x-forwarded-for') || '0.0.0.0',
+          userAgent: request.headers.get('user-agent')
+        }
+      })
+
+      // Legacy Log (UI)
       await db.log.create({
         data: {
           userId,
@@ -393,7 +419,7 @@ export async function POST(request: NextRequest) {
         }
       })
     } catch (logError) {
-      console.warn('⚠️ Failed to create log:', logError)
+      console.warn('⚠️ Failed to create logs:', logError)
     }
 
     // ============================================
@@ -514,14 +540,13 @@ export async function POST(request: NextRequest) {
 // PUT - Update SOP metadata, status, or increment counters
 export async function PUT(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const userIdCookie = cookieStore.get('userId')?.value
+    const { authenticated, authorized, user, role } = await validateRole(['ADMIN', 'DEVELOPER', 'STAF'])
 
-    if (!userIdCookie) {
+    if (!authenticated) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const userId = userIdCookie
+    const userId = user!.id
 
     const body = await request.json()
     const { id, status, verificationStatus, verifiedBy, incrementPreview, incrementDownload, judul, kategori, jenis, lingkup, tahun, rejectionReason, nomorSop } = body
@@ -671,6 +696,26 @@ export async function PUT(request: NextRequest) {
         console.warn('⚠️ Failed to create log:', logError)
       }
 
+      // Create audit log for edit
+      try {
+        await db.auditLog.create({
+          data: {
+            userId,
+            action: 'edit_metadata',
+            details: JSON.stringify({
+              id,
+              nomorSop: sopFile.nomorSop,
+              judul: sopFile.judul,
+              changes: updateData
+            }),
+            ipAddress: request.headers.get('x-forwarded-for') || '0.0.0.0',
+            userAgent: request.headers.get('user-agent')
+          }
+        })
+      } catch (logError) {
+        console.warn('⚠️ Failed to create audit log for edit:', logError)
+      }
+
       return NextResponse.json({
         success: true,
         data: sopFile,
@@ -795,18 +840,17 @@ export async function PUT(request: NextRequest) {
 // DELETE - Delete SOP
 export async function DELETE(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const userIdCookie = cookieStore.get('userId')?.value
+    const { authenticated, authorized, user, role } = await validateRole(['ADMIN', 'DEVELOPER'])
 
-    if (!userIdCookie) {
+    if (!authenticated) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if user is admin or developer
-    const user = await db.user.findUnique({ where: { id: userIdCookie } })
-    if (!user || (user.role !== 'ADMIN' && user.role !== 'DEVELOPER')) {
+    if (!authorized) {
       return NextResponse.json({ error: 'Hanya admin atau developer yang dapat menghapus file' }, { status: 403 })
     }
+
+    const userId = user!.id
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -814,7 +858,7 @@ export async function DELETE(request: NextRequest) {
 
     // Handle Bulk Delete
     if (bulkStatus) {
-      if (user.role !== 'DEVELOPER') {
+      if (user?.role !== 'DEVELOPER') {
         return NextResponse.json({ error: 'Hanya developer yang dapat melakukan reset stats' }, { status: 403 })
       }
 
@@ -864,7 +908,7 @@ export async function DELETE(request: NextRequest) {
       try {
         await db.log.create({
           data: {
-            userId: userIdCookie,
+            userId,
             aktivitas: 'DELETE_BULK',
             deskripsi: `Reset stats: Hapus masal ${filesToDelete.length} file dengan status ${bulkStatus}`,
           }
@@ -925,6 +969,27 @@ export async function DELETE(request: NextRequest) {
       console.warn('⚠️ Failed to delete FileSync record:', syncError)
     }
 
+    // Create audit log for deletion
+    try {
+      await db.auditLog.create({
+        data: {
+          userId,
+          action: bulkStatus ? 'delete_bulk' : 'delete',
+          details: JSON.stringify({
+            id,
+            bulkStatus,
+            nomorSop: sopFile?.nomorSop,
+            judul: sopFile?.judul,
+            filePath: sopFile?.filePath
+          }),
+          ipAddress: request.headers.get('x-forwarded-for') || '0.0.0.0',
+          userAgent: request.headers.get('user-agent')
+        }
+      })
+    } catch (logError) {
+      console.warn('⚠️ Failed to create audit log for delete:', logError)
+    }
+
     // Delete from database
     await db.sopFile.delete({ where: { id } })
 
@@ -932,7 +997,7 @@ export async function DELETE(request: NextRequest) {
     try {
       await db.log.create({
         data: {
-          userId: userIdCookie,
+          userId,
           aktivitas: 'DELETE',
           deskripsi: `Hapus ${sopFile.jenis}: ${sopFile.judul}`,
           fileId: id

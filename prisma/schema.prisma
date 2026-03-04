@@ -30,6 +30,7 @@ model User {
 
   // Relations
   logs            Log[]
+  auditLogs       AuditLog[]
   sopFiles        SopFile[]      @relation("UploadedBy")
   editedSopFiles  SopFile[]      @relation("UpdatedBy")
 }
@@ -87,7 +88,7 @@ model SopFile {
   updatedAt DateTime @updatedAt
 }
 
-// Activity Log model
+// Activity Log model (Legacy/UI events)
 model Log {
   id          String   @id @default(cuid())
   userId      String
@@ -100,6 +101,20 @@ model Log {
   // Relations
   user    User     @relation(fields: [userId], references: [id])
   sopFile SopFile? @relation(fields: [fileId], references: [id])
+}
+
+// Audit Log model (Security/Sensitive actions)
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String   // upload, delete, approve, replace, login, logout
+  details   String?  // JSON string for additional context
+  ipAddress String?
+  userAgent String?
+  timestamp DateTime @default(now())
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 // Counter for auto-generate nomor SOP

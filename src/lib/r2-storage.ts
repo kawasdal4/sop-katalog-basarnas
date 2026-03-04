@@ -57,14 +57,19 @@ function extractAccountIdFromEndpoint(endpoint: string): string | null {
   return null
 }
 
+import { validateEnv } from './env-val'
+
 // Get R2 configuration from environment
-function getR2Config(): R2Config {
+export function getR2Config(): R2Config {
+  // Validate env on first call
+  validateEnv()
+
   // Support multiple env var naming conventions
 
   // Account ID can come from R2_ACCOUNT_ID or extracted from R2_ENDPOINT
-  let accountId = process.env.R2_ACCOUNT_ID
+  let accountId: string | undefined = process.env.R2_ACCOUNT_ID
   if (!accountId && process.env.R2_ENDPOINT) {
-    accountId = extractAccountIdFromEndpoint(process.env.R2_ENDPOINT)
+    accountId = extractAccountIdFromEndpoint(process.env.R2_ENDPOINT) || undefined
   }
 
   // Access key can be R2_ACCESS_KEY_ID or R2_ACCESS_KEY
@@ -116,8 +121,10 @@ function createR2Client(): S3Client {
   })
 }
 
+import { v4 as uuidv4 } from 'uuid'
+
 /**
- * Upload file to R2 with automatic checksum calculation
+ * Upload file to R2 with automatic checksum calculation and naming
  */
 export async function uploadToR2(
   fileBuffer: Buffer,
@@ -132,8 +139,17 @@ export async function uploadToR2(
   const config = getR2Config()
   const client = createR2Client()
 
-  // Generate or use provided key
-  const key = options?.key || (options?.folder ? `${options.folder}/${fileName}` : fileName)
+  // Generate UUID-based key if not provided
+  let key = options?.key
+  if (!key) {
+    const ext = fileName.split('.').pop() || 'file'
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const uuid = uuidv4()
+    // Structure: /sop/tahun/bulan/uuid.ext
+    key = `sop/${year}/${month}/${uuid}.${ext}`
+  }
 
   // Calculate checksum
   const checksum = calculateChecksum(fileBuffer)
@@ -203,18 +219,26 @@ export async function downloadFromR2(key: string): Promise<{
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     const errorCode = (error as { Code?: string; name?: string })?.Code || (error as { name?: string })?.name || ''
-    
+
     console.error(`❌ Failed to download from R2: ${key}`)
     console.error(`   Error: ${errorMessage}`)
     console.error(`   Code: ${errorCode}`)
-    
-    // Provide more helpful error message
-    if (errorCode === 'NoSuchKey' || errorMessage.includes('does not exist')) {
-      throw new Error(`File tidak ditemukan di R2: ${key}. File mungkin telah dihapus atau dipindahkan.`)
+
+    // Friendly handling for 404
+    if (errorCode === 'NoSuchKey' || errorMessage.includes('does not exist') || errorCode === '404') {
+      throw new Error(`File tidak ditemukan di storage.`)
     }
-    
+
     throw error
   }
+}
+
+
+/**
+ * Get R2 bucket name
+ */
+export function getR2BucketName(): string {
+  return process.env.R2_BUCKET_NAME || process.env.R2_BUCKET || 'sop-katalog-basarnas'
 }
 
 /**
@@ -224,12 +248,12 @@ export async function checkR2FileExists(key: string): Promise<boolean> {
   try {
     const config = getR2Config()
     const client = createR2Client()
-    
+
     await client.send(new HeadObjectCommand({
       Bucket: config.bucketName,
       Key: key,
     }))
-    
+
     return true
   } catch {
     return false
@@ -562,18 +586,11 @@ export async function verifyR2Integrity(key: string, expectedChecksum: string): 
 }
 
 /**
- * Get R2 bucket name
- */
-export function getR2BucketName(): string {
-  return process.env.R2_BUCKET_NAME || process.env.R2_BUCKET || 'sop-katalog-basarnas'
-}
-
-/**
  * Generate presigned URL for file access (download)
  * @param key - File key/path in R2
- * @param expiresIn - URL expiration time in seconds (default: 1 hour)
+ * @param expiresIn - URL expiration time in seconds (default: 5 minutes)
  */
-export async function getR2PresignedUrl(key: string, expiresIn: number = 3600): Promise<string> {
+export async function getR2PresignedUrl(key: string, expiresIn: number = 300): Promise<string> {
   const config = getR2Config()
   const client = createR2Client()
 
