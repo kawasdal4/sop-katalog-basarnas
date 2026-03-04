@@ -99,7 +99,8 @@ import {
   PieChartIcon,
   BarChart2,
   Hash,
-  Edit3
+  Edit3,
+  ClipboardCheck
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { StorageStatus } from '@/components/storage'
