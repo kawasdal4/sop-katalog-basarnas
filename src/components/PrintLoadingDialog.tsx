@@ -133,7 +133,7 @@ export default function PrintLoadingDialog({ open, onClose, fileId, fileName, fi
 
       const pdfRes = await fetch(`/api/print?token=${printToken}`)
       if (!pdfRes.ok) {
-        let errMessage = 'Gagal mengunduh PDF dari server'
+        let errMessage = pdfRes.status === 404 ? 'object tidak ada' : 'Gagal mengunduh PDF dari server'
         try {
           const errData = await pdfRes.json()
           if (errData.details) errMessage = errData.details
