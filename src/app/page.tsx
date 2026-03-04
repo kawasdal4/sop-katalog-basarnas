@@ -103,16 +103,7 @@ import {
   ClipboardCheck,
   Copy,
   Stethoscope,
-  RefreshCw,
-  CheckCircle,
-  XCircle,
-  CloudOff,
-  Globe,
-  Check,
-  X,
-  LayoutDashboard,
-  History,
-  Clock
+  CloudOff
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { StorageStatus } from '@/components/storage'
@@ -1232,12 +1223,12 @@ export default function ESOPApp() {
       origError(...args)
       const msg = args.map(a => (a instanceof Error ? a.message : String(a))).join(' ')
       const stack = args[0] instanceof Error ? args[0].stack : undefined
-      setCapturedConsoleErrors(prev => [{ type: 'error', msg, ts: Date.now(), stack }, ...prev].slice(0, MAX_ITEMS))
+      setCapturedConsoleErrors(prev => [{ type: 'error' as const, msg, ts: Date.now(), stack }, ...prev].slice(0, MAX_ITEMS))
     }
     console.warn = (...args: unknown[]) => {
       origWarn(...args)
       const msg = args.map(a => String(a)).join(' ')
-      setCapturedConsoleErrors(prev => [{ type: 'warn', msg, ts: Date.now() }, ...prev].slice(0, MAX_ITEMS))
+      setCapturedConsoleErrors(prev => [{ type: 'warn' as const, msg, ts: Date.now() }, ...prev].slice(0, MAX_ITEMS))
     }
 
     // 2. Intercept fetch for network errors
@@ -1751,7 +1742,7 @@ export default function ESOPApp() {
       const t0 = performance.now()
       try {
         const r = await fetch(ep.url, { cache: 'no-store' })
-        let errorMsg = undefined
+        let errorMsg: string | undefined = undefined
         if (r.status === 404) errorMsg = 'object tidak ada'
         apiHealth.push({ endpoint: ep.label, ok: r.ok, status: r.status, latency: Math.round(performance.now() - t0), error: errorMsg })
       } catch (err) {
@@ -1853,7 +1844,7 @@ export default function ESOPApp() {
     if (failingEnv.length > 0) {
       report += `## ⚠️ ENVIRONMENT ISSUES\n`
       failingEnv.forEach(e => {
-        report += `- ${e.key}: ${e.status} (${e.detail})\n`
+        report += `- ${e.key}: ${e.ok ? 'OK' : 'FAIL'} (${e.detail})\n`
       })
       report += `\n`
     }
@@ -3350,8 +3341,8 @@ export default function ESOPApp() {
       setExcelEditData(sop)
 
       // Persist to localStorage to survive page reloads
-      localStorage.setItem('desktopEditSessionToken', sessionId)
-      localStorage.setItem('desktopEditOriginalHash', originalHash)
+      localStorage.setItem('desktopEditSessionToken', sessionId || '')
+      localStorage.setItem('desktopEditOriginalHash', originalHash || '')
       localStorage.setItem('excelEditData', JSON.stringify(sop))
 
       // Get file blob
@@ -3361,7 +3352,7 @@ export default function ESOPApp() {
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = finalFileName
+      a.download = finalFileName || 'document'
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -6466,7 +6457,7 @@ export default function ESOPApp() {
                                   tickLine={false}
                                 />
                                 <Tooltip
-                                  cursor={{ fill: 'rgba(249,115,22,0.12)', radius: 8 }}
+                                  cursor={{ fill: 'rgba(249,115,22,0.12)' } as any}
                                   content={({ active, payload, label }) => {
                                     if (active && payload && payload.length) {
                                       const maxCount = Math.max(...(stats.byTahun || []).map(d => d.count))
@@ -6841,8 +6832,9 @@ export default function ESOPApp() {
                               <div className="lg:w-72 flex flex-col justify-center">
                                 <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
                                   {(stats.topViewed || []).map((item, index) => {
-                                    const total = (stats.topViewed || []).reduce((sum, i) => sum + i.previewCount, 0)
-                                    const percentage = total > 0 ? Math.round((item.previewCount / total) * 100) : 0
+                                    const totalEntries = (stats.topViewed || [])
+                                    const total = totalEntries.reduce((sum, i) => sum + (i.previewCount || 0), 0)
+                                    const percentage = total > 0 ? Math.round(((item.previewCount || 0) / total) * 100) : 0
                                     return (
                                       <motion.div
                                         key={item.id}
@@ -7339,7 +7331,7 @@ export default function ESOPApp() {
                         <div className="absolute inset-0 pointer-events-none">
                           <motion.div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-orange-500/10 blur-3xl" animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }} />
                           <motion.div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full bg-red-500/10 blur-3xl" animate={{ scale: [1.2, 1, 1.2], opacity: [0.4, 0.7, 0.4] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }} />
-                          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.1) 1px, transparent 0)', backgroundSize: '16px 16px' }} />
+                          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
                         </div>
 
                         <div className="relative z-10 flex items-center gap-5">
@@ -8052,7 +8044,7 @@ export default function ESOPApp() {
 
                               {/* Card Body */}
                               <div className={`relative overflow-hidden rounded-2xl border transition-all duration-500 ${isDesktopSyncActive
-                                ? 'bg-slate-900 border-indigo-500/50 shadow-[0_0_50px_rgba(99,102,241,0.3)] ring-2 ring-indigo-500/50 backdrop-blur-xl scale-[1.02]'
+                                ? 'bg-slate-900 border-indigo-500/50 shadow-[0_0_50px_rgba(99,102,241,0.3)] ring-2 ring-500/50 backdrop-blur-xl scale-[1.02]'
                                 : isEditing
                                   ? 'bg-orange-600/10 border-orange-500/50 shadow-[0_0_30px_rgba(249,115,22,0.15)] ring-2 ring-orange-500/20'
                                   : 'bg-slate-900/40 hover:bg-slate-900/60 border-slate-800 hover:border-orange-500/30 backdrop-blur-sm hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)]'
@@ -8146,7 +8138,7 @@ export default function ESOPApp() {
                                                         <div className="flex items-center gap-2 mb-1 border-b border-slate-700/50 pb-2">
                                                           <Edit3 className="w-3.5 h-3.5 text-amber-500" />
                                                           <span className="font-bold text-slate-200 text-xs uppercase tracking-wider">Detail Perubahan</span>
-                                                          <span className="text-[9px] text-slate-500 ml-auto font-medium">{new Date(sop.updatedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                          <span className="text-[9px] text-slate-500 ml-auto font-medium">{sop && sop.updatedAt ? new Date(sop.updatedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
                                                         </div>
                                                         <div className="text-[11px] text-slate-300 leading-relaxed font-medium">
                                                           {(() => {
