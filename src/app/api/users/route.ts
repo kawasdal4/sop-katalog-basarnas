@@ -39,9 +39,14 @@ export async function GET() {
     // DEVELOPER can see passwords, ADMIN cannot
     const includePassword = isDeveloper(currentUser.role)
 
-    // Get all users without select to avoid Turbopack cache issues
+    // Get all users and their log count
     const users = await db.user.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: {
+        _count: {
+          select: { logs: true }
+        }
+      }
     })
 
     // Transform users to include only needed fields and profile photo URLs
@@ -64,9 +69,7 @@ export async function GET() {
           : null,
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt,
-        _count: {
-          logs: 0 // We'll skip the log count for now to avoid issues
-        }
+        _count: user._count
       }
     })
 
