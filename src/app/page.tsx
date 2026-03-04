@@ -4019,6 +4019,7 @@ export default function ESOPApp() {
           }
         }}>
           <DialogContent className="sm:max-w-md bg-slate-900 border-0 shadow-2xl overflow-hidden p-0 gap-0" aria-describedby={undefined}>
+            <DialogTitle className="sr-only">Reset Password</DialogTitle>
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -4817,6 +4818,7 @@ export default function ESOPApp() {
           }
         }}>
           <DialogContent className="sm:max-w-md bg-transparent border-0 overflow-visible p-0 shadow-none" aria-describedby={undefined}>
+            <DialogTitle className="sr-only">Lupa Password</DialogTitle>
             <DialogTitle className="sr-only">Reset Password</DialogTitle>
 
             {/* Animated Background Container */}
