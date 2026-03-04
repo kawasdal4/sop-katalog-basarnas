@@ -5,8 +5,8 @@ date: "2026"
 ---
 
 <div style="text-align: center; margin-top: 0px;">
-  <!-- Gunakan gambar cover persis seperti lampiran, scaling 20% -->
-  <img src="https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/cover.png" alt="Cover Buku Manual" style="width: 20%; height: auto; display: block; margin: 0 auto;" />
+  <!-- Gunakan gambar cover persis seperti lampiran dengan max-height optimal untuk A4 -->
+  <img src="https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/cover.png" alt="Cover Buku Manual" style="width: 100%; max-height: 250mm; object-fit: contain; display: block; margin: 0 auto;" />
 </div>
 
 <div style="page-break-after: always;"></div>
