@@ -100,7 +100,8 @@ import {
   BarChart2,
   Hash,
   Edit3,
-  ClipboardCheck
+  ClipboardCheck,
+  Copy
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { StorageStatus } from '@/components/storage'
@@ -1813,6 +1814,70 @@ export default function ESOPApp() {
       toast({ title: `⚠️ ${warnings} Peringatan`, description: 'Semua API berjalan, tapi ada log mencurigakan.', duration: 4000 })
     }
   }, [capturedConsoleErrors, capturedNetworkErrors, capturedRejections, isAuthenticated, user, toast])
+
+  const handleCopyFullDiagnosticReport = useCallback(() => {
+    if (!diagnosticResult) return
+
+    let report = `# 🔍 DIAGNOSTIC REPORT - ${new Date(diagnosticResult.ranAt).toLocaleString('id-ID')}\n\n`
+
+    report += `## 📊 SUMMARY\n`
+    report += `- Total Cek: ${diagnosticResult.summary.total}\n`
+    report += `- Lulus: ${diagnosticResult.summary.passed}\n`
+    report += `- Gagal: ${diagnosticResult.summary.failed}\n`
+    report += `- Peringatan: ${diagnosticResult.summary.warnings}\n\n`
+
+    const failingApis = diagnosticResult.apiHealth.filter(a => !a.ok)
+    if (failingApis.length > 0) {
+      report += `## ❌ FAILING APIS\n`
+      failingApis.forEach(a => {
+        report += `### Endpoint: ${a.endpoint}\n`
+        report += `- Status: ${a.status}\n`
+        report += `- Error: ${a.error || 'Unknown'}\n\n`
+      })
+    }
+
+    const failingEnv = diagnosticResult.envChecks.filter(e => !e.ok)
+    if (failingEnv.length > 0) {
+      report += `## ⚠️ ENVIRONMENT ISSUES\n`
+      failingEnv.forEach(e => {
+        report += `- ${e.key}: ${e.status} (${e.detail})\n`
+      })
+      report += `\n`
+    }
+
+    if (diagnosticResult.consoleErrors.length > 0) {
+      report += `## 📜 CONSOLE LOGS\n`
+      diagnosticResult.consoleErrors.forEach(e => {
+        report += `### [${e.type.toUpperCase()}] ${new Date(e.ts).toLocaleTimeString()}\n`
+        report += `${e.msg}\n`
+        if (e.stack) report += `\`\`\`\n${e.stack}\n\`\`\`\n`
+        report += `\n`
+      })
+    }
+
+    if (diagnosticResult.networkErrors.length > 0) {
+      report += `## 🌐 NETWORK ERRORS\n`
+      diagnosticResult.networkErrors.forEach(e => {
+        report += `- ${e.status || 'ERR'}: ${e.url} (${e.duration}ms)\n`
+      })
+      report += `\n`
+    }
+
+    if (diagnosticResult.rejections.length > 0) {
+      report += `## ⚡ UNHANDLED REJECTIONS\n`
+      diagnosticResult.rejections.forEach(r => {
+        report += `- Reason: ${r.reason}\n`
+      })
+      report += `\n`
+    }
+
+    navigator.clipboard.writeText(report)
+    toast({
+      title: 'Laporan Disalin',
+      description: 'Laporan lengkap telah disalin untuk AI Builder.',
+      variant: 'success'
+    })
+  }, [diagnosticResult, toast])
 
   const fetchSopFiles = useCallback(async (resetPage = false) => {
     // Prevent concurrent fetches
@@ -7826,7 +7891,7 @@ export default function ESOPApp() {
                               </div>
                               <div className="divide-y divide-white/5">
                                 {diagnosticResult.apiHealth.map((ep) => (
-                                  <div key={ep.endpoint} className="flex items-center gap-3 px-4 py-2.5">
+                                  <div key={ep.endpoint} className="flex items-center gap-3 px-4 py-2.5 group relative hover:bg-white/[0.02] transition-colors">
                                     {ep.ok
                                       ? <CheckCircle className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
                                       : <XCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
@@ -7837,6 +7902,18 @@ export default function ESOPApp() {
                                     </span>
                                     <span className="text-[10px] text-slate-500 w-12 text-right">{ep.latency}ms</span>
                                     {ep.error && <span className="text-[9px] text-red-400 font-mono max-w-[120px] truncate">{ep.error}</span>}
+                                    {!ep.ok && (
+                                      <button
+                                        onClick={() => {
+                                          const copyText = `## API Error\nEndpoint: ${ep.endpoint}\nStatus: ${ep.status}\nError: ${ep.error || 'Unknown'}`;
+                                          navigator.clipboard.writeText(copyText);
+                                          toast({ title: 'Tersalin', description: 'Log API error telah disalin.', variant: 'success' });
+                                        }}
+                                        className="absolute right-12 top-1/2 -translate-y-1/2 p-1.5 bg-slate-800 text-slate-400 hover:text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                                      >
+                                        <Copy className="w-3 h-3" />
+                                      </button>
+                                    )}
                                   </div>
                                 ))}
                               </div>
@@ -7885,15 +7962,26 @@ export default function ESOPApp() {
                               ) : (
                                 <div className="max-h-40 overflow-y-auto divide-y divide-white/5">
                                   {diagnosticResult.consoleErrors.slice(0, 20).map((e, i) => (
-                                    <div key={i} className="px-4 py-2 flex gap-2">
-                                      <span className={`text-[9px] font-bold px-1 py-0.5 rounded flex-shrink-0 mt-0.5 ${e.type === 'error' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                    <div key={i} className="px-4 py-2 flex gap-2 group relative hover:bg-white/[0.02] transition-colors rounded-lg mx-2 my-1">
+                                      <span className={`text-[9px] font-bold px-1 py-0.5 rounded flex-shrink-0 mt-0.5 h-max ${e.type === 'error' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
                                         {e.type.toUpperCase()}
                                       </span>
-                                      <div className="min-w-0 flex-1">
+                                      <div className="min-w-0 flex-1 pr-8">
                                         <p className="text-[10px] text-slate-300 font-mono truncate">{e.msg}</p>
                                         {e.stack && <p className="text-[9px] text-slate-500 font-mono truncate mt-0.5">{e.stack.split('\n')[1]?.trim()}</p>}
                                         <p className="text-[9px] text-slate-600 mt-0.5">{new Date(e.ts).toLocaleTimeString('id-ID')}</p>
                                       </div>
+                                      <button
+                                        onClick={() => {
+                                          const copyText = `## Error Type\nConsole ${e.type === 'error' ? 'Error' : 'Warning'}\n\n## Error Message\n${e.msg}\n\n${e.stack ? `## Stack Trace\n${e.stack}\n` : ''}`;
+                                          navigator.clipboard.writeText(copyText);
+                                          toast({ title: 'Tersalin', description: 'Log console telah disalin ke clipboard untuk AI AI Builder.', variant: 'success' });
+                                        }}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 bg-slate-800 text-slate-400 hover:text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Salin log untuk AI Builder"
+                                      >
+                                        <Copy className="w-3.5 h-3.5" />
+                                      </button>
                                     </div>
                                   ))}
                                 </div>
@@ -7918,11 +8006,22 @@ export default function ESOPApp() {
                               ) : (
                                 <div className="max-h-40 overflow-y-auto divide-y divide-white/5">
                                   {diagnosticResult.networkErrors.slice(0, 20).map((e, i) => (
-                                    <div key={i} className="px-4 py-2 flex items-center gap-3">
+                                    <div key={i} className="px-4 py-2 flex items-center gap-3 group relative hover:bg-white/[0.02] transition-colors rounded-lg mx-2 my-1">
                                       <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-red-500/20 text-red-400 flex-shrink-0">{e.status || 'NET'}</span>
-                                      <span className="text-[10px] text-slate-300 font-mono flex-1 truncate">{e.url}</span>
+                                      <span className="text-[10px] text-slate-300 font-mono flex-1 truncate pr-8">{e.url}</span>
                                       <span className="text-[9px] text-slate-500">{e.duration}ms</span>
                                       <span className="text-[9px] text-slate-600">{new Date(e.ts).toLocaleTimeString('id-ID')}</span>
+                                      <button
+                                        onClick={() => {
+                                          const copyText = `## Error Type\nNetwork Error\n\n## Status\n${e.status || 'Unknown'}\n\n## URL\n${e.url}\n\n## Duration\n${e.duration}ms`;
+                                          navigator.clipboard.writeText(copyText);
+                                          toast({ title: 'Tersalin', description: 'Log network telah disalin ke clipboard.', variant: 'success' });
+                                        }}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 bg-slate-800 text-slate-400 hover:text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Salin log untuk AI Builder"
+                                      >
+                                        <Copy className="w-3.5 h-3.5" />
+                                      </button>
                                     </div>
                                   ))}
                                 </div>
@@ -7943,9 +8042,20 @@ export default function ESOPApp() {
                                 </div>
                                 <div className="max-h-32 overflow-y-auto divide-y divide-white/5">
                                   {diagnosticResult.rejections.map((r, i) => (
-                                    <div key={i} className="px-4 py-2 flex items-center gap-3">
-                                      <p className="text-[10px] text-red-300 font-mono flex-1 truncate">{r.reason}</p>
+                                    <div key={i} className="px-4 py-2 flex items-center gap-3 group relative hover:bg-white/[0.02] transition-colors rounded-lg mx-2 my-1">
+                                      <p className="text-[10px] text-red-300 font-mono flex-1 truncate pr-8">{r.reason}</p>
                                       <span className="text-[9px] text-slate-600">{new Date(r.ts).toLocaleTimeString('id-ID')}</span>
+                                      <button
+                                        onClick={() => {
+                                          const copyText = `## Error Type\nUnhandled Promise Rejection\n\n## Reason\n${r.reason}`;
+                                          navigator.clipboard.writeText(copyText);
+                                          toast({ title: 'Tersalin', description: 'Log rejection telah disalin ke clipboard.', variant: 'success' });
+                                        }}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 bg-slate-800 text-slate-400 hover:text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Salin log untuk AI Builder"
+                                      >
+                                        <Copy className="w-3.5 h-3.5" />
+                                      </button>
                                     </div>
                                   ))}
                                 </div>
@@ -7973,11 +8083,22 @@ export default function ESOPApp() {
                         <button
                           type="button"
                           onClick={() => setShowDiagnosticDialog(false)}
-                          className="flex-1 h-9 rounded-xl text-sm font-bold text-slate-400 hover:text-white transition-colors"
+                          className="px-6 h-9 rounded-xl text-sm font-bold text-slate-400 hover:text-white transition-colors"
                           style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
                         >
                           Tutup
                         </button>
+
+                        {diagnosticResult && (
+                          <button
+                            type="button"
+                            onClick={handleCopyFullDiagnosticReport}
+                            className="flex-1 h-9 rounded-xl text-xs font-bold text-cyan-400 flex items-center justify-center gap-2 transition-all hover:bg-cyan-500/10"
+                            style={{ border: '1px solid rgba(6,182,212,0.2)' }}
+                          >
+                            <Copy className="w-3.5 h-3.5" /> Salin Laporan Full (untuk AI)
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={handleRunDiagnostic}

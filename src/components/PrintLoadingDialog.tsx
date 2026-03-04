@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, Loader2, FileText, FileOutput, Printer, X, AlertTriangle } from 'lucide-react'
+import { CheckCircle2, Loader2, FileText, FileOutput, Printer, X, AlertTriangle, Copy } from 'lucide-react'
+import { useToast } from '@/hooks/use-toast'
 
 interface PrintStep {
   id: string
@@ -56,9 +57,11 @@ const AmbientBackground = () => (
 )
 
 export default function PrintLoadingDialog({ open, onClose, fileId, fileName, fileType, onComplete }: PrintLoadingDialogProps) {
+  const { toast } = useToast()
   const [steps, setSteps] = useState<PrintStep[]>([])
   const [currentStepIndex, setCurrentStepIndex] = useState(-1)
   const [error, setError] = useState<string | null>(null)
+  const [readyUrl, setReadyUrl] = useState<string | null>(null)
 
   const progressPercent = steps.length > 0
     ? Math.round(((steps.filter(s => s.status === 'completed').length) / steps.length) * 100)
@@ -69,11 +72,16 @@ export default function PrintLoadingDialog({ open, onClose, fileId, fileName, fi
       setSteps(getInitialSteps(fileType))
       setCurrentStepIndex(-1)
       setError(null)
+      setReadyUrl(null)
     }
   }, [open, fileId, fileType])
 
+  const isPrintingRef = useRef(false)
+
   const startPrintProcess = useCallback(async () => {
-    if (!fileId) return
+    if (!fileId || isPrintingRef.current) return
+    isPrintingRef.current = true
+
     setCurrentStepIndex(0)
     setError(null)
     setSteps(getInitialSteps(fileType).map((s, i) => i === 0 ? { ...s, status: 'processing' } : s))
@@ -124,34 +132,48 @@ export default function PrintLoadingDialog({ open, onClose, fileId, fileName, fi
       setSteps(prev => prev.map((s, i) => i === readyIndex ? { ...s, status: 'processing' } : s))
 
       const pdfRes = await fetch(`/api/print?token=${printToken}`)
-      if (!pdfRes.ok) throw new Error('Gagal mengunduh PDF dari server')
+      if (!pdfRes.ok) {
+        let errMessage = 'Gagal mengunduh PDF dari server'
+        try {
+          const errData = await pdfRes.json()
+          if (errData.details) errMessage = errData.details
+          else if (errData.error) errMessage = errData.error
+        } catch (e) { }
+        throw new Error(errMessage)
+      }
 
-      const blob = await pdfRes.blob()
-      const blobUrl = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = blobUrl
-      link.download = fileName.replace(/\.[^.]+$/, '') + '.pdf'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
+      const rawBlob = await pdfRes.blob()
+      const pdfBlob = new Blob([rawBlob], { type: 'application/pdf' })
+      const blobUrl = URL.createObjectURL(pdfBlob)
+
+      setReadyUrl(blobUrl)
 
       await new Promise(r => setTimeout(r, 400))
       setSteps(prev => prev.map((s, i) => i === readyIndex ? { ...s, status: 'completed' } : s))
 
       if (onComplete) onComplete()
-      setTimeout(() => onClose(), 800)
+
+      const newTab = window.open(blobUrl, '_blank')
+      if (newTab) {
+        setTimeout(() => onClose(), 2000)
+      }
     } catch (err) {
       console.error('Print error:', err)
       setError(err instanceof Error ? err.message : 'Terjadi kesalahan sistem')
       setSteps(prev => prev.map(s => s.status === 'processing' ? { ...s, status: 'error' } : s))
+    } finally {
+      isPrintingRef.current = false
     }
-  }, [fileId, fileType, fileName, onComplete, onClose])
+  }, [fileId, fileType, onComplete, onClose])
 
   useEffect(() => {
     if (open && fileId) {
-      const timer = setTimeout(() => startPrintProcess(), 400)
+      const timer = setTimeout(() => {
+        if (!isPrintingRef.current) startPrintProcess()
+      }, 400)
       return () => clearTimeout(timer)
+    } else {
+      isPrintingRef.current = false
     }
   }, [open, fileId, startPrintProcess])
 
@@ -161,7 +183,7 @@ export default function PrintLoadingDialog({ open, onClose, fileId, fileName, fi
         <DialogTitle className="sr-only">Proses Print</DialogTitle>
         <AmbientBackground />
 
-        <div className="relative z-10 p-5 sm:p-7">
+        <div className="relative z-10 p-5 sm:p-7 max-h-[85vh] overflow-y-auto w-full">
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
@@ -249,12 +271,13 @@ export default function PrintLoadingDialog({ open, onClose, fileId, fileName, fi
                     <motion.div
                       key={step.id}
                       layout
-                      className={`relative flex items-center gap-4 p-3.5 rounded-2xl transition-all duration-500 overflow-hidden ${isActive ? 'bg-orange-500/10 border border-orange-500/30 shadow-[0_0_30px_rgba(249,115,22,0.1)]' :
-                        isCompleted ? 'bg-white/[0.02] border border-white/5' :
-                          'opacity-40 grayscale border border-transparent pb-2 pt-2'
+                      className={`relative flex items-center gap-4 p-3.5 rounded-2xl transition-all duration-500 overflow-hidden ${isError ? 'bg-red-500/10 border border-red-500/30 shadow-[0_0_30px_rgba(239,68,68,0.15)]' :
+                        isActive ? 'bg-orange-500/10 border border-orange-500/30 shadow-[0_0_30px_rgba(249,115,22,0.1)]' :
+                          isCompleted ? 'bg-white/[0.02] border border-white/5' :
+                            'opacity-40 grayscale border border-transparent pb-2 pt-2'
                         }`}
                     >
-                      {isActive && (
+                      {isActive && !isError && (
                         <motion.div
                           layoutId="activeGlowBg"
                           className="absolute inset-0 bg-gradient-to-r from-orange-500/10 to-transparent"
@@ -263,37 +286,48 @@ export default function PrintLoadingDialog({ open, onClose, fileId, fileName, fi
                         />
                       )}
 
+                      {isError && (
+                        <motion.div
+                          layoutId="errorGlowBg"
+                          className="absolute inset-0 bg-gradient-to-r from-red-500/10 to-transparent"
+                          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                          transition={{ duration: 0.3 }}
+                        />
+                      )}
+
                       {/* Icon */}
-                      <div className={`relative w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-colors duration-500 ${isActive ? 'bg-gradient-to-br from-orange-400 to-rose-500 shadow-lg shadow-orange-500/30' :
-                        isCompleted ? 'bg-emerald-500/20 text-emerald-400' :
-                          isError ? 'bg-red-500/20 text-red-400' :
+                      <div className={`relative w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-colors duration-500 ${isError ? 'bg-red-500/20 text-red-500 shadow-lg shadow-red-500/30' :
+                        isActive ? 'bg-gradient-to-br from-orange-400 to-rose-500 shadow-lg shadow-orange-500/30' :
+                          isCompleted ? 'bg-emerald-500/20 text-emerald-400' :
                             'bg-white/5 text-white/30'
                         }`}>
-                        {isCompleted ? <CheckCircle2 className="w-5 h-5" /> :
-                          isActive ? <Loader2 className="w-5 h-5 text-white animate-spin" /> :
-                            isError ? <X className="w-5 h-5" /> :
+                        {isError ? <X className="w-5 h-5 text-red-400" /> :
+                          isCompleted ? <CheckCircle2 className="w-5 h-5" /> :
+                            isActive ? <Loader2 className="w-5 h-5 text-white animate-spin" /> :
                               <span className="text-xs font-bold">{index + 1}</span>}
                       </div>
 
                       {/* Text content */}
                       <div className="flex-1 min-w-0 relative z-10">
                         <div className="flex items-start justify-between gap-2">
-                          <h4 className={`text-sm font-bold tracking-tight leading-tight transition-colors duration-300 ${isActive ? 'text-white' : 'text-white/80'}`}>
+                          <h4 className={`text-sm font-bold tracking-tight leading-tight transition-colors duration-300 ${isError ? 'text-red-300' : isActive ? 'text-white' : 'text-white/80'}`}>
                             {step.label}
                           </h4>
                           {isCompleted && <span className="text-[9px] font-black text-emerald-500 uppercase tracking-wider shrink-0 hidden sm:block mt-0.5">OK</span>}
                         </div>
                         <AnimatePresence>
-                          {isActive && (
+                          {(isActive || isError) && (
                             <motion.div
                               initial={{ height: 0, opacity: 0 }}
                               animate={{ height: 'auto', opacity: 1 }}
                               exit={{ height: 0, opacity: 0 }}
                               className="overflow-hidden"
                             >
-                              <p className="text-xs text-orange-200/70 mt-1.5 leading-relaxed pr-2">
-                                {step.description}
-                              </p>
+                              <div className="pt-1.5 pb-0.5">
+                                <p className={`text-xs leading-relaxed pr-2 ${isError ? 'text-red-300/80' : 'text-orange-200/70'}`}>
+                                  {step.description}
+                                </p>
+                              </div>
                             </motion.div>
                           )}
                         </AnimatePresence>
@@ -307,20 +341,56 @@ export default function PrintLoadingDialog({ open, onClose, fileId, fileName, fi
               <AnimatePresence>
                 {error && (
                   <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden mt-2"
+                  >
+                    <div className="pt-2">
+                      <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex flex-col sm:flex-row items-center gap-4 justify-between">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
+                            <AlertTriangle className="w-4 h-4 text-red-400" />
+                          </div>
+                          <p className="text-sm text-red-300 font-medium leading-tight break-words flex-1">{error}</p>
+                          <button
+                            onClick={() => {
+                              const copyText = `## Print Error Report\nFile: ${fileName}\nType: ${fileType}\nMessage: ${error}\n\nSteps:\n${steps.map(s => `- ${s.label}: ${s.status} (${s.description})`).join('\n')}`;
+                              navigator.clipboard.writeText(copyText);
+                              toast({ title: 'Tersalin', description: 'Detail error telah disalin untuk AI Builder.', variant: 'success' });
+                            }}
+                            className="p-2 h-max bg-red-500/20 text-red-400 hover:bg-red-500/30 hover:text-red-300 rounded-lg transition-all shrink-0"
+                            title="Salin detail error"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <Button size="sm" onClick={startPrintProcess} className="shrink-0 w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white rounded-xl shadow-lg shadow-red-500/20">
+                          Coba Lagi
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Success Message / Preview Button */}
+              <AnimatePresence>
+                {readyUrl && !error && progressPercent === 100 && (
+                  <motion.div
                     initial={{ opacity: 0, y: 10, height: 0 }}
                     animate={{ opacity: 1, y: 0, height: 'auto' }}
-                    exit={{ opacity: 0, y: 10, height: 0 }}
                     className="mt-2"
                   >
-                    <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex flex-col sm:flex-row items-center gap-4 justify-between">
+                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex flex-col sm:flex-row items-center gap-4 justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
-                          <AlertTriangle className="w-4 h-4 text-red-400" />
+                        <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                         </div>
-                        <p className="text-sm text-red-300 font-medium leading-tight">{error}</p>
+                        <p className="text-sm text-emerald-300 font-medium leading-tight">Dokumen siap! Klik tombol berikut jika dokumen tidak otomatis terbuka.</p>
                       </div>
-                      <Button size="sm" onClick={startPrintProcess} className="shrink-0 w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white rounded-xl shadow-lg shadow-red-500/20">
-                        Coba Lagi
+                      <Button size="sm" onClick={() => window.open(readyUrl, '_blank')} className="shrink-0 w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-500/20">
+                        Buka Preview
                       </Button>
                     </div>
                   </motion.div>
