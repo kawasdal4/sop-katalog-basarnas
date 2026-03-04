@@ -101,7 +101,18 @@ import {
   Hash,
   Edit3,
   ClipboardCheck,
-  Copy
+  Copy,
+  Stethoscope,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  CloudOff,
+  Globe,
+  Check,
+  X,
+  LayoutDashboard,
+  History,
+  Clock
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { StorageStatus } from '@/components/storage'
