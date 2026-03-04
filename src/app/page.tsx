@@ -8233,14 +8233,14 @@ export default function ESOPApp() {
                                       <div className="flex items-center gap-3 mb-2">
                                         <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-800/80 border border-slate-700">
                                           <Hash className="w-3 h-3 text-orange-400" />
-                                          <span className="text-[10px] font-bold text-slate-300 tracking-wider font-mono">
+                                          <span className="text-[10px] font-medium text-slate-300 tracking-wider font-mono">
                                             {sop.nomorSop || 'BELUM ADA NO'}
                                           </span>
                                         </div>
                                         <span className="text-[10px] font-black text-slate-500">•</span>
                                         <div className="flex items-center gap-1.5 group/year">
                                           <Calendar className="w-3 h-3 text-slate-500 group-hover/year:text-orange-400 transition-colors" />
-                                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">{sop.tahun}</span>
+                                          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-tight">{sop.tahun}</span>
                                         </div>
                                       </div>
 
@@ -8251,7 +8251,7 @@ export default function ESOPApp() {
                                         </div>
 
                                         <div className="flex-1 min-w-0">
-                                          <h3 className={`text-lg font-black tracking-tight leading-tight group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r transition-all duration-300 ${isDesktopSyncActive
+                                          <h3 className={`text-lg font-semibold tracking-tight leading-tight group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r transition-all duration-300 ${isDesktopSyncActive
                                             ? 'text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 via-purple-300 to-indigo-300 animate-pulse'
                                             : isEditing
                                               ? 'text-orange-400 bg-gradient-to-r from-orange-400 to-red-400'
@@ -8275,8 +8275,8 @@ export default function ESOPApp() {
                                               const isEdited = sop.updatedAt && new Date(sop.updatedAt).getTime() !== new Date(sop.uploadedAt).getTime();
                                               const editBadge = (
                                                 <div className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border transition-colors ${isEdited
-                                                    ? 'bg-amber-500/10 border-amber-500/15 text-amber-400/90 cursor-help hover:bg-amber-500/20'
-                                                    : 'bg-slate-500/10 border-slate-500/20 text-slate-400'
+                                                  ? 'bg-amber-500/10 border-amber-500/15 text-amber-400/90 cursor-help hover:bg-amber-500/20'
+                                                  : 'bg-slate-500/10 border-slate-500/20 text-slate-400'
                                                   }`}>
                                                   <Edit3 className="w-2.5 h-2.5 flex-shrink-0" />
                                                   <span className="truncate max-w-[280px]">
@@ -8397,19 +8397,19 @@ export default function ESOPApp() {
 
                                     {/* Center: Badges */}
                                     <div className="flex flex-wrap items-center gap-2 lg:justify-center">
-                                      <Badge variant="outline" className="h-7 border-slate-700 bg-slate-800/40 text-slate-300 font-bold tracking-wide rounded-lg px-3">
+                                      <Badge variant="outline" className="h-7 border-slate-700 bg-slate-800/40 text-slate-300 font-medium tracking-wide rounded-lg px-3">
                                         {sop.kategori}
                                       </Badge>
-                                      <Badge variant="outline" className="h-7 border-indigo-500/20 bg-indigo-500/5 text-indigo-400 font-bold tracking-wide rounded-lg px-3">
+                                      <Badge variant="outline" className="h-7 border-indigo-500/20 bg-indigo-500/5 text-indigo-400 font-medium tracking-wide rounded-lg px-3">
                                         {sop.lingkup || '-'}
                                       </Badge>
-                                      <div className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider shadow-lg ${sop.jenis === 'SOP'
+                                      <div className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-lg ${sop.jenis === 'SOP'
                                         ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-orange-500/20'
                                         : 'bg-gradient-to-br from-yellow-500 to-yellow-600 text-white shadow-yellow-500/20'
                                         }`}>
                                         {sop.jenis}
                                       </div>
-                                      <div className={`px-2 py-1 rounded-md text-[9px] font-bold border ${STATUS_COLORS[sop.status]}`}>
+                                      <div className={`px-2 py-1 rounded-md text-[9px] font-medium border ${STATUS_COLORS[sop.status]}`}>
                                         {sop.status}
                                       </div>
                                     </div>
