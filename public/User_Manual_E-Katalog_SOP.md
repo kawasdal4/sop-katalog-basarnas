@@ -4,47 +4,18 @@ author: "Tim Developer BASARNAS"
 date: "2026"
 ---
 
-<div style="text-align: center; margin-top: 50px;">
-  
-  <div style="width: 150px; height: 150px; margin: 0 auto; display: flex; align-items: center; justify-content: center;">
-    <img src="https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/logo.png" alt="Logo BASARNAS" style="max-width: 100%; max-height: 100%;" />
-  </div>
-  <br/><br/>
-
-  <h1 style="font-size: 38px; font-weight: 900; line-height: 1.2; margin-bottom: 0;">Web App</h1>
-  <h1 style="font-size: 48px; font-weight: 900; color: #E85D22; line-height: 1.1; margin-top: 0; margin-bottom: 0;">E-Katalog<br/>SOP dan IK</h1>
-  
-  <h2 style="font-size: 24px; color: #333; margin-top: 15px;">Direktorat Kesiapsiagaan</h2>
-  <h2 style="font-size: 24px; color: #E85D22; margin-top: 0;">Basarnas</h2>
-  
-  <br/><br/>
-  <div style="background-color: #1A2B4C; color: white; padding: 20px; border-radius: 8px; margin: 20px auto; max-width: 80%;">
-    <h3 style="margin: 0; font-size: 20px; letter-spacing: 1px;">SISTEM OPERASIONAL</h3>
-    <h3 style="margin: 5px 0 0 0; font-size: 20px; letter-spacing: 1px;">PROSEDUR & INSTRUKSI KERJA</h3>
-    <h3 style="margin: 5px 0 0 0; font-size: 20px; letter-spacing: 1px;">DIREKTORAT KESIAPSIAGAAN</h3>
-  </div>
-
-  <br/><br/><br/><br/>
-  
-  <p style="font-size: 13px; color: #555; line-height: 1.5;">
-    <strong>Developed & Maintained by:</strong><br/>
-    Muhammad Fuadunnas, S.I.Kom., M.IKom.<br/>
-    PKPP Ahli Muda – Direktorat Kesiapsiagaan
-  </p>
-  
-  <p style="font-size: 11px; color: #888; margin-top: 15px;">
-    &copy; 2026 FOE - All Rights Reserved<br/>
-    Badan Nasional Pencarian dan Pertolongan (BASARNAS)
-  </p>
+<div style="text-align: center; margin: -50px -40px;">
+  <!-- Gunakan gambar cover persis seperti lampiran -->
+  <img src="https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/cover.png" alt="Cover Buku Manual" style="width: 100%; height: auto; display: block;" />
 </div>
 
 <div style="page-break-after: always;"></div>
 
 # KATA PENGANTAR
 
-Puji syukur kami panjatkan ke hadirat Tuhan Yang Maha Esa atas terselesaikannya penyusunan **Buku Manual (User Manual) Sistem E-Katalog SOP**. Buku saku ini disusun sebagai panduan komprehensif bagi seluruh pengguna dalam mengoperasikan aplikasi E-Katalog SOP di lingkungan Badan Nasional Pencarian dan Pertolongan (BASARNAS).
+Puji syukur kami panjatkan ke hadirat Tuhan Yang Maha Esa atas terselesaikannya penyusunan **Buku Manual (User Manual) Web App E-Katalog SOP dan IK**. Buku saku ini disusun sebagai panduan komprehensif bagi seluruh pengguna dalam mengoperasikan aplikasi katalog Standar Operasional Prosedur (SOP) dan Instruksi Kerja (IK) di lingkungan Direktorat Kesiapsiagaan, Badan Nasional Pencarian dan Pertolongan (BASARNAS).
 
-Kehadiran Sistem E-Katalog SOP merupakan langkah strategis dalam mewujudkan transformasi digital guna meningkatkan efisiensi, akuntabilitas, serta aksesibilitas dokumen Standar Operasional Prosedur (SOP). Dengan sistem ini, pengelolaan SOP mulai dari proses pengajuan, penyimpanan, hingga publikasi dapat dilakukan secara terpusat, cepat, dan aman.
+Kehadiran Web App E-Katalog SOP dan IK merupakan langkah strategis dalam mewujudkan transformasi digital guna meningkatkan efisiensi, akuntabilitas, serta aksesibilitas dokumen. Dengan sistem ini, pengelolaan SOP maupun IK mulai dari proses pengajuan, penyimpanan, hingga publikasi dapat dilakukan secara terpusat, cepat, dan aman.
 
 Buku manual ini dirancang secara sistematis dengan bahasa yang lugas agar mudah dipahami oleh Pengguna Cerdas (User) maupun Administrator (Admin). Setiap tahapan proses dilengkapi dengan instruksi rinci serta contoh skenario penggunaan.
 
@@ -74,11 +45,11 @@ Jakarta, 2026
 # BAB I – PENDAHULUAN
 
 ## 1.1 Latar Belakang Sistem
-Pengelolaan Standar Operasional Prosedur (SOP) secara konvensional sering kali menghadapi kendala seperti tersebarnya dokumen di berbagai unit kerja, sulitnya melacak versi dokumen terbaru, serta panjangnya birokrasi dalam proses pengajuan SOP baru. Untuk memecahkan kendala tersebut, dibangunlah platform **Sistem E-Katalog SOP**. Aplikasi ini berbasis web modern (Next.js) dengan dukungan infrastruktur *cloud* sehingga dapat diakses secara real-time dan terintegrasi penuh.
+Pengelolaan Standar Operasional Prosedur (SOP) dan Instruksi Kerja (IK) secara konvensional sering kali menghadapi kendala seperti tersebarnya dokumen di berbagai unit kerja, sulitnya melacak versi dokumen terbaru, serta panjangnya birokrasi dalam proses pengajuan. Untuk memecahkan kendala tersebut, dibangunlah platform **Web App E-Katalog SOP dan IK**. Aplikasi ini berbasis web modern (Next.js) dengan dukungan infrastruktur *cloud* sehingga dapat diakses secara real-time dan terintegrasi penuh khusus bagi Direktorat Kesiapsiagaan.
 
 ## 1.2 Tujuan Pembuatan Aplikasi
-1. **Sentralisasi Data**: Menyediakan wadah penyimpanan terpusat terpadu bagi seluruh dokumen SOP.
-2. **Efisiensi Pengajuan**: Mempercepat proses pengajuan, persetujuan (approval), hingga publikasi SOP.
+1. **Sentralisasi Data**: Menyediakan wadah penyimpanan terpusat terpadu bagi seluruh dokumen SOP dan Instruksi Kerja.
+2. **Efisiensi Pengajuan**: Mempercepat proses pengajuan, persetujuan (approval), hingga publikasi SOP dan IK.
 3. **Integritas Pengetahuan**: Memastikan setiap pegawai dapat merujuk pada dokumen prosedur versi terbaru yang sah dan *valid*.
 4. **Keamanan Dokumen**: Menerapkan arsitektur pembatasan akses berdasarkan otorisasi peran (*role-based access*).
 
@@ -89,16 +60,17 @@ Sistem ini ditujukan untuk pengguna internal yang meliputi:
 - **Developer / Super Admin**: Memonitor kinerja sistem, diagnosis *error*, dan *maintenance* jaringan.
 
 ## 1.4 Definisi Istilah Penting
-- **SOP (Standar Operasional Prosedur)**: Dokumen petunjuk tertulis untuk memandu proses spesifik.
+- **SOP (Standar Operasional Prosedur)**: Dokumen petunjuk tertulis untuk memandu proses spesifik pada eselon manajerial.
+- **IK (Instruksi Kerja)**: Petunjuk eksekusi rinci dan tata laksana spesifik di lapangan bagi tim Direktorat Kesiapsiagaan.
 - **Role**: Hak tingkatan pengguna di dalam sistem (Admin, User, Developer).
-- **Cloudflare R2**: Layanan *cloud storage* tempat file fisik dokumen (.pdf, .docx) disimpan secara aman.
+- **Cloudflare R2**: Layanan *cloud storage* tempat file fisik dokumen (.pdf, .docx, excel) disimpan secara aman.
 - **Supabase**: Layanan yang menangani autentikasi (*Login/Logout*) dan pangkalan data relasional secara canggih.
 
 <div style="page-break-after: always;"></div>
 
 # BAB II – SPESIFIKASI SISTEM
 
-Penggunaan platform **Sistem E-Katalog SOP** tidak membutuhkan instalasi *software* maupun instalasi manual yang rumit karena menggunakan basis Web API yang responsif.
+Penggunaan platform **Web App E-Katalog SOP dan IK** tidak membutuhkan instalasi *software* maupun instalasi manual yang rumit karena menggunakan basis Web API yang responsif.
 
 ## 2.1 Kebutuhan Perangkat Keras (Hardware)
 Sistem dapat diakses menggunakan berbagai *device*, dengan spesifikasi standar minimum:
@@ -130,8 +102,8 @@ Keamanan organisasi dilindungi melalui manajemen identitas dan hak akses secara 
 
 ## 3.1 Cara Mengakses Aplikasi melalui Browser
 1. Buka *web browser* pilihan Anda yang sudah terhubung ke jaringan internet.
-2. Ketikkan URL aplikasi pada tautan yang diberikan secara resmi oleh badan TI organisasi (contoh: `https://sop-katalog.basarnas.go.id`).
-3. Tekan tombol `Enter` pada keyboard Anda. Panel publik **Sistem E-Katalog SOP** akan segera tampil.
+2. Ketikkan URL aplikasi pada tautan yang diberikan secara resmi oleh badan TI organisasi (contoh: `https://e-katalog-sop.cloud/`).
+3. Tekan tombol `Enter` pada keyboard Anda. Panel publik **Web App E-Katalog SOP dan IK** akan segera tampil.
    
    <div style="width: 100%; border: 1px dashed #ccc; padding: 10px; margin: 10px 0; background: #fafafa; color: #555; text-align: center;">
      [Gambar: Placeholder Screenshot Halaman Akses Publik]
@@ -164,12 +136,12 @@ Sistem me-rotasi fungsionalitas berdasarkan tipe perizinan sesi:
 
 # BAB IV – DASHBOARD
 
-Pusat kendali (Command Center) aplikasi dirancang untuk menyajikan statistik instan seluruh aliran data *Sistem E-Katalog SOP*.
+Pusat kendali (Command Center) aplikasi dirancang untuk menyajikan statistik instan seluruh aliran data *Web App E-Katalog SOP dan IK*.
 
 ## 4.1 Penjelasan Tampilan Dashboard
 Ketika masuk, sistem memperlihatkan jajaran analitik yang tersusun atas komponen:
 1. **Header Panel**: Area salam pengguna yang menyesuaikan dengan konteks login Anda berserta tanggal periode berjalan.
-2. **Kartu Statistik Ringkas (Counter Cards)**: Menyajikan nilai *summary* total jumlah SOP terunggah, jumlah draft tertunda, serta total arsip dinamis pada penyimpanan. Efek animasi *responsive* diterapkan supaya metrik informatif.
+2. **Kartu Statistik Ringkas (Counter Cards)**: Menyajikan nilai *summary* total jumlah SOP dan IK terunggah, jumlah draft tertunda, serta total arsip dinamis pada penyimpanan. Efek animasi *responsive* diterapkan supaya metrik informatif.
 3. **Analytics Chart (Diagram Bersusun)**: Diagram lingkaran (*pie chart*) untuk menunjukkan komposisi persentase jumlah kategori SOP dan juga diagram grafik fluktuasi riwayat unduhan bulanan dokumen.
 
    <div style="width: 100%; border: 1px dashed #ccc; padding: 10px; margin: 10px 0; background: #fafafa; color: #555; text-align: center;">
@@ -178,9 +150,9 @@ Ketika masuk, sistem memperlihatkan jajaran analitik yang tersusun atas komponen
 
 ## 4.2 Fungsi Setiap Menu
 Di sisi kiri layar (pada versi Desktop) terhampar **Side Navigation Bar** yang berisikan rute spesifik:
-- **Katalog Draf**: Menampilkan grid / tabel khusus data *Standar Operasional Prosedur* operasional siap pakai.
-- **Verifikasi SOP**: Panel khusus diakses *Admin* untuk mengeksekusi justifikasi SOP yang mendaftar.
-- **Arsip**: Tempat penyimpanan berkas SOP yang kedaluwarsa, tidak relevan (obsolete), atau digantikan varian versi baru.
+- **Katalog Draf**: Menampilkan grid / tabel khusus data *Standar Operasional Prosedur* dan *Instruksi Kerja* yang operasional siap pakai.
+- **Verifikasi**: Panel khusus diakses *Admin* untuk mengeksekusi justifikasi SOP/IK yang mendaftar.
+- **Arsip**: Tempat penyimpanan berkas SOP dan IK yang kedaluwarsa, tidak relevan (obsolete), atau digantikan varian versi baru.
 - **Log Aktivitas**: Rangkuman transaksi *audit trail* mengenai perubahan apa, siapakah pelaku perubahannya, serta waktu detail (timestamp) berlangsung.
 
 ## 4.3 Navigasi Sistem
@@ -191,7 +163,7 @@ Di sisi kiri layar (pada versi Desktop) terhampar **Side Navigation Bar** yang b
 
 # BAB V – MANAJEMEN SOP
 
-Penggelaran *Manajemen SOP* merupakan proses inti operasional administrasi, mencakup serangkaian langkah tambah, hapus, pembaharuan, sekaligus mengorganisir riwayat *file* rujukan.
+Penggelaran *Manajemen SOP dan IK* merupakan proses inti operasional administrasi, mencakup serangkaian langkah tambah, hapus, pembaharuan, sekaligus mengorganisir riwayat *file* rujukan.
 
 ## 5.1 Cara Menambahkan SOP Baru (Oleh Admin)
 Pengurus diizinkan menerbitkan prosedur baru melalui pendaftaran langsung bernilai final:
@@ -281,7 +253,7 @@ Memperbaharui *file* bersinonim dengan proses menumpuk, tetapi demi keapikan rek
 
 # BAB VIII – KEAMANAN SISTEM
 
-Proteksi menjadi pondasi dasar atas instansi pemerintah yang mengakar sekeras besi di dalam **Sistem E-Katalog SOP**. Berikut lapisan proteksinya.
+Proteksi menjadi pondasi dasar atas instansi pemerintah yang mengakar sekeras besi di dalam **Web App E-Katalog SOP dan IK**. Berikut lapisan proteksinya.
 
 ## 8.1 Sistem Autentikasi Supabase
 Sistem mempercayakan sirkulasi autentikasi pada platform *Supabase* berstandar keamanan industri yang menolak manipulasi (pengguna tak berdaftar sama dengan akses tertolak). Basis data melindungi algoritma penyandian sandi (Salt & Hashes) lewat kerahasiaan canggih mutakhir, bukan sekedar merangkum string teks dasar.
@@ -333,7 +305,7 @@ Berikut merupakan ensiklopedia kecil pemecahan keluhan tatkala menjumpai kondisi
 
 # BAB X – PENUTUP
 
-Dokumen standar prosedur merupakan roda bergeraknya kejelasan administratif suatu instansi. Dihadirkan-Nya **Sistem E-Katalog SOP**, segenap langkah dalam pendokumentasian dapat dikonstruksi secorak lebih sistematis hingga memutus benang berliku dalam koordinasi birokrasi lintas unit kerja di institusi.
+Dokumen standar prosedur dan instruksi kerja merupakan roda bergeraknya kejelasan administratif suatu instansi. Dihadirkan-Nya **Web App E-Katalog SOP dan IK** di ranah Direktorat Kesiapsiagaan, segenap langkah dalam pendokumentasian dapat dikonstruksi secorak lebih sistematis hingga memutus benang berliku dalam koordinasi birokrasi lintas unit kerja operasional di lapangan.
 
 Tuntunan praktikal pada sekeping modul *Digital Booklet* User Manual ini disinyalir patut digemari dalam mendistribusi referensi terpercaya. Demikian pengenalan buku petunjuk pengoperasian. Sekiranya pegawai tetap dilanda seramutan komplikasi, jangan sangsikan kesigapan perpanjangan tangan tim Administrator Pusat (*Biro Ortala & Pusat Teknologi*) lewat surel korespondensi bantuan teknis sistem rujukan harian instansi. Teruslah berkarya menyelaraskan layanan efisien berbasis kecanggihan.
 
