@@ -106,7 +106,7 @@ export default function LogoutAnimation({ show, userName, userPhoto }: { show: b
                     {/* Animated orange radial glow */}
                     <motion.div
                         className="absolute inset-0"
-                        style={{ background: 'radial-gradient(ellipse at center, rgba(249,115,22,0.15) 0%, transparent 70%)' }}
+                        style={{ background: 'radial-gradient(ellipse at center, rgba(249,115,22,0.15) 0%, transparent 70%)', willChange: 'transform, opacity' }}
                         animate={{ scale: [1, 1.3, 1], opacity: [0.6, 1, 0.6] }}
                         transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                     />
@@ -122,6 +122,7 @@ export default function LogoutAnimation({ show, userName, userPhoto }: { show: b
                                 left: `${(i * 37 + 5) % 100}%`,
                                 top: `${(i * 29 + 8) % 100}%`,
                                 background: COLORS[i % COLORS.length],
+                                willChange: 'transform, opacity',
                             }}
                             animate={{ opacity: [0, 1, 0], scale: [0, 1.5, 0] }}
                             transition={{ duration: (i % 3) + 1, repeat: Infinity, delay: (i % 5) * 0.4, ease: 'easeInOut' }}
@@ -163,6 +164,7 @@ export default function LogoutAnimation({ show, userName, userPhoto }: { show: b
                                 x: (Math.random() - 0.5) * 600,
                                 y: (Math.random() - 0.5) * 600,
                             } : {}}
+                            style={{ left: `${item.x}%`, top: `${item.y}%`, willChange: 'transform, opacity' }}
                             transition={{
                                 opacity: { duration: 0.4, delay: i * 0.04 },
                                 scale: { duration: 0.5, delay: i * 0.04, type: 'spring', stiffness: 200 },
@@ -217,7 +219,9 @@ export default function LogoutAnimation({ show, userName, userPhoto }: { show: b
                             background: 'rgba(15, 23, 42, 0.85)',
                             border: '1px solid rgba(249, 115, 22, 0.3)',
                             backdropFilter: 'blur(24px)',
+                            WebkitBackdropFilter: 'blur(24px)',
                             boxShadow: '0 0 60px rgba(249, 115, 22, 0.2), 0 40px 80px rgba(0,0,0,0.6)',
+                            willChange: 'transform, opacity',
                         }}
                         initial={{ opacity: 0, scale: 0.5, y: 40 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -226,7 +230,7 @@ export default function LogoutAnimation({ show, userName, userPhoto }: { show: b
                         {/* User photo or waving hand icon with glow */}
                         <motion.div
                             className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center overflow-hidden"
-                            style={{ 
+                            style={{
                                 background: userPhoto ? 'transparent' : 'linear-gradient(135deg, #f97316, #ef4444)',
                                 border: userPhoto ? '3px solid rgba(249, 115, 22, 0.5)' : 'none'
                             }}
@@ -240,8 +244,8 @@ export default function LogoutAnimation({ show, userName, userPhoto }: { show: b
                             transition={{ duration: 1.5, repeat: Infinity }}
                         >
                             {userPhoto ? (
-                                <img 
-                                    src={userPhoto} 
+                                <img
+                                    src={userPhoto}
                                     alt={userName || 'User'}
                                     className="w-full h-full object-cover"
                                 />

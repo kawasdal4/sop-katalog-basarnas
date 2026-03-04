@@ -28,6 +28,7 @@ function SARAnimatedLogo() {
   return (
     <motion.div
       className="relative w-24 h-24"
+      style={{ willChange: 'transform, opacity' }}
       initial={{ scale: 0.8, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ duration: 0.5, ease: 'easeOut' }}
@@ -35,6 +36,7 @@ function SARAnimatedLogo() {
       {/* Outer glow ring */}
       <motion.div
         className="absolute inset-0 rounded-full"
+        style={{ willChange: 'box-shadow' }}
         animate={{
           boxShadow: [
             '0 0 20px rgba(251, 146, 60, 0.3), 0 0 40px rgba(251, 146, 60, 0.2)',
@@ -52,6 +54,7 @@ function SARAnimatedLogo() {
       {/* Spinning radar ring */}
       <motion.div
         className="absolute inset-[-8px] rounded-full border-2 border-orange-400/30"
+        style={{ willChange: 'transform' }}
         animate={{ rotate: 360 }}
         transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
       >
@@ -61,6 +64,7 @@ function SARAnimatedLogo() {
       {/* Second spinning ring */}
       <motion.div
         className="absolute inset-[-16px] rounded-full border border-orange-300/20"
+        style={{ willChange: 'transform' }}
         animate={{ rotate: -360 }}
         transition={{ duration: 5, repeat: Infinity, ease: 'linear' }}
       >
@@ -109,6 +113,7 @@ function LoadingDots() {
         <motion.div
           key={i}
           className="w-2 h-2 bg-orange-400 rounded-full"
+          style={{ willChange: 'transform, opacity' }}
           animate={{
             scale: [1, 1.5, 1],
             opacity: [0.5, 1, 0.5],
@@ -143,7 +148,7 @@ function FloatingSARICons() {
         <motion.div
           key={i}
           className="absolute"
-          style={{ left: `${x}%`, top: `${y}%` }}
+          style={{ left: `${x}%`, top: `${y}%`, willChange: 'transform, opacity' }}
           initial={{ opacity: 0, scale: 0 }}
           animate={{
             opacity: [0, 0.4, 0],
@@ -203,6 +208,7 @@ export default function SARLoadingOverlay({
           {/* Glassmorphism backdrop */}
           <motion.div
             className="absolute inset-0 bg-gradient-to-br from-slate-900/95 via-slate-800/95 to-slate-900/95 backdrop-blur-md"
+            style={{ WebkitBackdropFilter: 'blur(12px)', willChange: 'opacity' }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -228,6 +234,7 @@ export default function SARLoadingOverlay({
                   background: i % 2 === 0
                     ? 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, transparent 70%)'
                     : 'radial-gradient(circle, rgba(251,146,60,0.8) 0%, transparent 70%)',
+                  willChange: 'transform, opacity',
                 }}
                 animate={{
                   opacity: [0, 1, 0],
@@ -246,6 +253,7 @@ export default function SARLoadingOverlay({
           {/* Main content */}
           <motion.div
             className="relative z-10 flex flex-col items-center"
+            style={{ willChange: 'transform' }}
             initial={{ scale: 0.9, y: 20 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.9, y: 20 }}
