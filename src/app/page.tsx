@@ -6275,12 +6275,13 @@ export default function ESOPApp() {
                         trend={stats.totalKadaluarsa > 0 ? 'down' : undefined}
                       />
                       <StatCard
-                        title="Lingkup"
-                        value={stats.byLingkup?.length || 0}
-                        icon={Globe}
+                        title="Antrian Verifikasi"
+                        value={stats.totalPublikMenunggu || 0}
+                        icon={ClipboardCheck}
                         color="blue"
                         delay={0.7}
-                        subtitle="Bidang kerja yang tercakup dalam katalog"
+                        subtitle="Pengajuan publik menunggu persetujuan admin"
+                        trend={stats.totalPublikMenunggu > 0 ? 'up' : undefined}
                       />
                     </motion.div>
 
@@ -6627,11 +6628,20 @@ export default function ESOPApp() {
                                   >
                                     <Globe className="w-6 h-6 text-white drop-shadow-lg" />
                                   </motion.div>
-                                  <div>
-                                    <CardTitle className="text-lg font-extrabold bg-gradient-to-r from-cyan-300 via-blue-200 to-sky-300 bg-clip-text text-transparent drop-shadow-sm">
-                                      Distribusi per Lingkup
-                                    </CardTitle>
-                                    <p className="text-xs text-cyan-300/50 mt-0.5">Persebaran dokumen berdasarkan ruang lingkup bidang kerja</p>
+                                  <div className="flex items-center gap-3 mb-1">
+                                    <motion.div
+                                      animate={{ rotate: [0, 5, -5, 0] }}
+                                      transition={{ duration: 5, repeat: Infinity }}
+                                      className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/30 ring-2 ring-cyan-400/20"
+                                    >
+                                      <TrendingUp className="w-6 h-6 text-white" />
+                                    </motion.div>
+                                    <div>
+                                      <CardTitle className="text-lg font-extrabold bg-gradient-to-r from-cyan-300 via-blue-200 to-sky-300 bg-clip-text text-transparent drop-shadow-sm">
+                                        Top 5 Dokumen Terpopuler
+                                      </CardTitle>
+                                      <p className="text-xs text-cyan-300/50 mt-0.5">Dokumen dengan jumlah penayangan (preview) terbanyak</p>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -6640,8 +6650,8 @@ export default function ESOPApp() {
                                 transition={{ duration: 3, repeat: Infinity }}
                                 className="text-right px-4 py-2 rounded-xl" style={{ background: 'rgba(6,182,212,0.12)', border: '1px solid rgba(6,182,212,0.25)' }}
                               >
-                                <p className="text-3xl font-black bg-gradient-to-r from-cyan-300 to-blue-300 bg-clip-text text-transparent">{stats.byLingkup?.length || 0}</p>
-                                <p className="text-[10px] text-cyan-300/60 uppercase tracking-widest font-bold">Lingkup</p>
+                                <p className="text-3xl font-black bg-gradient-to-r from-cyan-300 to-blue-300 bg-clip-text text-transparent">{stats.totalPreviews || 0}</p>
+                                <p className="text-[10px] text-cyan-300/60 uppercase tracking-widest font-bold">Total Views</p>
                               </motion.div>
                             </div>
                           </CardHeader>
@@ -6652,13 +6662,13 @@ export default function ESOPApp() {
                                   <PieChart>
                                     <defs>
                                       {LINGKUP_COLORS.map((color, index) => (
-                                        <linearGradient key={`lingkup-grad-${index}`} id={`lingkupGradient-${index}`} x1="0" y1="0" x2="1" y2="1">
+                                        <linearGradient key={`top-grad-${index}`} id={`topGradient-${index}`} x1="0" y1="0" x2="1" y2="1">
                                           <stop offset="0%" stopColor={color} stopOpacity={1} />
                                           <stop offset="50%" stopColor={color} stopOpacity={0.85} />
                                           <stop offset="100%" stopColor={color} stopOpacity={0.65} />
                                         </linearGradient>
                                       ))}
-                                      <filter id="lingkupShadow" x="-50%" y="-50%" width="200%" height="200%">
+                                      <filter id="topShadow" x="-50%" y="-50%" width="200%" height="200%">
                                         <feGaussianBlur in="SourceAlpha" stdDeviation="6" />
                                         <feOffset dx="0" dy="4" />
                                         <feComponentTransfer><feFuncA type="linear" slope="0.25" /></feComponentTransfer>
@@ -6666,9 +6676,9 @@ export default function ESOPApp() {
                                       </filter>
                                     </defs>
                                     <Pie
-                                      data={stats.byLingkup || []}
-                                      dataKey="count"
-                                      nameKey="lingkup"
+                                      data={stats.topViewed || []}
+                                      dataKey="previewCount"
+                                      nameKey="judul"
                                       cx="50%"
                                       cy="50%"
                                       innerRadius={60}
@@ -6676,7 +6686,7 @@ export default function ESOPApp() {
                                       paddingAngle={4}
                                       stroke="rgba(255,255,255,0.15)"
                                       strokeWidth={2}
-                                      filter="url(#lingkupShadow)"
+                                      filter="url(#topShadow)"
                                       label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
                                         if (percent < 0.05) return null
                                         const RADIAN = Math.PI / 180
@@ -6684,15 +6694,15 @@ export default function ESOPApp() {
                                         const x = cx + radius * Math.cos(-midAngle * RADIAN)
                                         const y = cy + radius * Math.sin(-midAngle * RADIAN)
                                         return (
-                                          <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight="900" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.8), 0 0 20px rgba(6,182,212,0.5)' }}>
+                                          <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight="900" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>
                                             {`${(percent * 100).toFixed(0)}%`}
                                           </text>
                                         )
                                       }}
                                       labelLine={false}
                                     >
-                                      {(stats.byLingkup || []).map((_, index) => (
-                                        <Cell key={`cell-${index}`} fill={`url(#lingkupGradient-${index % LINGKUP_COLORS.length})`} />
+                                      {(stats.topViewed || []).map((_, index) => (
+                                        <Cell key={`cell-${index}`} fill={`url(#topGradient-${index % LINGKUP_COLORS.length})`} />
                                       ))}
                                     </Pie>
                                     <RechartsTooltip
@@ -6700,26 +6710,13 @@ export default function ESOPApp() {
                                       content={({ active, payload }) => {
                                         if (active && payload && payload.length) {
                                           const data = payload[0].payload
-                                          const total = (stats.byLingkup || []).reduce((sum, item) => sum + item.count, 0)
-                                          const percentage = total > 0 ? Math.round((data.count / total) * 100) : 0
-                                          const colorIdx = (stats.byLingkup || []).indexOf(data) % LINGKUP_COLORS.length
+                                          const colorIdx = (stats.topViewed || []).findIndex(i => i.id === data.id) % LINGKUP_COLORS.length
                                           return (
-                                            <div className="border rounded-2xl shadow-2xl p-4 min-w-[200px]" style={{ background: 'linear-gradient(135deg, rgba(10,22,40,0.97), rgba(13,40,65,0.97))', borderColor: LINGKUP_COLORS[colorIdx] + '60', backdropFilter: 'blur(16px)', boxShadow: `0 8px 32px ${LINGKUP_COLORS[colorIdx]}30, 0 0 60px ${LINGKUP_COLORS[colorIdx]}10` }}>
-                                              <div className="flex items-center gap-2.5 mb-3">
-                                                <div className="w-4 h-4 rounded-full shadow-lg ring-2 ring-white/20" style={{ backgroundColor: LINGKUP_COLORS[colorIdx], boxShadow: `0 0 12px ${LINGKUP_COLORS[colorIdx]}80` }} />
-                                                <span className="font-extrabold text-white text-sm tracking-wide">{data.lingkup || 'Tidak Ada'}</span>
-                                              </div>
-                                              <div className="flex items-end justify-between mb-3">
-                                                <div>
-                                                  <span className="text-4xl font-black text-white" style={{ textShadow: `0 0 20px ${LINGKUP_COLORS[colorIdx]}40` }}>{data.count}</span>
-                                                  <span className="text-cyan-200/50 text-xs ml-1.5">dokumen</span>
-                                                </div>
-                                                <div className="px-3 py-1.5 rounded-xl text-sm font-black text-white" style={{ background: `linear-gradient(135deg, ${LINGKUP_COLORS[colorIdx]}90, ${LINGKUP_COLORS[colorIdx]}60)`, boxShadow: `0 4px 12px ${LINGKUP_COLORS[colorIdx]}40` }}>
-                                                  {percentage}%
-                                                </div>
-                                              </div>
-                                              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                                                <div className="h-full rounded-full transition-all" style={{ width: `${percentage}%`, background: `linear-gradient(90deg, ${LINGKUP_COLORS[colorIdx]}, ${LINGKUP_COLORS[colorIdx]}99)`, boxShadow: `0 0 10px ${LINGKUP_COLORS[colorIdx]}60` }} />
+                                            <div className="border rounded-2xl shadow-2xl p-4 max-w-[250px]" style={{ background: 'linear-gradient(135deg, rgba(10,22,40,0.97), rgba(13,40,65,0.97))', borderColor: LINGKUP_COLORS[colorIdx] + '60', backdropFilter: 'blur(16px)' }}>
+                                              <p className="font-extrabold text-white text-xs mb-2 line-clamp-2 leading-tight">{data.judul}</p>
+                                              <div className="flex items-center justify-between">
+                                                <span className="text-2xl font-black text-white">{data.previewCount}</span>
+                                                <span className="text-[10px] text-cyan-200/50 uppercase font-bold">Views</span>
                                               </div>
                                             </div>
                                           )
@@ -6737,47 +6734,40 @@ export default function ESOPApp() {
                                     className="w-[100px] h-[100px] rounded-full flex flex-col items-center justify-center"
                                     style={{ background: 'radial-gradient(circle, rgba(13,33,55,0.95) 0%, rgba(10,26,48,0.9) 100%)', border: '2px solid rgba(6,182,212,0.2)' }}
                                   >
-                                    <span className="text-3xl font-black text-white" style={{ textShadow: '0 0 20px rgba(6,182,212,0.5)' }}>
-                                      {(stats.byLingkup || []).reduce((sum, item) => sum + item.count, 0)}
-                                    </span>
-                                    <span className="text-[9px] text-cyan-300/70 uppercase tracking-[0.2em] font-bold mt-0.5">Total</span>
+                                    <TrendingUp className="w-5 h-5 text-cyan-400 opacity-50 mb-1" />
+                                    <span className="text-xs text-cyan-300 font-bold uppercase tracking-widest">TOP 5</span>
                                   </motion.div>
                                 </div>
                               </div>
                               {/* Premium Legend with Stats */}
                               <div className="lg:w-72 flex flex-col justify-center">
                                 <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
-                                  {(stats.byLingkup || []).slice(0, 6).map((item, index) => {
-                                    const total = (stats.byLingkup || []).reduce((sum, i) => sum + i.count, 0)
-                                    const percentage = total > 0 ? Math.round((item.count / total) * 100) : 0
+                                  {(stats.topViewed || []).map((item, index) => {
+                                    const total = (stats.topViewed || []).reduce((sum, i) => sum + i.previewCount, 0)
+                                    const percentage = total > 0 ? Math.round((item.previewCount / total) * 100) : 0
                                     return (
                                       <motion.div
-                                        key={item.lingkup}
+                                        key={item.id}
                                         initial={{ opacity: 0, x: 20 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         transition={{ delay: 0.7 + index * 0.08 }}
                                         className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-default transition-all duration-300 hover:scale-[1.02]"
                                         style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${LINGKUP_COLORS[index % LINGKUP_COLORS.length]}15` }}
-                                        onMouseEnter={(e) => { e.currentTarget.style.background = `${LINGKUP_COLORS[index % LINGKUP_COLORS.length]}12`; e.currentTarget.style.borderColor = `${LINGKUP_COLORS[index % LINGKUP_COLORS.length]}35` }}
-                                        onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.borderColor = `${LINGKUP_COLORS[index % LINGKUP_COLORS.length]}15` }}
                                       >
                                         <div className="w-3.5 h-3.5 rounded-full flex-shrink-0 shadow-lg" style={{ backgroundColor: LINGKUP_COLORS[index % LINGKUP_COLORS.length], boxShadow: `0 0 8px ${LINGKUP_COLORS[index % LINGKUP_COLORS.length]}60` }} />
                                         <div className="flex-1 min-w-0">
                                           <div className="flex items-center justify-between mb-1">
-                                            <p className="text-xs font-bold text-white/80 truncate">{item.lingkup || 'Tidak Ada'}</p>
-                                            <span className="text-xs font-extrabold ml-2" style={{ color: LINGKUP_COLORS[index % LINGKUP_COLORS.length] }}>{percentage}%</span>
+                                            <p className="text-[10px] font-bold text-white/80 truncate">{item.judul}</p>
+                                            <span className="text-[10px] font-extrabold ml-2" style={{ color: LINGKUP_COLORS[index % LINGKUP_COLORS.length] }}>{item.previewCount}</span>
                                           </div>
-                                          <div className="flex items-center gap-2">
-                                            <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                              <motion.div
-                                                initial={{ width: 0 }}
-                                                animate={{ width: `${percentage}%` }}
-                                                transition={{ delay: 0.8 + index * 0.08, duration: 0.5 }}
-                                                className="h-full rounded-full"
-                                                style={{ backgroundColor: LINGKUP_COLORS[index % LINGKUP_COLORS.length], boxShadow: `0 0 6px ${LINGKUP_COLORS[index % LINGKUP_COLORS.length]}40` }}
-                                              />
-                                            </div>
-                                            <span className="text-[11px] font-black text-white/60">{item.count}</span>
+                                          <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                                            <motion.div
+                                              initial={{ width: 0 }}
+                                              animate={{ width: `${percentage}%` }}
+                                              transition={{ delay: 0.8 + index * 0.08, duration: 0.5 }}
+                                              className="h-full rounded-full"
+                                              style={{ backgroundColor: LINGKUP_COLORS[index % LINGKUP_COLORS.length] }}
+                                            />
                                           </div>
                                         </div>
                                       </motion.div>
