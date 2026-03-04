@@ -4233,14 +4233,14 @@ export default function ESOPApp() {
               {/* Quick Info - Compact */}
               <div
                 className="p-3 rounded-xl bg-orange-500/10 border border-white/5 flex items-center gap-3 backdrop-blur-sm cursor-pointer hover:bg-orange-500/20 hover:border-orange-500/30 transition-all group/help"
-                onClick={() => window.open('/panduan', '_blank')}
+                onClick={() => window.open('/User_Manual_E-Katalog_SOP.pdf', '_blank')}
               >
                 <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center group-hover/help:scale-110 transition-transform">
                   <FileText className="w-4 h-4 text-orange-400" />
                 </div>
                 <div>
                   <p className="text-[10px] font-black text-white uppercase tracking-tight group-hover/help:text-orange-400 transition-colors">Butuh Bantuan?</p>
-                  <p className="text-[9px] text-gray-500">Klik untuk buka Panduan Sistem</p>
+                  <p className="text-[9px] text-gray-500">Buka Panduan Sistem (PDF)</p>
                 </div>
               </div>
             </div>
