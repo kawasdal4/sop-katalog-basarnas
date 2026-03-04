@@ -10809,245 +10809,247 @@ export default function ESOPApp() {
                 </Button>
               </div>
             </DialogContent>
-            {/* Diagnostic Dialog */}
-            <Dialog open={showDiagnosticDialog} onOpenChange={setShowDiagnosticDialog}>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 bg-gray-900 border-gray-700 text-white shadow-2xl">
-                <DialogHeader className="p-6 pb-0">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg bg-orange-500/20 text-orange-400 ${diagnosticLoading ? 'animate-pulse' : ''}`}>
-                        <Stethoscope className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <DialogTitle className="text-xl font-bold flex items-center gap-2">
-                          Diagnosa Sistem
-                          {diagnosticLoading && (
-                            <Badge variant="outline" className="animate-pulse bg-orange-500/10 text-orange-400 border-orange-500/20 text-[10px]">
-                              SCANNING...
-                            </Badge>
-                          )}
-                        </DialogTitle>
-                        <DialogDescription className="text-gray-400">
-                          Pemeriksaan kesehatan API, konektivitas, dan log aplikasi secara real-time.
-                        </DialogDescription>
-                      </div>
+          </Dialog>
+
+          {/* Diagnostic Dialog */}
+          <Dialog open={showDiagnosticDialog} onOpenChange={setShowDiagnosticDialog}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 bg-gray-900 border-gray-700 text-white shadow-2xl">
+              <DialogHeader className="p-6 pb-0">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg bg-orange-500/20 text-orange-400 ${diagnosticLoading ? 'animate-pulse' : ''}`}>
+                      <Stethoscope className="w-5 h-5" />
                     </div>
-                    <div className="flex items-center gap-2">
-                      {diagnosticResult && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleCopyFullDiagnosticReport}
-                          className="gap-2 bg-gray-800 border-gray-700 hover:bg-gray-700 text-xs"
-                        >
-                          <Copy className="w-3.5 h-3.5" />
-                          Salin Laporan
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRunDiagnostic()}
-                        disabled={diagnosticLoading}
-                        className="gap-2 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
-                      >
-                        <RefreshCw className={`w-3.5 h-3.5 ${diagnosticLoading ? 'animate-spin' : ''}`} />
-                        Reset
-                      </Button>
-                    </div>
-                  </div>
-                </DialogHeader>
-
-                <ScrollArea className="flex-1 p-6 pt-4">
-                  <div className="space-y-6">
-                    {/* Summary Stats */}
-                    {diagnosticResult && (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div className="bg-gray-800/50 border border-gray-700/50 p-3 rounded-xl">
-                          <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">Status Lulus</p>
-                          <div className="flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-500" />
-                            <span className="text-lg font-bold">{diagnosticResult.summary.passed}/{diagnosticResult.summary.total}</span>
-                          </div>
-                        </div>
-                        <div className="bg-gray-800/50 border border-gray-700/50 p-3 rounded-xl">
-                          <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">Error Konsol</p>
-                          <div className="flex items-center gap-2">
-                            <XCircle className={`w-4 h-4 ${diagnosticResult.consoleErrors.filter(e => e.type === 'error').length > 0 ? 'text-red-500' : 'text-gray-500'}`} />
-                            <span className="text-lg font-bold">{diagnosticResult.consoleErrors.filter(e => e.type === 'error').length}</span>
-                          </div>
-                        </div>
-                        <div className="bg-gray-800/50 border border-gray-700/50 p-3 rounded-xl">
-                          <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">Gagal Jaringan</p>
-                          <div className="flex items-center gap-2">
-                            <CloudOff className={`w-4 h-4 ${diagnosticResult.networkErrors.length > 0 ? 'text-orange-500' : 'text-gray-500'}`} />
-                            <span className="text-lg font-bold">{diagnosticResult.networkErrors.length}</span>
-                          </div>
-                        </div>
-                        <div className="bg-gray-800/50 border border-gray-700/50 p-3 rounded-xl">
-                          <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">Latency Rata-rata</p>
-                          <div className="flex items-center gap-2">
-                            <Zap className="w-4 h-4 text-yellow-500" />
-                            <span className="text-lg font-bold">
-                              {Math.round(diagnosticResult.apiHealth.reduce((acc, h) => acc + h.latency, 0) / diagnosticResult.apiHealth.length || 0)}ms
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* API Health */}
-                      <Card className="bg-gray-800/30 border-gray-700">
-                        <CardHeader className="p-4 pb-2">
-                          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                            <Globe className="w-4 h-4 text-blue-400" />
-                            API Health Check
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4 pt-0 space-y-2">
-                          {diagnosticLoading && !diagnosticResult ? (
-                            <div className="space-y-2 py-2">
-                              {[1, 2, 3, 4].map(i => (
-                                <div key={i} className="h-8 bg-gray-700/30 animate-pulse rounded flex items-center px-3 justify-between">
-                                  <div className="w-20 h-3 bg-gray-600 rounded" />
-                                  <div className="w-12 h-3 bg-gray-600 rounded" />
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            diagnosticResult?.apiHealth.map((api, idx) => (
-                              <div key={idx} className="flex items-center justify-between p-2 rounded bg-gray-900/40 border border-gray-700/30">
-                                <div className="flex items-center gap-2">
-                                  {api.ok ? <Check className="w-3.5 h-3.5 text-green-500" /> : <X className="w-3.5 h-3.5 text-red-500" />}
-                                  <span className={`text-xs ${api.ok ? 'text-gray-200' : 'text-red-400 font-medium'}`}>{api.endpoint}</span>
-                                  {api.error && <Badge className="bg-red-500/10 text-red-400 border-red-500/20 text-[8px] h-4">{api.error}</Badge>}
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <span className={`text-[10px] font-mono ${api.status >= 200 && api.status < 300 ? 'text-green-400' : 'text-orange-400'}`}>
-                                    {api.status || 'ERR'}
-                                  </span>
-                                  <span className="text-[10px] text-gray-500 font-mono w-10 text-right">{api.latency}ms</span>
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </CardContent>
-                      </Card>
-
-                      {/* Environment/Browser Checks */}
-                      <Card className="bg-gray-800/30 border-gray-700">
-                        <CardHeader className="p-4 pb-2">
-                          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                            <LayoutDashboard className="w-4 h-4 text-purple-400" />
-                            Browser & Env Checks
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4 pt-0 space-y-2">
-                          {diagnosticResult?.envChecks.map((check, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-2 rounded bg-gray-900/40 border border-gray-700/30">
-                              <div className="flex items-center gap-2">
-                                {check.ok ? <Shield className="w-3.5 h-3.5 text-green-500" /> : <Shield className="w-3.5 h-3.5 text-red-500" />}
-                                <span className="text-xs text-gray-200">{check.key}</span>
-                              </div>
-                              <span className={`text-[10px] ${check.ok ? 'text-green-400' : 'text-red-400'}`}>{check.detail}</span>
-                            </div>
-                          ))}
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Browser Console Logs */}
                     <div>
-                      <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                        <History className="w-4 h-4 text-orange-400" />
-                        Live Error & Event Logs
-                      </h3>
-                      <div className="rounded-xl border border-gray-700 bg-gray-950/50 overflow-hidden">
-                        <div className="max-h-60 overflow-y-auto font-mono text-[11px] p-2 space-y-1">
-                          {diagnosticResult && diagnosticResult.consoleErrors.length === 0 && diagnosticResult.networkErrors.length === 0 && (
-                            <div className="py-8 text-center text-gray-600 italic">
-                              Tidak ada log error yang terekam. Sistem berjalan bersih.
-                            </div>
-                          )}
-
-                          {/* Console Errors */}
-                          {diagnosticResult?.consoleErrors.map((log, i) => (
-                            <div key={`console-${i}`} className={`p-2 rounded ${log.type === 'error' ? 'bg-red-500/10 border-l-2 border-red-500' : 'bg-yellow-500/10 border-l-2 border-yellow-500'}`}>
-                              <div className="flex items-center justify-between opacity-50 mb-1">
-                                <span className="uppercase text-[9px] font-bold">{log.type}</span>
-                                <span>{new Date(log.ts).toLocaleTimeString()}</span>
-                              </div>
-                              <p className={log.type === 'error' ? 'text-red-200' : 'text-yellow-200'}>{log.msg}</p>
-                              {log.stack && (
-                                <details className="mt-1">
-                                  <summary className="cursor-pointer text-gray-500 text-[9px] hover:text-gray-400">View Stacktrace</summary>
-                                  <pre className="p-2 mt-1 bg-black/40 rounded text-[9px] text-gray-500 whitespace-pre-wrap">{log.stack}</pre>
-                                </details>
-                              )}
-                            </div>
-                          ))}
-
-                          {/* Network Errors */}
-                          {diagnosticResult?.networkErrors.map((net, i) => (
-                            <div key={`net-${i}`} className="p-2 rounded bg-orange-500/10 border-l-2 border-orange-500">
-                              <div className="flex items-center justify-between opacity-50 mb-1">
-                                <span className="uppercase text-[9px] font-bold">NETWORK FAILURE</span>
-                                <span>{new Date(net.ts).toLocaleTimeString()}</span>
-                              </div>
-                              <p className="text-orange-200">Failed to fetch: {net.url}</p>
-                              <div className="flex gap-2 mt-1 text-[9px]">
-                                <span className="text-red-400">Status: {net.status || 'CONNECTION_FAILED'}</span>
-                                <span className="text-gray-500">|</span>
-                                <span className="text-gray-500">Latency: {net.duration}ms</span>
-                              </div>
-                            </div>
-                          ))}
-
-                          {/* Unhandled Rejections */}
-                          {diagnosticResult?.rejections.map((rej, i) => (
-                            <div key={`rej-${i}`} className="p-2 rounded bg-purple-500/10 border-l-2 border-purple-500">
-                              <div className="flex items-center justify-between opacity-50 mb-1">
-                                <span className="uppercase text-[9px] font-bold">PROMISE REJECTION</span>
-                                <span>{new Date(rej.ts).toLocaleTimeString()}</span>
-                              </div>
-                              <p className="text-purple-200">{rej.reason}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                      <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                        Diagnosa Sistem
+                        {diagnosticLoading && (
+                          <Badge variant="outline" className="animate-pulse bg-orange-500/10 text-orange-400 border-orange-500/20 text-[10px]">
+                            SCANNING...
+                          </Badge>
+                        )}
+                      </DialogTitle>
+                      <DialogDescription className="text-gray-400">
+                        Pemeriksaan kesehatan API, konektivitas, dan log aplikasi secara real-time.
+                      </DialogDescription>
                     </div>
                   </div>
-                </ScrollArea>
-
-                <DialogFooter className="p-6 bg-gray-950/30 border-t border-gray-700">
-                  <div className="flex w-full items-center justify-between">
+                  <div className="flex items-center gap-2">
                     {diagnosticResult && (
-                      <div className="text-[10px] text-gray-500 flex items-center gap-1.5">
-                        <Clock className="w-3 h-3" />
-                        Terakhir diperiksa: {new Date(diagnosticResult.ranAt).toLocaleString('id-ID')}
-                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCopyFullDiagnosticReport}
+                        className="gap-2 bg-gray-800 border-gray-700 hover:bg-gray-700 text-xs"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        Salin Laporan
+                      </Button>
                     )}
-                    <Button onClick={() => setShowDiagnosticDialog(false)} className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-8">
-                      Tutup
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRunDiagnostic()}
+                      disabled={diagnosticLoading}
+                      className="gap-2 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${diagnosticLoading ? 'animate-spin' : ''}`} />
+                      Reset
                     </Button>
                   </div>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                </div>
+              </DialogHeader>
 
-            {/* Print Loading Dialog */}
-            <PrintLoadingDialog
-              open={showPrintDialog}
-              onClose={handlePrintDialogClose}
-              fileId={printDialogFileId}
-              fileName={printDialogFileName}
-              fileType={printDialogFileType}
-              onComplete={handlePrintComplete}
-            />
+              <ScrollArea className="flex-1 p-6 pt-4">
+                <div className="space-y-6">
+                  {/* Summary Stats */}
+                  {diagnosticResult && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="bg-gray-800/50 border border-gray-700/50 p-3 rounded-xl">
+                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">Status Lulus</p>
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          <span className="text-lg font-bold">{diagnosticResult.summary.passed}/{diagnosticResult.summary.total}</span>
+                        </div>
+                      </div>
+                      <div className="bg-gray-800/50 border border-gray-700/50 p-3 rounded-xl">
+                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">Error Konsol</p>
+                        <div className="flex items-center gap-2">
+                          <XCircle className={`w-4 h-4 ${diagnosticResult.consoleErrors.filter(e => e.type === 'error').length > 0 ? 'text-red-500' : 'text-gray-500'}`} />
+                          <span className="text-lg font-bold">{diagnosticResult.consoleErrors.filter(e => e.type === 'error').length}</span>
+                        </div>
+                      </div>
+                      <div className="bg-gray-800/50 border border-gray-700/50 p-3 rounded-xl">
+                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">Gagal Jaringan</p>
+                        <div className="flex items-center gap-2">
+                          <CloudOff className={`w-4 h-4 ${diagnosticResult.networkErrors.length > 0 ? 'text-orange-500' : 'text-gray-500'}`} />
+                          <span className="text-lg font-bold">{diagnosticResult.networkErrors.length}</span>
+                        </div>
+                      </div>
+                      <div className="bg-gray-800/50 border border-gray-700/50 p-3 rounded-xl">
+                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">Latency Rata-rata</p>
+                        <div className="flex items-center gap-2">
+                          <Zap className="w-4 h-4 text-yellow-500" />
+                          <span className="text-lg font-bold">
+                            {Math.round(diagnosticResult.apiHealth.reduce((acc, h) => acc + h.latency, 0) / diagnosticResult.apiHealth.length || 0)}ms
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
-            {/* Custom Highlight Animation CSS */}
-            <style jsx global>{`
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* API Health */}
+                    <Card className="bg-gray-800/30 border-gray-700">
+                      <CardHeader className="p-4 pb-2">
+                        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                          <Globe className="w-4 h-4 text-blue-400" />
+                          API Health Check
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0 space-y-2">
+                        {diagnosticLoading && !diagnosticResult ? (
+                          <div className="space-y-2 py-2">
+                            {[1, 2, 3, 4].map(i => (
+                              <div key={i} className="h-8 bg-gray-700/30 animate-pulse rounded flex items-center px-3 justify-between">
+                                <div className="w-20 h-3 bg-gray-600 rounded" />
+                                <div className="w-12 h-3 bg-gray-600 rounded" />
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          diagnosticResult?.apiHealth.map((api, idx) => (
+                            <div key={idx} className="flex items-center justify-between p-2 rounded bg-gray-900/40 border border-gray-700/30">
+                              <div className="flex items-center gap-2">
+                                {api.ok ? <Check className="w-3.5 h-3.5 text-green-500" /> : <X className="w-3.5 h-3.5 text-red-500" />}
+                                <span className={`text-xs ${api.ok ? 'text-gray-200' : 'text-red-400 font-medium'}`}>{api.endpoint}</span>
+                                {api.error && <Badge className="bg-red-500/10 text-red-400 border-red-500/20 text-[8px] h-4">{api.error}</Badge>}
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className={`text-[10px] font-mono ${api.status >= 200 && api.status < 300 ? 'text-green-400' : 'text-orange-400'}`}>
+                                  {api.status || 'ERR'}
+                                </span>
+                                <span className="text-[10px] text-gray-500 font-mono w-10 text-right">{api.latency}ms</span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Environment/Browser Checks */}
+                    <Card className="bg-gray-800/30 border-gray-700">
+                      <CardHeader className="p-4 pb-2">
+                        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                          <LayoutDashboard className="w-4 h-4 text-purple-400" />
+                          Browser & Env Checks
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0 space-y-2">
+                        {diagnosticResult?.envChecks.map((check, idx) => (
+                          <div key={idx} className="flex items-center justify-between p-2 rounded bg-gray-900/40 border border-gray-700/30">
+                            <div className="flex items-center gap-2">
+                              {check.ok ? <Shield className="w-3.5 h-3.5 text-green-500" /> : <Shield className="w-3.5 h-3.5 text-red-500" />}
+                              <span className="text-xs text-gray-200">{check.key}</span>
+                            </div>
+                            <span className={`text-[10px] ${check.ok ? 'text-green-400' : 'text-red-400'}`}>{check.detail}</span>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Browser Console Logs */}
+                  <div>
+                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <History className="w-4 h-4 text-orange-400" />
+                      Live Error & Event Logs
+                    </h3>
+                    <div className="rounded-xl border border-gray-700 bg-gray-950/50 overflow-hidden">
+                      <div className="max-h-60 overflow-y-auto font-mono text-[11px] p-2 space-y-1">
+                        {diagnosticResult && diagnosticResult.consoleErrors.length === 0 && diagnosticResult.networkErrors.length === 0 && (
+                          <div className="py-8 text-center text-gray-600 italic">
+                            Tidak ada log error yang terekam. Sistem berjalan bersih.
+                          </div>
+                        )}
+
+                        {/* Console Errors */}
+                        {diagnosticResult?.consoleErrors.map((log, i) => (
+                          <div key={`console-${i}`} className={`p-2 rounded ${log.type === 'error' ? 'bg-red-500/10 border-l-2 border-red-500' : 'bg-yellow-500/10 border-l-2 border-yellow-500'}`}>
+                            <div className="flex items-center justify-between opacity-50 mb-1">
+                              <span className="uppercase text-[9px] font-bold">{log.type}</span>
+                              <span>{new Date(log.ts).toLocaleTimeString()}</span>
+                            </div>
+                            <p className={log.type === 'error' ? 'text-red-200' : 'text-yellow-200'}>{log.msg}</p>
+                            {log.stack && (
+                              <details className="mt-1">
+                                <summary className="cursor-pointer text-gray-500 text-[9px] hover:text-gray-400">View Stacktrace</summary>
+                                <pre className="p-2 mt-1 bg-black/40 rounded text-[9px] text-gray-500 whitespace-pre-wrap">{log.stack}</pre>
+                              </details>
+                            )}
+                          </div>
+                        ))}
+
+                        {/* Network Errors */}
+                        {diagnosticResult?.networkErrors.map((net, i) => (
+                          <div key={`net-${i}`} className="p-2 rounded bg-orange-500/10 border-l-2 border-orange-500">
+                            <div className="flex items-center justify-between opacity-50 mb-1">
+                              <span className="uppercase text-[9px] font-bold">NETWORK FAILURE</span>
+                              <span>{new Date(net.ts).toLocaleTimeString()}</span>
+                            </div>
+                            <p className="text-orange-200">Failed to fetch: {net.url}</p>
+                            <div className="flex gap-2 mt-1 text-[9px]">
+                              <span className="text-red-400">Status: {net.status || 'CONNECTION_FAILED'}</span>
+                              <span className="text-gray-500">|</span>
+                              <span className="text-gray-500">Latency: {net.duration}ms</span>
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Unhandled Rejections */}
+                        {diagnosticResult?.rejections.map((rej, i) => (
+                          <div key={`rej-${i}`} className="p-2 rounded bg-purple-500/10 border-l-2 border-purple-500">
+                            <div className="flex items-center justify-between opacity-50 mb-1">
+                              <span className="uppercase text-[9px] font-bold">PROMISE REJECTION</span>
+                              <span>{new Date(rej.ts).toLocaleTimeString()}</span>
+                            </div>
+                            <p className="text-purple-200">{rej.reason}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </ScrollArea>
+
+              <DialogFooter className="p-6 bg-gray-950/30 border-t border-gray-700">
+                <div className="flex w-full items-center justify-between">
+                  {diagnosticResult && (
+                    <div className="text-[10px] text-gray-500 flex items-center gap-1.5">
+                      <Clock className="w-3 h-3" />
+                      Terakhir diperiksa: {new Date(diagnosticResult.ranAt).toLocaleString('id-ID')}
+                    </div>
+                  )}
+                  <Button onClick={() => setShowDiagnosticDialog(false)} className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-8">
+                    Tutup
+                  </Button>
+                </div>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Print Loading Dialog */}
+          <PrintLoadingDialog
+            open={showPrintDialog}
+            onClose={handlePrintDialogClose}
+            fileId={printDialogFileId}
+            fileName={printDialogFileName}
+            fileType={printDialogFileType}
+            onComplete={handlePrintComplete}
+          />
+
+          {/* Custom Highlight Animation CSS */}
+          <style jsx global>{`
         @keyframes aesthetic-row-glow {
           0% { box-shadow: 0 0 5px rgba(249, 115, 22, 0.1); background-color: rgba(249, 115, 22, 0.02); }
           50% { box-shadow: inset 0 0 25px rgba(249, 115, 22, 0.15); background-color: rgba(249, 115, 22, 0.06); }
