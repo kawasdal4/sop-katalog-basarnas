@@ -8271,20 +8271,38 @@ export default function ESOPApp() {
                                               <Clock className="w-3 h-3 text-slate-600" />
                                               <span>{new Date(sop.uploadedAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                                             </div>
-                                            {sop.updatedAt && new Date(sop.updatedAt).getTime() !== new Date(sop.uploadedAt).getTime() && (
-                                              <TooltipProvider delayDuration={200}>
-                                                <Tooltip>
-                                                  <TooltipTrigger asChild>
-                                                    <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/15 text-amber-400/90 cursor-help transition-colors hover:bg-amber-500/20">
-                                                      <Edit3 className="w-2.5 h-2.5 flex-shrink-0" />
-                                                      <span className="truncate max-w-[280px]">
-                                                        Diedit oleh&nbsp;
-                                                        <span className="font-black text-amber-300">{sop.updatedByUser?.name || sop.updatedBy || 'Admin'}</span>
+                                            {(() => {
+                                              const isEdited = sop.updatedAt && new Date(sop.updatedAt).getTime() !== new Date(sop.uploadedAt).getTime();
+                                              const editBadge = (
+                                                <div className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border transition-colors ${
+                                                  isEdited 
+                                                    ? 'bg-amber-500/10 border-amber-500/15 text-amber-400/90 cursor-help hover:bg-amber-500/20' 
+                                                    : 'bg-slate-500/10 border-slate-500/20 text-slate-400'
+                                                }`}>
+                                                  <Edit3 className="w-2.5 h-2.5 flex-shrink-0" />
+                                                  <span className="truncate max-w-[280px]">
+                                                    Diedit oleh&nbsp;
+                                                    <span className={`font-black ${isEdited ? 'text-amber-300' : 'text-slate-300'}`}>
+                                                      {isEdited ? (sop.updatedByUser?.name || sop.updatedBy || 'Admin') : '-'}
+                                                    </span>
+                                                    {isEdited && (
+                                                      <>
                                                         &nbsp;·&nbsp;
-                                                        {new Date(sop.updatedAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                                      </span>
-                                                    </div>
-                                                  </TooltipTrigger>
+                                                        {new Date(sop.updatedAt!).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                      </>
+                                                    )}
+                                                  </span>
+                                                </div>
+                                              );
+
+                                              if (!isEdited) return editBadge;
+
+                                              return (
+                                                <TooltipProvider delayDuration={200}>
+                                                  <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                      {editBadge}
+                                                    </TooltipTrigger>
                                                   <TooltipContent side="top" className="bg-slate-900 border-amber-500/20 p-3 max-w-[280px] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.7)] shadow-amber-500/10 rounded-xl z-50 backdrop-blur-md">
                                                     <div className="flex flex-col gap-1.5">
                                                       <div className="flex items-center gap-2 mb-1 border-b border-slate-700/50 pb-2">
