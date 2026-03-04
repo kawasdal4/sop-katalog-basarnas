@@ -13,7 +13,17 @@ export function validateEnv() {
         'R2_BUCKET_NAME',
     ]
 
-    const missing = required.filter((key) => !process.env[key])
+    const missing = required.filter((key) => {
+        // Access key check (allow R2_ACCESS_KEY_ID or R2_ACCESS_KEY)
+        if (key === 'R2_ACCESS_KEY_ID') {
+            return !process.env.R2_ACCESS_KEY_ID && !process.env.R2_ACCESS_KEY
+        }
+        // Secret key check (allow R2_SECRET_ACCESS_KEY or R2_SECRET_KEY)
+        if (key === 'R2_SECRET_ACCESS_KEY') {
+            return !process.env.R2_SECRET_ACCESS_KEY && !process.env.R2_SECRET_KEY
+        }
+        return !process.env[key]
+    })
 
     if (missing.length > 0) {
         const errorMsg = `❌ Missing required environment variables: ${missing.join(', ')}`
