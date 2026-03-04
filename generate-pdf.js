@@ -11,6 +11,26 @@ const path = require('path');
     console.log('Parsing Markdown ke HTML...');
     let htmlContent = marked.parse(md);
 
+    // Parse and replace any local images (e.g., ./screenshots/...) with base64 URIs
+    console.log('Menginjeksi gambar lokal (screenshots) ke Base64 URI...');
+    const localImgRegex = /<img[^>]*src="(\.\/screenshots\/[^"]+)"[^>]*>/g;
+    let match;
+    while ((match = localImgRegex.exec(htmlContent)) !== null) {
+      const fullImgTag = match[0];
+      const relativePath = match[1];
+      const absolutePath = path.resolve(__dirname, 'public', relativePath.replace('./', ''));
+      if (fs.existsSync(absolutePath)) {
+        const ext = path.extname(absolutePath).substring(1);
+        const mimeType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'image/png';
+        const imgBase64 = fs.readFileSync(absolutePath).toString('base64');
+        const dataUri = `data:${mimeType};base64,${imgBase64}`;
+        htmlContent = htmlContent.replace(relativePath, dataUri);
+        console.log(`✅ Berhasil menginjeksi gambar: ${relativePath}`);
+      } else {
+        console.log(`⚠️ Gambar tidak ditemukan: ${absolutePath}`);
+      }
+    }
+
     // Inject custom CSS styling
     const fullHtml = `
       <!DOCTYPE html>
@@ -63,7 +83,7 @@ const path = require('path');
 
     const page = await browser.newPage();
 
-    await page.setContent(fullHtml, { waitUntil: ['networkidle0', 'load', 'domcontentloaded'] });
+    await page.setContent(fullHtml, { waitUntil: ['load', 'domcontentloaded'], timeout: 60000 });
 
     console.log('Merender PDF...');
     await page.pdf({

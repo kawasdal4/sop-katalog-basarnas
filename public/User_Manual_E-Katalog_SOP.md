@@ -11,6 +11,36 @@ date: "2026"
 
 <div style="page-break-after: always;"></div>
 
+<!-- COPYRIGHT PAGE -->
+<div style="margin-top: 50px; padding: 40px; border-left: 5px solid #E85D22; background-color: #f8fafc; border-radius: 8px;">
+  <h2 style="color: #1A2B4C; font-size: 28px; font-weight: 800; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">HAK CIPTA & KEPEMILIKAN</h2>
+  
+  <p style="font-size: 14px; color: #475569; line-height: 1.8;">
+    &copy; 2026 FOE - All Rights Reserved.<br/>
+    <strong>Badan Nasional Pencarian dan Pertolongan (BASARNAS)</strong>
+  </p>
+  
+  <div style="margin-top: 30px; display: flex; align-items: start; gap: 15px;">
+    <div style="background: #E85D22; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px;">!</div>
+    <div>
+      <h3 style="margin: 0 0 5px 0; color: #1e293b; font-size: 16px;">Peringatan Hukum</h3>
+      <p style="margin: 0; font-size: 13px; color: #64748b; line-height: 1.6;">
+        Hak cipta dilindungi undang-undang. Dilarang keras mereproduksi, menyalin, mendistribusikan, atau memodifikasi seluruh maupun sebagian isi dokumen aplikasi <strong>Web App E-Katalog SOP dan IK</strong> tanpa rujukan dan otorisasi tertulis dari Direktorat Kesiapsiagaan.
+      </p>
+    </div>
+  </div>
+
+  <div style="margin-top: 30px; padding-top: 20px; border-top: 1px dashed #cbd5e1;">
+    <p style="margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.6;">
+      <strong>Developed & Maintained by:</strong><br/>
+      Muhammad Fuadunnas, S.I.Kom., M.IKom.<br/>
+      PKPP Ahli Muda &ndash; Direktorat Kesiapsiagaan
+    </p>
+  </div>
+</div>
+
+<div style="page-break-after: always;"></div>
+
 # KATA PENGANTAR
 
 Puji syukur kami panjatkan ke hadirat Tuhan Yang Maha Esa atas terselesaikannya penyusunan **Buku Manual (User Manual) Web App E-Katalog SOP dan IK**. Buku saku ini disusun sebagai panduan komprehensif bagi seluruh pengguna dalam mengoperasikan aplikasi katalog Standar Operasional Prosedur (SOP) dan Instruksi Kerja (IK) di lingkungan Direktorat Kesiapsiagaan, Badan Nasional Pencarian dan Pertolongan (BASARNAS).
@@ -106,7 +136,8 @@ Keamanan organisasi dilindungi melalui manajemen identitas dan hak akses secara 
 3. Tekan tombol `Enter` pada keyboard Anda. Panel publik **Web App E-Katalog SOP dan IK** akan segera tampil.
    
    <div style="width: 100%; border: 1px dashed #ccc; padding: 10px; margin: 10px 0; background: #fafafa; color: #555; text-align: center;">
-     [Gambar: Placeholder Screenshot Halaman Akses Publik]
+     <img src="./screenshots/1_akses_publik.jpg" alt="Screenshot Halaman Akses Publik" style="max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);" />
+     <p style="font-size: 12px; font-style: italic; margin-top: 10px;">Gambar 1: Tampilan Awal / Akses Publik Katalog SOP</p>
    </div>
 
 ## 3.2 Proses Login
@@ -144,8 +175,39 @@ Ketika masuk, sistem memperlihatkan jajaran analitik yang tersusun atas komponen
 2. **Kartu Statistik Ringkas (Counter Cards)**: Menyajikan nilai *summary* total jumlah SOP dan IK terunggah, jumlah draft tertunda, serta total arsip dinamis pada penyimpanan. Efek animasi *responsive* diterapkan supaya metrik informatif.
 3. **Analytics Chart (Diagram Bersusun)**: Diagram lingkaran (*pie chart*) untuk menunjukkan komposisi persentase jumlah kategori SOP dan juga diagram grafik fluktuasi riwayat unduhan bulanan dokumen.
 
-   <div style="width: 100%; border: 1px dashed #ccc; padding: 10px; margin: 10px 0; background: #fafafa; color: #555; text-align: center;">
-     [Gambar: Placeholder Screenshot Tampilan Dashboard dan Diagram]
+   <div style="width: 100%; margin: 15px 0; background: #0f172a; border-radius: 8px; overflow: hidden; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);">
+     <div style="background: #1e293b; padding: 10px 15px; border-bottom: 1px solid #334155; display: flex; align-items: center; justify-content: space-between;">
+       <div style="color: #f1f5f9; font-weight: bold; font-size: 14px;">Dashboard Analytics</div>
+       <div style="color: #94a3b8; font-size: 11px;">Update Terakhir: Hari ini</div>
+     </div>
+     <div style="padding: 20px; display: flex; gap: 15px;">
+       <div style="flex: 1; background: #1e293b; border-radius: 6px; padding: 15px; border-left: 4px solid #3b82f6;">
+         <div style="color: #94a3b8; font-size: 11px; margin-bottom: 5px;">TOTAL SOP</div>
+         <div style="color: #f1f5f9; font-size: 24px; font-weight: 800;">128</div>
+       </div>
+       <div style="flex: 1; background: #1e293b; border-radius: 6px; padding: 15px; border-left: 4px solid #eab308;">
+         <div style="color: #94a3b8; font-size: 11px; margin-bottom: 5px;">DRAFT PENDING</div>
+         <div style="color: #f1f5f9; font-size: 24px; font-weight: 800;">12</div>
+       </div>
+       <div style="flex: 1; background: #1e293b; border-radius: 6px; padding: 15px; border-left: 4px solid #22c55e;">
+         <div style="color: #94a3b8; font-size: 11px; margin-bottom: 5px;">SOP TERPUBLIKASI</div>
+         <div style="color: #f1f5f9; font-size: 24px; font-weight: 800;">116</div>
+       </div>
+     </div>
+     <div style="padding: 0 20px 20px 20px; display: flex; gap: 15px;">
+        <div style="flex: 1.5; background: #1e293b; border-radius: 6px; padding: 15px; height: 120px; display: flex; align-items: flex-end; gap: 10px;">
+           <div style="width: 15%; background: #3b82f6; height: 40%; border-radius: 4px 4px 0 0;"></div>
+           <div style="width: 15%; background: #3b82f6; height: 70%; border-radius: 4px 4px 0 0;"></div>
+           <div style="width: 15%; background: #3b82f6; height: 50%; border-radius: 4px 4px 0 0;"></div>
+           <div style="width: 15%; background: #3b82f6; height: 90%; border-radius: 4px 4px 0 0;"></div>
+           <div style="width: 15%; background: #3b82f6; height: 60%; border-radius: 4px 4px 0 0;"></div>
+           <div style="width: 15%; background: #E85D22; height: 100%; border-radius: 4px 4px 0 0;"></div>
+        </div>
+        <div style="flex: 1; background: #1e293b; border-radius: 6px; padding: 15px; display: flex; align-items: center; justify-content: center;">
+           <div style="width: 80px; height: 80px; border-radius: 50%; border: 12px solid #3b82f6; border-top-color: #E85D22; border-right-color: #eab308; transform: rotate(45deg);"></div>
+        </div>
+     </div>
+     <p style="font-size: 12px; font-style: italic; margin-top: 5px; color: #94a3b8; text-align: center; padding-bottom: 10px;">Gambar 2: Representasi Visual Dashboard & Statistik SOP</p>
    </div>
 
 ## 4.2 Fungsi Setiap Menu
@@ -213,8 +275,35 @@ Agar organisasi menjaga kualitas pengarsipan terakreditasi, aplikasi menawarkan 
 2. Membentuk rincian dokumen hingga meletakkan salinan pendukungnya. 
 3. Saat disubmit, sistem menyita entitas dokumen pada tab terpisah bernama **Draft / Menunggu (Pending)**. Dokumen User **TIDAK AKAN** tampil di halaman layar Publik Katalog sebelum diijinkan Admin.
 
-   <div style="width: 100%; border: 1px dashed #ccc; padding: 10px; margin: 10px 0; background: #fafafa; color: #555; text-align: center;">
-     [Gambar: Placeholder Screenshot Status Pending dan Skenario Approve]
+   <div style="width: 100%; margin: 15px 0; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+     <table style="width: 100%; border-collapse: collapse; text-align: left;">
+       <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+         <th style="padding: 12px 15px; color: #64748b; font-size: 12px;">ID PENGAJUAN</th>
+         <th style="padding: 12px 15px; color: #64748b; font-size: 12px;">JUDUL SOP</th>
+         <th style="padding: 12px 15px; color: #64748b; font-size: 12px;">STATUS</th>
+         <th style="padding: 12px 15px; color: #64748b; font-size: 12px;">AKSI ADMIN</th>
+       </tr>
+       <tr style="border-bottom: 1px solid #f1f5f9;">
+         <td style="padding: 12px 15px; font-size: 13px; font-weight: bold; color: #0f172a;">#SOP-2026-001</td>
+         <td style="padding: 12px 15px; font-size: 13px; color: #334155;">Prosedur Evakuasi Udara</td>
+         <td style="padding: 12px 15px;">
+           <span style="background: #fef9c3; color: #a16207; padding: 4px 8px; border-radius: 12px; font-size: 10px; font-weight: bold;">PENDING</span>
+         </td>
+         <td style="padding: 12px 15px;">
+           <span style="background: #22c55e; color: white; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; display: inline-block; margin-right: 5px;">✔ Terima</span>
+           <span style="background: #ef4444; color: white; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; display: inline-block;">✖ Tolak</span>
+         </td>
+       </tr>
+       <tr>
+         <td style="padding: 12px 15px; font-size: 13px; font-weight: bold; color: #0f172a;">#IK-2026-002</td>
+         <td style="padding: 12px 15px; font-size: 13px; color: #334155;">Instruksi Kerja Telekomunikasi Lapangan</td>
+         <td style="padding: 12px 15px;">
+           <span style="background: #dcfce3; color: #166534; padding: 4px 8px; border-radius: 12px; font-size: 10px; font-weight: bold;">DISETUJUI</span>
+         </td>
+         <td style="padding: 12px 15px; color: #94a3b8; font-size: 11px; font-style: italic;">Selesai</td>
+       </tr>
+     </table>
+     <p style="font-size: 12px; font-style: italic; margin-top: 15px; color: #64748b; text-align: center; padding-bottom: 10px;">Gambar 3: Skema Tabel Status Pengajuan & Aksi Persetujuan</p>
    </div>
 
 ## 6.2 Proses Persetujuan Oleh Admin
