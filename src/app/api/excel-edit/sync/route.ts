@@ -16,17 +16,13 @@ import {
   getFileMetadata
 } from '@/lib/graph-api'
 import { isAzureConfigured } from '@/lib/azure-auth'
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { uploadToR2, isR2Configured } from '@/lib/r2-storage'
 import { db } from '@/lib/db'
 import { cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
 
-// R2 Configuration
-const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || process.env.CLOUDFLARE_ACCOUNT_ID
-const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY
-const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_KEY
-const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || process.env.CLOUDFLARE_BUCKET_NAME
+// Cron configuration
 const CRON_SECRET = process.env.CRON_SECRET || 'default-cron-secret'
 
 // Content types for Excel and Word files
@@ -47,25 +43,7 @@ interface SyncResult {
   error?: string
 }
 
-// Check R2 configuration
-function isR2Configured(): boolean {
-  return !!(R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_NAME)
-}
 
-// Get R2 client (lazy initialization)
-function getR2Client() {
-  if (!isR2Configured()) {
-    throw new Error('R2 credentials not configured')
-  }
-  return new S3Client({
-    region: 'auto',
-    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId: R2_ACCESS_KEY_ID!,
-      secretAccessKey: R2_SECRET_ACCESS_KEY!,
-    },
-  })
-}
 
 /**
  * GET - Cron-triggered sync check
@@ -162,11 +140,11 @@ export async function POST(request: NextRequest) {
 
     if (driveItemId) {
       // Sync specific file
-      const result = await syncSpecificFile(driveItemId)
+      const result = await syncSpecificFile(driveItemId, userId)
       results = [result]
     } else {
       // Sync all files
-      results = await syncAllFiles()
+      results = await syncAllFiles(userId)
     }
 
     // Log activity
@@ -203,7 +181,7 @@ export async function POST(request: NextRequest) {
 /**
  * Sync a specific file by driveItemId
  */
-async function syncSpecificFile(driveItemId: string): Promise<SyncResult> {
+async function syncSpecificFile(driveItemId: string, userId?: string): Promise<SyncResult> {
   console.log(`📥 Syncing specific file: ${driveItemId}`)
 
   // Get file metadata
@@ -211,13 +189,13 @@ async function syncSpecificFile(driveItemId: string): Promise<SyncResult> {
   const fileName = fileMetadata.name
   const description = fileMetadata.description || ''
 
-  return syncFileToR2(driveItemId, fileName, description)
+  return syncFileToR2(driveItemId, fileName, description, userId)
 }
 
 /**
  * Sync all files from OneDrive edit folder to R2
  */
-async function syncAllFiles(): Promise<SyncResult[]> {
+async function syncAllFiles(userId?: string): Promise<SyncResult[]> {
   const results: SyncResult[] = []
 
   // List all files in edit folder
@@ -238,7 +216,7 @@ async function syncAllFiles(): Promise<SyncResult[]> {
         continue
       }
 
-      const result = await syncFileToR2(file.id, file.name, file.description || '')
+      const result = await syncFileToR2(file.id, file.name, file.description || '', userId)
       results.push(result)
 
     } catch (error) {
@@ -263,7 +241,8 @@ async function syncAllFiles(): Promise<SyncResult[]> {
 async function syncFileToR2(
   driveItemId: string,
   fileName: string,
-  description: string
+  description: string,
+  userId?: string
 ): Promise<SyncResult> {
   // Parse R2 path from metadata
   const parsedMeta = parseFileMetadata(description)
@@ -285,23 +264,18 @@ async function syncFileToR2(
   const fileExt = fileName.split('.').pop()?.toLowerCase() || 'xlsx'
   const contentType = CONTENT_TYPES[fileExt] || CONTENT_TYPES.xlsx
 
-  // Get R2 client
-  const r2Client = getR2Client()
+  // Convert ArrayBuffer to Buffer for uploadToR2
+  const buffer = Buffer.from(fileContent)
 
-  // Upload to R2
-  const putCommand = new PutObjectCommand({
-    Bucket: R2_BUCKET_NAME!,
-    Key: r2Path,
-    Body: new Uint8Array(fileContent),
-    ContentType: contentType,
-    Metadata: {
+  // Upload to R2 using centralized method
+  await uploadToR2(buffer, fileName, contentType, {
+    key: r2Path,
+    metadata: {
       'synced-from': 'onedrive',
       'synced-at': new Date().toISOString(),
       'original-drive-item': driveItemId,
-    },
+    }
   })
-
-  await r2Client.send(putCommand)
   console.log(`✅ Uploaded to R2: ${r2Path} (${fileContent.byteLength} bytes)`)
 
   // Trigger FILE_UPDATED notification to all users (Async)
@@ -313,10 +287,15 @@ async function syncFileToR2(
     })
 
     if (sopFile) {
-      // Update timestamp
+      // Update timestamp and last editor
+      const updateData: any = { updatedAt: new Date() }
+      if (userId) {
+        updateData.updatedBy = userId
+      }
+
       await db.sopFile.update({
         where: { id: sopFile.id },
-        data: { updatedAt: new Date() }
+        data: updateData
       })
 
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://e-katalog-sop.cloud';

@@ -117,7 +117,16 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         user: { select: { name: true, email: true } },
-        updatedByUser: { select: { name: true, email: true } }
+        updatedByUser: { select: { name: true, email: true } },
+        logs: {
+          where: {
+            aktivitas: {
+              in: ['UPDATE_FILE', 'EXCEL_EDIT_SYNC', 'EDIT_METADATA', 'VERIFIKASI', 'EDIT_STATUS']
+            }
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        }
       },
       orderBy,
       skip: (page - 1) * limit,
@@ -642,6 +651,7 @@ export async function PUT(request: NextRequest) {
         if (judul && judul !== existingSop.judul) {
           changes.push(`judul: "${existingSop.judul}" → "${judul}"`)
         }
+        if (nomorSop !== undefined && nomorSop !== existingSop.nomorSop) changes.push(`nomor: ${existingSop.nomorSop || '-'} → ${nomorSop || '-'}`)
         if (kategori && kategori !== existingSop.kategori) changes.push(`kategori: ${existingSop.kategori} → ${kategori}`)
         if (jenis && jenis !== existingSop.jenis) changes.push(`jenis: ${existingSop.jenis} → ${jenis}`)
         if (lingkup !== undefined && lingkup !== existingSop.lingkup) changes.push(`lingkup: ${existingSop.lingkup || '-'} → ${lingkup || '-'}`)

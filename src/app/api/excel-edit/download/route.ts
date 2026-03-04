@@ -11,30 +11,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { cookies } from 'next/headers'
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3'
-import { createHash } from 'crypto'
+import { downloadFromR2 } from '@/lib/r2-storage'
 import {
   checkFileLock,
   createEditSession,
   calculateHash,
   getLastEditor
 } from '@/lib/file-lock-service'
-
-// R2 Configuration
-const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID!
-const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY!
-const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_KEY!
-const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME!
-
-// Initialize R2 client
-const r2Client = new S3Client({
-  region: 'auto',
-  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: R2_ACCESS_KEY_ID,
-    secretAccessKey: R2_SECRET_ACCESS_KEY,
-  },
-})
 
 // Content types for Excel and Word files
 const CONTENT_TYPES: Record<string, string> = {
@@ -64,56 +47,56 @@ function sanitizeFileName(name: string): string {
  */
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
-  
+
   try {
     // ============================================
     // STEP 1: Authentication Check
     // ============================================
     const cookieStore = await cookies()
     const userId = cookieStore.get('userId')?.value
-    
+
     if (!userId) {
       return NextResponse.json({
         success: false,
         error: 'Unauthorized - Silakan login terlebih dahulu',
       }, { status: 401 })
     }
-    
+
     const user = await db.user.findUnique({
       where: { id: userId },
       select: { role: true, name: true, email: true },
     })
-    
+
     if (!user || user.role !== 'ADMIN' && user.role !== 'DEVELOPER') {
       return NextResponse.json({
         success: false,
         error: 'Forbidden - Hanya admin yang dapat mengedit file',
       }, { status: 403 })
     }
-    
+
     // ============================================
     // STEP 2: Validate Request
     // ============================================
     const body = await request.json()
     const { objectKey, fileId, sopNumber, sopTitle } = body
-    
+
     if (!objectKey) {
       return NextResponse.json({
         success: false,
         error: 'objectKey diperlukan',
       }, { status: 400 })
     }
-    
+
     // ============================================
     // STEP 3: Check File Lock
     // ============================================
     console.log(`🔒 [Download] Checking lock for: ${objectKey}`)
-    
+
     const lockCheck = await checkFileLock(objectKey, userId)
-    
+
     if (!lockCheck.canProceed) {
       console.log(`⚠️ [Download] File is locked: ${lockCheck.message}`)
-      
+
       return NextResponse.json({
         success: false,
         error: 'FILE_LOCKED',
@@ -121,18 +104,18 @@ export async function POST(request: NextRequest) {
         lockedBy: lockCheck.lockedBy
       }, { status: 423 }) // 423 Locked
     }
-    
+
     // If locked by same user, warn but allow
     if (lockCheck.isLocked && lockCheck.lockedBy) {
       console.log(`ℹ️ [Download] User has existing session`)
     }
-    
+
     // ============================================
     // STEP 4: Download from R2
     // ============================================
     const originalFileName = objectKey.split('/').pop() || objectKey
     const fileExt = originalFileName.split('.').pop()?.toLowerCase() || 'xlsx'
-    
+
     // Validate file type
     if (!['xlsx', 'xls', 'xlsm', 'docx', 'doc'].includes(fileExt)) {
       return NextResponse.json({
@@ -140,33 +123,28 @@ export async function POST(request: NextRequest) {
         error: 'Hanya file Excel (.xlsx, .xls, .xlsm) dan Word (.docx, .doc) yang dapat diedit',
       }, { status: 400 })
     }
-    
+
     console.log(`📥 [Download] Starting download for: ${objectKey}`)
-    
-    const getCommand = new GetObjectCommand({
-      Bucket: R2_BUCKET_NAME,
-      Key: objectKey,
-    })
-    
-    const r2Response = await r2Client.send(getCommand)
-    
-    if (!r2Response.Body) {
+
+    let fileBuffer: Buffer
+    try {
+      const { buffer } = await downloadFromR2(objectKey)
+      fileBuffer = buffer
+      console.log(`✅ [Download] File downloaded: ${fileBuffer.length} bytes`)
+    } catch (r2Error) {
+      console.error(`❌ [Download] R2 Error for key ${objectKey}:`, r2Error)
       return NextResponse.json({
         success: false,
-        error: 'File tidak ditemukan di storage',
+        error: 'File tidak ditemukan di storage (Mungkin telah dihapus atau dipindahkan)',
       }, { status: 404 })
     }
-    
-    // Convert stream to buffer
-    const fileBuffer = Buffer.from(await r2Response.Body.transformToByteArray())
-    console.log(`✅ [Download] File downloaded: ${fileBuffer.length} bytes`)
-    
+
     // ============================================
     // STEP 5: Calculate Hash
     // ============================================
     const originalHash = calculateHash(fileBuffer)
     console.log(`🔐 [Hash] Original hash: ${originalHash.slice(0, 16)}...`)
-    
+
     // ============================================
     // STEP 6: Create Edit Session (Lock the file)
     // ============================================
@@ -178,14 +156,14 @@ export async function POST(request: NextRequest) {
       user.name,
       originalHash
     )
-    
+
     console.log(`🎫 [Session] Created session: ${session.id}`)
-    
+
     // ============================================
     // STEP 7: Get Last Editor Info
     // ============================================
     const lastEditor = await getLastEditor(objectKey)
-    
+
     // ============================================
     // STEP 8: Log Activity
     // ============================================
@@ -207,7 +185,7 @@ export async function POST(request: NextRequest) {
     } catch (logError) {
       console.warn('⚠️ Failed to create log:', logError)
     }
-    
+
     // ============================================
     // STEP 9: Generate Custom Filename
     // ============================================
@@ -220,15 +198,15 @@ export async function POST(request: NextRequest) {
     } else {
       fileName = originalFileName
     }
-    
+
     // ============================================
     // STEP 10: Return File with Session
     // ============================================
     const contentType = CONTENT_TYPES[fileExt] || CONTENT_TYPES.xlsx
     const encodedFileName = encodeURIComponent(fileName)
-    
+
     console.log(`✅ [Download] Complete in ${Date.now() - startTime}ms`)
-    
+
     // Return the file with session info in headers
     return new NextResponse(fileBuffer, {
       status: 200,
@@ -247,7 +225,7 @@ export async function POST(request: NextRequest) {
         'X-Last-Editor-Time': lastEditor?.timestamp?.toISOString() || '',
       },
     })
-    
+
   } catch (error) {
     console.error('❌ [Download] Error:', error)
     return NextResponse.json({

@@ -253,7 +253,10 @@ export async function POST(request: NextRequest) {
         try {
           await db.sopFile.update({
             where: { id: existingSession.sopFileId },
-            data: { updatedAt: new Date() }
+            data: {
+              updatedAt: new Date(),
+              updatedBy: userId
+            }
           })
           console.log(`✅ [Sync] Updated SopFile timestamp`)
 

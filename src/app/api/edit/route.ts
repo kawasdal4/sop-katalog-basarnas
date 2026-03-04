@@ -10,29 +10,29 @@ export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies()
     const userId = cookieStore.get('userId')?.value
-    
+
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    
+
     const { searchParams } = new URL(request.url)
     const fileId = searchParams.get('fileId')
-    
+
     if (!fileId) {
       return NextResponse.json({ error: 'File ID required' }, { status: 400 })
     }
-    
+
     const sopFile = await db.sopFile.findUnique({
       where: { id: fileId },
     })
-    
+
     if (!sopFile) {
       return NextResponse.json({ error: 'File not found' }, { status: 404 })
     }
 
     // Check R2 configuration
     if (!isR2Configured()) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Cloudflare R2 tidak terkonfigurasi. Hubungi administrator.',
         needsSetup: true
       }, { status: 500 })
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     const isExcel = sopFile.fileName.endsWith('.xlsx') || sopFile.fileName.endsWith('.xls')
     const isWord = sopFile.fileName.endsWith('.docx') || sopFile.fileName.endsWith('.doc')
     const canEdit = isExcel || isWord
-    
+
     return NextResponse.json({
       success: true,
       mode: 'local',
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       canEdit,
       message: `Download file, edit di ${isExcel ? 'Excel' : isWord ? 'Word' : 'aplikasi'} lokal, lalu upload ulang file yang sudah diedit.`,
     })
-    
+
   } catch (error) {
     console.error('Edit GET error:', error)
     return NextResponse.json({
@@ -73,49 +73,49 @@ export async function POST(request: NextRequest) {
   try {
     const cookieStore = await cookies()
     const userId = cookieStore.get('userId')?.value
-    
+
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    
+
     const user = await db.user.findUnique({
       where: { id: userId },
       select: { role: true, name: true },
     })
-    
+
     if (!user || user.role !== 'ADMIN' && user.role !== 'DEVELOPER') {
       return NextResponse.json({ error: 'Hanya admin yang dapat mengubah file' }, { status: 403 })
     }
-    
+
     const formData = await request.formData()
     const fileId = formData.get('fileId') as string
     const file = formData.get('file') as File
-    
+
     if (!fileId || !file) {
       return NextResponse.json({ error: 'File ID dan file diperlukan' }, { status: 400 })
     }
-    
+
     const sopFile = await db.sopFile.findUnique({
       where: { id: fileId },
     })
-    
+
     if (!sopFile) {
       return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 404 })
     }
-    
+
     // Validate file type
     const originalExt = sopFile.fileName.toLowerCase().split('.').pop()
     const newExt = file.name.toLowerCase().split('.').pop()
-    
+
     if (originalExt !== newExt) {
-      return NextResponse.json({ 
-        error: `Tipe file harus sama dengan aslinya (.${originalExt})` 
+      return NextResponse.json({
+        error: `Tipe file harus sama dengan aslinya (.${originalExt})`
       }, { status: 400 })
     }
-    
+
     // Check R2 configuration
     if (!isR2Configured()) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Cloudflare R2 tidak terkonfigurasi. Hubungi administrator.',
         needsSetup: true
       }, { status: 500 })
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
 
     // Read file content
     const fileBuffer = Buffer.from(await file.arrayBuffer())
-    
+
     // Determine content type
     let contentType = 'application/octet-stream'
     if (newExt === 'xlsx') {
@@ -137,10 +137,10 @@ export async function POST(request: NextRequest) {
     } else if (newExt === 'pdf') {
       contentType = 'application/pdf'
     }
-    
+
     // Upload to R2 (overwrite existing file)
     console.log(`📤 Replacing file in R2: ${sopFile.filePath} (${fileBuffer.length} bytes)`)
-    
+
     try {
       await uploadToR2(fileBuffer, sopFile.fileName, contentType, {
         key: sopFile.filePath,
@@ -159,13 +159,16 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
-    // Update timestamp
+    // Update timestamp and last editor
     const now = new Date()
     await db.sopFile.update({
       where: { id: fileId },
-      data: { updatedAt: now }
+      data: {
+        updatedAt: now,
+        updatedBy: userId
+      }
     })
-    
+
     // Log activity
     await db.log.create({
       data: {
@@ -175,9 +178,9 @@ export async function POST(request: NextRequest) {
         fileId: sopFile.id,
       },
     })
-    
+
     const publicUrl = getR2PublicUrl(sopFile.filePath)
-    
+
     return NextResponse.json({
       success: true,
       message: `File "${file.name}" berhasil diupload dan menggantikan file lama`,
@@ -190,7 +193,7 @@ export async function POST(request: NextRequest) {
       },
       r2Url: publicUrl,
     })
-    
+
   } catch (error) {
     console.error('Replace file error:', error)
     return NextResponse.json({

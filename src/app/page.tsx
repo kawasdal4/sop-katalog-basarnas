@@ -143,6 +143,7 @@ interface SopFile {
   updatedBy?: string
   user?: { name: string }
   updatedByUser?: { name: string; email: string }
+  logs?: { aktivitas: string; deskripsi: string; createdAt: string }[]
   isPublicSubmission?: boolean
   submitterName?: string
   submitterEmail?: string
@@ -380,111 +381,130 @@ function ShimmerTitle({ children, subtitle, size = 'md' }: { children: React.Rea
   )
 }
 
-// SAR Logo Component with stunning sparkle animations that follow logo shape
+// SAR Logo — cahaya putih berputar mengikuti outline logo (mask-composite benar)
 function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
-  const sizeClasses = {
-    sm: 'w-8 h-8',
-    md: 'w-12 h-12',
-    lg: 'w-16 h-16'
+  const sizeClasses = { sm: 'w-8 h-8', md: 'w-12 h-12', lg: 'w-16 h-16' }
+  const logoUrl = 'https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/logo.png'
+  // maskUrl — path lokal, HARUS lokal agar CSS mask-image tidak diblokir CORS
+  const maskUrl = '/logo.png'
+
+  // Mask penuh logo (untuk clip shimmer & logo layer)
+  const fullMask: React.CSSProperties = {
+    WebkitMaskImage: `url(${maskUrl})`,
+    WebkitMaskSize: 'contain',
+    WebkitMaskRepeat: 'no-repeat',
+    WebkitMaskPosition: 'center',
+    maskImage: `url(${maskUrl})`,
+    maskSize: 'contain',
+    maskRepeat: 'no-repeat',
+    maskPosition: 'center',
   }
 
-  const logoUrl = 'https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/logo.png'
+  // Outline ring mask: outer logo (100%) MINUS inner logo (80%)
+  //   → hanya ring tipis ~10% di tepi logo yang terlihat → efek benar mengikuti silhouette
+  // Chrome/Safari: WebkitMaskComposite: 'source-out'
+  // Firefox:       maskComposite: 'subtract'
+  const outlineRingMask: React.CSSProperties = {
+    WebkitMaskImage: `url(${maskUrl}), url(${maskUrl})`,
+    WebkitMaskSize: '100% 100%, 80% 80%',
+    WebkitMaskRepeat: 'no-repeat, no-repeat',
+    WebkitMaskPosition: 'center, center',
+    WebkitMaskComposite: 'source-out',
+    maskImage: `url(${maskUrl}), url(${maskUrl})`,
+    maskSize: '100% 100%, 80% 80%',
+    maskRepeat: 'no-repeat, no-repeat',
+    maskPosition: 'center, center',
+    maskComposite: 'subtract',
+  }
 
   return (
     <motion.div
-      className={`relative ${sizeClasses[size]} overflow-visible`}
+      className={`relative ${sizeClasses[size]}`}
+      style={{ overflow: 'visible', isolation: 'auto' }}
       whileHover={{ scale: 1.08 }}
       whileTap={{ scale: 0.95 }}
     >
-      {/* Sparkle particles that follow logo shape */}
-      {[...Array(8)].map((_, i) => {
-        // Position sparkles around the logo in a circular pattern
-        const angle = (i * 45) * (Math.PI / 180)
-        const radius = 45 // percentage from center
-        const x = 50 + radius * Math.cos(angle)
-        const y = 50 + radius * Math.sin(angle)
-
-        return (
-          <motion.div
-            key={i}
-            className="absolute w-1.5 h-1.5 rounded-full"
-            style={{
-              left: `${x}%`,
-              top: `${y}%`,
-              transform: 'translate(-50%, -50%)',
-              background: i % 2 === 0
-                ? 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 70%)'
-                : 'radial-gradient(circle, rgba(251,191,36,1) 0%, rgba(251,191,36,0) 70%)',
-              boxShadow: i % 2 === 0
-                ? '0 0 6px 2px rgba(255,255,255,0.8)'
-                : '0 0 6px 2px rgba(251,191,36,0.8)',
-            }}
-            animate={{
-              opacity: [0, 1, 0],
-              scale: [0.5, 1.2, 0.5],
-            }}
-            transition={{
-              duration: 1.8 + (i * 0.15),
-              repeat: Infinity,
-              delay: i * 0.2,
-              ease: 'easeInOut',
-            }}
-          />
-        )
-      })}
-
-      {/* Main shimmer sweep over logo */}
-      <motion.div
-        className="absolute inset-0 z-10 overflow-hidden"
-        style={{
-          pointerEvents: 'none',
-          borderRadius: '50%',
-        }}
-      >
-        <motion.div
-          className="absolute inset-0"
-          style={{
-            background: 'linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.6) 50%, transparent 65%)',
-            backgroundSize: '200% 100%',
-          }}
-          animate={{
-            backgroundPosition: ['200% 0', '-200% 0'],
-          }}
-          transition={{
-            duration: 2.5,
-            repeat: Infinity,
-            ease: 'linear',
-          }}
-        />
-      </motion.div>
-
-      {/* Glowing border that follows logo */}
-      <motion.div
-        className="absolute inset-0 z-5 rounded-full"
+      {/* ── z:8 GLOW: drop-shadow mengikuti alpha PNG logo ─────────────────── */}
+      <motion.img
+        src={logoUrl} alt="" aria-hidden="true"
+        className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
+        style={{ zIndex: 8 }}
         animate={{
-          boxShadow: [
-            '0 0 8px 2px rgba(251,191,36,0.4)',
-            '0 0 16px 4px rgba(251,191,36,0.6)',
-            '0 0 8px 2px rgba(251,191,36,0.4)',
+          filter: [
+            'drop-shadow(0 0 3px rgba(251,191,36,0.6)) drop-shadow(0 0 10px rgba(251,191,36,0.3))',
+            'drop-shadow(0 0 8px rgba(251,191,36,1.0)) drop-shadow(0 0 22px rgba(251,191,36,0.65))',
+            'drop-shadow(0 0 3px rgba(251,191,36,0.6)) drop-shadow(0 0 10px rgba(251,191,36,0.3))',
           ],
         }}
-        transition={{
-          duration: 2,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
+        transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
       />
 
-      {/* Logo image - no background */}
-      <img
-        src={logoUrl}
-        alt="BASARNAS Logo"
-        className="relative z-20 w-full h-full object-contain"
-        style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.3))' }}
+      {/* ── z:15 OUTLINE RING CAHAYA PUTIH BERPUTAR ───────────────────────────
+          outlineRingMask = mask-composite subtract → isolasi area ring tepi logo.
+          Conic-gradient: transparan 80%, putih cerah di arc ~20%.
+          Rotasi 360° → cahaya berputar mengelilingi outline logo persis. */}
+      <motion.div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          zIndex: 15,
+          background: 'conic-gradient(from 0deg, transparent 0%, transparent 60%, rgba(255,255,255,0.25) 72%, rgba(255,255,255,0.9) 80%, white 84%, rgba(255,255,255,0.9) 88%, rgba(255,255,255,0.25) 96%, transparent 100%)',
+          ...outlineRingMask,
+        }}
+        animate={{ rotate: [0, 360] }}
+        transition={{ duration: 2.8, repeat: Infinity, ease: 'linear' }}
       />
+
+      {/* Kilap kedua berlawanan arah — efek berkilau silang */}
+      <motion.div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          zIndex: 16,
+          background: 'conic-gradient(from 180deg, transparent 0%, transparent 75%, rgba(255,255,255,0.5) 84%, white 88%, rgba(255,255,255,0.5) 93%, transparent 100%)',
+          ...outlineRingMask,
+        }}
+        animate={{ rotate: [360, 0] }}
+        transition={{ duration: 5.0, repeat: Infinity, ease: 'linear' }}
+      />
+
+      {/* ── z:20 LOGO + SHIMMER dalam masked container ─────────────────────── */}
+      <div className="absolute inset-0" style={{ zIndex: 20, ...fullMask }}>
+        <img
+          src={logoUrl} alt="BASARNAS Logo"
+          className="w-full h-full object-contain"
+          style={{ position: 'relative', zIndex: 1, display: 'block' }}
+        />
+        {/* Shimmer diagonal: band putih kanan-bawah → kiri-atas */}
+        <motion.div
+          className="absolute pointer-events-none"
+          style={{
+            zIndex: 2,
+            width: '45%', height: '300%',
+            top: '-100%', left: '27.5%',
+            background: 'linear-gradient(to right, transparent 0%, rgba(255,255,255,0.5) 30%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,0.5) 70%, transparent 100%)',
+            rotate: '35deg',
+          }}
+          animate={{ x: ['120%', '-170%'], y: ['80%', '-80%'] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut', repeatDelay: 2.5 }}
+        />
+      </div>
     </motion.div>
   )
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 function StatCard({
@@ -1167,27 +1187,85 @@ export default function ESOPApp() {
     }
   }, [])
 
-  // Excel Edit Diagnostic state
+  // === FULL CLIENT-SIDE DIAGNOSTIC STATE ===
   const [showDiagnosticDialog, setShowDiagnosticDialog] = useState(false)
   const [diagnosticLoading, setDiagnosticLoading] = useState(false)
+
+  // Live capture buffers (persisted across page lifecycle)
+  const [capturedConsoleErrors, setCapturedConsoleErrors] = useState<{ type: 'error' | 'warn'; msg: string; ts: number; stack?: string }[]>([])
+  const [capturedNetworkErrors, setCapturedNetworkErrors] = useState<{ url: string; status: number; statusText: string; ts: number; duration: number }[]>([])
+  const [capturedRejections, setCapturedRejections] = useState<{ reason: string; ts: number }[]>([])
+
+  // Diagnostic run result
   const [diagnosticResult, setDiagnosticResult] = useState<{
-    success: boolean
-    message: string
-    results: {
-      step: string
-      success: boolean
-      message: string
-      details?: Record<string, unknown>
-      error?: string
-      duration?: number
-    }[]
-    summary: {
-      totalSteps: number
-      passed: number
-      failed: number
-    }
-    nextSteps: string[]
+    ranAt: number
+    apiHealth: { endpoint: string; ok: boolean; status: number; latency: number; error?: string }[]
+    consoleErrors: typeof capturedConsoleErrors
+    networkErrors: typeof capturedNetworkErrors
+    rejections: typeof capturedRejections
+    envChecks: { key: string; ok: boolean; detail: string }[]
+    summary: { total: number; passed: number; failed: number; warnings: number }
   } | null>(null)
+
+  // === GLOBAL ERROR CAPTURE (runs once on mount) ===
+  useEffect(() => {
+    const MAX_ITEMS = 100
+
+    // 1. Patch console.error / console.warn
+    const origError = console.error.bind(console)
+    const origWarn = console.warn.bind(console)
+
+    console.error = (...args: unknown[]) => {
+      origError(...args)
+      const msg = args.map(a => (a instanceof Error ? a.message : String(a))).join(' ')
+      const stack = args[0] instanceof Error ? args[0].stack : undefined
+      setCapturedConsoleErrors(prev => [{ type: 'error', msg, ts: Date.now(), stack }, ...prev].slice(0, MAX_ITEMS))
+    }
+    console.warn = (...args: unknown[]) => {
+      origWarn(...args)
+      const msg = args.map(a => String(a)).join(' ')
+      setCapturedConsoleErrors(prev => [{ type: 'warn', msg, ts: Date.now() }, ...prev].slice(0, MAX_ITEMS))
+    }
+
+    // 2. Intercept fetch for network errors
+    const origFetch = window.fetch.bind(window)
+    window.fetch = async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url
+      const t0 = performance.now()
+      try {
+        const resp = await origFetch(input, init)
+        const duration = Math.round(performance.now() - t0)
+        if (!resp.ok) {
+          setCapturedNetworkErrors(prev => [
+            { url, status: resp.status, statusText: resp.statusText, ts: Date.now(), duration },
+            ...prev
+          ].slice(0, MAX_ITEMS))
+        }
+        return resp
+      } catch (err) {
+        const duration = Math.round(performance.now() - t0)
+        setCapturedNetworkErrors(prev => [
+          { url, status: 0, statusText: String(err), ts: Date.now(), duration },
+          ...prev
+        ].slice(0, MAX_ITEMS))
+        throw err
+      }
+    }
+
+    // 3. Catch unhandled promise rejections
+    const handleRejection = (ev: PromiseRejectionEvent) => {
+      const reason = ev.reason instanceof Error ? ev.reason.message : String(ev.reason)
+      setCapturedRejections(prev => [{ reason, ts: Date.now() }, ...prev].slice(0, MAX_ITEMS))
+    }
+    window.addEventListener('unhandledrejection', handleRejection)
+
+    return () => {
+      console.error = origError
+      console.warn = origWarn
+      window.fetch = origFetch
+      window.removeEventListener('unhandledrejection', handleRejection)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const checkAuth = useCallback(async () => {
     try {
@@ -1640,43 +1718,100 @@ export default function ESOPApp() {
     fetchSyncStatus()
   }
 
-  // Run System Diagnostic
+  // === FULL CLIENT-SIDE DIAGNOSTIC ===
   const handleRunDiagnostic = useCallback(async () => {
     setShowDiagnosticDialog(true)
     setDiagnosticLoading(true)
     setDiagnosticResult(null)
 
-    try {
-      const res = await fetch('/api/system-diagnostic')
-      const data = await res.json()
+    // ── 1. API health probes ──────────────────────────────────────────
+    const ENDPOINTS = [
+      { label: 'Auth', url: '/api/auth' },
+      { label: 'Stats', url: '/api/stats' },
+      { label: 'SOP List', url: '/api/sop?limit=1&page=1' },
+      { label: 'System Init', url: '/api/init' },
+      { label: 'System Diagnostic', url: '/api/system-diagnostic' },
+    ]
 
-      setDiagnosticResult(data)
-
-      if (data.success) {
-        toast({
-          title: '✅ Diagnostik Berhasil',
-          description: 'Semua komponen Excel Edit System berfungsi dengan baik.',
-          duration: 5000
-        })
-      } else {
-        toast({
-          title: '⚠️ Diagnostik Gagal',
-          description: `Terdapat ${data.summary?.failed || 0} masalah yang perlu diperbaiki.`,
-          variant: 'destructive',
-          duration: 5000
-        })
+    const apiHealth: NonNullable<typeof diagnosticResult>['apiHealth'] = []
+    for (const ep of ENDPOINTS) {
+      const t0 = performance.now()
+      try {
+        const r = await fetch(ep.url, { cache: 'no-store' })
+        apiHealth.push({ endpoint: ep.label, ok: r.ok, status: r.status, latency: Math.round(performance.now() - t0) })
+      } catch (err) {
+        apiHealth.push({ endpoint: ep.label, ok: false, status: 0, latency: Math.round(performance.now() - t0), error: String(err) })
       }
-    } catch (error) {
-      console.error('Diagnostic error:', error)
-      toast({
-        title: '❌ Error',
-        description: 'Gagal menjalankan diagnostik',
-        variant: 'destructive',
-        duration: 5000
-      })
     }
+
+    // ── 2. Environment / browser checks ──────────────────────────────
+    const envChecks: NonNullable<typeof diagnosticResult>['envChecks'] = [
+      {
+        key: 'Browser Fetch API',
+        ok: typeof window.fetch === 'function',
+        detail: typeof window.fetch === 'function' ? 'Tersedia' : 'Tidak tersedia',
+      },
+      {
+        key: 'localStorage',
+        ok: (() => { try { localStorage.setItem('__test', '1'); localStorage.removeItem('__test'); return true } catch { return false } })(),
+        detail: (() => { try { localStorage.setItem('__test', '1'); localStorage.removeItem('__test'); return 'Tersedia & dapat tulis' } catch { return 'Tidak dapat diakses' } })(),
+      },
+      {
+        key: 'Performance API',
+        ok: typeof performance !== 'undefined' && typeof performance.now === 'function',
+        detail: typeof performance !== 'undefined' ? 'Tersedia' : 'Tidak tersedia',
+      },
+      {
+        key: 'WebSocket Support',
+        ok: typeof WebSocket !== 'undefined',
+        detail: typeof WebSocket !== 'undefined' ? 'Tersedia' : 'Tidak tersedia',
+      },
+      {
+        key: 'Session Auth',
+        ok: isAuthenticated,
+        detail: isAuthenticated ? `Login sebagai ${user?.name} (${user?.role})` : 'Tidak terautentikasi',
+      },
+      {
+        key: 'Memory Usage',
+        ok: true,
+        detail: (performance as Performance & { memory?: { usedJSHeapSize: number; jsHeapSizeLimit: number } }).memory
+          ? `${Math.round((performance as Performance & { memory: { usedJSHeapSize: number; jsHeapSizeLimit: number } }).memory.usedJSHeapSize / 1024 / 1024)}MB / ${Math.round((performance as Performance & { memory: { usedJSHeapSize: number; jsHeapSizeLimit: number } }).memory.jsHeapSizeLimit / 1024 / 1024)}MB`
+          : 'Tidak tersedia di browser ini',
+      },
+    ]
+
+    // ── 3. Compute summary ────────────────────────────────────────────
+    const errCount = capturedConsoleErrors.filter(e => e.type === 'error').length
+    const warnCount = capturedConsoleErrors.filter(e => e.type === 'warn').length
+    const netErrCount = capturedNetworkErrors.length
+    const rejCount = capturedRejections.length
+    const apiFailCount = apiHealth.filter(a => !a.ok).length
+    const envFailCount = envChecks.filter(e => !e.ok).length
+
+    const totalChecks = apiHealth.length + envChecks.length
+    const failed = apiFailCount + envFailCount
+    const warnings = errCount + warnCount + netErrCount + rejCount
+
+    setDiagnosticResult({
+      ranAt: Date.now(),
+      apiHealth,
+      consoleErrors: [...capturedConsoleErrors],
+      networkErrors: [...capturedNetworkErrors],
+      rejections: [...capturedRejections],
+      envChecks,
+      summary: { total: totalChecks, passed: totalChecks - failed, failed, warnings },
+    })
+
     setDiagnosticLoading(false)
-  }, [toast])
+
+    if (failed === 0 && warnings === 0) {
+      toast({ title: '✅ Sistem Berjalan Normal', description: 'Tidak ada error yang terdeteksi.', duration: 4000 })
+    } else if (failed > 0) {
+      toast({ title: `❌ ${failed} Kegagalan Terdeteksi`, description: `${warnings} peringatan tambahan ditemukan.`, variant: 'destructive', duration: 5000 })
+    } else {
+      toast({ title: `⚠️ ${warnings} Peringatan`, description: 'Semua API berjalan, tapi ada log mencurigakan.', duration: 4000 })
+    }
+  }, [capturedConsoleErrors, capturedNetworkErrors, capturedRejections, isAuthenticated, user, toast])
 
   const fetchSopFiles = useCallback(async (resetPage = false) => {
     // Prevent concurrent fetches
@@ -5875,26 +6010,70 @@ export default function ESOPApp() {
                       ))}
                     </div>
 
-                    {/* Charts Skeleton */}
+
+                    {/* Charts Skeleton - dark themed */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <motion.div
-                        className="bg-white/80 backdrop-blur rounded-xl p-6 border border-slate-200 shadow-lg"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
-                      >
-                        <div className="h-6 w-32 bg-slate-200/50 rounded mb-4 animate-pulse" />
-                        <div className="h-[300px] bg-slate-100/50 rounded-lg animate-pulse" />
-                      </motion.div>
-                      <motion.div
-                        className="bg-white/80 backdrop-blur rounded-xl p-6 border border-slate-200 shadow-lg"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3 }}
-                      >
-                        <div className="h-6 w-32 bg-slate-200/50 rounded mb-4 animate-pulse" />
-                        <div className="h-[300px] bg-slate-100/50 rounded-lg animate-pulse" />
-                      </motion.div>
+                      {[{ color: 'orange', delay: 0.2 }, { color: 'purple', delay: 0.3 }, { color: 'blue', delay: 0.35 }, { color: 'emerald', delay: 0.4 }].map(({ color, delay }, i) => (
+                        <motion.div
+                          key={i}
+                          className="relative overflow-hidden rounded-2xl border-0 shadow-2xl p-5"
+                          style={{ background: 'linear-gradient(145deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)' }}
+                          initial={{ opacity: 0, y: 15 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay }}
+                        >
+                          {/* Glow pulse */}
+                          <motion.div
+                            className="absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl"
+                            style={{ background: `rgba(${color === 'orange' ? '249,115,22' : color === 'purple' ? '139,92,246' : color === 'blue' ? '59,130,246' : '16,185,129'},0.15)` }}
+                            animate={{ opacity: [0.3, 0.7, 0.3] }}
+                            transition={{ duration: 2.5, repeat: Infinity, delay: i * 0.3 }}
+                          />
+                          {/* Header skeleton */}
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-xl animate-pulse" style={{ background: `rgba(${color === 'orange' ? '249,115,22' : color === 'purple' ? '139,92,246' : color === 'blue' ? '59,130,246' : '16,185,129'},0.25)` }} />
+                            <div className="space-y-1.5">
+                              <div className="h-4 w-32 rounded-lg animate-pulse bg-white/10" />
+                              <div className="h-3 w-48 rounded-lg animate-pulse bg-white/5" />
+                            </div>
+                          </div>
+                          {/* Chart area skeleton */}
+                          <div className="h-[260px] rounded-xl animate-pulse relative overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                            {/* Shimmer effect */}
+                            <motion.div
+                              className="absolute inset-0"
+                              style={{ background: `linear-gradient(90deg, transparent 0%, rgba(${color === 'orange' ? '249,115,22' : color === 'purple' ? '139,92,246' : color === 'blue' ? '59,130,246' : '16,185,129'},0.06) 50%, transparent 100%)` }}
+                              animate={{ x: ['-100%', '200%'] }}
+                              transition={{ duration: 2, repeat: Infinity, ease: 'linear', delay: i * 0.25 }}
+                            />
+                            {/* Fake bars for bar chart */}
+                            {i === 0 && (
+                              <div className="absolute bottom-4 left-4 right-4 flex items-end gap-2">
+                                {[60, 85, 40, 95, 70, 55, 80].map((h, bi) => (
+                                  <motion.div
+                                    key={bi}
+                                    className="flex-1 rounded-t-md"
+                                    style={{ height: `${h}%`, background: 'rgba(249,115,22,0.15)', border: '1px solid rgba(249,115,22,0.1)' }}
+                                    animate={{ opacity: [0.4, 0.8, 0.4] }}
+                                    transition={{ duration: 1.5, repeat: Infinity, delay: bi * 0.1 }}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                            {/* Fake pie for pie chart */}
+                            {i !== 0 && (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <motion.div
+                                  className="w-32 h-32 rounded-full"
+                                  style={{ background: `conic-gradient(rgba(${color === 'purple' ? '139,92,246' : color === 'blue' ? '59,130,246' : '16,185,129'},0.25) 0% 60%, rgba(255,255,255,0.05) 60%)`, border: '4px solid rgba(255,255,255,0.05)' }}
+                                  animate={{ rotate: 360 }}
+                                  transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      ))}
                     </div>
                   </>
                 ) : (
@@ -6188,12 +6367,13 @@ export default function ESOPApp() {
                                   tickLine={false}
                                 />
                                 <Tooltip
+                                  cursor={{ fill: 'rgba(249,115,22,0.12)', radius: 8 }}
                                   content={({ active, payload, label }) => {
                                     if (active && payload && payload.length) {
                                       const maxCount = Math.max(...(stats.byTahun || []).map(d => d.count))
                                       const pct = maxCount > 0 ? Math.round(((payload[0].value as number) / maxCount) * 100) : 0
                                       return (
-                                        <div className="border rounded-2xl shadow-2xl p-4 min-w-[180px]" style={{ background: 'linear-gradient(135deg, rgba(15,15,30,0.95), rgba(22,33,62,0.95))', borderColor: 'rgba(249,115,22,0.4)', backdropFilter: 'blur(12px)' }}>
+                                        <div className="border rounded-2xl shadow-2xl p-4 min-w-[180px]" style={{ background: 'linear-gradient(135deg, rgba(15,15,30,0.97), rgba(22,33,62,0.97))', borderColor: 'rgba(249,115,22,0.5)', backdropFilter: 'blur(16px)', boxShadow: '0 0 24px rgba(249,115,22,0.2)' }}>
                                           <div className="flex items-center gap-2 mb-3">
                                             <div className="w-3 h-3 rounded-full bg-gradient-to-r from-orange-400 to-amber-400 shadow shadow-orange-500/50" />
                                             <span className="font-bold text-orange-200 text-sm">Tahun {label}</span>
@@ -6231,14 +6411,14 @@ export default function ESOPApp() {
                               </BarChart>
                             </ResponsiveContainer>
                             {/* Summary Footer */}
-                            <div className="flex items-center justify-center gap-6 mt-5 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                              {(stats.byTahun || []).slice(-3).reverse().map((item, idx) => (
+                            <div className="flex flex-wrap items-center justify-center gap-2 mt-5 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                              {(stats.byTahun || []).map((item, idx) => (
                                 <motion.div
                                   key={item.tahun}
                                   initial={{ opacity: 0, y: 10 }}
                                   animate={{ opacity: 1, y: 0 }}
                                   transition={{ delay: 0.5 + idx * 0.1 }}
-                                  className="text-center px-4 py-2 rounded-xl" style={{ background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.12)' }}
+                                  className="text-center px-3 py-2 rounded-xl" style={{ background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.12)' }}
                                 >
                                   <p className="text-[10px] text-orange-300/50 uppercase tracking-wider font-bold">{item.tahun}</p>
                                   <p className="text-xl font-black bg-gradient-to-r from-orange-400 to-amber-300 bg-clip-text text-transparent">{item.count}</p>
@@ -6834,58 +7014,57 @@ export default function ESOPApp() {
                           Tambah SOP/IK
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="sm:max-w-xl p-0 overflow-hidden border-0 shadow-[0_0_40px_rgba(0,0,0,0.5)] bg-slate-900 rounded-[1.5rem]" aria-describedby={undefined}>
+                      <DialogContent className="sm:max-w-lg p-0 overflow-hidden border-0 shadow-[0_0_40px_rgba(0,0,0,0.5)] bg-slate-900 rounded-[1.5rem]" aria-describedby={undefined}>
                         {/* Premium Glassmorphism Header */}
-                        <div className="relative overflow-hidden p-6" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' }}>
+                        <div className="relative overflow-hidden px-5 pt-4 pb-3" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' }}>
                           <div className="absolute inset-0 pointer-events-none">
-                            <motion.div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-orange-500/10 blur-3xl" animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }} />
-                            <motion.div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full bg-red-500/10 blur-3xl" animate={{ scale: [1.2, 1, 1.2], opacity: [0.4, 0.7, 0.4] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }} />
-                            <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.1) 1px, transparent 0)', backgroundSize: '16px 16px' }} />
+                            <motion.div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-orange-500/10 blur-3xl" animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }} />
+                            <motion.div className="absolute -bottom-10 -left-10 w-32 h-32 rounded-full bg-red-500/10 blur-3xl" animate={{ scale: [1.2, 1, 1.2], opacity: [0.4, 0.7, 0.4] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }} />
                           </div>
 
-                          <div className="relative z-10 flex items-center gap-5">
+                          <div className="relative z-10 flex items-center gap-3">
                             <motion.div
-                              className="w-16 h-16 rounded-2xl flex items-center justify-center relative shadow-2xl"
-                              style={{ background: 'linear-gradient(135deg, rgba(249,115,22,0.9), rgba(220,38,38,0.9))', boxShadow: '0 10px 30px -10px rgba(249,115,22,0.5)' }}
+                              className="w-11 h-11 rounded-xl flex items-center justify-center relative shadow-xl flex-shrink-0"
+                              style={{ background: 'linear-gradient(135deg, rgba(249,115,22,0.9), rgba(220,38,38,0.9))', boxShadow: '0 8px 20px -8px rgba(249,115,22,0.5)' }}
                               initial={{ scale: 0, rotate: -180 }}
                               animate={{ scale: 1, rotate: 0 }}
                               transition={{ type: 'spring', stiffness: 200, damping: 15 }}
                             >
-                              <div className="absolute inset-0 rounded-2xl border border-white/20" />
-                              <Upload className="w-8 h-8 text-white drop-shadow-md" />
+                              <div className="absolute inset-0 rounded-xl border border-white/20" />
+                              <Upload className="w-5 h-5 text-white drop-shadow-md" />
                             </motion.div>
                             <div>
-                              <DialogTitle className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-400 tracking-tight">
+                              <DialogTitle className="text-base font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-400 tracking-tight">
                                 Upload Dokumen
                               </DialogTitle>
-                              <DialogDescription className="text-slate-400 text-xs mt-1 font-medium">
+                              <DialogDescription className="text-slate-400 text-[11px] mt-0.5 font-medium">
                                 Tambahkan SOP/IK baru ke dalam katalog sistem digital.
                               </DialogDescription>
                             </div>
                           </div>
                         </div>
 
-                        {/* Form Content inside Glassmorphism container */}
-                        <form onSubmit={(e) => handleUpload(e)} className="p-6 space-y-6 bg-slate-900 border-t border-slate-800">
+                        {/* Form Content */}
+                        <form onSubmit={(e) => handleUpload(e)} className="px-5 pb-5 pt-4 space-y-4 bg-slate-900 border-t border-slate-800">
 
                           {/* Grid Inputs */}
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Judul Dokumen <span className="text-red-500">*</span></Label>
+                          <div className="space-y-3">
+                            <div className="space-y-1">
+                              <Label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Judul Dokumen <span className="text-red-500">*</span></Label>
                               <Input
                                 value={uploadForm.judul}
                                 onChange={(e) => setUploadForm({ ...uploadForm, judul: e.target.value })}
                                 placeholder="Ketik judul SOP atau IK di sini..."
                                 required
-                                className="h-11 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-orange-500 focus:ring-orange-500/20 rounded-xl transition-all font-medium"
+                                className="h-8 text-sm bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-orange-500 focus:ring-orange-500/20 rounded-lg transition-all font-medium"
                               />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Kategori</Label>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1">
+                                <Label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Kategori</Label>
                                 <Select value={uploadForm.kategori} onValueChange={(v) => setUploadForm({ ...uploadForm, kategori: v })}>
-                                  <SelectTrigger className="h-11 bg-slate-800/50 border-slate-700 text-slate-200 focus:border-orange-500 rounded-xl">
+                                  <SelectTrigger className="h-8 text-sm bg-slate-800/50 border-slate-700 text-slate-200 focus:border-orange-500 rounded-lg">
                                     <SelectValue placeholder="Pilih kategori" />
                                   </SelectTrigger>
                                   <SelectContent className="bg-slate-800 border-slate-700 text-slate-200 rounded-xl">
@@ -6893,10 +7072,10 @@ export default function ESOPApp() {
                                   </SelectContent>
                                 </Select>
                               </div>
-                              <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Lingkup</Label>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Lingkup</Label>
                                 <Select value={uploadForm.lingkup} onValueChange={(v) => setUploadForm({ ...uploadForm, lingkup: v })}>
-                                  <SelectTrigger className="h-11 bg-slate-800/50 border-slate-700 text-slate-200 focus:border-orange-500 rounded-xl">
+                                  <SelectTrigger className="h-8 text-sm bg-slate-800/50 border-slate-700 text-slate-200 focus:border-orange-500 rounded-lg">
                                     <SelectValue placeholder="Pilih lingkup" />
                                   </SelectTrigger>
                                   <SelectContent className="bg-slate-800 border-slate-700 text-slate-200 rounded-xl">
@@ -6906,55 +7085,54 @@ export default function ESOPApp() {
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Jenis</Label>
+                            <div className="grid grid-cols-3 gap-3">
+                              <div className="space-y-1">
+                                <Label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Jenis</Label>
                                 <Select value={uploadForm.jenis} onValueChange={(v) => setUploadForm({ ...uploadForm, jenis: v })}>
-                                  <SelectTrigger className="h-11 bg-slate-800/50 border-slate-700 text-slate-200 focus:border-orange-500 rounded-xl">
-                                    <SelectValue placeholder="Pilih jenis" />
+                                  <SelectTrigger className="h-8 text-sm bg-slate-800/50 border-slate-700 text-slate-200 focus:border-orange-500 rounded-lg">
+                                    <SelectValue placeholder="Jenis" />
                                   </SelectTrigger>
                                   <SelectContent className="bg-slate-800 border-slate-700 text-slate-200 rounded-xl">
                                     {JENIS_OPTIONS.map(j => <SelectItem key={j} value={j} className="focus:bg-slate-700 focus:text-white">{j}</SelectItem>)}
                                   </SelectContent>
                                 </Select>
                               </div>
-                              <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Status</Label>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Status</Label>
                                 <Select value={uploadForm.status} onValueChange={(v) => setUploadForm({ ...uploadForm, status: v })}>
-                                  <SelectTrigger className="h-11 bg-slate-800/50 border-slate-700 text-slate-200 focus:border-orange-500 rounded-xl">
-                                    <SelectValue placeholder="Pilih status" />
+                                  <SelectTrigger className="h-8 text-sm bg-slate-800/50 border-slate-700 text-slate-200 focus:border-orange-500 rounded-lg">
+                                    <SelectValue placeholder="Status" />
                                   </SelectTrigger>
                                   <SelectContent className="bg-slate-800 border-slate-700 text-slate-200 rounded-xl">
                                     {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s} className="focus:bg-slate-700 focus:text-white">{s}</SelectItem>)}
                                   </SelectContent>
                                 </Select>
                               </div>
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Tahun</Label>
-                              <Input
-                                type="number"
-                                value={uploadForm.tahun || ''}
-                                onChange={(e) => setUploadForm({ ...uploadForm, tahun: parseInt(e.target.value) })}
-                                required
-                                className="h-11 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-orange-500 focus:ring-orange-500/20 rounded-xl text-center font-medium"
-                              />
+                              <div className="space-y-1">
+                                <Label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Tahun</Label>
+                                <Input
+                                  type="number"
+                                  value={uploadForm.tahun || ''}
+                                  onChange={(e) => setUploadForm({ ...uploadForm, tahun: parseInt(e.target.value) })}
+                                  required
+                                  className="h-8 text-sm bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-orange-500 focus:ring-orange-500/20 rounded-lg text-center font-medium"
+                                />
+                              </div>
                             </div>
                           </div>
 
                           {/* Futuristic File Dropzone */}
-                          <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
                               File Dokumen <span className="text-red-500">*</span>
                             </Label>
 
                             <motion.div
                               whileHover={{ scale: uploadForm.file ? 1 : 1.01 }}
                               whileTap={{ scale: 0.98 }}
-                              className={`relative border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-300 group overflow-hidden ${uploadForm.file
-                                ? 'border-orange-500/50 bg-orange-500/5 ring-4 ring-orange-500/10'
-                                : 'border-slate-700 bg-slate-800/30 hover:border-orange-500/50 hover:bg-slate-800/80 hover:shadow-[0_0_20px_rgba(249,115,22,0.1)]'
+                              className={`relative border-2 border-dashed rounded-xl p-3 text-center cursor-pointer transition-all duration-300 group overflow-hidden ${uploadForm.file
+                                ? 'border-orange-500/50 bg-orange-500/5 ring-2 ring-orange-500/10'
+                                : 'border-slate-700 bg-slate-800/30 hover:border-orange-500/50 hover:bg-slate-800/80 hover:shadow-[0_0_15px_rgba(249,115,22,0.1)]'
                                 }`}
                               onClick={() => document.getElementById('file-input')?.click()}
                               onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
@@ -6975,23 +7153,23 @@ export default function ESOPApp() {
                               />
 
                               {uploadForm.file ? (
-                                <div className="flex items-center justify-between gap-4 relative z-10">
-                                  <div className="flex items-center gap-4">
+                                <div className="flex items-center justify-between gap-3 relative z-10">
+                                  <div className="flex items-center gap-3">
                                     <div className="relative">
                                       <div className="absolute inset-0 bg-orange-500 blur-md opacity-20 rounded-full" />
-                                      <div className="w-14 h-14 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center relative z-10 shadow-lg">
+                                      <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center relative z-10 shadow-md">
                                         {uploadForm.file.name.endsWith('.xlsx') || uploadForm.file.name.endsWith('.xls') ? (
-                                          <FileSpreadsheet className="w-7 h-7 text-green-400" />
+                                          <FileSpreadsheet className="w-5 h-5 text-green-400" />
                                         ) : uploadForm.file.name.endsWith('.docx') || uploadForm.file.name.endsWith('.doc') ? (
-                                          <FileText className="w-7 h-7 text-blue-400" />
+                                          <FileText className="w-5 h-5 text-blue-400" />
                                         ) : (
-                                          <FileIcon className="w-7 h-7 text-red-400" />
+                                          <FileIcon className="w-5 h-5 text-red-400" />
                                         )}
                                       </div>
                                     </div>
                                     <div className="text-left">
-                                      <p className="font-bold text-white text-sm max-w-[220px] truncate">{uploadForm.file.name}</p>
-                                      <p className="text-xs text-orange-400 font-medium mt-0.5">{(uploadForm.file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                      <p className="font-bold text-white text-xs max-w-[200px] truncate">{uploadForm.file.name}</p>
+                                      <p className="text-[11px] text-orange-400 font-medium mt-0.5">{(uploadForm.file.size / 1024 / 1024).toFixed(2)} MB</p>
                                     </div>
                                   </div>
                                   <motion.button
@@ -6999,29 +7177,23 @@ export default function ESOPApp() {
                                     whileTap={{ scale: 0.9 }}
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); setUploadForm({ ...uploadForm, file: null }); }}
-                                    className="p-2 rounded-full bg-slate-800 border border-slate-700 text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                    className="p-1.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                                   >
-                                    <X className="w-5 h-5" />
+                                    <X className="w-3.5 h-3.5" />
                                   </motion.button>
                                 </div>
                               ) : (
-                                <div className="space-y-4 relative z-10 py-4">
-                                  <div className="flex justify-center">
-                                    <motion.div
-                                      className="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center shadow-lg group-hover:border-orange-500/30 group-hover:bg-slate-800 group-hover:shadow-[0_0_15px_rgba(249,115,22,0.2)] transition-all"
-                                      animate={{ y: [0, -5, 0] }}
-                                      transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-                                    >
-                                      <Cloud className="w-7 h-7 text-slate-400 group-hover:text-orange-400 transition-colors" />
-                                    </motion.div>
-                                  </div>
-                                  <div>
-                                    <p className="font-bold text-white text-sm">
-                                      <span className="text-orange-400">Pilih File</span> atau seret ke sini
-                                    </p>
-                                    <p className="text-xs text-slate-500 mt-1.5 font-medium">
-                                      Mendukung XLSX, DOCX, PDF (Maks. 50MB)
-                                    </p>
+                                <div className="flex items-center gap-3 relative z-10 py-1 justify-center">
+                                  <motion.div
+                                    className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center shadow-md group-hover:border-orange-500/30 group-hover:shadow-[0_0_12px_rgba(249,115,22,0.15)] transition-all flex-shrink-0"
+                                    animate={{ y: [0, -4, 0] }}
+                                    transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+                                  >
+                                    <Cloud className="w-5 h-5 text-slate-400 group-hover:text-orange-400 transition-colors" />
+                                  </motion.div>
+                                  <div className="text-left">
+                                    <p className="font-bold text-white text-xs"><span className="text-orange-400">Pilih File</span> atau seret ke sini</p>
+                                    <p className="text-[10px] text-slate-500 mt-0.5 font-medium">XLSX, DOCX, PDF (Maks. 50MB)</p>
                                   </div>
                                 </div>
                               )}
@@ -7029,20 +7201,19 @@ export default function ESOPApp() {
                           </div>
 
                           {/* Action Buttons */}
-                          <div className="flex gap-3 pt-4 border-t border-slate-800 mt-6 relative">
-                            {/* Decorative glow above buttons */}
-                            <div className="absolute -top-6 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-orange-500/20 to-transparent" />
+                          <div className="flex gap-2 pt-3 border-t border-slate-800 relative">
+                            <div className="absolute -top-4 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-orange-500/20 to-transparent" />
 
                             <Button
                               type="button"
                               onClick={() => setShowUploadDialog(false)}
-                              className="w-1/3 h-12 bg-slate-800 hover:bg-slate-700 text-white border-0 rounded-xl font-bold transition-colors"
+                              className="w-1/3 h-9 bg-slate-800 hover:bg-slate-700 text-white border-0 rounded-xl font-bold transition-colors text-sm"
                             >
                               Batal
                             </Button>
                             <Button
                               type="submit"
-                              className="flex-1 h-12 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white border-0 shadow-[0_0_20px_rgba(249,115,22,0.3)] hover:shadow-[0_0_25px_rgba(249,115,22,0.5)] rounded-xl font-bold relative overflow-hidden transition-all"
+                              className="flex-1 h-9 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white border-0 shadow-[0_0_15px_rgba(249,115,22,0.3)] hover:shadow-[0_0_20px_rgba(249,115,22,0.5)] rounded-xl font-bold relative overflow-hidden transition-all text-sm"
                               disabled={loading}
                             >
                               <motion.div
@@ -7054,13 +7225,13 @@ export default function ESOPApp() {
                                 {loading ? (
                                   <>
                                     <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
-                                      <RefreshCw className="w-5 h-5" />
+                                      <RefreshCw className="w-4 h-4" />
                                     </motion.div>
                                     <span>Memproses...</span>
                                   </>
                                 ) : (
                                   <>
-                                    <Send className="w-5 h-5" />
+                                    <Send className="w-4 h-4" />
                                     <span>Upload ke Server</span>
                                   </>
                                 )}
@@ -7575,246 +7746,338 @@ export default function ESOPApp() {
 
                   {/* Excel Edit Diagnostic Dialog */}
                   <Dialog open={showDiagnosticDialog} onOpenChange={setShowDiagnosticDialog}>
-                    <DialogContent className="sm:max-w-none w-fit max-w-[95vw] bg-white border-2 border-orange-200 shadow-xl overflow-visible" aria-describedby={undefined}>
-                      <DialogHeader>
-                        <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                          <Activity className="w-5 h-5 text-orange-600" />
-                          Diagnostik Excel Edit System
-                        </DialogTitle>
-                        <DialogDescription className="text-gray-600">
-                          Memeriksa semua komponen untuk fitur edit Excel dengan Microsoft 365
-                        </DialogDescription>
-                      </DialogHeader>
+                    <DialogContent className="sm:max-w-2xl p-0 overflow-hidden border-0 shadow-[0_0_60px_rgba(0,0,0,0.7)] rounded-2xl" aria-describedby={undefined} style={{ background: '#0f172a' }}>
+                      {/* Header */}
+                      <div className="relative px-6 pt-5 pb-4 overflow-hidden" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderBottom: '1px solid rgba(249,115,22,0.2)' }}>
+                        <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-orange-500/10 blur-3xl pointer-events-none" />
+                        <div className="relative flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #f97316, #dc2626)', boxShadow: '0 6px 20px -6px rgba(249,115,22,0.6)' }}>
+                            <Activity className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <DialogTitle className="text-base font-bold text-white">🔍 Diagnosa Sistem Web App</DialogTitle>
+                            <DialogDescription className="text-[11px] text-slate-400 mt-0.5">Deteksi error console, jaringan, sintaks, dan kesehatan API secara real-time</DialogDescription>
+                          </div>
+                          {diagnosticResult && (
+                            <div className="ml-auto text-[10px] text-slate-500">
+                              Dijalankan: {new Date(diagnosticResult.ranAt).toLocaleTimeString('id-ID')}
+                            </div>
+                          )}
+                        </div>
+                      </div>
 
-                      <div className="space-y-4">
+                      {/* Body */}
+                      <div className="px-5 py-4 space-y-4 overflow-y-auto max-h-[70vh]">
+
+                        {/* Loading */}
                         {diagnosticLoading && (
-                          <div className="flex flex-col items-center justify-center py-8">
-                            <Loader2 className="w-10 h-10 text-orange-500 animate-spin mb-4" />
-                            <p className="text-gray-600">Menjalankan diagnostik...</p>
+                          <div className="flex flex-col items-center justify-center py-14 gap-4">
+                            <div className="relative">
+                              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.2)' }}>
+                                <Loader2 className="w-8 h-8 text-orange-400 animate-spin" />
+                              </div>
+                              <div className="absolute inset-0 rounded-2xl bg-orange-500/10 blur-md animate-pulse" />
+                            </div>
+                            <div className="text-center">
+                              <p className="text-sm font-semibold text-white">Menjalankan Diagnosa...</p>
+                              <p className="text-xs text-slate-400 mt-1">Memeriksa API, environment, dan log error</p>
+                            </div>
+                            {/* Progress dots */}
+                            <div className="flex gap-1.5">
+                              {[0, 1, 2, 3, 4].map(i => (
+                                <div key={i} className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-bounce" style={{ animationDelay: `${i * 0.12}s` }} />
+                              ))}
+                            </div>
                           </div>
                         )}
 
                         {diagnosticResult && !diagnosticLoading && (
                           <>
-                            {/* Summary */}
-                            <div className={`p - 4 rounded - lg ${diagnosticResult.success
-                              ? 'bg-green-50 border border-green-200'
-                              : 'bg-red-50 border border-red-200'
-                              } `}>
-                              <div className="flex items-center gap-3">
-                                {diagnosticResult.success ? (
-                                  <CheckCircle className="w-8 h-8 text-green-500" />
-                                ) : (
-                                  <XCircle className="w-8 h-8 text-red-500" />
-                                )}
-                                <div>
-                                  <p className={`font - bold ${diagnosticResult.success ? 'text-green-800' : 'text-red-800'} `}>
-                                    {diagnosticResult.success ? 'Semua Sistem Berfungsi!' : 'Terdapat Masalah'}
-                                  </p>
-                                  <p className={`text - sm ${diagnosticResult.success ? 'text-green-600' : 'text-red-600'} `}>
-                                    {diagnosticResult.message}
-                                  </p>
-                                </div>
-                              </div>
-
-                              {/* Stats */}
-                              <div className="flex gap-4 mt-3 text-sm">
-                                <span className="text-gray-600">
-                                  Total: <strong>{diagnosticResult.summary.totalSteps}</strong>
-                                </span>
-                                <span className="text-green-600">
-                                  Pass: <strong>{diagnosticResult.summary.passed}</strong>
-                                </span>
-                                <span className="text-red-600">
-                                  Fail: <strong>{diagnosticResult.summary.failed}</strong>
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Results List */}
-                            <div className="space-y-3">
-                              <h4 className="font-semibold text-gray-700">Detail Hasil:</h4>
-                              {diagnosticResult.results.map((result, index) => (
-                                <div
-                                  key={index}
-                                  className={`p - 3 rounded - lg border ${result.success
-                                    ? 'bg-green-50 border-green-200'
-                                    : 'bg-red-50 border-red-200'
-                                    } `}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      {result.success ? (
-                                        <CheckCircle className="w-5 h-5 text-green-500" />
-                                      ) : (
-                                        <XCircle className="w-5 h-5 text-red-500" />
-                                      )}
-                                      <span className="font-medium text-gray-900">{result.step}</span>
-                                    </div>
-                                    {result.duration && (
-                                      <span className="text-xs text-gray-500">{result.duration}ms</span>
-                                    )}
-                                  </div>
-                                  <p className={`text - sm mt - 1 ${result.success ? 'text-green-700' : 'text-red-700'} `}>
-                                    {result.message}
-                                  </p>
-                                  {result.error && (
-                                    <p className="text-xs text-red-600 mt-1 font-mono bg-red-100 p-2 rounded">
-                                      {result.error}
-                                    </p>
-                                  )}
-                                  {result.details && (
-                                    <div className="mt-2 text-xs bg-gray-100 p-2 rounded font-mono overflow-x-auto">
-                                      {Object.entries(result.details).map(([key, value]) => (
-                                        <div key={key} className="flex gap-2">
-                                          <span className="text-gray-500">{key}:</span>
-                                          <span className={typeof value === 'string' && value.includes('✅') ? 'text-green-600' : typeof value === 'string' && value.includes('❌') ? 'text-red-600' : 'text-gray-700'}>
-                                            {String(value)}
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
+                            {/* ── Summary Chips */}
+                            <div className="grid grid-cols-4 gap-2">
+                              {[
+                                { label: 'Total Cek', val: diagnosticResult.summary.total, color: '#94a3b8', bg: 'rgba(148,163,184,0.1)', border: 'rgba(148,163,184,0.2)' },
+                                { label: 'Lulus', val: diagnosticResult.summary.passed, color: '#22c55e', bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.25)' },
+                                { label: 'Gagal', val: diagnosticResult.summary.failed, color: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.25)' },
+                                { label: 'Peringatan', val: diagnosticResult.summary.warnings, color: '#eab308', bg: 'rgba(234,179,8,0.1)', border: 'rgba(234,179,8,0.25)' },
+                              ].map(({ label, val, color, bg, border }) => (
+                                <div key={label} className="rounded-xl p-3 text-center" style={{ background: bg, border: `1px solid ${border}` }}>
+                                  <div className="text-2xl font-black" style={{ color }}>{val}</div>
+                                  <div className="text-[10px] text-slate-400 mt-0.5">{label}</div>
                                 </div>
                               ))}
                             </div>
 
-                            {/* Next Steps */}
-                            {!diagnosticResult.success && diagnosticResult.nextSteps.length > 0 && (
-                              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                                <h4 className="font-semibold text-amber-800 mb-2">Langkah Selanjutnya:</h4>
-                                <ul className="list-disc list-inside space-y-1 text-sm text-amber-700">
-                                  {diagnosticResult.nextSteps.map((step, index) => (
-                                    <li key={index}>{step}</li>
+                            {/* ── API Health */}
+                            <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                              <div className="px-4 py-2.5 flex items-center gap-2" style={{ background: 'rgba(249,115,22,0.08)', borderBottom: '1px solid rgba(249,115,22,0.15)' }}>
+                                <Activity className="w-3.5 h-3.5 text-orange-400" />
+                                <span className="text-[11px] font-bold text-orange-400 uppercase tracking-wider">API Health Check</span>
+                              </div>
+                              <div className="divide-y divide-white/5">
+                                {diagnosticResult.apiHealth.map((ep) => (
+                                  <div key={ep.endpoint} className="flex items-center gap-3 px-4 py-2.5">
+                                    {ep.ok
+                                      ? <CheckCircle className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
+                                      : <XCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                                    }
+                                    <span className="text-xs text-slate-300 flex-1 font-medium">{ep.endpoint}</span>
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${ep.ok ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                                      {ep.status || 'ERR'}
+                                    </span>
+                                    <span className="text-[10px] text-slate-500 w-12 text-right">{ep.latency}ms</span>
+                                    {ep.error && <span className="text-[9px] text-red-400 font-mono max-w-[120px] truncate">{ep.error}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* ── Environment Checks */}
+                            <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                              <div className="px-4 py-2.5 flex items-center gap-2" style={{ background: 'rgba(99,102,241,0.08)', borderBottom: '1px solid rgba(99,102,241,0.15)' }}>
+                                <Hash className="w-3.5 h-3.5 text-indigo-400" />
+                                <span className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">Environment & Browser</span>
+                              </div>
+                              <div className="divide-y divide-white/5">
+                                {diagnosticResult.envChecks.map((ec) => (
+                                  <div key={ec.key} className="flex items-center gap-3 px-4 py-2">
+                                    {ec.ok
+                                      ? <CheckCircle className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
+                                      : <XCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                                    }
+                                    <span className="text-xs text-slate-300 w-36 flex-shrink-0 font-medium">{ec.key}</span>
+                                    <span className="text-[10px] text-slate-400 truncate">{ec.detail}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* ── Console Errors & Warnings */}
+                            <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                              <div className="px-4 py-2.5 flex items-center justify-between" style={{ background: 'rgba(239,68,68,0.08)', borderBottom: '1px solid rgba(239,68,68,0.15)' }}>
+                                <div className="flex items-center gap-2">
+                                  <XCircle className="w-3.5 h-3.5 text-red-400" />
+                                  <span className="text-[11px] font-bold text-red-400 uppercase tracking-wider">Console Log</span>
+                                </div>
+                                <div className="flex gap-1.5">
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-bold">
+                                    {diagnosticResult.consoleErrors.filter(e => e.type === 'error').length} error
+                                  </span>
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 font-bold">
+                                    {diagnosticResult.consoleErrors.filter(e => e.type === 'warn').length} warn
+                                  </span>
+                                </div>
+                              </div>
+                              {diagnosticResult.consoleErrors.length === 0 ? (
+                                <div className="px-4 py-3 text-xs text-green-400 flex items-center gap-2">
+                                  <CheckCircle className="w-3.5 h-3.5" /> Tidak ada console error atau warning
+                                </div>
+                              ) : (
+                                <div className="max-h-40 overflow-y-auto divide-y divide-white/5">
+                                  {diagnosticResult.consoleErrors.slice(0, 20).map((e, i) => (
+                                    <div key={i} className="px-4 py-2 flex gap-2">
+                                      <span className={`text-[9px] font-bold px-1 py-0.5 rounded flex-shrink-0 mt-0.5 ${e.type === 'error' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                        {e.type.toUpperCase()}
+                                      </span>
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-[10px] text-slate-300 font-mono truncate">{e.msg}</p>
+                                        {e.stack && <p className="text-[9px] text-slate-500 font-mono truncate mt-0.5">{e.stack.split('\n')[1]?.trim()}</p>}
+                                        <p className="text-[9px] text-slate-600 mt-0.5">{new Date(e.ts).toLocaleTimeString('id-ID')}</p>
+                                      </div>
+                                    </div>
                                   ))}
-                                </ul>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* ── Network Errors */}
+                            <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                              <div className="px-4 py-2.5 flex items-center justify-between" style={{ background: 'rgba(249,115,22,0.08)', borderBottom: '1px solid rgba(249,115,22,0.15)' }}>
+                                <div className="flex items-center gap-2">
+                                  <Activity className="w-3.5 h-3.5 text-orange-400" />
+                                  <span className="text-[11px] font-bold text-orange-400 uppercase tracking-wider">Network Errors</span>
+                                </div>
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 font-bold">
+                                  {diagnosticResult.networkErrors.length} error
+                                </span>
+                              </div>
+                              {diagnosticResult.networkErrors.length === 0 ? (
+                                <div className="px-4 py-3 text-xs text-green-400 flex items-center gap-2">
+                                  <CheckCircle className="w-3.5 h-3.5" /> Tidak ada network error yang terdeteksi
+                                </div>
+                              ) : (
+                                <div className="max-h-40 overflow-y-auto divide-y divide-white/5">
+                                  {diagnosticResult.networkErrors.slice(0, 20).map((e, i) => (
+                                    <div key={i} className="px-4 py-2 flex items-center gap-3">
+                                      <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-red-500/20 text-red-400 flex-shrink-0">{e.status || 'NET'}</span>
+                                      <span className="text-[10px] text-slate-300 font-mono flex-1 truncate">{e.url}</span>
+                                      <span className="text-[9px] text-slate-500">{e.duration}ms</span>
+                                      <span className="text-[9px] text-slate-600">{new Date(e.ts).toLocaleTimeString('id-ID')}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* ── Unhandled Rejections */}
+                            {diagnosticResult.rejections.length > 0 && (
+                              <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                                <div className="px-4 py-2.5 flex items-center justify-between" style={{ background: 'rgba(239,68,68,0.1)', borderBottom: '1px solid rgba(239,68,68,0.2)' }}>
+                                  <div className="flex items-center gap-2">
+                                    <XCircle className="w-3.5 h-3.5 text-red-400" />
+                                    <span className="text-[11px] font-bold text-red-400 uppercase tracking-wider">Unhandled Promise Rejections</span>
+                                  </div>
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-bold">
+                                    {diagnosticResult.rejections.length}
+                                  </span>
+                                </div>
+                                <div className="max-h-32 overflow-y-auto divide-y divide-white/5">
+                                  {diagnosticResult.rejections.map((r, i) => (
+                                    <div key={i} className="px-4 py-2 flex items-center gap-3">
+                                      <p className="text-[10px] text-red-300 font-mono flex-1 truncate">{r.reason}</p>
+                                      <span className="text-[9px] text-slate-600">{new Date(r.ts).toLocaleTimeString('id-ID')}</span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             )}
                           </>
                         )}
+
+                        {/* Idle state (not yet run) */}
+                        {!diagnosticLoading && !diagnosticResult && (
+                          <div className="flex flex-col items-center justify-center py-12 gap-4">
+                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.2)' }}>
+                              <Activity className="w-8 h-8 text-orange-400" />
+                            </div>
+                            <div className="text-center">
+                              <p className="text-sm font-semibold text-white">Siap Mendiagnosa</p>
+                              <p className="text-xs text-slate-400 mt-1">Klik &quot;Jalankan Diagnosa&quot; untuk memulai pemeriksaan sistem</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
-                      <DialogFooter className="gap-2">
-                        <Button
+                      {/* Footer */}
+                      <div className="px-5 py-3.5 flex gap-2 border-t border-white/5" style={{ background: 'rgba(15,23,42,0.8)' }}>
+                        <button
                           type="button"
-                          variant="outline"
                           onClick={() => setShowDiagnosticDialog(false)}
-                          className="border-gray-300 text-gray-700 hover:bg-gray-100"
+                          className="flex-1 h-9 rounded-xl text-sm font-bold text-slate-400 hover:text-white transition-colors"
+                          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
                         >
                           Tutup
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           type="button"
                           onClick={handleRunDiagnostic}
                           disabled={diagnosticLoading}
-                          className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
+                          className="flex-1 h-9 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                          style={{ background: 'linear-gradient(135deg, #f97316, #dc2626)', boxShadow: '0 4px 15px -4px rgba(249,115,22,0.4)' }}
                         >
-                          {diagnosticLoading ? (
-                            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menjalankan...</>
-                          ) : (
-                            <><RefreshCw className="w-4 h-4 mr-2" /> Jalankan Ulang</>
-                          )}
-                        </Button>
-                      </DialogFooter>
+                          {diagnosticLoading
+                            ? <><Loader2 className="w-4 h-4 animate-spin" /> Menjalankan...</>
+                            : <><RefreshCw className="w-4 h-4" /> Jalankan Diagnosa</>
+                          }
+                        </button>
+                        {diagnosticResult && (
+                          <button
+                            type="button"
+                            onClick={() => { setCapturedConsoleErrors([]); setCapturedNetworkErrors([]); setCapturedRejections([]); setDiagnosticResult(null) }}
+                            className="h-9 px-3 rounded-xl text-xs font-bold text-red-400 hover:bg-red-500/10 transition-all"
+                            style={{ border: '1px solid rgba(239,68,68,0.2)' }}
+                            title="Hapus semua log yang sudah ditangkap"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </DialogContent>
                   </Dialog>
                 </div>
 
-                {/* Filters */}
-                <div className="rounded-2xl overflow-hidden shadow-2xl" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)', border: '1px solid rgba(249,115,22,0.25)' }}>
-                  {/* Header bar */}
-                  <div className="flex items-center justify-between px-5 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ef4444)' }}><Search className="w-3.5 h-3.5 text-white" /></div>
-                      <span className="text-sm font-bold text-white">Filter &amp; Pencarian</span>
-                      {(sopFilters.kategori !== 'SEMUA' || sopFilters.jenis !== 'SEMUA' || sopFilters.lingkup !== 'SEMUA' || sopFilters.status !== 'SEMUA' || sopFilters.tahun || searchInput) && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: 'linear-gradient(135deg, #f97316, #ef4444)', color: 'white' }}>
-                          {[sopFilters.kategori !== 'SEMUA', sopFilters.jenis !== 'SEMUA', sopFilters.lingkup !== 'SEMUA', sopFilters.status !== 'SEMUA', !!sopFilters.tahun, !!searchInput].filter(Boolean).length} aktif
-                        </span>
+                {/* Filters — compact bar */}
+                <div className="rounded-xl overflow-hidden shadow-xl" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)', border: '1px solid rgba(249,115,22,0.2)' }}>
+                  <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+                    {/* Search */}
+                    <div className="relative flex-1 min-w-[160px]">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: '#f97316' }} />
+                      <Input
+                        placeholder="Cari judul..."
+                        value={searchInput}
+                        onChange={(e) => { setSearchInput(e.target.value); setSopPagination(p => ({ ...p, page: 1 })) }}
+                        className="pl-7 pr-7 h-7 text-[11px] text-white placeholder:text-gray-500 font-medium rounded-lg"
+                        style={{ background: 'rgba(255,255,255,0.06)', border: searchInput ? '1.5px solid rgba(249,115,22,0.6)' : '1.5px solid rgba(255,255,255,0.1)', boxShadow: searchInput ? '0 0 8px rgba(249,115,22,0.2)' : 'none', outline: 'none' }}
+                      />
+                      {isSearching && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-orange-400 animate-spin" />}
+                      {searchInput && !isSearching && (
+                        <button onClick={() => { setSearchInput(''); setSopFilters(prev => ({ ...prev, search: '' })); setSopPagination(p => ({ ...p, page: 1 })) }} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"><X className="w-3 h-3" /></button>
                       )}
                     </div>
+
+                    {/* Separator */}
+                    <div className="w-px h-5 bg-white/10 hidden sm:block" />
+
+                    {/* Filter dropdowns — all in one row */}
+                    {[
+                      { label: 'Kategori', value: sopFilters.kategori, key: 'kategori', options: ['SEMUA', ...KATEGORI_OPTIONS], onChange: (v: string) => setSopFilters({ ...sopFilters, kategori: v }) },
+                      { label: 'Lingkup', value: sopFilters.lingkup, key: 'lingkup', options: ['SEMUA', ...LINGKUP_OPTIONS], onChange: (v: string) => setSopFilters({ ...sopFilters, lingkup: v }) },
+                      { label: 'Jenis', value: sopFilters.jenis, key: 'jenis', options: ['SEMUA', ...JENIS_OPTIONS], onChange: (v: string) => setSopFilters({ ...sopFilters, jenis: v }) },
+                      { label: 'Status', value: sopFilters.status, key: 'status', options: ['SEMUA', ...STATUS_OPTIONS], onChange: (v: string) => setSopFilters({ ...sopFilters, status: v }) },
+                    ].map((f) => (
+                      <Select key={f.key} value={f.value} onValueChange={(v) => { f.onChange(v); setSopPagination(p => ({ ...p, page: 1 })) }}>
+                        <SelectTrigger className="h-7 w-[110px] rounded-lg text-[11px] font-medium px-2" style={{ background: f.value !== 'SEMUA' ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.05)', border: f.value !== 'SEMUA' ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.08)', color: f.value !== 'SEMUA' ? '#fb923c' : '#9ca3af' }}>
+                          <SelectValue placeholder={f.label} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {f.options.map(o => <SelectItem key={o} value={o} className="text-xs">{o === 'SEMUA' ? `Semua ${f.label}` : o}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    ))}
+
+                    {/* Tahun */}
+                    <Select value={sopFilters.tahun || 'SEMUA'} onValueChange={(v) => { setSopFilters({ ...sopFilters, tahun: v === 'SEMUA' ? '' : v }); setSopPagination(p => ({ ...p, page: 1 })) }}>
+                      <SelectTrigger className="h-7 w-[90px] rounded-lg text-[11px] font-medium px-2" style={{ background: sopFilters.tahun ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.05)', border: sopFilters.tahun ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.08)', color: sopFilters.tahun ? '#fb923c' : '#9ca3af' }}>
+                        <SelectValue placeholder="Tahun" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="SEMUA" className="text-xs">Semua Tahun</SelectItem>
+                        {stats?.byTahun?.map(t => <SelectItem key={t.tahun} value={t.tahun.toString()} className="text-xs">{t.tahun}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+
+                    {/* Separator */}
+                    <div className="w-px h-5 bg-white/10 hidden sm:block" />
+
+                    {/* Sort */}
+                    <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+                      <SelectTrigger className="h-7 w-[140px] rounded-lg text-[11px] font-medium px-2" style={{ background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(255,255,255,0.08)', color: '#9ca3af' }}>
+                        <SelectValue placeholder="Urutkan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="tahun-asc" className="text-xs">Tahun ↑</SelectItem>
+                        <SelectItem value="tahun-desc" className="text-xs">Tahun ↓</SelectItem>
+                        <SelectItem value="uploadedAt-desc" className="text-xs">Terbaru Upload</SelectItem>
+                        <SelectItem value="uploadedAt-asc" className="text-xs">Terlama Upload</SelectItem>
+                        <SelectItem value="judul-asc" className="text-xs">Judul A→Z</SelectItem>
+                        <SelectItem value="judul-desc" className="text-xs">Judul Z→A</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {/* Active filters badge + Reset */}
                     {(sopFilters.kategori !== 'SEMUA' || sopFilters.jenis !== 'SEMUA' || sopFilters.lingkup !== 'SEMUA' || sopFilters.status !== 'SEMUA' || sopFilters.tahun || searchInput) && (
-                      <button onClick={() => { setSearchInput(''); setSopFilters({ kategori: 'SEMUA', jenis: 'SEMUA', lingkup: 'SEMUA', status: 'SEMUA', tahun: '', search: '' }); setSopPagination(p => ({ ...p, page: 1 })) }} className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all" style={{ background: 'rgba(239,68,68,0.15)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.25)' }}>
-                        <X className="w-3 h-3" /> Reset Semua
+                      <button
+                        onClick={() => { setSearchInput(''); setSopFilters({ kategori: 'SEMUA', jenis: 'SEMUA', lingkup: 'SEMUA', status: 'SEMUA', tahun: '', search: '' }); setSopPagination(p => ({ ...p, page: 1 })) }}
+                        className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg transition-all ml-auto"
+                        style={{ background: 'rgba(239,68,68,0.15)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.25)' }}
+                      >
+                        <X className="w-2.5 h-2.5" />
+                        Reset
+                        <span className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[9px] font-black" style={{ background: 'linear-gradient(135deg, #f97316, #ef4444)' }}>
+                          {[sopFilters.kategori !== 'SEMUA', sopFilters.jenis !== 'SEMUA', sopFilters.lingkup !== 'SEMUA', sopFilters.status !== 'SEMUA', !!sopFilters.tahun, !!searchInput].filter(Boolean).length}
+                        </span>
                       </button>
                     )}
-                  </div>
-
-                  <div className="p-5 space-y-4">
-                    {/* Row 1: Search + Sort */}
-                    <div className="flex flex-col md:flex-row gap-3">
-                      {/* Search */}
-                      <div className="flex-1">
-                        <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Pencarian</p>
-                        <div className="relative">
-                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#f97316' }} />
-                          <Input
-                            placeholder="Cari judul dokumen..."
-                            value={searchInput}
-                            onChange={(e) => { setSearchInput(e.target.value); setSopPagination(p => ({ ...p, page: 1 })) }}
-                            className="pl-10 pr-10 h-11 text-white placeholder:text-gray-500 text-sm font-medium rounded-xl"
-                            style={{ background: 'rgba(255,255,255,0.06)', border: searchInput ? '1.5px solid rgba(249,115,22,0.6)' : '1.5px solid rgba(255,255,255,0.1)', boxShadow: searchInput ? '0 0 12px rgba(249,115,22,0.2)' : 'none', outline: 'none' }}
-                          />
-                          {isSearching && <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-400 animate-spin" />}
-                          {searchInput && !isSearching && (
-                            <button onClick={() => { setSearchInput(''); setSopFilters(prev => ({ ...prev, search: '' })); setSopPagination(p => ({ ...p, page: 1 })) }} className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 hover:text-gray-300 transition-colors"><X className="w-4 h-4" /></button>
-                          )}
-                        </div>
-                      </div>
-                      {/* Sort */}
-                      <div className="w-full md:w-56">
-                        <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Urutkan</p>
-                        <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
-                          <SelectTrigger className="h-11 text-white rounded-xl text-sm" style={{ background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.1)' }}>
-                            <SelectValue placeholder="Pilih urutan" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="tahun-asc">Tahun (Terkecil → Terbesar)</SelectItem>
-                            <SelectItem value="tahun-desc">Tahun (Terbesar → Terkecil)</SelectItem>
-                            <SelectItem value="uploadedAt-desc">Terbaru Diupload</SelectItem>
-                            <SelectItem value="uploadedAt-asc">Terlama Diupload</SelectItem>
-                            <SelectItem value="judul-asc">Judul (A → Z)</SelectItem>
-                            <SelectItem value="judul-desc">Judul (Z → A)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    {/* Row 2: Filter chips */}
-                    <div>
-                      <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-2">Filter</p>
-                      <div className="flex flex-wrap gap-2">
-                        {[
-                          { label: 'Kategori', value: sopFilters.kategori, key: 'kategori', options: ['SEMUA', ...KATEGORI_OPTIONS], onChange: (v: string) => setSopFilters({ ...sopFilters, kategori: v }) },
-                          { label: 'Lingkup', value: sopFilters.lingkup, key: 'lingkup', options: ['SEMUA', ...LINGKUP_OPTIONS], onChange: (v: string) => setSopFilters({ ...sopFilters, lingkup: v }) },
-                          { label: 'Jenis', value: sopFilters.jenis, key: 'jenis', options: ['SEMUA', ...JENIS_OPTIONS], onChange: (v: string) => setSopFilters({ ...sopFilters, jenis: v }) },
-                          { label: 'Status', value: sopFilters.status, key: 'status', options: ['SEMUA', ...STATUS_OPTIONS], onChange: (v: string) => setSopFilters({ ...sopFilters, status: v }) },
-                        ].map((f) => (
-                          <div key={f.key} className="flex-1 min-w-[130px]">
-                            <Select value={f.value} onValueChange={(v) => { f.onChange(v); setSopPagination(p => ({ ...p, page: 1 })) }}>
-                              <SelectTrigger className="h-9 rounded-xl text-xs font-medium" style={{ background: f.value !== 'SEMUA' ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.05)', border: f.value !== 'SEMUA' ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.08)', color: f.value !== 'SEMUA' ? '#fb923c' : '#9ca3af' }}>
-                                <SelectValue placeholder={f.label} />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {f.options.map(o => <SelectItem key={o} value={o}>{o === 'SEMUA' ? `Semua ${f.label}` : o}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        ))}
-                        {/* Tahun */}
-                        <div className="flex-1 min-w-[110px]">
-                          <Select value={sopFilters.tahun || 'SEMUA'} onValueChange={(v) => { setSopFilters({ ...sopFilters, tahun: v === 'SEMUA' ? '' : v }); setSopPagination(p => ({ ...p, page: 1 })) }}>
-                            <SelectTrigger className="h-9 rounded-xl text-xs font-medium" style={{ background: sopFilters.tahun ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.05)', border: sopFilters.tahun ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.08)', color: sopFilters.tahun ? '#fb923c' : '#9ca3af' }}>
-                              <SelectValue placeholder="Tahun" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="SEMUA">Semua Tahun</SelectItem>
-                              {stats?.byTahun?.map(t => <SelectItem key={t.tahun} value={t.tahun.toString()}>{t.tahun}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
@@ -7859,225 +8122,380 @@ export default function ESOPApp() {
 
                   <div className="grid grid-cols-1 gap-4">
                     <AnimatePresence mode="popLayout">
-                      {sopFiles.length === 0 && !katalogLoading ? (
-                        <motion.div
-                          key="empty"
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="flex flex-col items-center justify-center py-20 bg-slate-900/30 backdrop-blur-sm border-2 border-dashed border-slate-800 rounded-3xl"
-                        >
-                          <div className="relative">
-                            <div className="absolute inset-0 bg-orange-500/10 blur-3xl rounded-full" />
-                            <FileText className="w-20 h-20 text-slate-700 relative z-10" />
-                          </div>
-                          <p className="mt-4 text-slate-400 font-bold tracking-wide uppercase text-xs">Katalog Kosong</p>
-                          <p className="text-slate-500 text-sm mt-1">Gunakan filter lain atau tambah dokumen baru</p>
-                        </motion.div>
-                      ) : (
-                        sopFiles.map((sop, index) => (
-                          <motion.div
-                            key={sop.id}
-                            layout
-                            initial={{ opacity: 0, y: 30, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.9 }}
-                            transition={{
-                              duration: 0.4,
-                              delay: index * 0.05,
-                              type: "spring",
-                              stiffness: 100,
-                              damping: 15
-                            }}
-                            className="group relative"
-                          >
-                            {/* Card Body */}
-                            <div className={`relative overflow-hidden rounded-2xl border transition-all duration-500 ${excelEditData?.id === sop.id
-                              ? 'bg-orange-600/10 border-orange-500/50 shadow-[0_0_30px_rgba(249,115,22,0.15)] ring-2 ring-orange-500/20'
-                              : 'bg-slate-900/40 hover:bg-slate-900/60 border-slate-800 hover:border-orange-500/30 backdrop-blur-sm hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)]'
-                              }`}>
-
-                              {/* Glowing Accent Line */}
-                              <div className={`absolute top-0 left-0 bottom-0 w-1.5 transition-all duration-500 ${sop.jenis === 'SOP' ? 'bg-orange-500' : 'bg-yellow-500'
-                                } group-hover:w-2`} />
-
-                              <div className="p-5 pl-8">
-                                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-
-                                  {/* Left Content: Title & Info */}
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-3 mb-2">
-                                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-800/80 border border-slate-700">
-                                        <Hash className="w-3 h-3 text-orange-400" />
-                                        <span className="text-[10px] font-bold text-slate-300 tracking-wider font-mono">
-                                          {sop.nomorSop || 'BELUM ADA NO'}
-                                        </span>
-                                      </div>
-                                      <span className="text-[10px] font-black text-slate-500">•</span>
-                                      <div className="flex items-center gap-1.5 group/year">
-                                        <Calendar className="w-3 h-3 text-slate-500 group-hover/year:text-orange-400 transition-colors" />
-                                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">{sop.tahun}</span>
-                                      </div>
+                      {(() => {
+                        if (katalogLoading && sopFiles.length === 0) {
+                          // Skeleton cards loading saat pertama kali memuat data
+                          return (
+                            <>
+                              {[0, 1, 2, 3, 4, 5].map((i) => (
+                                <motion.div
+                                  key={`skel-${i}`}
+                                  initial={{ opacity: 0, y: 20 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ delay: i * 0.06 }}
+                                  className="relative overflow-hidden rounded-2xl border border-white/5 p-4"
+                                  style={{ background: 'linear-gradient(135deg, rgba(15,15,35,0.8), rgba(22,33,62,0.8))', backdropFilter: 'blur(8px)' }}
+                                >
+                                  {/* Shimmer sweep */}
+                                  <motion.div
+                                    className="absolute inset-0 z-10"
+                                    style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(249,115,22,0.05) 50%, transparent 100%)' }}
+                                    animate={{ x: ['-100%', '200%'] }}
+                                    transition={{ duration: 2, repeat: Infinity, ease: 'linear', delay: i * 0.15 }}
+                                  />
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-white/5 animate-pulse flex-shrink-0" />
+                                    <div className="flex-1 space-y-2">
+                                      <div className="h-4 rounded-lg animate-pulse bg-white/8" style={{ width: `${60 + (i % 3) * 15}%` }} />
+                                      <div className="h-3 rounded-md animate-pulse w-1/3 bg-white/5" />
                                     </div>
+                                    <div className="flex gap-2">
+                                      <div className="w-16 h-6 rounded-full animate-pulse bg-white/5" />
+                                      <div className="w-12 h-6 rounded-full animate-pulse bg-white/5" />
+                                    </div>
+                                  </div>
+                                  <div className="mt-3 flex items-center gap-4">
+                                    <div className="h-3 w-24 rounded animate-pulse bg-white/5" />
+                                    <div className="h-3 w-20 rounded animate-pulse bg-white/5" />
+                                    <div className="ml-auto h-8 w-24 rounded-xl animate-pulse bg-white/5" />
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </>
+                          );
+                        }
+                        if (sopFiles.length === 0 && !katalogLoading) {
+                          return (
+                            <motion.div
+                              key="empty"
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="flex flex-col items-center justify-center py-20 bg-slate-900/30 backdrop-blur-sm border-2 border-dashed border-slate-800 rounded-3xl"
+                            >
+                              <div className="relative">
+                                <div className="absolute inset-0 bg-orange-500/10 blur-3xl rounded-full" />
+                                <FileText className="w-20 h-20 text-slate-700 relative z-10" />
+                              </div>
+                              <p className="mt-4 text-slate-400 font-bold tracking-wide uppercase text-xs">Katalog Kosong</p>
+                              <p className="text-slate-500 text-sm mt-1">Gunakan filter lain atau tambah dokumen baru</p>
+                            </motion.div>
+                          );
+                        }
+                        return sopFiles.map((sop, index) => {
+                          const isEditing = excelEditData?.id === sop.id;
+                          const isDesktopSyncActive = desktopEditSessionToken && isEditing;
 
-                                    <div className="flex items-start gap-4">
-                                      <div className="mt-1 relative flex-shrink-0">
-                                        <div className="absolute inset-0 bg-white/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                                        <FileTypeIcon fileName={sop.fileName} className="w-10 h-10 relative z-10 drop-shadow-lg transform group-hover:scale-110 transition-transform" />
+                          return (
+                            <motion.div
+                              key={sop.id}
+                              layout
+                              initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.9 }}
+                              transition={{
+                                duration: 0.4,
+                                delay: index * 0.05,
+                                type: "spring",
+                                stiffness: 100,
+                                damping: 15
+                              }}
+                              className={`group relative ${isDesktopSyncActive ? 'z-50' : 'z-10'}`}
+                            >
+                              {/* Glowing Backdrop When Sync Active */}
+                              {isDesktopSyncActive && (
+                                <motion.div
+                                  className="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 rounded-3xl blur-md opacity-70"
+                                  animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }}
+                                  transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+                                  style={{ backgroundSize: '200% 200%' }}
+                                />
+                              )}
+
+                              {/* Card Body */}
+                              <div className={`relative overflow-hidden rounded-2xl border transition-all duration-500 ${isDesktopSyncActive
+                                ? 'bg-slate-900 border-indigo-500/50 shadow-[0_0_50px_rgba(99,102,241,0.3)] ring-2 ring-indigo-500/50 backdrop-blur-xl scale-[1.02]'
+                                : isEditing
+                                  ? 'bg-orange-600/10 border-orange-500/50 shadow-[0_0_30px_rgba(249,115,22,0.15)] ring-2 ring-orange-500/20'
+                                  : 'bg-slate-900/40 hover:bg-slate-900/60 border-slate-800 hover:border-orange-500/30 backdrop-blur-sm hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)]'
+                                }`}>
+
+                                {/* Glowing Accent Line */}
+                                <div className={`absolute top-0 left-0 bottom-0 w-1.5 transition-all duration-500 ${isDesktopSyncActive
+                                  ? 'bg-gradient-to-b from-indigo-400 via-purple-400 to-indigo-400 w-2 shadow-[0_0_15px_rgba(99,102,241,0.8)]'
+                                  : sop.jenis === 'SOP' ? 'bg-orange-500 group-hover:w-2' : 'bg-yellow-500 group-hover:w-2'
+                                  }`} />
+
+                                <div className="p-5 pl-8">
+                                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+
+                                    {/* Left Content: Title & Info */}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-3 mb-2">
+                                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-800/80 border border-slate-700">
+                                          <Hash className="w-3 h-3 text-orange-400" />
+                                          <span className="text-[10px] font-bold text-slate-300 tracking-wider font-mono">
+                                            {sop.nomorSop || 'BELUM ADA NO'}
+                                          </span>
+                                        </div>
+                                        <span className="text-[10px] font-black text-slate-500">•</span>
+                                        <div className="flex items-center gap-1.5 group/year">
+                                          <Calendar className="w-3 h-3 text-slate-500 group-hover/year:text-orange-400 transition-colors" />
+                                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">{sop.tahun}</span>
+                                        </div>
                                       </div>
 
-                                      <div className="flex-1 min-w-0">
-                                        <h3 className={`text-lg font-black tracking-tight leading-tight group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r transition-all duration-300 ${excelEditData?.id === sop.id
-                                          ? 'text-orange-400 bg-gradient-to-r from-orange-400 to-red-400'
-                                          : 'text-white group-hover:from-white group-hover:to-orange-200'
-                                          }`}>
-                                          {sop.judul}
-                                        </h3>
+                                      <div className="flex items-start gap-4">
+                                        <div className="mt-1 relative flex-shrink-0">
+                                          <div className="absolute inset-0 bg-white/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                                          <FileTypeIcon fileName={sop.fileName} className="w-10 h-10 relative z-10 drop-shadow-lg transform group-hover:scale-110 transition-transform" />
+                                        </div>
 
-                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 text-[11px] font-medium text-slate-500">
-                                          <div className="flex items-center gap-1.5">
-                                            <div className="w-5 h-5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
-                                              <User className="w-2.5 h-2.5 text-slate-400" />
+                                        <div className="flex-1 min-w-0">
+                                          <h3 className={`text-lg font-black tracking-tight leading-tight group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r transition-all duration-300 ${isDesktopSyncActive
+                                            ? 'text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 via-purple-300 to-indigo-300 animate-pulse'
+                                            : isEditing
+                                              ? 'text-orange-400 bg-gradient-to-r from-orange-400 to-red-400'
+                                              : 'text-white group-hover:from-white group-hover:to-orange-200'
+                                            }`}>
+                                            {sop.judul}
+                                          </h3>
+
+                                          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 text-[11px] font-medium text-slate-500">
+                                            <div className="flex items-center gap-1.5">
+                                              <div className="w-5 h-5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
+                                                <User className="w-2.5 h-2.5 text-slate-400" />
+                                              </div>
+                                              <span>Oleh <span className="text-orange-400/80 group-hover:text-orange-400 transition-colors">{sop.user?.name || 'System'}</span></span>
                                             </div>
-                                            <span>Oleh <span className="text-orange-400/80 group-hover:text-orange-400 transition-colors">{sop.user?.name || 'System'}</span></span>
-                                          </div>
-                                          <div className="flex items-center gap-1.5">
-                                            <Clock className="w-3 h-3 text-slate-600" />
-                                            <span>{new Date(sop.uploadedAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                                          </div>
-                                          {sop.updatedAt && new Date(sop.updatedAt).getTime() !== new Date(sop.uploadedAt).getTime() && (
-                                            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/15 text-amber-400/90">
-                                              <Edit3 className="w-2.5 h-2.5 flex-shrink-0" />
-                                              <span className="truncate max-w-[220px]">
-                                                Diedit oleh&nbsp;
-                                                <span className="font-black text-amber-300">{sop.updatedByUser?.name || sop.updatedBy || 'Admin'}</span>
-                                                &nbsp;·&nbsp;
-                                                {new Date(sop.updatedAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                              </span>
+                                            <div className="flex items-center gap-1.5">
+                                              <Clock className="w-3 h-3 text-slate-600" />
+                                              <span>{new Date(sop.uploadedAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                                             </div>
-                                          )}
+                                            {sop.updatedAt && new Date(sop.updatedAt).getTime() !== new Date(sop.uploadedAt).getTime() && (
+                                              <TooltipProvider delayDuration={200}>
+                                                <Tooltip>
+                                                  <TooltipTrigger asChild>
+                                                    <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/15 text-amber-400/90 cursor-help transition-colors hover:bg-amber-500/20">
+                                                      <Edit3 className="w-2.5 h-2.5 flex-shrink-0" />
+                                                      <span className="truncate max-w-[280px]">
+                                                        Diedit oleh&nbsp;
+                                                        <span className="font-black text-amber-300">{sop.updatedByUser?.name || sop.updatedBy || 'Admin'}</span>
+                                                        &nbsp;·&nbsp;
+                                                        {new Date(sop.updatedAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                      </span>
+                                                    </div>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent side="top" className="bg-slate-900 border-amber-500/20 p-3 max-w-[280px] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.7)] shadow-amber-500/10 rounded-xl z-50 backdrop-blur-md">
+                                                    <div className="flex flex-col gap-1.5">
+                                                      <div className="flex items-center gap-2 mb-1 border-b border-slate-700/50 pb-2">
+                                                        <Edit3 className="w-3.5 h-3.5 text-amber-500" />
+                                                        <span className="font-bold text-slate-200 text-xs uppercase tracking-wider">Detail Perubahan</span>
+                                                        <span className="text-[9px] text-slate-500 ml-auto font-medium">{new Date(sop.updatedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                      </div>
+                                                      <div className="text-[11px] text-slate-300 leading-relaxed font-medium">
+                                                        {(() => {
+                                                          if (!sop.logs || sop.logs.length === 0) return 'Melakukan sikronisasi dokumen via Desktop/M365.';
+
+                                                          const log = sop.logs[0];
+                                                          if (log.aktivitas === 'EDIT_METADATA') {
+                                                            const dashIdx = log.deskripsi.indexOf(' - ');
+                                                            if (dashIdx !== -1) {
+                                                              const changesStr = log.deskripsi.slice(dashIdx + 3);
+                                                              const fieldLabels: Record<string, string> = {
+                                                                judul: 'Judul',
+                                                                tahun: 'Tahun',
+                                                                jenis: 'Jenis',
+                                                                kategori: 'Kategori',
+                                                                lingkup: 'Lingkup',
+                                                                status: 'Status',
+                                                                nomor: 'Nomor SOP',
+                                                                'file renamed': 'Nama File',
+                                                              };
+                                                              // Pecah per field: split pada ", fieldname: "
+                                                              const fieldPattern = /(?:^|(?<=, ?))(judul|tahun|jenis|kategori|lingkup|status|nomor|file renamed): /g;
+                                                              const parts: Array<{ key: string; raw: string }> = [];
+                                                              let match: RegExpExecArray | null;
+                                                              let lastEnd = 0;
+                                                              let lastKey = '';
+                                                              const allMatches: Array<{ key: string; index: number; end: number }> = [];
+                                                              for (const m of changesStr.matchAll(/(?:^|, )(judul|tahun|jenis|kategori|lingkup|status|nomor|file renamed): /g)) {
+                                                                allMatches.push({ key: m[1], index: (m.index ?? 0) + (m[0].startsWith(', ') ? 2 : 0), end: (m.index ?? 0) + m[0].length });
+                                                              }
+                                                              for (let mi = 0; mi < allMatches.length; mi++) {
+                                                                const cur = allMatches[mi];
+                                                                const nextStart = allMatches[mi + 1]?.index;
+                                                                const rawValue = nextStart !== undefined
+                                                                  ? changesStr.slice(cur.end, nextStart - 2) // remove ", "
+                                                                  : changesStr.slice(cur.end);
+                                                                parts.push({ key: cur.key, raw: rawValue.trim() });
+                                                              }
+                                                              if (parts.length > 0) {
+                                                                return (
+                                                                  <div className="mt-1 space-y-1">
+                                                                    {parts.map((p, i) => {
+                                                                      // Gunakan String.fromCharCode agar karakter panah selalu benar
+                                                                      const PANAH = ' ' + String.fromCharCode(8594) + ' '; // → (U+2192)
+                                                                      const arrowIdx = p.raw.indexOf(PANAH);
+                                                                      let oldVal = p.raw;
+                                                                      let newVal = '';
+                                                                      if (arrowIdx !== -1) {
+                                                                        oldVal = p.raw.slice(0, arrowIdx).replace(/"/g, '').trim();
+                                                                        newVal = p.raw.slice(arrowIdx + PANAH.length).replace(/"/g, '').trim();
+                                                                      }
+                                                                      return (
+                                                                        <div key={i} className="flex flex-col gap-0.5 bg-white/5 rounded px-2 py-1">
+                                                                          <span className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">{fieldLabels[p.key] ?? p.key}</span>
+                                                                          <div className="flex items-center gap-1 text-[11px] flex-wrap">
+                                                                            <span className="text-red-300 line-through">{oldVal}</span>
+                                                                            {newVal && <><span className="text-slate-500">→</span><span className="text-emerald-300">{newVal}</span></>}
+                                                                          </div>
+                                                                        </div>
+                                                                      );
+                                                                    })}
+                                                                  </div>
+                                                                );
+                                                              }
+                                                            }
+                                                            return <span>Memperbarui informasi metadata dokumen.</span>;
+                                                          }
+
+                                                          if (log.aktivitas === 'UPDATE_FILE') return <span className="text-emerald-400">Mengunggah ulang file dokumen yang baru (Replace).</span>;
+                                                          if (log.aktivitas === 'EXCEL_EDIT_SYNC') return <span className="text-indigo-400">Menyimpan perubahan isi dokumen via Desktop Sync.</span>;
+                                                          if (log.aktivitas === 'VERIFIKASI') return 'Memverifikasi status persetujuan dokumen publik.';
+                                                          if (log.aktivitas === 'EDIT_STATUS') return 'Mengubah status tracking dokumen (Aktif/Review/Kadaluarsa).';
+
+                                                          return log.deskripsi;
+                                                        })()}
+                                                      </div>
+                                                    </div>
+                                                  </TooltipContent>
+                                                </Tooltip>
+                                              </TooltipProvider>
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                     </div>
-                                  </div>
 
-                                  {/* Center: Badges */}
-                                  <div className="flex flex-wrap items-center gap-2 lg:justify-center">
-                                    <Badge variant="outline" className="h-7 border-slate-700 bg-slate-800/40 text-slate-300 font-bold tracking-wide rounded-lg px-3">
-                                      {sop.kategori}
-                                    </Badge>
-                                    <Badge variant="outline" className="h-7 border-indigo-500/20 bg-indigo-500/5 text-indigo-400 font-bold tracking-wide rounded-lg px-3">
-                                      {sop.lingkup || '-'}
-                                    </Badge>
-                                    <div className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider shadow-lg ${sop.jenis === 'SOP'
-                                      ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-orange-500/20'
-                                      : 'bg-gradient-to-br from-yellow-500 to-yellow-600 text-white shadow-yellow-500/20'
-                                      }`}>
-                                      {sop.jenis}
+                                    {/* Center: Badges */}
+                                    <div className="flex flex-wrap items-center gap-2 lg:justify-center">
+                                      <Badge variant="outline" className="h-7 border-slate-700 bg-slate-800/40 text-slate-300 font-bold tracking-wide rounded-lg px-3">
+                                        {sop.kategori}
+                                      </Badge>
+                                      <Badge variant="outline" className="h-7 border-indigo-500/20 bg-indigo-500/5 text-indigo-400 font-bold tracking-wide rounded-lg px-3">
+                                        {sop.lingkup || '-'}
+                                      </Badge>
+                                      <div className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider shadow-lg ${sop.jenis === 'SOP'
+                                        ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-orange-500/20'
+                                        : 'bg-gradient-to-br from-yellow-500 to-yellow-600 text-white shadow-yellow-500/20'
+                                        }`}>
+                                        {sop.jenis}
+                                      </div>
+                                      <div className={`px-2 py-1 rounded-md text-[9px] font-bold border ${STATUS_COLORS[sop.status]}`}>
+                                        {sop.status}
+                                      </div>
                                     </div>
-                                    <div className={`px-2 py-1 rounded-md text-[9px] font-bold border ${STATUS_COLORS[sop.status]}`}>
-                                      {sop.status}
-                                    </div>
-                                  </div>
 
-                                  {/* Right: Actions */}
-                                  <div className="flex items-center gap-2 lg:pl-6 lg:border-l lg:border-slate-800/50">
-                                    {/* Action Group */}
-                                    <div className="flex items-center p-1.5 rounded-xl bg-slate-800/40 border border-slate-700/50 group-hover:border-orange-500/20 transition-all shadow-inner">
-                                      <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} disabled={previewLoading === sop.id} className="w-9 h-9 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-400 text-slate-400 transition-all">
-                                              {previewLoading === sop.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent className="bg-slate-800 border-slate-700 text-cyan-400 font-bold">Preview</TooltipContent>
-                                        </Tooltip>
-
-                                        {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && (
+                                    {/* Right: Actions */}
+                                    <div className="flex items-center gap-2 lg:pl-6 lg:border-l lg:border-slate-800/50">
+                                      {/* Action Group */}
+                                      <div className="flex items-center p-1.5 rounded-xl bg-slate-800/40 border border-slate-700/50 group-hover:border-orange-500/20 transition-all shadow-inner">
+                                        <TooltipProvider>
                                           <Tooltip>
                                             <TooltipTrigger asChild>
-                                              <Button size="icon" variant="ghost" onClick={() => handleOpenEdit(sop.id)} className="w-9 h-9 rounded-lg hover:bg-orange-500/10 hover:text-orange-400 text-slate-400 transition-all">
-                                                <Edit className="w-4 h-4" />
+                                              <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} disabled={previewLoading === sop.id} className="w-9 h-9 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-400 text-slate-400 transition-all">
+                                                {previewLoading === sop.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
                                               </Button>
                                             </TooltipTrigger>
-                                            <TooltipContent className="bg-slate-800 border-slate-700 text-orange-400 font-bold">Edit Info</TooltipContent>
+                                            <TooltipContent className="bg-slate-800 border-slate-700 text-cyan-400 font-bold">Preview</TooltipContent>
                                           </Tooltip>
-                                        )}
 
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} disabled={downloadLoading === sop.id} className="w-9 h-9 rounded-lg hover:bg-green-500/10 hover:text-green-400 text-slate-400 transition-all">
-                                              {downloadLoading === sop.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent className="bg-slate-800 border-slate-700 text-green-400 font-bold">Download</TooltipContent>
-                                        </Tooltip>
+                                          {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && (
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Button size="icon" variant="ghost" onClick={() => handleOpenEdit(sop.id)} className="w-9 h-9 rounded-lg hover:bg-orange-500/10 hover:text-orange-400 text-slate-400 transition-all">
+                                                  <Edit className="w-4 h-4" />
+                                                </Button>
+                                              </TooltipTrigger>
+                                              <TooltipContent className="bg-slate-800 border-slate-700 text-orange-400 font-bold">Edit Info</TooltipContent>
+                                            </Tooltip>
+                                          )}
 
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button size="icon" variant="ghost" onClick={() => handlePrint(sop.id)} disabled={printLoading === sop.id} className="w-9 h-9 rounded-lg hover:bg-slate-400/10 hover:text-slate-100 text-slate-400 transition-all">
-                                              {printLoading === sop.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent className="bg-slate-800 border-slate-700 text-white font-bold">Cetak</TooltipContent>
-                                        </Tooltip>
-
-                                        {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && (
                                           <Tooltip>
                                             <TooltipTrigger asChild>
-                                              <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                onClick={() => handleDesktopEdit(sop.id)}
-                                                className={`w-9 h-9 rounded-lg transition-all ${['xlsx', 'xls', 'xlsm'].includes(sop.fileType || '')
-                                                  ? 'hover:bg-green-500/10 hover:text-green-400'
-                                                  : ['docx', 'doc'].includes(sop.fileType || '')
-                                                    ? 'hover:bg-blue-500/10 hover:text-blue-400'
-                                                    : 'hover:bg-red-500/10 hover:text-red-400'
-                                                  } text-slate-400`}
-                                              >
-                                                {['docx', 'doc'].includes(sop.fileType || '') ? <FileText className="w-4 h-4" /> : ['xlsx', 'xls', 'xlsm'].includes(sop.fileType || '') ? <FileSpreadsheet className="w-4 h-4" /> : <FileIcon className="w-4 h-4" />}
+                                              <Button size="icon" variant="ghost" onClick={() => handleDownload(sop.id)} disabled={downloadLoading === sop.id} className="w-9 h-9 rounded-lg hover:bg-green-500/10 hover:text-green-400 text-slate-400 transition-all">
+                                                {downloadLoading === sop.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                                               </Button>
                                             </TooltipTrigger>
-                                            <TooltipContent className="bg-slate-800 border-slate-700 font-bold">Edit Desktop</TooltipContent>
+                                            <TooltipContent className="bg-slate-800 border-slate-700 text-green-400 font-bold">Download</TooltipContent>
                                           </Tooltip>
-                                        )}
 
-                                        {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && (
                                           <Tooltip>
                                             <TooltipTrigger asChild>
-                                              <Button size="icon" variant="ghost" onClick={() => handleDeleteSop(sop.id, sop.fileName)} className="w-9 h-9 rounded-lg hover:bg-red-500/10 hover:text-red-500 text-slate-400 transition-all">
-                                                <Trash2 className="w-4 h-4" />
+                                              <Button size="icon" variant="ghost" onClick={() => handlePrint(sop.id)} disabled={printLoading === sop.id} className="w-9 h-9 rounded-lg hover:bg-slate-400/10 hover:text-slate-100 text-slate-400 transition-all">
+                                                {printLoading === sop.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
                                               </Button>
                                             </TooltipTrigger>
-                                            <TooltipContent className="bg-slate-900 border-red-900 text-red-500 font-bold">Hapus</TooltipContent>
+                                            <TooltipContent className="bg-slate-800 border-slate-700 text-white font-bold">Cetak</TooltipContent>
                                           </Tooltip>
-                                        )}
-                                      </TooltipProvider>
 
-                                      {/* Session Sync Shortcut */}
-                                      {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && excelEditData?.id === sop.id && (
-                                        <motion.div
-                                          animate={{ x: [0, 2, 0] }}
-                                          transition={{ duration: 1.5, repeat: Infinity }}
-                                        >
-                                          <Button size="icon" variant="ghost" onClick={handleOpenDesktopSync} className="w-9 h-9 rounded-lg bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white ml-1">
-                                            <RefreshCw className="w-4 h-4" />
-                                          </Button>
-                                        </motion.div>
-                                      )}
+                                          {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && (
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Button
+                                                  size="icon"
+                                                  variant="ghost"
+                                                  onClick={() => handleDesktopEdit(sop.id)}
+                                                  className={`w-9 h-9 rounded-lg transition-all ${['xlsx', 'xls', 'xlsm'].includes(sop.fileType || '')
+                                                    ? 'hover:bg-green-500/10 hover:text-green-400'
+                                                    : ['docx', 'doc'].includes(sop.fileType || '')
+                                                      ? 'hover:bg-blue-500/10 hover:text-blue-400'
+                                                      : 'hover:bg-red-500/10 hover:text-red-400'
+                                                    } text-slate-400`}
+                                                >
+                                                  {['docx', 'doc'].includes(sop.fileType || '') ? <FileText className="w-4 h-4" /> : ['xlsx', 'xls', 'xlsm'].includes(sop.fileType || '') ? <FileSpreadsheet className="w-4 h-4" /> : <FileIcon className="w-4 h-4" />}
+                                                </Button>
+                                              </TooltipTrigger>
+                                              <TooltipContent className="bg-slate-800 border-slate-700 font-bold">Edit Desktop</TooltipContent>
+                                            </Tooltip>
+                                          )}
+
+                                          {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && (
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Button size="icon" variant="ghost" onClick={() => handleDeleteSop(sop.id, sop.fileName)} className="w-9 h-9 rounded-lg hover:bg-red-500/10 hover:text-red-500 text-slate-400 transition-all">
+                                                  <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                              </TooltipTrigger>
+                                              <TooltipContent className="bg-slate-900 border-red-900 text-red-500 font-bold">Hapus</TooltipContent>
+                                            </Tooltip>
+                                          )}
+                                        </TooltipProvider>
+
+                                        {/* Session Sync Shortcut */}
+                                        {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && excelEditData?.id === sop.id && (
+                                          <motion.div
+                                            animate={{ x: [0, 2, 0] }}
+                                            transition={{ duration: 1.5, repeat: Infinity }}
+                                          >
+                                            <Button size="icon" variant="ghost" onClick={handleOpenDesktopSync} className="w-9 h-9 rounded-lg bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white ml-1">
+                                              <RefreshCw className="w-4 h-4" />
+                                            </Button>
+                                          </motion.div>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
 
+                                  </div>
                                 </div>
-                              </div>
 
-                              {/* Decorative corner element */}
-                              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-white/[0.03] to-transparent pointer-events-none" />
-                            </div>
-                          </motion.div>
-                        ))
-                      )}
+                                {/* Decorative corner element */}
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-white/[0.03] to-transparent pointer-events-none" />
+                              </div>
+                            </motion.div>
+                          );
+                        });
+                      })()}
                     </AnimatePresence>
                   </div>
                 </div>
@@ -8141,125 +8559,81 @@ export default function ESOPApp() {
                     <ShimmerTitle subtitle="Kelola pengajuan SOP dan IK dari publik">Verifikasi SOP Publik</ShimmerTitle>
                   </div>
 
-                  {/* Search and Filter Bar */}
-                  <div className="rounded-2xl overflow-hidden shadow-2xl" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)', border: '1px solid rgba(249,115,22,0.25)' }}>
-                    <div className="flex items-center justify-between px-5 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f97316, #ef4444)' }}><Search className="w-3.5 h-3.5 text-white" /></div>
-                        <span className="text-sm font-bold text-white">Filter &amp; Pencarian</span>
+                  {/* Search and Filter Bar — compact */}
+                  <div className="rounded-xl overflow-hidden shadow-xl" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)', border: '1px solid rgba(249,115,22,0.2)' }}>
+                    <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+                      {/* Search */}
+                      <div className="relative flex-1 min-w-[160px]">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: '#f97316' }} />
+                        <Input
+                          placeholder="Cari judul, nama, email..."
+                          value={verificationSearch}
+                          onChange={(e) => setVerificationSearch(e.target.value)}
+                          className="pl-7 h-7 text-[11px] text-white placeholder:text-gray-500 font-medium rounded-lg"
+                          style={{ background: 'rgba(255,255,255,0.06)', border: verificationSearch ? '1.5px solid rgba(249,115,22,0.6)' : '1.5px solid rgba(255,255,255,0.1)', outline: 'none' }}
+                        />
                       </div>
-                    </div>
-                    <div className="p-4">
-                      <div className="flex flex-wrap items-end gap-3">
-                        {/* Search */}
-                        <div className="flex-1 min-w-[200px]">
-                          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Cari</p>
-                          <div className="relative">
-                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#f97316' }} />
-                            <Input
-                              placeholder="Cari judul, nama, email..."
-                              value={verificationSearch}
-                              onChange={(e) => setVerificationSearch(e.target.value)}
-                              className="pl-10 h-10 text-white placeholder:text-gray-500 text-sm rounded-xl"
-                              style={{ background: 'rgba(255,255,255,0.06)', border: verificationSearch ? '1.5px solid rgba(249,115,22,0.6)' : '1.5px solid rgba(255,255,255,0.1)', boxShadow: verificationSearch ? '0 0 10px rgba(249,115,22,0.2)' : 'none' }}
-                            />
-                          </div>
-                        </div>
-                        {/* Status */}
-                        <div className="min-w-[140px]">
-                          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Status</p>
-                          <Select value={verificationFilter} onValueChange={(v) => setVerificationFilter(v)}>
-                            <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: verificationFilter !== 'SEMUA' ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.06)', border: verificationFilter !== 'SEMUA' ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.1)', color: verificationFilter !== 'SEMUA' ? '#fb923c' : '#9ca3af' }}>
-                              <SelectValue placeholder="Filter Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="SEMUA">Semua Status</SelectItem>
-                              <SelectItem value="MENUNGGU">Menunggu</SelectItem>
-                              <SelectItem value="DISETUJUI">Disetujui</SelectItem>
-                              <SelectItem value="DITOLAK">Ditolak</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {/* Lingkup */}
-                        <div className="min-w-[140px]">
-                          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Lingkup</p>
-                          <Select value={verificationLingkupFilter} onValueChange={(v) => setVerificationLingkupFilter(v)}>
-                            <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: verificationLingkupFilter !== 'SEMUA' ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.06)', border: verificationLingkupFilter !== 'SEMUA' ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.1)', color: verificationLingkupFilter !== 'SEMUA' ? '#fb923c' : '#9ca3af' }}>
-                              <SelectValue placeholder="Filter Lingkup" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="SEMUA">Semua Lingkup</SelectItem>
-                              {LINGKUP_OPTIONS.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {/* Sort */}
-                        <div className="min-w-[140px]">
-                          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Urutkan</p>
-                          <Select value={verificationSortBy} onValueChange={(v) => setVerificationSortBy(v as 'uploadedAt-desc' | 'uploadedAt-asc')}>
-                            <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.1)', color: '#9ca3af' }}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="uploadedAt-desc">Terbaru</SelectItem>
-                              <SelectItem value="uploadedAt-asc">Terlama</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
+                      <div className="w-px h-5 bg-white/10 hidden sm:block" />
+                      {/* Status */}
+                      <Select value={verificationFilter} onValueChange={(v) => setVerificationFilter(v)}>
+                        <SelectTrigger className="h-7 w-[120px] rounded-lg text-[11px] font-medium px-2" style={{ background: verificationFilter !== 'SEMUA' ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.05)', border: verificationFilter !== 'SEMUA' ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.08)', color: verificationFilter !== 'SEMUA' ? '#fb923c' : '#9ca3af' }}>
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SEMUA" className="text-xs">Semua Status</SelectItem>
+                          <SelectItem value="MENUNGGU" className="text-xs">Menunggu</SelectItem>
+                          <SelectItem value="DISETUJUI" className="text-xs">Disetujui</SelectItem>
+                          <SelectItem value="DITOLAK" className="text-xs">Ditolak</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {/* Lingkup */}
+                      <Select value={verificationLingkupFilter} onValueChange={(v) => setVerificationLingkupFilter(v)}>
+                        <SelectTrigger className="h-7 w-[120px] rounded-lg text-[11px] font-medium px-2" style={{ background: verificationLingkupFilter !== 'SEMUA' ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.05)', border: verificationLingkupFilter !== 'SEMUA' ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.08)', color: verificationLingkupFilter !== 'SEMUA' ? '#fb923c' : '#9ca3af' }}>
+                          <SelectValue placeholder="Lingkup" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SEMUA" className="text-xs">Semua Lingkup</SelectItem>
+                          {LINGKUP_OPTIONS.map(l => <SelectItem key={l} value={l} className="text-xs">{l}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <div className="w-px h-5 bg-white/10 hidden sm:block" />
+                      {/* Sort */}
+                      <Select value={verificationSortBy} onValueChange={(v) => setVerificationSortBy(v as 'uploadedAt-desc' | 'uploadedAt-asc')}>
+                        <SelectTrigger className="h-7 w-[110px] rounded-lg text-[11px] font-medium px-2" style={{ background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(255,255,255,0.08)', color: '#9ca3af' }}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="uploadedAt-desc" className="text-xs">Terbaru</SelectItem>
+                          <SelectItem value="uploadedAt-asc" className="text-xs">Terlama</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
 
-                  {/* Stats Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <StatCard
-                      title="SOP Aktif"
-                      value={stats?.totalAktif || 0}
-                      icon={CheckCircle}
-                      color="green"
-                      delay={0}
-                      subtitle="Dokumen yang berlaku"
-                      total={(stats?.totalAktif || 0) + (stats?.totalReview || 0) + (stats?.totalKadaluarsa || 0)}
-                    />
-                    <StatCard
-                      title="Menunggu Verifikasi"
-                      value={stats?.totalPublikMenunggu || 0}
-                      icon={Clock}
-                      color="yellow"
-                      delay={0.1}
-                      subtitle="Pengajuan dari publik"
-                      action={user?.role === 'DEVELOPER' ? (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-6 w-6 text-yellow-600 hover:bg-yellow-100 rounded-full"
-                          onClick={() => handleResetStats('MENUNGGU')}
-                          title="Reset Stats (Hapus Semua Menunggu)"
-                        >
-                          <RefreshCw className="h-3 w-3" />
-                        </Button>
-                      ) : undefined}
-                    />
-                    <StatCard
-                      title="Ditolak"
-                      value={stats?.totalPublikDitolak || 0}
-                      icon={XCircle}
-                      color="red"
-                      delay={0.2}
-                      subtitle="Pengajuan ditolak"
-                      action={user?.role === 'DEVELOPER' ? (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-6 w-6 text-red-600 hover:bg-red-100 rounded-full"
-                          onClick={() => handleResetStats('DITOLAK')}
-                          title="Reset Stats (Hapus Semua Arsip)"
-                        >
-                          <RefreshCw className="h-3 w-3" />
-                        </Button>
-                      ) : undefined}
-                    />
+                  {/* Stats — compact inline row */}
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { label: 'SOP Aktif', value: stats?.totalAktif || 0, color: '#22c55e', bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.25)', Icon: CheckCircle },
+                      { label: 'Menunggu', value: stats?.totalPublikMenunggu || 0, color: '#eab308', bg: 'rgba(234,179,8,0.12)', border: 'rgba(234,179,8,0.25)', Icon: Clock },
+                      { label: 'Ditolak', value: stats?.totalPublikDitolak || 0, color: '#ef4444', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.25)', Icon: XCircle },
+                    ].map(({ label, value, color, bg, border, Icon }) => (
+                      <div key={label} className="flex items-center gap-2 px-3 py-1.5 rounded-xl" style={{ background: bg, border: `1px solid ${border}` }}>
+                        <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color }} />
+                        <span className="text-base font-black" style={{ color }}>{value}</span>
+                        <span className="text-[11px] font-medium text-slate-400">{label}</span>
+                      </div>
+                    ))}
+                    {user?.role === 'DEVELOPER' && (
+                      <>
+                        <button onClick={() => handleResetStats('MENUNGGU')} className="flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold text-yellow-400 hover:bg-yellow-500/10 transition-all border border-yellow-500/20" title="Reset Menunggu">
+                          <RefreshCw className="w-3 h-3" /> Reset Menunggu
+                        </button>
+                        <button onClick={() => handleResetStats('DITOLAK')} className="flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold text-red-400 hover:bg-red-500/10 transition-all border border-red-500/20" title="Reset Ditolak">
+                          <RefreshCw className="w-3 h-3" /> Reset Ditolak
+                        </button>
+                      </>
+                    )}
                   </div>
 
                   {/* Verification Table */}
@@ -8742,87 +9116,62 @@ export default function ESOPApp() {
                     <ShimmerTitle subtitle="File yang ditolak dari pengajuan publik">Arsip File Ditolak</ShimmerTitle>
                   </div>
 
-                  {/* Search Bar */}
-                  <div className="rounded-2xl overflow-hidden shadow-2xl" style={{ background: 'linear-gradient(135deg, #1a0a0a 0%, #1e1015 50%, #1a0a0a 100%)', border: '1px solid rgba(239,68,68,0.25)' }}>
-                    <div className="flex items-center gap-2 px-5 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ef4444, #b91c1c)' }}><Search className="w-3.5 h-3.5 text-white" /></div>
-                      <span className="text-sm font-bold text-white">Filter &amp; Pencarian</span>
-                    </div>
-                    <div className="p-4">
-                      <div className="flex flex-wrap items-end gap-3">
-                        {/* Search */}
-                        <div className="flex-1 min-w-[200px]">
-                          <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1.5">Cari</p>
-                          <div className="relative">
-                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#f87171' }} />
-                            <Input
-                              placeholder="Cari judul, nama, email..."
-                              value={arsipSearch}
-                              onChange={(e) => setArsipSearch(e.target.value)}
-                              className="pl-10 h-10 text-white placeholder:text-gray-500 text-sm rounded-xl"
-                              style={{ background: 'rgba(255,255,255,0.06)', border: arsipSearch ? '1.5px solid rgba(239,68,68,0.6)' : '1.5px solid rgba(255,255,255,0.1)', boxShadow: arsipSearch ? '0 0 10px rgba(239,68,68,0.2)' : 'none' }}
-                            />
-                          </div>
-                        </div>
-                        {/* Lingkup */}
-                        <div className="min-w-[140px]">
-                          <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1.5">Lingkup</p>
-                          <Select value={arsipLingkupFilter} onValueChange={(v) => setArsipLingkupFilter(v)}>
-                            <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: arsipLingkupFilter !== 'SEMUA' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.06)', border: arsipLingkupFilter !== 'SEMUA' ? '1.5px solid rgba(239,68,68,0.4)' : '1.5px solid rgba(255,255,255,0.1)', color: arsipLingkupFilter !== 'SEMUA' ? '#fca5a5' : '#9ca3af' }}>
-                              <SelectValue placeholder="Filter Lingkup" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="SEMUA">Semua Lingkup</SelectItem>
-                              {LINGKUP_OPTIONS.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {/* Sort */}
-                        <div className="min-w-[140px]">
-                          <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1.5">Urutkan</p>
-                          <Select value={arsipSortBy} onValueChange={(v) => setArsipSortBy(v as 'uploadedAt-desc' | 'uploadedAt-asc')}>
-                            <SelectTrigger className="h-10 rounded-xl text-sm" style={{ background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.1)', color: '#9ca3af' }}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="uploadedAt-desc">Terbaru</SelectItem>
-                              <SelectItem value="uploadedAt-asc">Terlama</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                  {/* Search Bar — compact */}
+                  <div className="rounded-xl overflow-hidden shadow-xl" style={{ background: 'linear-gradient(135deg, #1a0a0a 0%, #1e1015 50%, #1a0a0a 100%)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                    <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+                      {/* Search */}
+                      <div className="relative flex-1 min-w-[160px]">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: '#f87171' }} />
+                        <Input
+                          placeholder="Cari judul, nama, email..."
+                          value={arsipSearch}
+                          onChange={(e) => setArsipSearch(e.target.value)}
+                          className="pl-7 h-7 text-[11px] text-white placeholder:text-gray-500 font-medium rounded-lg"
+                          style={{ background: 'rgba(255,255,255,0.06)', border: arsipSearch ? '1.5px solid rgba(239,68,68,0.6)' : '1.5px solid rgba(255,255,255,0.1)', outline: 'none' }}
+                        />
                       </div>
+                      <div className="w-px h-5 bg-white/10 hidden sm:block" />
+                      {/* Lingkup */}
+                      <Select value={arsipLingkupFilter} onValueChange={(v) => setArsipLingkupFilter(v)}>
+                        <SelectTrigger className="h-7 w-[120px] rounded-lg text-[11px] font-medium px-2" style={{ background: arsipLingkupFilter !== 'SEMUA' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)', border: arsipLingkupFilter !== 'SEMUA' ? '1.5px solid rgba(239,68,68,0.4)' : '1.5px solid rgba(255,255,255,0.08)', color: arsipLingkupFilter !== 'SEMUA' ? '#fca5a5' : '#9ca3af' }}>
+                          <SelectValue placeholder="Lingkup" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SEMUA" className="text-xs">Semua Lingkup</SelectItem>
+                          {LINGKUP_OPTIONS.map(l => <SelectItem key={l} value={l} className="text-xs">{l}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <div className="w-px h-5 bg-white/10 hidden sm:block" />
+                      {/* Sort */}
+                      <Select value={arsipSortBy} onValueChange={(v) => setArsipSortBy(v as 'uploadedAt-desc' | 'uploadedAt-asc')}>
+                        <SelectTrigger className="h-7 w-[110px] rounded-lg text-[11px] font-medium px-2" style={{ background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(255,255,255,0.08)', color: '#9ca3af' }}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="uploadedAt-desc" className="text-xs">Terbaru</SelectItem>
+                          <SelectItem value="uploadedAt-asc" className="text-xs">Terlama</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
-                  {/* Stats Cards */}
-                  < div className="grid grid-cols-1 md:grid-cols-2 gap-4" >
-                    <StatCard
-                      title="File Ditolak"
-                      value={arsipList.length}
-                      icon={XCircle}
-                      color="red"
-                      delay={0}
-                      subtitle="Pengajuan yang ditolak"
-                      action={user?.role === 'DEVELOPER' ? (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-6 w-6 text-red-600 hover:bg-red-100 rounded-full"
-                          onClick={() => handleResetStats('DITOLAK')}
-                          title="Reset Stats (Hapus Semua Arsip)"
-                        >
-                          <RefreshCw className="h-3 w-3" />
-                        </Button>
-                      ) : undefined}
-                    />
-                    <StatCard
-                      title="Lokasi Arsip"
-                      value="Publik-Ditolak"
-                      icon={FolderOpen}
-                      color="orange"
-                      delay={0.1}
-                      subtitle="Folder penyimpanan"
-                    />
+                  {/* Stats — compact inline row */}
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { label: 'File Ditolak', value: arsipList.length, color: '#ef4444', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.25)', Icon: XCircle },
+                      { label: 'Folder: Publik-Ditolak', value: '', color: '#f97316', bg: 'rgba(249,115,22,0.1)', border: 'rgba(249,115,22,0.2)', Icon: FolderOpen },
+                    ].map(({ label, value, color, bg, border, Icon }) => (
+                      <div key={label} className="flex items-center gap-2 px-3 py-1.5 rounded-xl" style={{ background: bg, border: `1px solid ${border}` }}>
+                        <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color }} />
+                        {value !== '' && <span className="text-base font-black" style={{ color }}>{value}</span>}
+                        <span className="text-[11px] font-medium text-slate-400">{label}</span>
+                      </div>
+                    ))}
+                    {user?.role === 'DEVELOPER' && (
+                      <button onClick={() => handleResetStats('DITOLAK')} className="flex items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-bold text-red-400 hover:bg-red-500/10 transition-all border border-red-500/20" title="Reset Arsip">
+                        <RefreshCw className="w-3 h-3" /> Reset Arsip
+                      </button>
+                    )}
                   </div>
 
                   {/* Arsip Table */}
@@ -8990,78 +9339,62 @@ export default function ESOPApp() {
                 >
                   <ShimmerTitle subtitle="Riwayat semua aktivitas sistem">Log Aktivitas</ShimmerTitle>
 
-                  {/* Filters */}
-                  <Card className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 border border-orange-500/30 shadow-xl overflow-hidden">
-                    <CardContent className="p-4">
-                      <div className="flex flex-wrap items-end gap-3">
-                        {/* Time Filter */}
-                        <div className="min-w-[140px]">
-                          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Waktu</p>
-                          <Select value={logsTimeFilter} onValueChange={(v) => { setLogsTimeFilter(v); setLogsPagination(p => ({ ...p, page: 1 })); }}>
-                            <SelectTrigger className="h-9 rounded-lg text-sm bg-gray-800/50 border-gray-700 text-gray-200">
-                              <SelectValue placeholder="Pilih Waktu" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="SEMUA">Semua Waktu</SelectItem>
-                              <SelectItem value="HARI_INI">Hari Ini</SelectItem>
-                              <SelectItem value="MINGGU_INI">Minggu Ini</SelectItem>
-                              <SelectItem value="BULAN_INI">Bulan Ini</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                  {/* Filters — compact bar */}
+                  <div className="rounded-xl overflow-hidden shadow-xl" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)', border: '1px solid rgba(249,115,22,0.2)' }}>
+                    <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+                      {/* Waktu */}
+                      <Select value={logsTimeFilter} onValueChange={(v) => { setLogsTimeFilter(v); setLogsPagination(p => ({ ...p, page: 1 })); }}>
+                        <SelectTrigger className="h-7 w-[120px] rounded-lg text-[11px] font-medium px-2" style={{ background: logsTimeFilter !== 'SEMUA' ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.05)', border: logsTimeFilter !== 'SEMUA' ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.08)', color: logsTimeFilter !== 'SEMUA' ? '#fb923c' : '#9ca3af' }}>
+                          <SelectValue placeholder="Waktu" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SEMUA" className="text-xs">Semua Waktu</SelectItem>
+                          <SelectItem value="HARI_INI" className="text-xs">Hari Ini</SelectItem>
+                          <SelectItem value="MINGGU_INI" className="text-xs">Minggu Ini</SelectItem>
+                          <SelectItem value="BULAN_INI" className="text-xs">Bulan Ini</SelectItem>
+                        </SelectContent>
+                      </Select>
 
-                        {/* User Filter */}
-                        <div className="min-w-[160px]">
-                          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">User</p>
-                          <Select value={logsUserFilter} onValueChange={(v) => { setLogsUserFilter(v); setLogsPagination(p => ({ ...p, page: 1 })); }}>
-                            <SelectTrigger className="h-9 rounded-lg text-sm bg-gray-800/50 border-gray-700 text-gray-200">
-                              <SelectValue placeholder="Pilih User" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="SEMUA">Semua User</SelectItem>
-                              {users.map(u => (
-                                <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                      {/* User */}
+                      <Select value={logsUserFilter} onValueChange={(v) => { setLogsUserFilter(v); setLogsPagination(p => ({ ...p, page: 1 })); }}>
+                        <SelectTrigger className="h-7 w-[140px] rounded-lg text-[11px] font-medium px-2" style={{ background: logsUserFilter !== 'SEMUA' ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.05)', border: logsUserFilter !== 'SEMUA' ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.08)', color: logsUserFilter !== 'SEMUA' ? '#fb923c' : '#9ca3af' }}>
+                          <SelectValue placeholder="User" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SEMUA" className="text-xs">Semua User</SelectItem>
+                          {users.map(u => (
+                            <SelectItem key={u.id} value={u.id} className="text-xs">{u.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
 
-                        {/* Activity Filter */}
-                        <div className="min-w-[140px]">
-                          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1.5">Aktivitas</p>
-                          <Select value={logsActivityFilter} onValueChange={(v) => { setLogsActivityFilter(v); setLogsPagination(p => ({ ...p, page: 1 })); }}>
-                            <SelectTrigger className="h-9 rounded-lg text-sm bg-gray-800/50 border-gray-700 text-gray-200">
-                              <SelectValue placeholder="Pilih Aktivitas" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="SEMUA">Semua Aktivitas</SelectItem>
-                              <SelectItem value="LOGIN">Login</SelectItem>
-                              <SelectItem value="UPLOAD">Upload</SelectItem>
-                              <SelectItem value="DOWNLOAD">Download</SelectItem>
-                              <SelectItem value="PREVIEW">Preview</SelectItem>
-                              <SelectItem value="VERIFIKASI">Verifikasi</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                      {/* Aktivitas */}
+                      <Select value={logsActivityFilter} onValueChange={(v) => { setLogsActivityFilter(v); setLogsPagination(p => ({ ...p, page: 1 })); }}>
+                        <SelectTrigger className="h-7 w-[130px] rounded-lg text-[11px] font-medium px-2" style={{ background: logsActivityFilter !== 'SEMUA' ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.05)', border: logsActivityFilter !== 'SEMUA' ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.08)', color: logsActivityFilter !== 'SEMUA' ? '#fb923c' : '#9ca3af' }}>
+                          <SelectValue placeholder="Aktivitas" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SEMUA" className="text-xs">Semua Aktivitas</SelectItem>
+                          <SelectItem value="LOGIN" className="text-xs">Login</SelectItem>
+                          <SelectItem value="UPLOAD" className="text-xs">Upload</SelectItem>
+                          <SelectItem value="DOWNLOAD" className="text-xs">Download</SelectItem>
+                          <SelectItem value="PREVIEW" className="text-xs">Preview</SelectItem>
+                          <SelectItem value="VERIFIKASI" className="text-xs">Verifikasi</SelectItem>
+                        </SelectContent>
+                      </Select>
 
-                        {/* Reset Button */}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setLogsTimeFilter('SEMUA')
-                            setLogsUserFilter('SEMUA')
-                            setLogsActivityFilter('SEMUA')
-                            setLogsPagination(p => ({ ...p, page: 1 }))
-                          }}
-                          className="h-9 px-3 bg-gray-800/50 border-gray-700 text-gray-300 hover:bg-gray-700 hover:text-white"
+                      {/* Reset */}
+                      {(logsTimeFilter !== 'SEMUA' || logsUserFilter !== 'SEMUA' || logsActivityFilter !== 'SEMUA') && (
+                        <button
+                          onClick={() => { setLogsTimeFilter('SEMUA'); setLogsUserFilter('SEMUA'); setLogsActivityFilter('SEMUA'); setLogsPagination(p => ({ ...p, page: 1 })) }}
+                          className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg transition-all"
+                          style={{ background: 'rgba(239,68,68,0.15)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.25)' }}
                         >
-                          <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-                          Reset
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                          <X className="w-2.5 h-2.5" /> Reset
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
                   <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
                     <CardContent className="p-0">
@@ -9376,147 +9709,200 @@ export default function ESOPApp() {
 
                     {/* Excel Edit Diagnostic Dialog */}
                     <Dialog open={showDiagnosticDialog} onOpenChange={setShowDiagnosticDialog}>
-                      <DialogContent className="sm:max-w-none w-fit max-w-[95vw] bg-white border-2 border-orange-200 shadow-xl overflow-visible" aria-describedby={undefined}>
-                        <DialogHeader>
-                          <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                            <Activity className="w-5 h-5 text-orange-600" />
-                            Diagnostik Excel Edit System
-                          </DialogTitle>
-                          <DialogDescription className="text-gray-600">
-                            Memeriksa semua komponen untuk fitur edit Excel dengan Microsoft 365
-                          </DialogDescription>
-                        </DialogHeader>
+                      <DialogContent className="sm:max-w-2xl p-0 overflow-hidden border-0 shadow-[0_0_60px_rgba(0,0,0,0.7)] rounded-2xl" aria-describedby={undefined} style={{ background: '#0f172a' }}>
+                        {/* Header */}
+                        <div className="relative px-6 pt-5 pb-4 overflow-hidden" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderBottom: '1px solid rgba(249,115,22,0.2)' }}>
+                          <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-orange-500/10 blur-3xl pointer-events-none" />
+                          <div className="relative flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #f97316, #dc2626)', boxShadow: '0 6px 20px -6px rgba(249,115,22,0.6)' }}>
+                              <Activity className="w-5 h-5 text-white" />
+                            </div>
+                            <div>
+                              <DialogTitle className="text-base font-bold text-white">🔍 Diagnosa Sistem Web App</DialogTitle>
+                              <DialogDescription className="text-[11px] text-slate-400 mt-0.5">Deteksi error console, jaringan, sintaks, dan kesehatan API secara real-time</DialogDescription>
+                            </div>
+                            {diagnosticResult && (
+                              <div className="ml-auto text-[10px] text-slate-500">
+                                Dijalankan: {new Date(diagnosticResult.ranAt).toLocaleTimeString('id-ID')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
 
-                        <div className="space-y-4">
+                        {/* Body */}
+                        <div className="px-5 py-4 space-y-4 overflow-y-auto max-h-[70vh]">
+
+                          {/* Loading */}
                           {diagnosticLoading && (
-                            <div className="flex flex-col items-center justify-center py-8">
-                              <Loader2 className="w-10 h-10 text-orange-500 animate-spin mb-4" />
-                              <p className="text-gray-600">Menjalankan diagnostik...</p>
+                            <div className="flex flex-col items-center justify-center py-14 gap-4">
+                              <div className="relative">
+                                <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.2)' }}>
+                                  <Loader2 className="w-8 h-8 text-orange-400 animate-spin" />
+                                </div>
+                                <div className="absolute inset-0 rounded-2xl bg-orange-500/10 blur-md animate-pulse" />
+                              </div>
+                              <div className="text-center">
+                                <p className="text-sm font-semibold text-white">Menjalankan Diagnosa...</p>
+                                <p className="text-xs text-slate-400 mt-1">Memeriksa API, environment, dan log error</p>
+                              </div>
+                              <div className="flex gap-1.5">
+                                {[0, 1, 2, 3, 4].map(i => (
+                                  <div key={i} className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-bounce" style={{ animationDelay: `${i * 0.12}s` }} />
+                                ))}
+                              </div>
                             </div>
                           )}
 
                           {diagnosticResult && !diagnosticLoading && (
                             <>
-                              {/* Summary */}
-                              <div className={`p - 4 rounded - lg ${diagnosticResult.success
-                                ? 'bg-green-50 border border-green-200'
-                                : 'bg-red-50 border border-red-200'
-                                } `}>
-                                <div className="flex items-center gap-3">
-                                  {diagnosticResult.success ? (
-                                    <CheckCircle className="w-8 h-8 text-green-500" />
-                                  ) : (
-                                    <XCircle className="w-8 h-8 text-red-500" />
-                                  )}
-                                  <div>
-                                    <p className={`font - bold ${diagnosticResult.success ? 'text-green-800' : 'text-red-800'} `}>
-                                      {diagnosticResult.success ? 'Semua Sistem Berfungsi!' : 'Terdapat Masalah'}
-                                    </p>
-                                    <p className={`text - sm ${diagnosticResult.success ? 'text-green-600' : 'text-red-600'} `}>
-                                      {diagnosticResult.message}
-                                    </p>
-                                  </div>
-                                </div>
-
-                                {/* Stats */}
-                                <div className="flex gap-4 mt-3 text-sm">
-                                  <span className="text-gray-600">
-                                    Total: <strong>{diagnosticResult.summary.totalSteps}</strong>
-                                  </span>
-                                  <span className="text-green-600">
-                                    Pass: <strong>{diagnosticResult.summary.passed}</strong>
-                                  </span>
-                                  <span className="text-red-600">
-                                    Fail: <strong>{diagnosticResult.summary.failed}</strong>
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Results List */}
-                              <div className="space-y-3">
-                                <h4 className="font-semibold text-gray-700">Detail Hasil:</h4>
-                                {diagnosticResult.results.map((result, index) => (
-                                  <div
-                                    key={index}
-                                    className={`p - 3 rounded - lg border ${result.success
-                                      ? 'bg-green-50 border-green-200'
-                                      : 'bg-red-50 border-red-200'
-                                      } `}
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-2">
-                                        {result.success ? (
-                                          <CheckCircle className="w-5 h-5 text-green-500" />
-                                        ) : (
-                                          <XCircle className="w-5 h-5 text-red-500" />
-                                        )}
-                                        <span className="font-medium text-gray-900">{result.step}</span>
-                                      </div>
-                                      {result.duration && (
-                                        <span className="text-xs text-gray-500">{result.duration}ms</span>
-                                      )}
-                                    </div>
-                                    <p className={`text - sm mt - 1 ${result.success ? 'text-green-700' : 'text-red-700'} `}>
-                                      {result.message}
-                                    </p>
-                                    {result.error && (
-                                      <p className="text-xs text-red-600 mt-1 font-mono bg-red-100 p-2 rounded">
-                                        {result.error}
-                                      </p>
-                                    )}
-                                    {result.details && (
-                                      <div className="mt-2 text-xs bg-gray-100 p-2 rounded font-mono overflow-x-auto">
-                                        {Object.entries(result.details).map(([key, value]) => (
-                                          <div key={key} className="flex gap-2">
-                                            <span className="text-gray-500">{key}:</span>
-                                            <span className={typeof value === 'string' && value.includes('✅') ? 'text-green-600' : typeof value === 'string' && value.includes('❌') ? 'text-red-600' : 'text-gray-700'}>
-                                              {String(value)}
-                                            </span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
+                              {/* Summary Chips */}
+                              <div className="grid grid-cols-4 gap-2">
+                                {[
+                                  { label: 'Total Cek', val: diagnosticResult.summary.total, color: '#94a3b8', bg: 'rgba(148,163,184,0.1)', border: 'rgba(148,163,184,0.2)' },
+                                  { label: 'Lulus', val: diagnosticResult.summary.passed, color: '#22c55e', bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.25)' },
+                                  { label: 'Gagal', val: diagnosticResult.summary.failed, color: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.25)' },
+                                  { label: 'Peringatan', val: diagnosticResult.summary.warnings, color: '#eab308', bg: 'rgba(234,179,8,0.1)', border: 'rgba(234,179,8,0.25)' },
+                                ].map(({ label, val, color, bg, border }) => (
+                                  <div key={label} className="rounded-xl p-3 text-center" style={{ background: bg, border: `1px solid ${border}` }}>
+                                    <div className="text-2xl font-black" style={{ color }}>{val}</div>
+                                    <div className="text-[10px] text-slate-400 mt-0.5">{label}</div>
                                   </div>
                                 ))}
                               </div>
 
-                              {/* Next Steps */}
-                              {!diagnosticResult.success && diagnosticResult.nextSteps.length > 0 && (
-                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                                  <h4 className="font-semibold text-amber-800 mb-2">Langkah Selanjutnya:</h4>
-                                  <ul className="list-disc list-inside space-y-1 text-sm text-amber-700">
-                                    {diagnosticResult.nextSteps.map((step, index) => (
-                                      <li key={index}>{step}</li>
+                              {/* API Health */}
+                              <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                                <div className="px-4 py-2.5 flex items-center gap-2" style={{ background: 'rgba(249,115,22,0.08)', borderBottom: '1px solid rgba(249,115,22,0.15)' }}>
+                                  <Activity className="w-3.5 h-3.5 text-orange-400" />
+                                  <span className="text-[11px] font-bold text-orange-400 uppercase tracking-wider">API Health Check</span>
+                                </div>
+                                <div className="divide-y divide-white/5">
+                                  {diagnosticResult.apiHealth.map((ep) => (
+                                    <div key={ep.endpoint} className="flex items-center gap-3 px-4 py-2.5">
+                                      {ep.ok ? <CheckCircle className="w-3.5 h-3.5 text-green-400 flex-shrink-0" /> : <XCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />}
+                                      <span className="text-xs text-slate-300 flex-1 font-medium">{ep.endpoint}</span>
+                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${ep.ok ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>{ep.status || 'ERR'}</span>
+                                      <span className="text-[10px] text-slate-500 w-12 text-right">{ep.latency}ms</span>
+                                      {ep.error && <span className="text-[9px] text-red-400 font-mono max-w-[120px] truncate">{ep.error}</span>}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Environment */}
+                              <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                                <div className="px-4 py-2.5 flex items-center gap-2" style={{ background: 'rgba(99,102,241,0.08)', borderBottom: '1px solid rgba(99,102,241,0.15)' }}>
+                                  <Hash className="w-3.5 h-3.5 text-indigo-400" />
+                                  <span className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">Environment & Browser</span>
+                                </div>
+                                <div className="divide-y divide-white/5">
+                                  {diagnosticResult.envChecks.map((ec) => (
+                                    <div key={ec.key} className="flex items-center gap-3 px-4 py-2">
+                                      {ec.ok ? <CheckCircle className="w-3.5 h-3.5 text-green-400 flex-shrink-0" /> : <XCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />}
+                                      <span className="text-xs text-slate-300 w-36 flex-shrink-0 font-medium">{ec.key}</span>
+                                      <span className="text-[10px] text-slate-400 truncate">{ec.detail}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Console Log */}
+                              <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                                <div className="px-4 py-2.5 flex items-center justify-between" style={{ background: 'rgba(239,68,68,0.08)', borderBottom: '1px solid rgba(239,68,68,0.15)' }}>
+                                  <div className="flex items-center gap-2"><XCircle className="w-3.5 h-3.5 text-red-400" /><span className="text-[11px] font-bold text-red-400 uppercase tracking-wider">Console Log</span></div>
+                                  <div className="flex gap-1.5">
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-bold">{diagnosticResult.consoleErrors.filter(e => e.type === 'error').length} error</span>
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 font-bold">{diagnosticResult.consoleErrors.filter(e => e.type === 'warn').length} warn</span>
+                                  </div>
+                                </div>
+                                {diagnosticResult.consoleErrors.length === 0 ? (
+                                  <div className="px-4 py-3 text-xs text-green-400 flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5" /> Tidak ada console error atau warning</div>
+                                ) : (
+                                  <div className="max-h-40 overflow-y-auto divide-y divide-white/5">
+                                    {diagnosticResult.consoleErrors.slice(0, 20).map((e, i) => (
+                                      <div key={i} className="px-4 py-2 flex gap-2">
+                                        <span className={`text-[9px] font-bold px-1 py-0.5 rounded flex-shrink-0 mt-0.5 ${e.type === 'error' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{e.type.toUpperCase()}</span>
+                                        <div className="min-w-0 flex-1">
+                                          <p className="text-[10px] text-slate-300 font-mono truncate">{e.msg}</p>
+                                          {e.stack && <p className="text-[9px] text-slate-500 font-mono truncate mt-0.5">{e.stack.split('\n')[1]?.trim()}</p>}
+                                          <p className="text-[9px] text-slate-600 mt-0.5">{new Date(e.ts).toLocaleTimeString('id-ID')}</p>
+                                        </div>
+                                      </div>
                                     ))}
-                                  </ul>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Network Errors */}
+                              <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                                <div className="px-4 py-2.5 flex items-center justify-between" style={{ background: 'rgba(249,115,22,0.08)', borderBottom: '1px solid rgba(249,115,22,0.15)' }}>
+                                  <div className="flex items-center gap-2"><Activity className="w-3.5 h-3.5 text-orange-400" /><span className="text-[11px] font-bold text-orange-400 uppercase tracking-wider">Network Errors</span></div>
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 font-bold">{diagnosticResult.networkErrors.length} error</span>
+                                </div>
+                                {diagnosticResult.networkErrors.length === 0 ? (
+                                  <div className="px-4 py-3 text-xs text-green-400 flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5" /> Tidak ada network error yang terdeteksi</div>
+                                ) : (
+                                  <div className="max-h-40 overflow-y-auto divide-y divide-white/5">
+                                    {diagnosticResult.networkErrors.slice(0, 20).map((e, i) => (
+                                      <div key={i} className="px-4 py-2 flex items-center gap-3">
+                                        <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-red-500/20 text-red-400 flex-shrink-0">{e.status || 'NET'}</span>
+                                        <span className="text-[10px] text-slate-300 font-mono flex-1 truncate">{e.url}</span>
+                                        <span className="text-[9px] text-slate-500">{e.duration}ms</span>
+                                        <span className="text-[9px] text-slate-600">{new Date(e.ts).toLocaleTimeString('id-ID')}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Unhandled Rejections */}
+                              {diagnosticResult.rejections.length > 0 && (
+                                <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                                  <div className="px-4 py-2.5 flex items-center justify-between" style={{ background: 'rgba(239,68,68,0.1)', borderBottom: '1px solid rgba(239,68,68,0.2)' }}>
+                                    <div className="flex items-center gap-2"><XCircle className="w-3.5 h-3.5 text-red-400" /><span className="text-[11px] font-bold text-red-400 uppercase tracking-wider">Unhandled Promise Rejections</span></div>
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-bold">{diagnosticResult.rejections.length}</span>
+                                  </div>
+                                  <div className="max-h-32 overflow-y-auto divide-y divide-white/5">
+                                    {diagnosticResult.rejections.map((r, i) => (
+                                      <div key={i} className="px-4 py-2 flex items-center gap-3">
+                                        <p className="text-[10px] text-red-300 font-mono flex-1 truncate">{r.reason}</p>
+                                        <span className="text-[9px] text-slate-600">{new Date(r.ts).toLocaleTimeString('id-ID')}</span>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
                             </>
                           )}
+
+                          {/* Idle */}
+                          {!diagnosticLoading && !diagnosticResult && (
+                            <div className="flex flex-col items-center justify-center py-12 gap-4">
+                              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.2)' }}>
+                                <Activity className="w-8 h-8 text-orange-400" />
+                              </div>
+                              <div className="text-center">
+                                <p className="text-sm font-semibold text-white">Siap Mendiagnosa</p>
+                                <p className="text-xs text-slate-400 mt-1">Klik &quot;Jalankan Diagnosa&quot; untuk memulai pemeriksaan sistem</p>
+                              </div>
+                            </div>
+                          )}
                         </div>
 
-                        <DialogFooter className="gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setShowDiagnosticDialog(false)}
-                            className="border-gray-300 text-gray-700 hover:bg-gray-100"
-                          >
+                        {/* Footer */}
+                        <div className="px-5 py-3.5 flex gap-2 border-t border-white/5" style={{ background: 'rgba(15,23,42,0.8)' }}>
+                          <button type="button" onClick={() => setShowDiagnosticDialog(false)} className="flex-1 h-9 rounded-xl text-sm font-bold text-slate-400 hover:text-white transition-colors" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
                             Tutup
-                          </Button>
-                          <Button
-                            type="button"
-                            onClick={handleRunDiagnostic}
-                            disabled={diagnosticLoading}
-                            className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
-                          >
-                            {diagnosticLoading ? (
-                              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menjalankan...</>
-                            ) : (
-                              <><RefreshCw className="w-4 h-4 mr-2" /> Jalankan Ulang</>
-                            )}
-                          </Button>
-                        </DialogFooter>
+                          </button>
+                          <button type="button" onClick={handleRunDiagnostic} disabled={diagnosticLoading} className="flex-1 h-9 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #f97316, #dc2626)', boxShadow: '0 4px 15px -4px rgba(249,115,22,0.4)' }}>
+                            {diagnosticLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Menjalankan...</> : <><RefreshCw className="w-4 h-4" /> Jalankan Diagnosa</>}
+                          </button>
+                          {diagnosticResult && (
+                            <button type="button" onClick={() => { setCapturedConsoleErrors([]); setCapturedNetworkErrors([]); setCapturedRejections([]); setDiagnosticResult(null) }} className="h-9 px-3 rounded-xl text-xs font-bold text-red-400 hover:bg-red-500/10 transition-all" style={{ border: '1px solid rgba(239,68,68,0.2)' }} title="Hapus semua log yang ditangkap">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </DialogContent>
                     </Dialog>
                   </div>
