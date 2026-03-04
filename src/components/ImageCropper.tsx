@@ -286,12 +286,12 @@ export default function ImageCropper({
     const cs = Math.max(eps, Math.min(w - cx - eps, h - cy - eps, cropSize))
 
     const canvas = document.createElement('canvas')
-    canvas.width = 400
-    canvas.height = 400
+    canvas.width = 1024
+    canvas.height = 1024
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    ctx.drawImage(image, cx, cy, cs, cs, 0, 0, 400, 400)
+    ctx.drawImage(image, cx, cy, cs, cs, 0, 0, 1024, 1024)
 
     canvas.toBlob((blob) => {
       if (blob) {
@@ -299,7 +299,7 @@ export default function ImageCropper({
         onCropComplete(file)
         onClose()
       }
-    }, 'image/jpeg', 0.92)
+    }, 'image/jpeg', 0.95)
   }, [image, crop, onCropComplete, onClose])
 
   // Reset
