@@ -93,7 +93,7 @@ export default function CopyrightPopup({ show, onClose }: CopyrightPopupProps) {
                         <img
                           src="https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/foe.jpg"
                           alt="Developer"
-                          className="w-full h-full object-cover object-[center_30%]"
+                          className="w-full h-full object-cover object-[center_5%]"
                         />
                       </div>
                       {/* Online indicator */}
