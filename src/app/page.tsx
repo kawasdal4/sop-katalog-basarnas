@@ -8274,11 +8274,10 @@ export default function ESOPApp() {
                                             {(() => {
                                               const isEdited = sop.updatedAt && new Date(sop.updatedAt).getTime() !== new Date(sop.uploadedAt).getTime();
                                               const editBadge = (
-                                                <div className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border transition-colors ${
-                                                  isEdited 
-                                                    ? 'bg-amber-500/10 border-amber-500/15 text-amber-400/90 cursor-help hover:bg-amber-500/20' 
+                                                <div className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border transition-colors ${isEdited
+                                                    ? 'bg-amber-500/10 border-amber-500/15 text-amber-400/90 cursor-help hover:bg-amber-500/20'
                                                     : 'bg-slate-500/10 border-slate-500/20 text-slate-400'
-                                                }`}>
+                                                  }`}>
                                                   <Edit3 className="w-2.5 h-2.5 flex-shrink-0" />
                                                   <span className="truncate max-w-[280px]">
                                                     Diedit oleh&nbsp;
@@ -8303,93 +8302,94 @@ export default function ESOPApp() {
                                                     <TooltipTrigger asChild>
                                                       {editBadge}
                                                     </TooltipTrigger>
-                                                  <TooltipContent side="top" className="bg-slate-900 border-amber-500/20 p-3 max-w-[280px] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.7)] shadow-amber-500/10 rounded-xl z-50 backdrop-blur-md">
-                                                    <div className="flex flex-col gap-1.5">
-                                                      <div className="flex items-center gap-2 mb-1 border-b border-slate-700/50 pb-2">
-                                                        <Edit3 className="w-3.5 h-3.5 text-amber-500" />
-                                                        <span className="font-bold text-slate-200 text-xs uppercase tracking-wider">Detail Perubahan</span>
-                                                        <span className="text-[9px] text-slate-500 ml-auto font-medium">{new Date(sop.updatedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
-                                                      </div>
-                                                      <div className="text-[11px] text-slate-300 leading-relaxed font-medium">
-                                                        {(() => {
-                                                          if (!sop.logs || sop.logs.length === 0) return 'Melakukan sikronisasi dokumen via Desktop/M365.';
+                                                    <TooltipContent side="top" className="bg-slate-900 border-amber-500/20 p-3 max-w-[280px] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.7)] shadow-amber-500/10 rounded-xl z-50 backdrop-blur-md">
+                                                      <div className="flex flex-col gap-1.5">
+                                                        <div className="flex items-center gap-2 mb-1 border-b border-slate-700/50 pb-2">
+                                                          <Edit3 className="w-3.5 h-3.5 text-amber-500" />
+                                                          <span className="font-bold text-slate-200 text-xs uppercase tracking-wider">Detail Perubahan</span>
+                                                          <span className="text-[9px] text-slate-500 ml-auto font-medium">{new Date(sop.updatedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                        </div>
+                                                        <div className="text-[11px] text-slate-300 leading-relaxed font-medium">
+                                                          {(() => {
+                                                            if (!sop.logs || sop.logs.length === 0) return 'Melakukan sikronisasi dokumen via Desktop/M365.';
 
-                                                          const log = sop.logs[0];
-                                                          if (log.aktivitas === 'EDIT_METADATA') {
-                                                            const dashIdx = log.deskripsi.indexOf(' - ');
-                                                            if (dashIdx !== -1) {
-                                                              const changesStr = log.deskripsi.slice(dashIdx + 3);
-                                                              const fieldLabels: Record<string, string> = {
-                                                                judul: 'Judul',
-                                                                tahun: 'Tahun',
-                                                                jenis: 'Jenis',
-                                                                kategori: 'Kategori',
-                                                                lingkup: 'Lingkup',
-                                                                status: 'Status',
-                                                                nomor: 'Nomor SOP',
-                                                                'file renamed': 'Nama File',
-                                                              };
-                                                              // Pecah per field: split pada ", fieldname: "
-                                                              const fieldPattern = /(?:^|(?<=, ?))(judul|tahun|jenis|kategori|lingkup|status|nomor|file renamed): /g;
-                                                              const parts: Array<{ key: string; raw: string }> = [];
-                                                              let match: RegExpExecArray | null;
-                                                              let lastEnd = 0;
-                                                              let lastKey = '';
-                                                              const allMatches: Array<{ key: string; index: number; end: number }> = [];
-                                                              for (const m of changesStr.matchAll(/(?:^|, )(judul|tahun|jenis|kategori|lingkup|status|nomor|file renamed): /g)) {
-                                                                allMatches.push({ key: m[1], index: (m.index ?? 0) + (m[0].startsWith(', ') ? 2 : 0), end: (m.index ?? 0) + m[0].length });
-                                                              }
-                                                              for (let mi = 0; mi < allMatches.length; mi++) {
-                                                                const cur = allMatches[mi];
-                                                                const nextStart = allMatches[mi + 1]?.index;
-                                                                const rawValue = nextStart !== undefined
-                                                                  ? changesStr.slice(cur.end, nextStart - 2) // remove ", "
-                                                                  : changesStr.slice(cur.end);
-                                                                parts.push({ key: cur.key, raw: rawValue.trim() });
-                                                              }
-                                                              if (parts.length > 0) {
-                                                                return (
-                                                                  <div className="mt-1 space-y-1">
-                                                                    {parts.map((p, i) => {
-                                                                      // Gunakan String.fromCharCode agar karakter panah selalu benar
-                                                                      const PANAH = ' ' + String.fromCharCode(8594) + ' '; // → (U+2192)
-                                                                      const arrowIdx = p.raw.indexOf(PANAH);
-                                                                      let oldVal = p.raw;
-                                                                      let newVal = '';
-                                                                      if (arrowIdx !== -1) {
-                                                                        oldVal = p.raw.slice(0, arrowIdx).replace(/"/g, '').trim();
-                                                                        newVal = p.raw.slice(arrowIdx + PANAH.length).replace(/"/g, '').trim();
-                                                                      }
-                                                                      return (
-                                                                        <div key={i} className="flex flex-col gap-0.5 bg-white/5 rounded px-2 py-1">
-                                                                          <span className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">{fieldLabels[p.key] ?? p.key}</span>
-                                                                          <div className="flex items-center gap-1 text-[11px] flex-wrap">
-                                                                            <span className="text-red-300 line-through">{oldVal}</span>
-                                                                            {newVal && <><span className="text-slate-500">→</span><span className="text-emerald-300">{newVal}</span></>}
+                                                            const log = sop.logs[0];
+                                                            if (log.aktivitas === 'EDIT_METADATA') {
+                                                              const dashIdx = log.deskripsi.indexOf(' - ');
+                                                              if (dashIdx !== -1) {
+                                                                const changesStr = log.deskripsi.slice(dashIdx + 3);
+                                                                const fieldLabels: Record<string, string> = {
+                                                                  judul: 'Judul',
+                                                                  tahun: 'Tahun',
+                                                                  jenis: 'Jenis',
+                                                                  kategori: 'Kategori',
+                                                                  lingkup: 'Lingkup',
+                                                                  status: 'Status',
+                                                                  nomor: 'Nomor SOP',
+                                                                  'file renamed': 'Nama File',
+                                                                };
+                                                                // Pecah per field: split pada ", fieldname: "
+                                                                const fieldPattern = /(?:^|(?<=, ?))(judul|tahun|jenis|kategori|lingkup|status|nomor|file renamed): /g;
+                                                                const parts: Array<{ key: string; raw: string }> = [];
+                                                                let match: RegExpExecArray | null;
+                                                                let lastEnd = 0;
+                                                                let lastKey = '';
+                                                                const allMatches: Array<{ key: string; index: number; end: number }> = [];
+                                                                for (const m of changesStr.matchAll(/(?:^|, )(judul|tahun|jenis|kategori|lingkup|status|nomor|file renamed): /g)) {
+                                                                  allMatches.push({ key: m[1], index: (m.index ?? 0) + (m[0].startsWith(', ') ? 2 : 0), end: (m.index ?? 0) + m[0].length });
+                                                                }
+                                                                for (let mi = 0; mi < allMatches.length; mi++) {
+                                                                  const cur = allMatches[mi];
+                                                                  const nextStart = allMatches[mi + 1]?.index;
+                                                                  const rawValue = nextStart !== undefined
+                                                                    ? changesStr.slice(cur.end, nextStart - 2) // remove ", "
+                                                                    : changesStr.slice(cur.end);
+                                                                  parts.push({ key: cur.key, raw: rawValue.trim() });
+                                                                }
+                                                                if (parts.length > 0) {
+                                                                  return (
+                                                                    <div className="mt-1 space-y-1">
+                                                                      {parts.map((p, i) => {
+                                                                        // Gunakan String.fromCharCode agar karakter panah selalu benar
+                                                                        const PANAH = ' ' + String.fromCharCode(8594) + ' '; // → (U+2192)
+                                                                        const arrowIdx = p.raw.indexOf(PANAH);
+                                                                        let oldVal = p.raw;
+                                                                        let newVal = '';
+                                                                        if (arrowIdx !== -1) {
+                                                                          oldVal = p.raw.slice(0, arrowIdx).replace(/"/g, '').trim();
+                                                                          newVal = p.raw.slice(arrowIdx + PANAH.length).replace(/"/g, '').trim();
+                                                                        }
+                                                                        return (
+                                                                          <div key={i} className="flex flex-col gap-0.5 bg-white/5 rounded px-2 py-1">
+                                                                            <span className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">{fieldLabels[p.key] ?? p.key}</span>
+                                                                            <div className="flex items-center gap-1 text-[11px] flex-wrap">
+                                                                              <span className="text-red-300 line-through">{oldVal}</span>
+                                                                              {newVal && <><span className="text-slate-500">→</span><span className="text-emerald-300">{newVal}</span></>}
+                                                                            </div>
                                                                           </div>
-                                                                        </div>
-                                                                      );
-                                                                    })}
-                                                                  </div>
-                                                                );
+                                                                        );
+                                                                      })}
+                                                                    </div>
+                                                                  );
+                                                                }
                                                               }
+                                                              return <span>Memperbarui informasi metadata dokumen.</span>;
                                                             }
-                                                            return <span>Memperbarui informasi metadata dokumen.</span>;
-                                                          }
 
-                                                          if (log.aktivitas === 'UPDATE_FILE') return <span className="text-emerald-400">Mengunggah ulang file dokumen yang baru (Replace).</span>;
-                                                          if (log.aktivitas === 'EXCEL_EDIT_SYNC') return <span className="text-indigo-400">Menyimpan perubahan isi dokumen via Desktop Sync.</span>;
-                                                          if (log.aktivitas === 'VERIFIKASI') return 'Memverifikasi status persetujuan dokumen publik.';
-                                                          if (log.aktivitas === 'EDIT_STATUS') return 'Mengubah status tracking dokumen (Aktif/Review/Kadaluarsa).';
+                                                            if (log.aktivitas === 'UPDATE_FILE') return <span className="text-emerald-400">Mengunggah ulang file dokumen yang baru (Replace).</span>;
+                                                            if (log.aktivitas === 'EXCEL_EDIT_SYNC') return <span className="text-indigo-400">Menyimpan perubahan isi dokumen via Desktop Sync.</span>;
+                                                            if (log.aktivitas === 'VERIFIKASI') return 'Memverifikasi status persetujuan dokumen publik.';
+                                                            if (log.aktivitas === 'EDIT_STATUS') return 'Mengubah status tracking dokumen (Aktif/Review/Kadaluarsa).';
 
-                                                          return log.deskripsi;
-                                                        })()}
+                                                            return log.deskripsi;
+                                                          })()}
+                                                        </div>
                                                       </div>
-                                                    </div>
-                                                  </TooltipContent>
-                                                </Tooltip>
-                                              </TooltipProvider>
-                                            )}
+                                                    </TooltipContent>
+                                                  </Tooltip>
+                                                </TooltipProvider>
+                                              );
+                                            })()}
                                           </div>
                                         </div>
                                       </div>
