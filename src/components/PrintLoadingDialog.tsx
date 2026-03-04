@@ -1,18 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import {
-  CheckCircle2,
-  Circle,
-  Loader2,
-  FileText,
-  FileOutput,
-  Printer,
-  X
-} from 'lucide-react'
+import { CheckCircle2, Loader2, FileText, FileOutput, Printer, X, AlertTriangle } from 'lucide-react'
 
 interface PrintStep {
   id: string
@@ -30,113 +22,48 @@ interface PrintLoadingDialogProps {
   onComplete?: () => void
 }
 
-// Initial steps based on file type
 const getInitialSteps = (fileType: string): PrintStep[] => {
-  const isPdf = fileType === 'pdf'
-
-  if (isPdf) {
+  if (fileType === 'pdf') {
     return [
-      { id: 'init', label: 'Memvalidasi', description: 'Memvalidasi file dan izin akses...', status: 'pending' },
-      { id: 'user', label: 'Mengambil Info User', description: 'Mengambil informasi pengguna...', status: 'pending' },
-      { id: 'download', label: 'Mengunduh dari R2', description: 'Mengunduh file dari Cloudflare R2...', status: 'pending' },
-      { id: 'footer', label: 'Menambahkan Footer', description: 'Menambahkan footer dinamis ke PDF...', status: 'pending' },
-      { id: 'ready', label: 'Mengunduh PDF', description: 'Mengunduh PDF ke perangkat Anda...', status: 'pending' },
+      { id: 'init', label: 'Memvalidasi File', description: 'Mengecek integritas dokumen...', status: 'pending' },
+      { id: 'user', label: 'Autentikasi User', description: 'Mengamankan koneksi & identifikasi...', status: 'pending' },
+      { id: 'download', label: 'Routing Storage', description: 'Mengambil data dari Cloudflare R2...', status: 'pending' },
+      { id: 'footer', label: 'Injeksi Footer', description: 'Menambahkan metadata sistem...', status: 'pending' },
+      { id: 'ready', label: 'Finalisasi', description: 'Menyiapkan unduhan PDF...', status: 'pending' },
     ]
   }
-
   return [
-    { id: 'init', label: 'Memvalidasi', description: 'Memvalidasi file dan izin akses...', status: 'pending' },
-    { id: 'user', label: 'Mengambil Info User', description: 'Mengambil informasi pengguna...', status: 'pending' },
-    { id: 'download', label: 'Mengunduh dari R2', description: 'Mengunduh file dari Cloudflare R2...', status: 'pending' },
-    { id: 'upload', label: 'Upload ke OneDrive', description: 'Mengunggah ke Microsoft OneDrive...', status: 'pending' },
-    { id: 'convert', label: 'Konversi ke PDF', description: 'Mengkonversi file ke format PDF...', status: 'pending' },
-    { id: 'footer', label: 'Menambahkan Footer', description: 'Menambahkan footer dinamis ke PDF...', status: 'pending' },
-    { id: 'ready', label: 'Mengunduh PDF', description: 'Mengunduh PDF ke perangkat Anda...', status: 'pending' },
+    { id: 'init', label: 'Memvalidasi File', description: 'Mengecek integritas dokumen...', status: 'pending' },
+    { id: 'user', label: 'Autentikasi User', description: 'Mengamankan koneksi & identifikasi...', status: 'pending' },
+    { id: 'download', label: 'Routing Storage', description: 'Mengambil data dari Cloudflare R2...', status: 'pending' },
+    { id: 'upload', label: 'Cloud Pre-processing', description: 'Menyiapkan konversi engine...', status: 'pending' },
+    { id: 'convert', label: 'Konversi Format', description: 'Format ulang menjadi PDF performa tinggi...', status: 'pending' },
+    { id: 'footer', label: 'Injeksi Footer', description: 'Menambahkan metadata sistem...', status: 'pending' },
+    { id: 'ready', label: 'Finalisasi', description: 'Menyiapkan unduhan PDF...', status: 'pending' },
   ]
 }
 
-// Step icon component
-const StepIcon = ({ step, isActive }: { step: PrintStep; isActive: boolean }) => {
-  if (step.status === 'completed') {
-    return (
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center"
-      >
-        <CheckCircle2 className="w-5 h-5 text-white" />
-      </motion.div>
-    )
-  }
-
-  if (step.status === 'processing') {
-    return (
-      <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-        className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center"
-      >
-        <Loader2 className="w-5 h-5 text-white" />
-      </motion.div>
-    )
-  }
-
-  if (step.status === 'error') {
-    return (
-      <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
-        <X className="w-5 h-5 text-white" />
-      </div>
-    )
-  }
-
-  return (
-    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-300 ${isActive ? 'bg-orange-500/30 border-2 border-orange-500' : 'bg-gray-700 border-2 border-gray-600'
-      }`}>
-      <Circle className={`w-3 h-3 ${isActive ? 'text-orange-400' : 'text-gray-500'}`} />
-    </div>
-  )
-}
-
-// Animated background particles
-const ParticleBackground = () => (
-  <div className="absolute inset-0 overflow-hidden pointer-events-none">
-    {[...Array(20)].map((_, i) => (
-      <motion.div
-        key={i}
-        className="absolute w-2 h-2 bg-orange-500/20 rounded-full"
-        initial={{
-          x: Math.random() * 100 + '%',
-          y: '100%',
-          opacity: 0
-        }}
-        animate={{
-          y: '-10%',
-          opacity: [0, 0.5, 0]
-        }}
-        transition={{
-          duration: 3 + Math.random() * 2,
-          repeat: Infinity,
-          delay: Math.random() * 2,
-          ease: 'linear'
-        }}
-      />
-    ))}
+const AmbientBackground = () => (
+  <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-3xl">
+    <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-orange-500/10 blur-[120px] mix-blend-screen rounded-full" />
+    <div className="absolute bottom-[-20%] left-[-10%] w-[500px] h-[500px] bg-rose-500/10 blur-[120px] mix-blend-screen rounded-full" />
+    {/* Micro grid pattern for aesthetic texture */}
+    <div
+      className="absolute inset-0 opacity-[0.03]"
+      style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '32px 32px' }}
+    />
   </div>
 )
 
-export default function PrintLoadingDialog({
-  open,
-  onClose,
-  fileId,
-  fileName,
-  fileType,
-  onComplete
-}: PrintLoadingDialogProps) {
+export default function PrintLoadingDialog({ open, onClose, fileId, fileName, fileType, onComplete }: PrintLoadingDialogProps) {
   const [steps, setSteps] = useState<PrintStep[]>([])
   const [currentStepIndex, setCurrentStepIndex] = useState(-1)
   const [error, setError] = useState<string | null>(null)
 
-  // Reset state when dialog opens
+  const progressPercent = steps.length > 0
+    ? Math.round(((steps.filter(s => s.status === 'completed').length) / steps.length) * 100)
+    : 0
+
   useEffect(() => {
     if (open && fileId) {
       setSteps(getInitialSteps(fileType))
@@ -145,277 +72,261 @@ export default function PrintLoadingDialog({
     }
   }, [open, fileId, fileType])
 
-  // Simulate step progress based on actual API call
   const startPrintProcess = useCallback(async () => {
     if (!fileId) return
-
-    const initialSteps = getInitialSteps(fileType)
-    setSteps(initialSteps)
-
-    // Step 1: Initialize
     setCurrentStepIndex(0)
-    setSteps(prev => prev.map((s, i) => i === 0 ? { ...s, status: 'processing' } : s))
-    await new Promise(r => setTimeout(r, 400))
+    setError(null)
+    setSteps(getInitialSteps(fileType).map((s, i) => i === 0 ? { ...s, status: 'processing' } : s))
+
+    await new Promise(r => setTimeout(r, 600))
     setSteps(prev => prev.map((s, i) => i === 0 ? { ...s, status: 'completed' } : s))
 
     try {
-      // Step 2: User info & Generate Token
       setCurrentStepIndex(1)
       setSteps(prev => prev.map((s, i) => i === 1 ? { ...s, status: 'processing' } : s))
 
-      // We need a print token to open the PDF directly
       const tokenRes = await fetch('/api/print', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileId })
       })
-
-      if (!tokenRes.ok) {
-        throw new Error('Gagal membuat akses print')
-      }
-
-      const tokenData = await tokenRes.json()
-      const printToken = tokenData.token
+      if (!tokenRes.ok) throw new Error('Gagal membuat akses print')
+      const { token: printToken } = await tokenRes.json()
 
       setSteps(prev => prev.map((s, i) => i === 1 ? { ...s, status: 'completed' } : s))
 
-      // Step 3: Download (visual only)
       setCurrentStepIndex(2)
       setSteps(prev => prev.map((s, i) => i === 2 ? { ...s, status: 'processing' } : s))
-      await new Promise(r => setTimeout(r, 400))
+      await new Promise(r => setTimeout(r, 600))
       setSteps(prev => prev.map((s, i) => i === 2 ? { ...s, status: 'completed' } : s))
 
       const isOfficeFile = !['pdf'].includes(fileType)
-
       if (isOfficeFile) {
-        // Step 4: Upload (visual)
         setCurrentStepIndex(3)
         setSteps(prev => prev.map((s, i) => i === 3 ? { ...s, status: 'processing' } : s))
-        await new Promise(r => setTimeout(r, 400))
+        await new Promise(r => setTimeout(r, 500))
         setSteps(prev => prev.map((s, i) => i === 3 ? { ...s, status: 'completed' } : s))
 
-        // Step 5: Convert (visual)
         setCurrentStepIndex(4)
         setSteps(prev => prev.map((s, i) => i === 4 ? { ...s, status: 'processing' } : s))
-        await new Promise(r => setTimeout(r, 400))
+        await new Promise(r => setTimeout(r, 800))
         setSteps(prev => prev.map((s, i) => i === 4 ? { ...s, status: 'completed' } : s))
       }
 
-      // Footer step
       const footerIndex = isOfficeFile ? 5 : 3
       setCurrentStepIndex(footerIndex)
       setSteps(prev => prev.map((s, i) => i === footerIndex ? { ...s, status: 'processing' } : s))
-      await new Promise(r => setTimeout(r, 300))
+      await new Promise(r => setTimeout(r, 500))
       setSteps(prev => prev.map((s, i) => i === footerIndex ? { ...s, status: 'completed' } : s))
 
-      // Final: Open PDF native viewer in new tab
       const readyIndex = isOfficeFile ? 6 : 4
       setCurrentStepIndex(readyIndex)
       setSteps(prev => prev.map((s, i) => i === readyIndex ? { ...s, status: 'processing' } : s))
 
-      const pdfFetchUrl = `/api/print?token=${printToken}`
-      // Fetch PDF sebagai blob — tunggu sampai server selesai generate PDF
-      const pdfRes = await fetch(pdfFetchUrl)
+      const pdfRes = await fetch(`/api/print?token=${printToken}`)
       if (!pdfRes.ok) throw new Error('Gagal mengunduh PDF dari server')
 
       const blob = await pdfRes.blob()
       const blobUrl = URL.createObjectURL(blob)
-
-      // Download langsung tanpa buka tab baru
       const link = document.createElement('a')
       link.href = blobUrl
       link.download = fileName.replace(/\.[^.]+$/, '') + '.pdf'
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-
-      // Bersihkan blob URL setelah download
       setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
 
-      await new Promise(r => setTimeout(r, 500))
+      await new Promise(r => setTimeout(r, 400))
       setSteps(prev => prev.map((s, i) => i === readyIndex ? { ...s, status: 'completed' } : s))
 
       if (onComplete) onComplete()
-      setTimeout(() => { onClose() }, 800)
-
+      setTimeout(() => onClose(), 800)
     } catch (err) {
       console.error('Print error:', err)
-      setError(err instanceof Error ? err.message : 'Terjadi kesalahan')
-
-      // Mark current step as error
-      setSteps(prev => prev.map((s, i) =>
-        s.status === 'processing' ? { ...s, status: 'error' } : s
-      ))
+      setError(err instanceof Error ? err.message : 'Terjadi kesalahan sistem')
+      setSteps(prev => prev.map(s => s.status === 'processing' ? { ...s, status: 'error' } : s))
     }
-  }, [fileId, fileType, onComplete, onClose])
+  }, [fileId, fileType, fileName, onComplete, onClose])
 
-  // Start process when dialog opens
   useEffect(() => {
     if (open && fileId) {
-      const timer = setTimeout(() => {
-        startPrintProcess()
-      }, 500)
+      const timer = setTimeout(() => startPrintProcess(), 400)
       return () => clearTimeout(timer)
     }
   }, [open, fileId, startPrintProcess])
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="max-w-lg w-[95vw] bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border-gray-700 text-white overflow-hidden">
-        {/* Accessibility: Hidden title and description for screen readers */}
-        <DialogTitle className="sr-only">
-          Mempersiapkan Print
-        </DialogTitle>
-        <DialogDescription className="sr-only">
-          Dialog untuk mempersiapkan dan mencetak file {fileName}
-        </DialogDescription>
+      <DialogContent className="max-w-2xl w-[95vw] bg-[#0A0A0B]/95 border-white/10 text-white backdrop-blur-3xl shadow-2xl p-0 overflow-hidden rounded-3xl" aria-describedby={undefined}>
+        <DialogTitle className="sr-only">Proses Print</DialogTitle>
+        <AmbientBackground />
 
-        <ParticleBackground />
-
-        <div className="relative z-10">
+        <div className="relative z-10 p-5 sm:p-7">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                className="p-3 rounded-xl bg-orange-500"
-              >
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+              <div className="relative w-12 h-12 flex items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-rose-600 shadow-lg shadow-orange-500/30 shrink-0">
                 <Printer className="w-6 h-6 text-white" />
-              </motion.div>
-              <div>
-                <h2 className="text-xl font-bold">Mempersiapkan Print...</h2>
-                <p className="text-sm text-gray-400 truncate max-w-[200px]">{fileName}</p>
+                <motion.div
+                  className="absolute inset-0 rounded-2xl border border-white/20"
+                  animate={{ scale: [1, 1.1, 1], opacity: [1, 0, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-xl font-bold tracking-tight text-white mb-0.5">Printing System</h2>
+                <div className="flex items-start gap-2 text-slate-400 mt-1">
+                  {fileType === 'pdf' ? <FileText className="w-3.5 h-3.5 mt-0.5 shrink-0" /> : <FileOutput className="w-3.5 h-3.5 mt-0.5 shrink-0" />}
+                  <p className="text-xs line-clamp-2 max-w-[200px] sm:max-w-[300px] font-medium text-orange-200/60 leading-tight" title={fileName}>{fileName}</p>
+                </div>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              className="text-gray-400 hover:text-white hover:bg-gray-700"
-            >
+            <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full hover:bg-white/10 text-white/50 hover:text-white shrink-0">
               <X className="w-5 h-5" />
             </Button>
           </div>
 
-          {/* Loading Animation */}
-          <div className="flex flex-col items-center justify-center py-8">
-            <motion.div
-              className="relative w-32 h-32 mb-6"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              {/* Outer ring */}
+          <div className="flex flex-col sm:flex-row gap-6 sm:gap-8">
+            {/* Left: Holographic Visualizer */}
+            <div className="flex-[0.8] flex flex-col items-center justify-center p-8 rounded-[2rem] bg-white/[0.02] border border-white/5 relative overflow-hidden group">
               <motion.div
-                className="absolute inset-0 border-4 border-orange-500/30 rounded-full"
-                animate={{ scale: [1, 1.1, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
+                className="absolute inset-0 bg-gradient-to-b from-transparent via-orange-500/20 to-transparent h-[200px]"
+                animate={{ top: ['-100%', '100%'] }}
+                transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
               />
-              {/* Spinning ring */}
-              <motion.div
-                className="absolute inset-0 border-4 border-transparent border-t-orange-500 rounded-full"
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-              />
-              {/* Inner spinning ring */}
-              <motion.div
-                className="absolute inset-3 border-4 border-transparent border-b-orange-400 rounded-full"
-                animate={{ rotate: -360 }}
-                transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-              />
-              {/* Center icon */}
-              <div className="absolute inset-6 flex items-center justify-center bg-gray-800 rounded-full">
+
+              <div className="relative w-36 h-36 flex items-center justify-center mb-6 z-10">
+                <svg className="absolute inset-0 w-full h-full -rotate-90 drop-shadow-2xl">
+                  <circle cx="72" cy="72" r="68" className="stroke-white/5" strokeWidth="4" fill="none" />
+                  <motion.circle
+                    cx="72" cy="72" r="68"
+                    className="stroke-orange-500"
+                    strokeWidth="4" fill="none" strokeLinecap="round"
+                    animate={{ strokeDasharray: "427", strokeDashoffset: 427 - (427 * progressPercent) / 100 }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                  />
+                </svg>
                 <motion.div
-                  animate={{ scale: [1, 1.1, 1] }}
-                  transition={{ duration: 1, repeat: Infinity }}
+                  animate={{
+                    scale: [1, 1.05, 1],
+                    filter: ['drop-shadow(0 0 10px rgba(249,115,22,0.3))', 'drop-shadow(0 0 25px rgba(249,115,22,0.8))', 'drop-shadow(0 0 10px rgba(249,115,22,0.3))']
+                  }}
+                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                  className="relative z-10"
                 >
-                  {fileType === 'pdf' ? (
-                    <FileText className="w-8 h-8 text-orange-400" />
-                  ) : (
-                    <FileOutput className="w-8 h-8 text-orange-400" />
-                  )}
+                  {fileType === 'pdf' ? <FileText className="w-14 h-14 text-orange-400" /> : <FileOutput className="w-14 h-14 text-orange-400" />}
                 </motion.div>
               </div>
-            </motion.div>
 
-            <motion.h3
-              className="text-lg font-semibold text-white mb-2 text-center"
-              key={steps[currentStepIndex]?.label}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              {steps[currentStepIndex]?.label || 'Memulai...'}
-            </motion.h3>
-            <p className="text-sm text-gray-400 text-center max-w-xs">
-              {steps[currentStepIndex]?.description || 'Mohon tunggu...'}
-            </p>
-
-            {/* Animated dots */}
-            <div className="flex gap-1 mt-4">
-              {[0, 1, 2].map((i) => (
-                <motion.div
-                  key={i}
-                  className="w-2 h-2 bg-orange-500 rounded-full"
-                  animate={{
-                    scale: [1, 1.5, 1],
-                    opacity: [0.5, 1, 0.5]
-                  }}
-                  transition={{
-                    duration: 1,
-                    repeat: Infinity,
-                    delay: i * 0.2
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Progress Steps */}
-          <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-            <h3 className="text-sm font-medium text-gray-300 mb-3">Proses Print</h3>
-
-            <div className="space-y-1">
-              {steps.map((step, index) => (
-                <motion.div
-                  key={step.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${currentStepIndex === index ? 'bg-orange-500/10' : ''
-                    }`}
+              <div className="text-center relative z-10">
+                <motion.h3
+                  key={progressPercent}
+                  initial={{ scale: 1.2, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="text-4xl font-black text-white tabular-nums tracking-tighter"
                 >
-                  <StepIcon step={step} isActive={currentStepIndex === index} />
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium ${step.status === 'completed' ? 'text-green-400' :
-                      step.status === 'processing' ? 'text-orange-400' :
-                        step.status === 'error' ? 'text-red-400' :
-                          'text-gray-400'
-                      }`}>
-                      {step.label}
-                    </p>
-                  </div>
-                </motion.div>
-              ))}
+                  {progressPercent}%
+                </motion.h3>
+                <p className="text-[10px] font-bold text-orange-400/80 uppercase tracking-[0.2em] mt-2">
+                  {progressPercent === 100 ? 'Selesai' : 'Processing'}
+                </p>
+              </div>
             </div>
 
-            {/* Error message */}
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg"
-              >
-                <p className="text-sm text-red-400">{error}</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-2"
-                  onClick={startPrintProcess}
-                >
-                  Coba Lagi
-                </Button>
-              </motion.div>
-            )}
+            {/* Right: Glassmorphic Stepper */}
+            <div className="flex-[1.2] flex flex-col justify-center gap-3">
+              <div className="sm:hidden flex items-center justify-between px-1 mb-2">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Workflow Progres</span>
+                <span className="text-[10px] font-bold text-orange-400 uppercase tracking-widest">{steps.filter(s => s.status === 'completed').length}/{steps.length} Selesai</span>
+              </div>
+              <div className="space-y-2">
+                {steps.map((step, index) => {
+                  const isActive = currentStepIndex === index
+                  const isCompleted = step.status === 'completed'
+                  const isError = step.status === 'error'
+
+                  return (
+                    <motion.div
+                      key={step.id}
+                      layout
+                      className={`relative flex items-center gap-4 p-3.5 rounded-2xl transition-all duration-500 overflow-hidden ${isActive ? 'bg-orange-500/10 border border-orange-500/30 shadow-[0_0_30px_rgba(249,115,22,0.1)]' :
+                        isCompleted ? 'bg-white/[0.02] border border-white/5' :
+                          'opacity-40 grayscale border border-transparent pb-2 pt-2'
+                        }`}
+                    >
+                      {isActive && (
+                        <motion.div
+                          layoutId="activeGlowBg"
+                          className="absolute inset-0 bg-gradient-to-r from-orange-500/10 to-transparent"
+                          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                          transition={{ duration: 0.3 }}
+                        />
+                      )}
+
+                      {/* Icon */}
+                      <div className={`relative w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-colors duration-500 ${isActive ? 'bg-gradient-to-br from-orange-400 to-rose-500 shadow-lg shadow-orange-500/30' :
+                        isCompleted ? 'bg-emerald-500/20 text-emerald-400' :
+                          isError ? 'bg-red-500/20 text-red-400' :
+                            'bg-white/5 text-white/30'
+                        }`}>
+                        {isCompleted ? <CheckCircle2 className="w-5 h-5" /> :
+                          isActive ? <Loader2 className="w-5 h-5 text-white animate-spin" /> :
+                            isError ? <X className="w-5 h-5" /> :
+                              <span className="text-xs font-bold">{index + 1}</span>}
+                      </div>
+
+                      {/* Text content */}
+                      <div className="flex-1 min-w-0 relative z-10">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className={`text-sm font-bold tracking-tight leading-tight transition-colors duration-300 ${isActive ? 'text-white' : 'text-white/80'}`}>
+                            {step.label}
+                          </h4>
+                          {isCompleted && <span className="text-[9px] font-black text-emerald-500 uppercase tracking-wider shrink-0 hidden sm:block mt-0.5">OK</span>}
+                        </div>
+                        <AnimatePresence>
+                          {isActive && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="overflow-hidden"
+                            >
+                              <p className="text-xs text-orange-200/70 mt-1.5 leading-relaxed pr-2">
+                                {step.description}
+                              </p>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </motion.div>
+                  )
+                })}
+              </div>
+
+              {/* Error Message */}
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: 'auto' }}
+                    exit={{ opacity: 0, y: 10, height: 0 }}
+                    className="mt-2"
+                  >
+                    <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex flex-col sm:flex-row items-center gap-4 justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
+                          <AlertTriangle className="w-4 h-4 text-red-400" />
+                        </div>
+                        <p className="text-sm text-red-300 font-medium leading-tight">{error}</p>
+                      </div>
+                      <Button size="sm" onClick={startPrintProcess} className="shrink-0 w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white rounded-xl shadow-lg shadow-red-500/20">
+                        Coba Lagi
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       </DialogContent>
