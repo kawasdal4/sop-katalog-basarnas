@@ -1441,25 +1441,30 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
     // Use refs to track if initial load has happened to prevent overwriting user changes
     const isInitialLoad = useRef(true);
 
-    // Track the last data version we synced from (to detect server-side changes)
+    // Track the last SOP ID we initialized edges for (to detect a NEW sop being opened, not just a re-render)
     const lastSopDataIdRef = useRef<string | null>(null);
     const lastFlowchartUpdatedRef = useRef<string | null>(null);
 
-    // CRITICAL FIX: Sync layout engine output to React Flow state ONLY when server data changes.
-    // This prevents the auto-generated `allEdges` from overwriting user canvas edits.
+    // CRITICAL FIX: Only sync from layout engine edges on initial load or when a truly new SOP opens.
+    // After initial load, user canvas edits must be authoritative - do NOT reset them.
+    // The previous bug was: save → onDataUpdate → sopData changes → useEffect fires → resets edges to defaults → auto-save saves defaults.
     useEffect(() => {
         const currentSopId = sopData?.id ?? null;
-        const currentFlowchartUpdated = sopData?.sopFlowchart?.updatedAt ?? sopData?.updatedAt ?? null;
-        const updatedStr = currentFlowchartUpdated ? String(currentFlowchartUpdated) : null;
+        // Use the flowchartJson as a stable version key (it only changes when YOU save new data)
+        const flowchartRef = sopData?.sopFlowchart?.flowchartJson
+            ? sopData.sopFlowchart.flowchartJson.slice(0, 50)  // just a hash-like prefix
+            : null;
 
-        const isNewData = currentSopId !== lastSopDataIdRef.current || updatedStr !== lastFlowchartUpdatedRef.current;
+        const isNewSop = currentSopId !== lastSopDataIdRef.current;
+        const isNewFlowchart = isNewSop || (flowchartRef !== lastFlowchartUpdatedRef.current && lastFlowchartUpdatedRef.current === null);
 
-        if (!isNewData) return; // User is editing - don't reset their state
+        if (!isNewFlowchart && lastSopDataIdRef.current !== null) {
+            return; // Same SOP, same or newer data - user edits must be preserved
+        }
 
         lastSopDataIdRef.current = currentSopId;
-        lastFlowchartUpdatedRef.current = updatedStr;
+        lastFlowchartUpdatedRef.current = flowchartRef;
 
-        // Now sync from the layout engine (which includes savedEdges from DB)
         if (!isPrintMode) {
             if (allEdges.length > 0) {
                 setEdges(allEdges.map(e => ({
@@ -1475,7 +1480,8 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
 
         setNodes(allNodes);
         isInitialLoad.current = false;
-    }, [allNodes, allEdges, sopData, setNodes, setEdges, isPrintMode, handleResetEdge]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sopData?.id, sopData?.sopFlowchart, isPrintMode]);
 
     const handleSaveFlowchart = useCallback(async (silent = false) => {
         if (!sopData?.id) return;
