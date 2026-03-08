@@ -4,6 +4,8 @@ import { cookies } from 'next/headers'
 import { uploadToR2, isR2Configured, deleteFromR2, moveR2Object, getR2PresignedUrl } from '@/lib/r2-storage'
 import { validateRole } from '@/lib/auth-utils'
 import { v4 as uuidv4 } from 'uuid'
+import path from 'path'
+import { mkdir, writeFile } from 'fs/promises'
 
 // Set runtime and max duration for Vercel
 export const runtime = 'nodejs'
@@ -298,7 +300,10 @@ export async function POST(request: NextRequest) {
     // ============================================
     // STEP 1: Upload to R2 (PRIMARY STORAGE)
     // ============================================
-    if (!isR2Configured()) {
+    const r2AccountId = process.env.R2_ACCOUNT_ID || ''
+    const isDummyR2 = !isProduction && (r2AccountId === 'dummy-account-id' || r2AccountId.startsWith('dummy-'))
+
+    if (!isR2Configured() || isDummyR2) {
       // Local storage fallback (development only)
       if (!isProduction) {
         console.log('📁 Using local storage (R2 not configured)')
@@ -338,20 +343,20 @@ export async function POST(request: NextRequest) {
         data: {
           nomorSop,
           judul,
-          tahun,
+          tahun: parseInt(tahun.toString()), // Ensure integer
           kategori,
           jenis,
-          lingkup,
+          lingkup: lingkup || null, // Allow null
           status: status || 'AKTIF',
           fileName,
           filePath,
           fileType: fileExtension,
           driveFileId: null, // Will be set by background backup
           uploadedBy: userId,
-          isPublicSubmission,
-          submitterName,
-          submitterEmail,
-          keterangan,
+          isPublicSubmission: isPublicSubmission, // Ensure boolean
+          submitterName: submitterName || null,
+          submitterEmail: submitterEmail || null,
+          keterangan: keterangan || null,
           verificationStatus: isPublicSubmission ? 'MENUNGGU' : null
         }
       })

@@ -153,6 +153,9 @@ export async function uploadFileToEditFolder(
   
   // Upload file
   console.log(`📤 Uploading file to OneDrive: ${fileName}`);
+  const requestBody = content instanceof ArrayBuffer
+    ? new Uint8Array(content)
+    : new Uint8Array(content)
   
   const uploadResponse = await graphRequest(
     `/users/${serviceAccount}/drive/root:/${folderName}/${fileName}:/content`,
@@ -161,7 +164,7 @@ export async function uploadFileToEditFolder(
       headers: {
         'Content-Type': contentType,
       },
-      body: content,
+      body: requestBody,
     }
   );
   

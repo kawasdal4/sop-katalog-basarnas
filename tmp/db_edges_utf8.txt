@@ -1,0 +1,38 @@
+Analyzing SopFlowchart cmmhk79zk0004eyekzzitnhen...
+Found 6 valid edges stored in flowchartJson:
+- ID: edge-1-next
+  SRC: flow-node-1 (bottom)
+  TGT: flow-node-2 (top-target)
+  LBL: undefined
+  HANDMADE: undefined
+
+- ID: edge-2-next
+  SRC: flow-node-2 (bottom)
+  TGT: flow-node-3 (top-target)
+  LBL: undefined
+  HANDMADE: undefined
+
+- ID: edge-3-yes
+  SRC: flow-node-3 (bottom)
+  TGT: flow-node-4 (top-target)
+  LBL: Ya
+  HANDMADE: undefined
+
+- ID: edge-flow-node-4-to-offpage
+  SRC: flow-node-4 (bottom)
+  TGT: off-page-out-0 (top)
+  LBL: undefined
+  HANDMADE: undefined
+
+- ID: edge-offpage-to-flow-node-5
+  SRC: off-page-in-1 (bottom)
+  TGT: flow-node-5 (top-target)
+  LBL: undefined
+  HANDMADE: undefined
+
+- ID: xy-edge__flow-node-3left-flow-node-2left
+  SRC: flow-node-3 (left)
+  TGT: flow-node-2 (left)
+  LBL: Tidak
+  HANDMADE: undefined
+

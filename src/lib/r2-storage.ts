@@ -11,6 +11,10 @@ import {
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { calculateChecksum } from './sync-core'
+import fs from 'fs/promises'
+import path from 'path'
+
+const LOCAL_UPLOAD_DIR = path.join(process.cwd(), 'public', 'temp_uploads')
 
 // Cloudflare R2 Configuration
 interface R2Config {
@@ -41,12 +45,9 @@ export interface R2UploadResult {
 
 // Helper to extract account ID from R2_ENDPOINT
 function extractAccountIdFromEndpoint(endpoint: string): string | null {
-  // Format: https://f8bdefda808aa952cd77b12e7cafa38c.r2.cloudflarestorage.com/...
-  // or: https://account-id.r2.cloudflarestorage.com
   try {
     const url = new URL(endpoint)
     const hostname = url.hostname
-    // Extract account ID from subdomain (first part before .r2.cloudflarestorage.com)
     const match = hostname.match(/^([a-f0-9]+)\.r2\.cloudflarestorage\.com$/i)
     if (match) {
       return match[1]
@@ -61,40 +62,45 @@ import { validateEnv } from './env-val'
 
 // Get R2 configuration from environment
 export function getR2Config(): R2Config {
-  // Validate env on first call
   validateEnv()
 
-  // Support multiple env var naming conventions
-
-  // Account ID can come from R2_ACCOUNT_ID or extracted from R2_ENDPOINT
   let accountId: string | undefined = process.env.R2_ACCOUNT_ID
   if (!accountId && process.env.R2_ENDPOINT) {
     accountId = extractAccountIdFromEndpoint(process.env.R2_ENDPOINT) || undefined
   }
 
-  // Access key can be R2_ACCESS_KEY_ID or R2_ACCESS_KEY
   const accessKeyId = process.env.R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY
-
-  // Secret key can be R2_SECRET_ACCESS_KEY or R2_SECRET_KEY
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_KEY
-
-  // Bucket name can be R2_BUCKET_NAME or R2_BUCKET
   const bucketName = process.env.R2_BUCKET_NAME || process.env.R2_BUCKET || 'sop-katalog-basarnas'
-
   const publicUrl = process.env.R2_PUBLIC_URL
 
-  if (!accountId || !accessKeyId || !secretAccessKey) {
-    console.error('R2 Configuration missing:', {
-      hasAccountId: !!accountId,
-      hasR2Endpoint: !!process.env.R2_ENDPOINT,
-      hasAccessKeyId: !!accessKeyId,
-      hasSecretAccessKey: !!secretAccessKey,
-      bucketName
-    })
-    throw new Error('R2 credentials not configured')
-  }
+  const sanitize = (val?: string) => val ? val.replace(/['"]/g, '').trim() : ''
 
-  return { accountId, accessKeyId, secretAccessKey, bucketName, publicUrl }
+  return {
+    accountId: sanitize(accountId),
+    accessKeyId: sanitize(accessKeyId),
+    secretAccessKey: sanitize(secretAccessKey),
+    bucketName: sanitize(bucketName) || 'sop-katalog-basarnas',
+    publicUrl: sanitize(publicUrl)
+  }
+}
+
+/**
+ * Check if storage should run in Mock Mode (local fallback)
+ */
+export function isStorageMockMode(): boolean {
+  try {
+    const config = getR2Config()
+    const isMock =
+      config.accountId.includes('dummy') ||
+      config.accessKeyId.includes('dummy') ||
+      config.secretAccessKey.includes('dummy') ||
+      process.env.MOCK_STORAGE === 'true'
+
+    return isMock || (process.env.NODE_ENV !== 'production' && !config.accountId)
+  } catch {
+    return true
+  }
 }
 
 // Check if R2 is configured
@@ -107,7 +113,7 @@ export function isR2Configured(): boolean {
   }
 }
 
-// Create R2 client (new instance each time for serverless compatibility)
+// Create R2 client
 function createR2Client(): S3Client {
   const config = getR2Config()
 
@@ -136,24 +142,48 @@ export async function uploadToR2(
     metadata?: Record<string, string>
   }
 ): Promise<R2UploadResult> {
+  // --- MOCK MODE FOR DEVELOPMENT ---
+  if (isStorageMockMode()) {
+    const ext = fileName.split('.').pop() || 'file'
+    const uuid = uuidv4()
+    const folder = options?.folder ? options.folder.replace(/\/$/, '') : 'sop_dev'
+    const key = options?.key || `${folder}/${uuid}.${ext}`
+
+    console.log(`[MOCK R2] Saving locally: ${key}`)
+    const fullPath = path.join(LOCAL_UPLOAD_DIR, key)
+
+    await fs.mkdir(path.dirname(fullPath), { recursive: true })
+    await fs.writeFile(fullPath, fileBuffer)
+
+    const checksum = calculateChecksum(fileBuffer)
+    return {
+      key,
+      url: `/temp_uploads/${key}`,
+      publicUrl: `/temp_uploads/${key}`,
+      checksum,
+      size: fileBuffer.length,
+    }
+  }
+
   const config = getR2Config()
   const client = createR2Client()
 
-  // Generate UUID-based key if not provided
   let key = options?.key
   if (!key) {
     const ext = fileName.split('.').pop() || 'file'
-    const now = new Date()
-    const year = now.getFullYear()
-    const month = String(now.getMonth() + 1).padStart(2, '0')
     const uuid = uuidv4()
-    // Structure: /sop/tahun/bulan/uuid.ext
-    key = `sop/${year}/${month}/${uuid}.${ext}`
+
+    if (options?.folder) {
+      key = `${options.folder.replace(/\/$/, '')}/${uuid}.${ext}`
+    } else {
+      const now = new Date()
+      const year = now.getFullYear()
+      const month = String(now.getMonth() + 1).padStart(2, '0')
+      key = `sop/${year}/${month}/${uuid}.${ext}`
+    }
   }
 
-  // Calculate checksum
   const checksum = calculateChecksum(fileBuffer)
-
   console.log(`📤 Uploading to R2: ${key} (${fileBuffer.length} bytes)`)
 
   const command = new PutObjectCommand({
@@ -169,7 +199,6 @@ export async function uploadToR2(
   })
 
   await client.send(command)
-
   console.log(`✅ Uploaded to R2: ${key}`)
 
   return {
@@ -189,11 +218,29 @@ export async function downloadFromR2(key: string): Promise<{
   contentType: string
   metadata?: Record<string, string>
 }> {
+  // --- MOCK MODE FOR DEVELOPMENT ---
+  if (isStorageMockMode()) {
+    console.log(`[MOCK R2] Reading locally: ${key}`)
+    const fullPath = path.join(LOCAL_UPLOAD_DIR, key)
+    const buffer = await fs.readFile(fullPath)
+
+    const ext = key.split('.').pop()?.toLowerCase()
+    let contentType = 'application/octet-stream'
+    if (ext === 'xlsx') contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    if (ext === 'pdf') contentType = 'application/pdf'
+    if (ext === 'png') contentType = 'image/png'
+
+    return {
+      buffer,
+      contentType,
+      metadata: { originalFilename: path.basename(key) }
+    }
+  }
+
   const config = getR2Config()
   const client = createR2Client()
 
   console.log(`📥 Downloading from R2: ${key}`)
-  console.log(`   Bucket: ${config.bucketName}`)
 
   try {
     const command = new GetObjectCommand({
@@ -202,13 +249,11 @@ export async function downloadFromR2(key: string): Promise<{
     })
 
     const response = await client.send(command)
-
     if (!response.Body) {
       throw new Error('No file content')
     }
 
     const buffer = Buffer.from(await response.Body.transformToByteArray())
-
     console.log(`✅ Downloaded from R2: ${key} (${buffer.length} bytes)`)
 
     return {
@@ -220,19 +265,12 @@ export async function downloadFromR2(key: string): Promise<{
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     const errorCode = (error as { Code?: string; name?: string })?.Code || (error as { name?: string })?.name || ''
 
-    console.error(`❌ Failed to download from R2: ${key}`)
-    console.error(`   Error: ${errorMessage}`)
-    console.error(`   Code: ${errorCode}`)
-
-    // Friendly handling for 404
     if (errorCode === 'NoSuchKey' || errorMessage.includes('does not exist') || errorCode === '404') {
       throw new Error(`File tidak ditemukan di storage.`)
     }
-
     throw error
   }
 }
-
 
 /**
  * Get R2 bucket name
@@ -246,6 +284,10 @@ export function getR2BucketName(): string {
  */
 export async function checkR2FileExists(key: string): Promise<boolean> {
   try {
+    if (isStorageMockMode()) {
+      return true
+    }
+
     const config = getR2Config()
     const client = createR2Client()
 
@@ -261,7 +303,7 @@ export async function checkR2FileExists(key: string): Promise<boolean> {
 }
 
 /**
- * List all keys in R2 bucket with a given prefix (useful for finding similar files)
+ * List all keys in R2 bucket with a given prefix
  */
 export async function listR2FilesByPrefix(prefix: string): Promise<string[]> {
   const objects = await listR2Objects(prefix)
@@ -347,7 +389,7 @@ export async function listR2Objects(prefix?: string, maxKeys: number = 1000): Pr
             size: obj.Size || 0,
             lastModified: obj.LastModified || new Date(),
             etag: obj.ETag || '',
-            contentType: undefined, // Not provided in list
+            contentType: undefined,
           })
         }
       }
@@ -356,7 +398,6 @@ export async function listR2Objects(prefix?: string, maxKeys: number = 1000): Pr
     continuationToken = response.NextContinuationToken
   } while (continuationToken)
 
-  console.log(`📋 Listed ${objects.length} objects from R2`)
   return objects
 }
 
@@ -374,89 +415,24 @@ export async function copyR2Object(sourceKey: string, destKey: string): Promise<
   })
 
   await client.send(command)
-  console.log(`📋 Copied: ${sourceKey} → ${destKey}`)
 }
 
 /**
- * Move object within R2 (copy + delete)
+ * Move object within R2
  */
 export async function moveR2Object(sourceKey: string, destKey: string): Promise<void> {
-  const config = getR2Config()
-  const client = createR2Client()
-
-  // Copy to new location
-  const copyCommand = new CopyObjectCommand({
-    Bucket: config.bucketName,
-    CopySource: encodeURI(`${config.bucketName}/${sourceKey}`),
-    Key: destKey,
-  })
-
-  await client.send(copyCommand)
-
-  // Delete from old location
-  const deleteCommand = new DeleteObjectCommand({
-    Bucket: config.bucketName,
-    Key: sourceKey,
-  })
-
-  await client.send(deleteCommand)
-  console.log(`📦 Moved: ${sourceKey} → ${destKey}`)
+  await copyR2Object(sourceKey, destKey)
+  await deleteFromR2(sourceKey)
 }
 
 /**
- * Rename object within R2 (same as move but returns result)
+ * Rename object within R2
  */
 export async function renameR2Object(sourceKey: string, destKey: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const config = getR2Config()
-    const client = createR2Client()
-
-    // Check if source exists
-    try {
-      await client.send(new HeadObjectCommand({
-        Bucket: config.bucketName,
-        Key: sourceKey,
-      }))
-    } catch {
-      return { success: false, error: 'Source file not found in R2' }
-    }
-
-    // Check if destination already exists
-    try {
-      await client.send(new HeadObjectCommand({
-        Bucket: config.bucketName,
-        Key: destKey,
-      }))
-      // Destination exists, delete it first
-      await client.send(new DeleteObjectCommand({
-        Bucket: config.bucketName,
-        Key: destKey,
-      }))
-    } catch {
-      // Destination doesn't exist, which is fine
-    }
-
-    // Copy to new location
-    const copyCommand = new CopyObjectCommand({
-      Bucket: config.bucketName,
-      CopySource: encodeURI(`${config.bucketName}/${sourceKey}`),
-      Key: destKey,
-    })
-
-    await client.send(copyCommand)
-
-    // Delete from old location
-    const deleteCommand = new DeleteObjectCommand({
-      Bucket: config.bucketName,
-      Key: sourceKey,
-    })
-
-    await client.send(deleteCommand)
-    console.log(`📝 Renamed: ${sourceKey} → ${destKey}`)
-
+    await moveR2Object(sourceKey, destKey)
     return { success: true }
   } catch (error) {
-    console.error(`❌ Rename failed: ${sourceKey}`, error)
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -473,15 +449,12 @@ export async function ensureR2Bucket(): Promise<boolean> {
 
   try {
     await client.send(new HeadBucketCommand({ Bucket: config.bucketName }))
-    console.log(`✅ R2 bucket exists: ${config.bucketName}`)
     return true
   } catch {
     try {
       await client.send(new CreateBucketCommand({ Bucket: config.bucketName }))
-      console.log(`✅ Created R2 bucket: ${config.bucketName}`)
       return true
-    } catch (createError) {
-      console.error(`❌ Failed to create R2 bucket:`, createError)
+    } catch {
       return false
     }
   }
@@ -494,67 +467,32 @@ export async function testR2Connection(): Promise<{
   success: boolean
   message: string
   status: 'connected' | 'bucket_not_found' | 'auth_failed' | 'error'
-  details?: Record<string, unknown>
-  setupInstructions?: string[]
 }> {
+  if (isStorageMockMode()) {
+    return {
+      success: true,
+      status: 'connected',
+      message: '✅ Mock Storage Mode (Development)'
+    }
+  }
+
   try {
-    const config = getR2Config()
     const client = createR2Client()
-
-    const command = new ListObjectsV2Command({
-      Bucket: config.bucketName,
+    await client.send(new ListObjectsV2Command({
+      Bucket: getR2BucketName(),
       MaxKeys: 1,
-    })
-
-    await client.send(command)
+    }))
 
     return {
       success: true,
       status: 'connected',
-      message: '✅ Cloudflare R2 terhubung!',
-      details: {
-        bucket: config.bucketName,
-        accountId: config.accountId,
-        endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
-      },
+      message: '✅ Cloudflare R2 terhubung!'
     }
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    const errorCode = (error as { Code?: string; name?: string })?.Code || (error as { name?: string })?.name || ''
-
-    // Bucket not found - credentials are valid but bucket doesn't exist
-    if (errorCode === 'NoSuchBucket' || errorMessage.includes('does not exist')) {
-      return {
-        success: false,
-        status: 'bucket_not_found',
-        message: `Bucket "${getR2BucketName()}" tidak ditemukan. Credentials valid, tapi bucket belum dibuat.`,
-        details: {
-          bucket: getR2BucketName(),
-          accountId: process.env.R2_ACCOUNT_ID,
-        },
-        setupInstructions: [
-          '1. Login ke Cloudflare Dashboard: https://dash.cloudflare.com',
-          '2. Pilih menu R2 Object Storage',
-          '3. Klik "Create bucket"',
-          `4. Buat bucket dengan nama: "${getR2BucketName()}"`,
-          '5. Bucket akan otomatis terhubung setelah dibuat',
-        ],
-      }
-    }
-
-    // Authentication failed - wrong credentials
-    if (errorCode === 'InvalidAccessKeyId' || errorCode === 'SignatureDoesNotMatch' || errorMessage.includes('Access Denied')) {
-      return {
-        success: false,
-        status: 'auth_failed',
-        message: 'Kredensial R2 tidak valid. Periksa R2_ACCESS_KEY_ID dan R2_SECRET_ACCESS_KEY.',
-      }
-    }
-
+  } catch (error: any) {
     return {
       success: false,
       status: 'error',
-      message: `❌ Koneksi R2 gagal: ${errorMessage}`,
+      message: `❌ Koneksi R2 gagal: ${error.message}`
     }
   }
 }
@@ -563,12 +501,13 @@ export async function testR2Connection(): Promise<{
  * Get public URL for a file
  */
 export function getR2PublicUrl(key: string): string | null {
+  if (isStorageMockMode()) {
+    return `/temp_uploads/${key}`
+  }
   const config = getR2Config()
-
   if (config.publicUrl) {
     return `${config.publicUrl}/${key}`
   }
-
   return null
 }
 
@@ -586,11 +525,13 @@ export async function verifyR2Integrity(key: string, expectedChecksum: string): 
 }
 
 /**
- * Generate presigned URL for file access (download)
- * @param key - File key/path in R2
- * @param expiresIn - URL expiration time in seconds (default: 5 minutes)
+ * Generate presigned URL for file access
  */
 export async function getR2PresignedUrl(key: string, expiresIn: number = 300): Promise<string> {
+  if (isStorageMockMode()) {
+    return `/temp_uploads/${key}`
+  }
+
   const config = getR2Config()
   const client = createR2Client()
 
@@ -599,22 +540,21 @@ export async function getR2PresignedUrl(key: string, expiresIn: number = 300): P
     Key: key,
   })
 
-  const url = await getSignedUrl(client, command, { expiresIn })
-  return url
+  return await getSignedUrl(client, command, { expiresIn })
 }
 
 /**
- * Generate presigned URL for file upload (PUT)
- * This allows frontend to upload directly to R2
- * @param key - File key/path in R2
- * @param contentType - File content type
- * @param expiresIn - URL expiration time in seconds (default: 1 hour)
+ * Generate presigned URL for file upload
  */
 export async function getR2PresignedUploadUrl(
   key: string,
   contentType: string,
   expiresIn: number = 3600
 ): Promise<string> {
+  if (isStorageMockMode()) {
+    return `/api/mock-upload?key=${key}` // Placeholder
+  }
+
   const config = getR2Config()
   const client = createR2Client()
 
@@ -624,6 +564,5 @@ export async function getR2PresignedUploadUrl(
     ContentType: contentType,
   })
 
-  const url = await getSignedUrl(client, command, { expiresIn })
-  return url
+  return await getSignedUrl(client, command, { expiresIn })
 }

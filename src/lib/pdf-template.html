@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOP Document</title>
+    <style>
+        @page {
+            size: Legal landscape;
+            margin: 0;
+        }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: white;
+            color: #000;
+        }
+
+        .page {
+            width: 355.6mm; /* Legal Landscape */
+            height: 215.9mm;
+            padding: 10mm;
+            box-sizing: border-box;
+            page-break-after: always;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .page:last-child {
+            page-break-after: avoid;
+        }
+
+        .cover-page {
+            padding: 6mm;
+            overflow: hidden;
+        }
+
+        /* HEADER SOP BASARNAS STYLE */
+        .sop-header-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 2px solid #000;
+            margin-bottom: 0;
+        }
+
+        .sop-header-table td {
+            border: 1px solid #000;
+            padding: 5px;
+            vertical-align: middle;
+        }
+
+        .header-logo-section {
+            width: 60%;
+            text-align: center;
+            vertical-align: top;
+            padding: 10px;
+        }
+
+        .logo-img {
+            max-width: 80px;
+            height: auto;
+            margin-bottom: 5px;
+        }
+
+        .header-org-text {
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 10pt;
+            line-height: 1.2;
+        }
+
+        .meta-section {
+            width: 40%;
+            padding: 0 !important;
+            vertical-align: top;
+        }
+
+        .meta-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9pt;
+        }
+
+        .meta-table td {
+            border: 1px solid #000;
+            padding: 4px 5px;
+            font-weight: bold;
+        }
+
+        .meta-label {
+            width: 35%;
+            background-color: transparent;
+        }
+
+        .meta-value {
+            width: 65%;
+        }
+
+        .meta-signature-box {
+            text-align: center;
+            height: 60px;
+            vertical-align: bottom !important;
+        }
+
+        /* CONTENT */
+        .content-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9pt;
+            margin-top: -1px; /* Overlap borders */
+        }
+
+        .content-table td {
+            border: 1px solid #000;
+            padding: 0;
+            vertical-align: top;
+        }
+
+        .section-header {
+            background-color: #d9d9d9; /* Grey background like Excel */
+            font-weight: bold;
+            padding: 5px;
+            border-bottom: 1px solid #000;
+            text-transform: uppercase;
+            font-size: 9pt;
+        }
+
+        .section-body {
+            padding: 5px;
+            min-height: 150px;
+            font-size: 9pt;
+        }
+
+        .cover-page .header-logo-section {
+            padding: 6px;
+        }
+
+        .cover-page .logo-img {
+            max-width: 64px;
+            margin-bottom: 3px;
+        }
+
+        .cover-page .header-org-text {
+            font-size: 8pt;
+            line-height: 1.15;
+        }
+
+        .cover-page .meta-table {
+            font-size: 8pt;
+        }
+
+        .cover-page .meta-table td {
+            padding: 2px 4px;
+        }
+
+        .cover-page .meta-signature-box {
+            height: 34px;
+        }
+
+        .cover-page .content-table tr {
+            height: 31mm;
+        }
+
+        .cover-page .section-header {
+            font-size: 8pt;
+            padding: 3px 4px;
+        }
+
+        .cover-page .section-body {
+            min-height: 24mm;
+            font-size: 8pt;
+            line-height: 1.2;
+            padding: 4px;
+            overflow: hidden;
+        }
+
+        .cover-page .list-item {
+            margin-bottom: 2px;
+        }
+
+        .cover-page .list-num {
+            min-width: 14px;
+        }
+
+        /* STEPS TABLE */
+        .steps-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9pt;
+            margin-top: 10px;
+            border: 1px solid #000;
+        }
+
+        .steps-table th {
+            background-color: #e0e0e0;
+            border: 1px solid #000;
+            padding: 8px;
+            font-weight: bold;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        .steps-table td {
+            border: 1px solid #000;
+            padding: 6px;
+            vertical-align: top;
+        }
+
+        .col-no { width: 5%; text-align: center; }
+        .col-aktivitas { width: 35%; }
+        .col-pelaksana { width: 15%; }
+        .col-mutu { width: 15%; }
+        .col-waktu { width: 10%; }
+        .col-output { width: 20%; }
+
+        /* SIGNATURE */
+        .signature-section {
+            margin-top: auto;
+            display: flex;
+            justify-content: flex-end;
+            page-break-inside: avoid;
+        }
+
+        .signature-box {
+            width: 300px;
+            text-align: center;
+            font-size: 11pt;
+        }
+
+        .signature-space {
+            height: 80px;
+        }
+
+        .signature-name {
+            font-weight: bold;
+            text-decoration: underline;
+        }
+
+        /* FLOWCHART PAGES */
+        .header-simple {
+            display: flex;
+            align-items: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .logo-small {
+            height: 40px;
+            margin-right: 15px;
+        }
+
+        .title-small {
+            font-weight: bold;
+            font-size: 12pt;
+        }
+
+        .flow-container-smart {
+            border: 1px dashed #ccc;
+            min-height: 500px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .footer-simple {
+            border-top: 1px solid #000;
+            padding-top: 5px;
+            margin-top: 10px;
+            font-size: 8pt;
+            text-align: right;
+            font-style: italic;
+        }
+
+        /* UTILS */
+        .list-container {
+            margin: 0;
+            padding: 0;
+        }
+        .list-item {
+            display: flex;
+            margin-bottom: 4px;
+        }
+        .list-num {
+            min-width: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- PAGE 1: COVER / IDENTITAS -->
+    <div class="page cover-page">
+        <!-- HEADER SOP -->
+        <table class="sop-header-table">
+            <tr>
+                <td class="header-logo-section">
+                    <img src="{{LOGO_BASE64}}" class="logo-img" alt="Logo Basarnas">
+                    <div class="header-org-text">
+                        BADAN NASIONAL PENCARIAN DAN PERTOLONGAN<br>
+                        DEPUTI BIDANG OPERASI PENCARIAN DAN PERTOLONGAN, DAN KESIAPSIAGAAN<br>
+                        DIREKTORAT KESIAPSIAGAAN
+                    </div>
+                </td>
+                <td class="meta-section">
+                    <table class="meta-table">
+                        <tr>
+                            <td class="meta-label">NOMOR SOP</td>
+                            <td class="meta-value">{{NOMOR_SOP}}</td>
+                        </tr>
+                        <tr>
+                            <td class="meta-label">TANGGAL PEMBUATAN</td>
+                            <td class="meta-value">{{TANGGAL_BUAT}}</td>
+                        </tr>
+                        <tr>
+                            <td class="meta-label">TANGGAL REVISI</td>
+                            <td class="meta-value">{{REVISI}}</td>
+                        </tr>
+                        <tr>
+                            <td class="meta-label">TANGGAL EFEKTIF</td>
+                            <td class="meta-value">{{TANGGAL_EFEKTIF}}</td>
+                        </tr>
+                        <tr>
+                            <td class="meta-label">DISAHKAN OLEH</td>
+                            <td class="meta-value" style="text-align: center;">
+                                <div style="font-weight: bold; margin-bottom: 5px;">{{DISAHKAN_JABATAN}}</div>
+                                <div class="meta-signature-box"></div>
+                                <div style="font-weight: bold; text-decoration: underline;">{{DISAHKAN_NAMA}}</div>
+                                <div>NIP. {{DISAHKAN_NIP}}</div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="meta-label">NAMA SOP</td>
+                            <td class="meta-value">{{JUDUL_SOP}}</td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+
+        <!-- CONTENT GRID (EXCEL MATCHING) -->
+        <table class="content-table">
+            <tr>
+                <!-- A10: DASAR HUKUM -->
+                <td style="width: 50%;">
+                    <div class="section-header">DASAR HUKUM :</div>
+                    <div class="section-body">{{DASAR_HUKUM}}</div>
+                </td>
+                <!-- H10: KUALIFIKASI PELAKSANA -->
+                <td style="width: 50%;">
+                    <div class="section-header">KUALIFIKASI PELAKSANA :</div>
+                    <div class="section-body">{{KUALIFIKASI}}</div>
+                </td>
+            </tr>
+            <tr>
+                <!-- A19: KETERKAITAN -->
+                <td style="width: 50%;">
+                    <div class="section-header">KETERKAITAN :</div>
+                    <div class="section-body">{{KETERKAITAN}}</div>
+                </td>
+                <!-- H19: PERALATAN -->
+                <td style="width: 50%;">
+                    <div class="section-header">PERALATAN / PERLENGKAPAN :</div>
+                    <div class="section-body">{{PERALATAN}}</div>
+                </td>
+            </tr>
+            <tr>
+                <!-- A27: PERINGATAN -->
+                <td style="width: 50%;">
+                    <div class="section-header">PERINGATAN :</div>
+                    <div class="section-body">{{PERINGATAN}}</div>
+                </td>
+                <!-- H27: PENCATATAN -->
+                <td style="width: 50%;">
+                    <div class="section-header">PENCATATAN DAN PENDAFTARAN :</div>
+                    <div class="section-body">{{PENCATATAN}}</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- PAGE 3: URAIAN PROSEDUR -->
+    <div class="page">
+        <div class="section-title" style="margin-top: 0;">URAIAN PROSEDUR</div>
+        
+        <table class="steps-table">
+            <thead>
+                <tr>
+                    <th rowspan="2" class="col-no">NO</th>
+                    <th rowspan="2" class="col-aktivitas">AKTIVITAS</th>
+                    <th rowspan="2" class="col-pelaksana">PELAKSANA</th>
+                    <th colspan="3">MUTU BAKU</th>
+                </tr>
+                <tr>
+                    <th class="col-mutu">KELENGKAPAN</th>
+                    <th class="col-waktu">WAKTU</th>
+                    <th class="col-output">OUTPUT</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{STEPS_HTML}}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- FLOWCHART PAGES INJECTED HERE -->
+    {{FLOWCHART_PAGES_HTML}}
+
+</body>
+</html>

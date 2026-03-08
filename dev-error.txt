@@ -1,0 +1,145 @@
+Init error: Error [Pris
+maClientInitializationE
+rror]: 
+Invalid `__TURBOPACK__i
+mported__module__$5b$pr
+oject$5d2f$src$2f$lib$2
+f$db$2e$ts__$5b$app$2d$
+route$5d$__$28$ecmascri
+pt$29$__["db"].user.fin
+dFirst()` invocation in
+D:\WEB APP E KATALOG\so
+p-katalog-basarnas\.nex
+t\dev\server\chunks\[ro
+ot-of-the-server]__f2d4
+1dd7._.js:86:163
+
+  83     messages: []
+  84 };
+  85 // Check if admin 
+exists
+ΓåÆ 86 const existingAd
+min = await __TURBOPACK
+__imported__module__$5b
+$project$5d2f$src$2f$li
+b$2f$db$2e$ts__$5b$app$
+2d$route$5d$__$28$ecmas
+cript$29$__["db"].user.
+findFirst(
+error: Error validating
+ datasource `db`: the U
+RL must start with the 
+protocol `postgresql://
+` or `postgres://`.
+  -->  schema.prisma:10
+   | 
+ 9 |   provider  = "pos
+tgresql"
+10 |   url       = env(
+"DATABASE_URL")
+   | 
+
+Validation Error Count:
+ 1
+    at <unknown> (src\a
+pp\api\init\route.ts:14
+:41)
+    at <unknown> (-->  
+schema.prisma:10)
+    at async GET (src\a
+pp\api\init\route.ts:14
+:27)
+  12 |     
+  13 |     // Check if 
+admin exists
+> 14 |     const existi
+ngAdmin = await db.user
+.findFirst({
+     |                 
+                       
+ ^
+  15 |       where: { r
+ole: 'ADMIN' }
+  16 |     })
+  17 |      {
+  clientVersion: '6.11.
+1',
+  errorCode: undefined,
+  retryable: undefined
+}
+Auth check error: Error
+ [PrismaClientInitializ
+ationError]: 
+Invalid `__TURBOPACK__i
+mported__module__$5b$pr
+oject$5d2f$src$2f$lib$2
+f$db$2e$ts__$5b$app$2d$
+route$5d$__$28$ecmascri
+pt$29$__["db"].user.fin
+dUnique()` invocation i
+n
+D:\WEB APP E KATALOG\so
+p-katalog-basarnas\.nex
+t\dev\server\chunks\[ro
+ot-of-the-server]__639a
+94b6._.js:833:154
+
+  830     });
+  831 }
+  832 // Get user witho
+ut select to avoid Turb
+opack cache issues
+ΓåÆ 833 const user = aw
+ait __TURBOPACK__import
+ed__module__$5b$project
+$5d2f$src$2f$lib$2f$db$
+2e$ts__$5b$app$2d$route
+$5d$__$28$ecmascript$29
+$__["db"].user.findUniq
+ue(
+error: Error validating
+ datasource `db`: the U
+RL must start with the 
+protocol `postgresql://
+` or `postgres://`.
+  -->  schema.prisma:10
+   | 
+ 9 |   provider  = "pos
+tgresql"
+10 |   url       = env(
+"DATABASE_URL")
+   | 
+
+Validation Error Count:
+ 1
+    at <unknown> (src\a
+pp\api\auth\route.ts:17
+:32)
+    at <unknown> (-->  
+schema.prisma:10)
+    at async GET (src\a
+pp\api\auth\route.ts:17
+:18)
+  15 |
+  16 |     // Get user 
+without select to avoid
+ Turbopack cache issues
+> 17 |     const user =
+ await db.user.findUniq
+ue({
+     |                 
+               ^
+  18 |       where: { i
+d: userId }
+  19 |     })
+  20 | {
+  clientVersion: '6.11.
+1',
+  errorCode: undefined,
+  retryable: undefined
+}
+ GET /api/init 500 in 647ms (compile: 74ms, proxy.ts: 9ms, render: 563ms)
+ GET /api/auth 200 in 656ms (compile: 328ms, proxy.ts: 6ms, render: 322ms)
+ GET /api/r2/status 200 in 921ms (compile: 265ms, proxy.ts: 10ms, render: 645ms)
+prisma:error 
+Invalid `_

@@ -30,8 +30,10 @@ model User {
 
   // Relations
   logs            Log[]
+  // auditLogs       AuditLog[] // Removed as AuditLog model is missing
   sopFiles        SopFile[]      @relation("UploadedBy")
   editedSopFiles  SopFile[]      @relation("UpdatedBy")
+  sopPembuatan    SopPembuatan[]
 }
 
 // SOP/IK File model
@@ -205,3 +207,60 @@ model ErrorLog {
   @@index([resolved])
   @@index([createdAt])
 }
+
+// ---------------------------------------------------------------------------
+// FITUR PEMBUATAN SOP TERINTEGRASI
+// ---------------------------------------------------------------------------
+
+model SopPembuatan {
+  id                    String   @id @default(cuid())
+  nomorSop              String?  @unique
+  judul                 String
+  unitKerja             String
+  tanggalEfektif        DateTime?
+  revisi                String?
+  dasarHukum            String?
+  kualifikasiPelaksana  String?
+  peralatanPerlengkapan String?
+  peringatan            String?
+  pencatatanPendataan   String?
+  keterkaitan           String?
+  disahkanOleh          String?
+  pelaksanaLanes        String?
+  connectorPaths        String?
+  status                String   @default("DRAFT") // DRAFT, FINAL
+  
+  // File results
+  generatedCoverPath    String?
+  combinedPdfPath       String?
+
+  authorId              String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relasi
+  author                User         @relation(fields: [authorId], references: [id])
+  langkahLangkah        SopLangkah[]
+}
+
+model SopLangkah {
+  id                  String   @id @default(cuid())
+  order               Int
+  aktivitas           String
+  pelaksana           String   // JSON string array eg: "['Pelapor', 'Kagahar']"
+  stepType            String?  @default("process")
+  nextStepYes         Int?
+  nextStepNo          Int?
+  mutuBakuKelengkapan String?
+  mutuBakuWaktu       String?
+  mutuBakuOutput      String?
+  keterangan          String?
+
+  sopPembuatanId      String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relasi
+  sopPembuatan        SopPembuatan @relation(fields: [sopPembuatanId], references: [id], onDelete: Cascade)
+}
+

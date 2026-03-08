@@ -31,10 +31,8 @@ export async function GET(request: NextRequest) {
       }, { status: 401 })
     }
     
-    // Run sync
-    const result = await syncStorages({
-      direction: 'bidirectional',
-    })
+    // Run sync (R2 -> Drive Backup Only)
+    const result = await syncStorages()
     
     const duration = Date.now() - startTime
     
@@ -44,24 +42,21 @@ export async function GET(request: NextRequest) {
         operation: 'sync',
         filename: 'cron',
         status: result.success ? 'success' : 'error',
-        message: `Cron sync completed in ${duration}ms. Drive→R2: ${result.driveToR2}, R2→Drive: ${result.r2ToDrive}, Conflicts: ${result.conflicts}`,
+        message: `Cron backup sync completed in ${duration}ms. R2→Drive: ${result.r2ToDrive}, Errors: ${result.errors.length}`,
         details: JSON.stringify({
           duration,
-          driveToR2: result.driveToR2,
           r2ToDrive: result.r2ToDrive,
-          conflicts: result.conflicts,
+          errors: result.errors.length
         }),
       }
     })
     
-    console.log(`✅ Cron sync completed in ${duration}ms`)
+    console.log(`✅ Cron backup sync completed in ${duration}ms`)
     
     return NextResponse.json({
       success: result.success,
       duration,
-      driveToR2: result.driveToR2,
       r2ToDrive: result.r2ToDrive,
-      conflicts: result.conflicts,
       errors: result.errors.length,
     })
     

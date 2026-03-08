@@ -143,7 +143,6 @@ export default function LogoutAnimation({ show, userName, userPhoto }: { show: b
                         <motion.div
                             key={item.id}
                             className="absolute select-none"
-                            style={{ left: `${item.x}%`, top: `${item.y}%` }}
                             initial={{
                                 opacity: 0,
                                 scale: 0,

@@ -9,7 +9,7 @@ import { Resend } from 'resend'
 import { db } from '@/lib/db'
 
 // Resend Configuration
-const resend = new Resend(process.env.RESEND_API_KEY)
+const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key')
 const EMAIL_FROM = process.env.EMAIL_FROM || 'notifikasi@e-katalog-sop.cloud'
 const EMAIL_FROM_NAME = 'SOP Katalog'
 const APP_URL = 'https://e-katalog-sop.cloud'

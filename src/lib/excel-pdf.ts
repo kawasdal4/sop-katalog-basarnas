@@ -91,7 +91,7 @@ export async function excelToPdfWithLayout(
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       },
-      body: fileBuffer
+      body: new Uint8Array(fileBuffer)
     }
   )
   

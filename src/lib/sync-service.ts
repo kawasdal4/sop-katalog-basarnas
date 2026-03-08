@@ -24,6 +24,7 @@ import {
   listAllFilesFromDrive, 
   downloadFileFromDrive, 
   uploadFileToDriveFolder,
+  isGoogleDriveConfigured,
   DriveFile 
 } from '@/lib/google-drive'
 import { 
@@ -297,15 +298,16 @@ async function migrateSingleFile(
  * 
  * R2 is PRIMARY storage, Google Drive is BACKUP only
  * Sync only goes from R2 to Google Drive for backup purposes
+ * DO NOT SYNC FROM DRIVE TO R2
  */
 export async function syncR2ToDriveBackup(): Promise<SyncResult> {
   console.log('========================================')
-  console.log('🔄 SYNC: R2 → Google Drive (Backup)')
+  console.log('🔄 SYNC: R2 → Google Drive (Backup Only)')
   console.log('========================================')
   
   const result: SyncResult = {
     success: true,
-    driveToR2: 0,  // Not used in backup mode
+    driveToR2: 0,  // Disabled
     r2ToDrive: 0,
     conflicts: 0,
     errors: [],
@@ -315,8 +317,13 @@ export async function syncR2ToDriveBackup(): Promise<SyncResult> {
     // Get files from R2 (Primary)
     const r2Objects = isR2Configured() ? await listR2Objects('sop-files') : []
     
-    console.log(`📋 Found ${r2Objects.length} files in R2`)
+    console.log(`📋 Found ${r2Objects.length} files in R2 (Primary Storage)`)
     
+    if (!isGoogleDriveConfigured()) {
+        console.warn('⚠️ Google Drive is not configured. Backup skipped.')
+        return result
+    }
+
     // Get all file sync records
     const syncRecords = await db.fileSync.findMany()
     const syncByR2Key = new Map(syncRecords.map(r => [r.r2Key, r]))
@@ -325,28 +332,31 @@ export async function syncR2ToDriveBackup(): Promise<SyncResult> {
     for (const r2Object of r2Objects) {
       const syncRecord = syncByR2Key.get(r2Object.key)
       
+      // If file exists in R2 but not in Drive, or modified in R2 -> Backup to Drive
       if (!syncRecord || !syncRecord.driveFileId) {
         // New file in R2 or not yet backed up - sync to Drive
         try {
           await syncR2ObjectToDrive(r2Object, syncRecord)
           result.r2ToDrive++
         } catch (error) {
-          result.errors.push({
-            filename: r2Object.key,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          })
+            console.error(`❌ Backup failed for ${r2Object.key}:`, error)
+            result.errors.push({
+                filename: r2Object.key,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            })
         }
       } else {
         // Check if R2 file is newer than last sync
         const lastSync = syncRecord.lastSyncedAt || new Date(0)
         const r2Modified = r2Object.lastModified
         
+        // Backup if R2 file is newer (Primary updated)
         if (r2Modified > lastSync) {
-          // R2 file modified - update backup in Drive
           try {
             await syncR2ObjectToDrive(r2Object, syncRecord)
             result.r2ToDrive++
           } catch (error) {
+            console.error(`❌ Backup update failed for ${r2Object.key}:`, error)
             result.errors.push({
               filename: r2Object.key,
               error: error instanceof Error ? error.message : 'Unknown error',
@@ -371,13 +381,14 @@ export async function syncR2ToDriveBackup(): Promise<SyncResult> {
 }
 
 /**
- * Legacy bidirectional sync (DEPRECATED - use syncR2ToDriveBackup instead)
+ * PRIMARY SYNC FUNCTION
+ * 
+ * Enforces R2 as Primary Storage and Google Drive as Backup Only.
+ * No bidirectional sync allowed to prevent data loss or conflicts.
  */
-export async function syncStorages(options?: {
-  direction?: 'drive-to-r2' | 'r2-to-drive' | 'bidirectional'
-}): Promise<SyncResult> {
-  // Always use R2 → Drive backup sync
-  console.log('⚠️ Using R2 → Drive backup sync (one-directional)')
+export async function syncStorages(): Promise<SyncResult> {
+  // Always use R2 → Drive backup sync (Strictly One-Way)
+  console.log('⚠️ Using R2 → Drive backup sync (Strictly One-Way)')
   return syncR2ToDriveBackup()
 }
 
@@ -407,8 +418,8 @@ async function syncStoragesBidirectional(options?: {
     ])
     
     // Build lookup maps
-    const driveMap = new Map(driveFiles.map(f => [f.id, f]))
-    const r2Map = new Map(r2Objects.map(o => [o.key, o]))
+    const driveMap = new Map(driveFiles.map(f => [f.id, f] as const))
+    const r2Map = new Map(r2Objects.map(o => [o.key, o] as const))
     
     // Get all file sync records
     const syncRecords = await db.fileSync.findMany()

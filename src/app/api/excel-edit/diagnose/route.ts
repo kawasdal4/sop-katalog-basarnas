@@ -69,7 +69,7 @@ async function runDiagnostics(): Promise<DiagnosticResult[]> {
   // STEP 2: Get Azure AD Access Token
   // ============================================
   const step2Start = Date.now()
-  let accessToken: string | null = null
+  let accessToken = ''
   
   try {
     const tokenUrl = `https://login.microsoftonline.com/${AZURE_TENANT_ID}/oauth2/v2.0/token`

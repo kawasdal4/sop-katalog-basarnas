@@ -13,6 +13,15 @@ import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3'
 
 export const dynamic = 'force-dynamic'
 
+interface DiagnosticStepResult {
+  step: string
+  success: boolean
+  message: string
+  error?: string
+  details?: Record<string, unknown>
+  duration: number
+}
+
 // Helper to check if user is developer
 const isDeveloper = async (): Promise<string | null> => {
   const cookieStore = await cookies()
@@ -32,7 +41,7 @@ const isDeveloper = async (): Promise<string | null> => {
 
 // Run system diagnostics
 async function runDiagnostics() {
-  const results = []
+  const results: DiagnosticStepResult[] = []
   const startTime = Date.now()
   
   // ============================================

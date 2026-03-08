@@ -21,15 +21,12 @@ export async function GET() {
         connected: true,
         status: 'connected',
         message: connectionTest.message,
-        details: connectionTest.details,
       })
     } else {
       return NextResponse.json({
         connected: false,
         status: connectionTest.status,
         message: connectionTest.message,
-        details: connectionTest.details,
-        setupInstructions: connectionTest.setupInstructions,
       })
     }
   } catch (error) {

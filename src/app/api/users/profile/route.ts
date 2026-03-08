@@ -24,17 +24,19 @@ export async function GET() {
     }
 
     // Get profile photo URL if exists
+    // Use any cast to avoid type errors if Prisma client is not yet updated
+    const userAny = user as any
     let profilePhotoUrl: string | null = null
-    if (user.profilePhoto) {
-      if (user.profilePhoto.startsWith('http')) {
-        profilePhotoUrl = user.profilePhoto
+    if (userAny.profilePhoto) {
+      if (userAny.profilePhoto.startsWith('http')) {
+        profilePhotoUrl = userAny.profilePhoto
       } else {
-        const r2Url = getR2PublicUrl(user.profilePhoto)
+        const r2Url = getR2PublicUrl(userAny.profilePhoto)
         const cacheBuster = user.updatedAt ? new Date(user.updatedAt).getTime() : Date.now()
         if (r2Url) {
           profilePhotoUrl = `${r2Url}?v=${cacheBuster}`
         } else {
-          profilePhotoUrl = `/api/users/photo?key=${encodeURIComponent(user.profilePhoto)}&v=${cacheBuster}`
+          profilePhotoUrl = `/api/users/photo?key=${encodeURIComponent(userAny.profilePhoto)}&v=${cacheBuster}`
         }
       }
     }
@@ -51,7 +53,7 @@ export async function GET() {
       email: user.email,
       name: user.name,
       role: user.role,
-      profilePhoto: user.profilePhoto,
+      profilePhoto: userAny.profilePhoto,
       profilePhotoUrl,
       createdAt: user.createdAt,
       lastLoginAt: user.lastLoginAt
@@ -77,6 +79,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'User tidak ditemukan' }, { status: 404 })
     }
 
+    const userAny = user as any
     const formData = await request.formData()
     const name = formData.get('name') as string
     const email = formData.get('email') as string
@@ -125,12 +128,14 @@ export async function PUT(request: NextRequest) {
     }
 
     // Handle profile photo
-    if (removePhoto && user.profilePhoto) {
+    if (removePhoto && userAny.profilePhoto) {
       // Delete old photo from R2
       try {
-        await deleteFromR2(user.profilePhoto)
+        console.log('[Profile API] Deleting old photo:', userAny.profilePhoto)
+        await deleteFromR2(userAny.profilePhoto as string)
+        console.log('[Profile API] Old photo deleted successfully')
       } catch (e) {
-        console.error('Failed to delete old profile photo:', e)
+        console.error('[Profile API] Failed to delete old profile photo (non-fatal):', e)
       }
       updateData.profilePhoto = null
     } else if (photo && photo.size > 0) {
@@ -146,11 +151,12 @@ export async function PUT(request: NextRequest) {
       }
 
       // Delete old photo if exists
-      if (user.profilePhoto) {
+      if (userAny.profilePhoto) {
         try {
-          await deleteFromR2(user.profilePhoto)
+          console.log('[Profile API] Deleting existing photo before replacement:', userAny.profilePhoto)
+          await deleteFromR2(userAny.profilePhoto as string)
         } catch (e) {
-          console.error('Failed to delete old profile photo:', e)
+          console.error('[Profile API] Failed to delete old profile photo (non-fatal):', e)
         }
       }
 
@@ -167,15 +173,10 @@ export async function PUT(request: NextRequest) {
           contentType
         })
 
-        // Don't pass folder option since photoKey already includes the folder prefix
-        const uploadResult = await uploadToR2(photoBuffer, photoKey, contentType)
+        // Pass photoKey as options.key to ensure it's uploaded exactly where we expect
+        const uploadResult = await uploadToR2(photoBuffer, photo.name, contentType, { key: photoKey })
 
-        console.log('[Profile API] R2 upload successful result:', {
-          key: uploadResult.key,
-          publicUrl: uploadResult.publicUrl,
-          hasUrl: !!uploadResult.url
-        })
-
+        console.log('[Profile API] R2 upload successful')
         updateData.profilePhoto = photoKey
       } catch (uploadError) {
         console.error('[Profile API] R2 upload FAILED:', uploadError)
@@ -192,46 +193,83 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ message: 'Tidak ada perubahan' })
     }
 
-    // Update without select to avoid Turbopack cache issues
-    const updatedUser = await db.user.update({
-      where: { id: userId },
-      data: updateData
-    })
+    // Update using raw SQL to bypass Prisma model sync issues if regenerate failed
+    try {
+      console.log('[Profile API] Executing DB update via Raw SQL:', updateData)
 
-    // Get profile photo URL if exists
-    let profilePhotoUrl: string | null = null
-    if (updatedUser.profilePhoto) {
-      if (updatedUser.profilePhoto.startsWith('http')) {
-        profilePhotoUrl = updatedUser.profilePhoto
-      } else {
-        const r2Url = getR2PublicUrl(updatedUser.profilePhoto)
-        const cacheBuster = updatedUser.updatedAt ? new Date(updatedUser.updatedAt).getTime() : Date.now()
-        if (r2Url) {
-          profilePhotoUrl = `${r2Url}?v=${cacheBuster}`
+      const setClauses: string[] = []
+      const params: any[] = []
+
+      for (const [key, value] of Object.entries(updateData)) {
+        setClauses.push(`"${key}" = ?`)
+        params.push(value)
+      }
+
+      // Always update updatedAt
+      setClauses.push(`"updatedAt" = ?`)
+      params.push(new Date())
+
+      // Final query construction
+      const sql = `UPDATE "User" SET ${setClauses.join(', ')} WHERE "id" = ?`
+      console.log('[Profile API] Raw SQL Update:', sql)
+
+      await (db as any).$executeRawUnsafe(sql, ...params, userId)
+      console.log('[Profile API] Raw SQL update successful')
+
+      // Fetch updated user using raw SQL to ensure we get all fields
+      const users = await (db as any).$queryRawUnsafe(`SELECT * FROM "User" WHERE "id" = ? LIMIT 1`, userId)
+      const updatedUser = users && users.length > 0 ? users[0] : null
+
+      if (!updatedUser) {
+        throw new Error('User tidak ditemukan setelah update')
+      }
+
+      const updatedUserAny = updatedUser as any
+      let profilePhotoUrl: string | null = null
+
+      if (updatedUserAny.profilePhoto) {
+        if (updatedUserAny.profilePhoto.startsWith('http')) {
+          profilePhotoUrl = updatedUserAny.profilePhoto
         } else {
-          profilePhotoUrl = `/api/users/photo?key=${encodeURIComponent(updatedUser.profilePhoto)}&v=${cacheBuster}`
+          const r2Url = getR2PublicUrl(updatedUserAny.profilePhoto)
+          // Handle updatedAt which might be a string or Date from raw query
+          const updatedAtTime = updatedUserAny.updatedAt
+            ? new Date(updatedUserAny.updatedAt).getTime()
+            : Date.now()
+
+          if (r2Url) {
+            profilePhotoUrl = `${r2Url}?v=${updatedAtTime}`
+          } else {
+            profilePhotoUrl = `/api/users/photo?key=${encodeURIComponent(updatedUserAny.profilePhoto)}&v=${updatedAtTime}`
+          }
         }
       }
-    }
 
-    console.log('[Profile API] Update complete:', {
-      userId: updatedUser.id,
-      profilePhoto: updatedUser.profilePhoto,
-      profilePhotoUrl
-    })
-
-    return NextResponse.json({
-      success: true,
-      message: 'Profil berhasil diperbarui',
-      user: {
-        id: updatedUser.id,
-        email: updatedUser.email,
-        name: updatedUser.name,
-        role: updatedUser.role,
-        profilePhoto: updatedUser.profilePhoto,
+      console.log('[Profile API] Update complete final check:', {
+        userId: updatedUserAny.id,
+        profilePhoto: updatedUserAny.profilePhoto,
         profilePhotoUrl
-      }
-    })
+      })
+
+      return NextResponse.json({
+        success: true,
+        message: 'Profil berhasil diperbarui',
+        user: {
+          id: updatedUserAny.id,
+          email: updatedUserAny.email,
+          name: updatedUserAny.name,
+          role: updatedUserAny.role,
+          profilePhoto: updatedUserAny.profilePhoto,
+          profilePhotoUrl
+        }
+      })
+    } catch (dbError) {
+      console.error('[Profile API] DB Update FAILED:', dbError)
+      return NextResponse.json({
+        error: 'Gagal memperbarui database',
+        details: dbError instanceof Error ? dbError.message : String(dbError)
+      }, { status: 500 })
+    }
   } catch (error) {
     console.error('Update profile error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Terjadi kesalahan saat memperbarui profil'

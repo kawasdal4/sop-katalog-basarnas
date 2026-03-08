@@ -112,10 +112,11 @@ import CopyrightPopup from '@/components/CopyrightPopup'
 import LogoutAnimation from '@/components/LogoutAnimation'
 import ImageCropper from '@/components/ImageCropper'
 import SARLoadingOverlay, { StatCardSkeleton, TableRowSkeleton } from '@/components/SARLoadingOverlay'
+import SopBuilderList from '@/components/sop-builder/SopBuilderList'
 
 // Types
 type UserRole = 'ADMIN' | 'STAF' | 'DEVELOPER' | null
-type PageView = 'dashboard' | 'katalog' | 'upload' | 'verifikasi' | 'arsip' | 'logs' | 'users' | 'submit-publik'
+type PageView = 'dashboard' | 'buat-sop-baru' | 'katalog' | 'upload' | 'verifikasi' | 'arsip' | 'logs' | 'users' | 'submit-publik' | 'import-sop'
 
 interface User {
   id: string
@@ -1269,15 +1270,19 @@ export default function ESOPApp() {
       window.fetch = origFetch
       window.removeEventListener('unhandledrejection', handleRejection)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   const checkAuth = useCallback(async () => {
     try {
       const res = await fetch('/api/auth')
-      const data = await res.json()
-      if (data.isAuthenticated && data.user) {
-        setUser(data.user)
-        setIsAuthenticated(true)
+      if (res.headers.get('content-type')?.includes('application/json')) {
+        const data = await res.json()
+        if (data.isAuthenticated && data.user) {
+          setUser(data.user)
+          setIsAuthenticated(true)
+        }
+      } else {
+        console.warn('Auth check returned non-JSON response')
       }
     } catch (error) {
       console.error('Auth check error:', error)
@@ -1297,9 +1302,13 @@ export default function ESOPApp() {
     const safetyTimer = setTimeout(() => setShowDashboardLoading(false), 5000)
     try {
       const res = await fetch('/api/stats')
-      const data = await res.json()
-      if (!data.error) {
-        setStats(data)
+      if (res.headers.get('content-type')?.includes('application/json')) {
+        const data = await res.json()
+        if (!data.error) {
+          setStats(data)
+        }
+      } else {
+        console.warn('Stats check returned non-JSON response')
       }
     } catch (error) {
       console.error('Stats error:', error)
@@ -3984,6 +3993,11 @@ export default function ESOPApp() {
   }
   // Handle navigation with notification clearing and loading state
   const handleNavigation = useCallback((page: PageView) => {
+    if (page === 'import-sop') {
+      window.location.href = '/sop/import'
+      return
+    }
+
     setCurrentPage(page)
 
     if (window.innerWidth < 1024) {
@@ -4015,6 +4029,8 @@ export default function ESOPApp() {
   const menuItems = [
     { id: 'dashboard' as PageView, label: 'Laporan Analitik', icon: LayoutDashboard, roles: ['ADMIN', 'STAF', 'DEVELOPER'] },
     { id: 'katalog' as PageView, label: 'Katalog SOP', icon: FileText, roles: ['ADMIN', 'STAF', 'DEVELOPER'] },
+    { id: 'import-sop' as PageView, label: 'Import SOP Excel', icon: FileSpreadsheet, roles: ['ADMIN', 'STAF', 'DEVELOPER'] },
+    { id: 'buat-sop-baru' as PageView, label: 'Buat SOP Baru', icon: FileSpreadsheet, roles: ['ADMIN', 'STAF', 'DEVELOPER'] },
     { id: 'verifikasi' as PageView, label: 'Verifikasi SOP', icon: CheckCircle, roles: ['ADMIN', 'DEVELOPER'] },
     { id: 'arsip' as PageView, label: 'Arsip', icon: FolderOpen, roles: ['ADMIN', 'DEVELOPER'] },
     { id: 'logs' as PageView, label: 'Log Aktivitas', icon: History, roles: ['ADMIN', 'DEVELOPER'] },
@@ -7072,6 +7088,19 @@ export default function ESOPApp() {
               </motion.div>
             )}
 
+            {/* SOP Builder List */}
+            {currentPage === 'buat-sop-baru' && (
+              <motion.div
+                key="buat-sop-baru"
+                variants={fadeInUp}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+              >
+                <SopBuilderList />
+              </motion.div>
+            )}
+
             {/* Katalog SOP */}
             {currentPage === 'katalog' && (
               <motion.div
@@ -9587,18 +9616,12 @@ export default function ESOPApp() {
                                 <TableRow key={u.id} className="hover:bg-orange-50 border-b border-gray-200">
                                   <TableCell>
                                     <div className="flex items-center gap-3">
-                                      <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-orange-200 shadow-sm bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center flex-shrink-0">
-                                        {userWithExtra.profilePhotoUrl ? (
-                                          <img
-                                            key={userWithExtra.profilePhotoUrl}
-                                            src={userWithExtra.profilePhotoUrl}
-                                            alt={u.name}
-                                            className="w-full h-full object-cover"
-                                          />
-                                        ) : (
-                                          <span className="text-white font-bold text-sm">{u.name?.charAt(0)?.toUpperCase()}</span>
-                                        )}
-                                      </div>
+                                      <UserAvatar
+                                        src={userWithExtra.profilePhotoUrl}
+                                        name={u.name}
+                                        size="md"
+                                        className="ring-2 ring-orange-100 shadow-sm"
+                                      />
                                       <span className="font-semibold text-blue-900">{u.name}</span>
                                     </div>
                                   </TableCell>

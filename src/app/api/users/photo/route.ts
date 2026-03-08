@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
             // Determine max-age for caching (1 hour)
             const maxAge = 60 * 60
 
-            return new NextResponse(imageBuffer, {
+            return new NextResponse(new Uint8Array(imageBuffer), {
                 status: 200,
                 headers: {
                     'Content-Type': contentType,

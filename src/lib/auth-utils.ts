@@ -1,10 +1,20 @@
-import { createClient } from './supabase/server'
+import { cookies } from 'next/headers'
 import { db } from './db'
 
 export async function getSession() {
-    const supabase = await createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    return session
+    const cookieStore = await cookies()
+    const userId = cookieStore.get('userId')?.value
+
+    if (!userId) return null
+
+    const user = await db.user.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, name: true, role: true }
+    })
+
+    if (!user) return null
+
+    return { user }
 }
 
 export async function getUserRole(userId: string) {
@@ -19,10 +29,10 @@ export async function validateRole(allowedRoles: string[]) {
     const session = await getSession()
     if (!session) return { authenticated: false, authorized: false }
 
-    const role = await getUserRole(session.user.id)
-    if (!role || !allowedRoles.includes(role)) {
-        return { authenticated: true, authorized: false, user: session.user, role }
+    const user = session.user
+    if (!user.role || !allowedRoles.includes(user.role)) {
+        return { authenticated: true, authorized: false, user, role: user.role }
     }
 
-    return { authenticated: true, authorized: true, user: session.user, role }
+    return { authenticated: true, authorized: true, user, role: user.role }
 }

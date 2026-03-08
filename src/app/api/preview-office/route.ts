@@ -247,6 +247,12 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
   
   try {
+    const isDev = process.env.NODE_ENV !== 'production'
+    const r2AccountId = process.env.R2_ACCOUNT_ID || ''
+    const azureClientId = process.env.AZURE_CLIENT_ID || process.env.CLIENT_ID || ''
+    const isDummyR2 = r2AccountId === 'dummy-account-id' || r2AccountId.startsWith('dummy-')
+    const isDummyAzure = azureClientId.startsWith('dummy-')
+
     // Check environment variables first (support multiple naming conventions)
     const azureConfigured = !!(
       (process.env.AZURE_TENANT_ID || process.env.TENANT_ID) &&
@@ -303,6 +309,14 @@ export async function POST(request: NextRequest) {
     
     if (!sopFile.filePath) {
       return NextResponse.json({ error: 'File tidak tersedia di storage' }, { status: 404 })
+    }
+
+    if (isDev && (isDummyR2 || isDummyAzure)) {
+      return NextResponse.json({
+        success: false,
+        error: 'Preview Office tidak tersedia pada mode kredensial dummy',
+        details: 'Gunakan kredensial R2 dan Azure asli untuk preview Office Online'
+      }, { status: 503 })
     }
     
     const fileExtension = sopFile.fileName.toLowerCase().split('.').pop() || ''

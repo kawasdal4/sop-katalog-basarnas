@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { sendEmail, generateForgotPasswordEmail } from '@/lib/email'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json()
@@ -12,7 +14,7 @@ export async function POST(request: NextRequest) {
 
     // Check if user exists
     const user = await db.user.findFirst({
-      where: { email: { equals: email, mode: 'insensitive' } }
+      where: { email: email }
     })
 
     if (!user) {

@@ -39,15 +39,15 @@ export async function GET() {
     // DEVELOPER can see passwords, ADMIN cannot
     const includePassword = isDeveloper(currentUser.role)
 
-    // Get all users and their log count
-    const users = await db.user.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        _count: {
-          select: { logs: true }
-        }
-      }
-    })
+    // Use raw SQL to bypass stale Prisma Client types and ensure profilePhoto is selected
+    // Also including subquery for log count to match the include: { _count: { select: { logs: true } } } structure
+    const users = await db.$queryRawUnsafe(`
+      SELECT 
+        u.*, 
+        (SELECT COUNT(*) FROM Log l WHERE l.userId = u.id) as logCount
+      FROM User u
+      ORDER BY u.createdAt DESC
+    `) as any[]
 
     // Transform users to include only needed fields and profile photo URLs
     const usersWithPhotoUrl = users.map(user => {
@@ -69,7 +69,7 @@ export async function GET() {
           : null,
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt,
-        _count: user._count
+        _count: { logs: Number(user.logCount) || 0 }
       }
     })
 
@@ -170,7 +170,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const currentUser = await db.user.findUnique({ where: { id: userId } })
+    const currentUser = await (db.user as any).findUnique({ where: { id: userId } })
 
     if (!hasUserManagementAccess(currentUser?.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -210,7 +210,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const currentUser = await db.user.findUnique({ where: { id: userId } })
+    const currentUser = await (db.user as any).findUnique({ where: { id: userId } })
 
     if (!hasUserManagementAccess(currentUser?.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

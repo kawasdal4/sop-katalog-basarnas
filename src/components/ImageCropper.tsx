@@ -23,7 +23,6 @@ export default function ImageCropper({
   circularCrop = true
 }: ImageCropperProps) {
   const [image, setImage] = useState<HTMLImageElement | null>(null)
-  const [imageSrc, setImageSrc] = useState<string | null>(null)
   const [crop, setCrop] = useState({ x: 0.1, y: 0.1, size: 0.8 }) // Normalized 0-1
 
   const [isDragging, setIsDragging] = useState(false)
@@ -42,8 +41,6 @@ export default function ImageCropper({
 
     // Create object URL instead of reading entire file into base64 string
     const src = URL.createObjectURL(imageFile)
-    setImageSrc(src)
-
     const img = new window.Image()
     img.onload = () => {
       setImage(img)
@@ -73,7 +70,6 @@ export default function ImageCropper({
     if (!isOpen) {
       const timeout = setTimeout(() => {
         setImage(null)
-        setImageSrc(null)
       }, 300)
       return () => clearTimeout(timeout)
     }

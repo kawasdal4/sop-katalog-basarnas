@@ -17,7 +17,7 @@ import { addPdfFooter } from '@/lib/pdf-footer'
 import crypto from 'crypto'
 import { exec } from 'child_process'
 import { promisify } from 'util'
-import { writeFile, unlink, mkdir, readFile, rmdir } from 'fs/promises'
+import { writeFile, unlink, mkdir, readFile, rmdir, access } from 'fs/promises'
 import path from 'path'
 import { tmpdir } from 'os'
 
@@ -278,7 +278,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Format tidak didukung' }, { status: 400 })
     }
 
-    if (!isR2Configured()) {
+    const r2AccountId = process.env.R2_ACCOUNT_ID || ''
+    const isDummyR2 = process.env.NODE_ENV !== 'production' && (r2AccountId === 'dummy-account-id' || r2AccountId.startsWith('dummy-'))
+
+    if (!isR2Configured() && !isDummyR2) {
       return NextResponse.json({ error: 'R2 tidak terkonfigurasi' }, { status: 500 })
     }
 
@@ -290,10 +293,43 @@ export async function GET(request: NextRequest) {
     const user = await db.user.findUnique({ where: { id: userId }, select: { name: true } })
     const userName = user?.name || 'Unknown'
 
-    // Download from R2
-    console.log(`📥 [Print] Downloading from R2...`)
-    const { buffer: fileBuffer } = await downloadFromR2(sopFile.filePath)
-    console.log(`✅ [Print] Downloaded: ${fileBuffer.length} bytes`)
+    let fileBuffer: Buffer | null = null
+
+    if (isDummyR2) {
+      const keyBaseName = sopFile.filePath.split('/').pop() || ''
+      const fallbackRoots = ['uploads', 'upload', 'store', path.join('store', 'uploads')]
+      const candidates = fallbackRoots.flatMap((root) => {
+        const base = path.join(process.cwd(), root)
+        return [
+          path.join(base, sopFile.fileName),
+          keyBaseName ? path.join(base, keyBaseName) : '',
+          path.join(base, sopFile.filePath.replace(/\//g, path.sep)),
+        ]
+      }).filter(Boolean)
+
+      if (path.isAbsolute(sopFile.filePath)) {
+        candidates.push(sopFile.filePath)
+      }
+
+      for (const candidate of [...new Set(candidates)]) {
+        try {
+          await access(candidate)
+          fileBuffer = await readFile(candidate)
+          console.log(`✅ [Print] Downloaded local fallback: ${candidate} (${fileBuffer.length} bytes)`)
+          break
+        } catch {
+        }
+      }
+    } else {
+      console.log(`📥 [Print] Downloading from R2...`)
+      const result = await downloadFromR2(sopFile.filePath)
+      fileBuffer = result.buffer
+      console.log(`✅ [Print] Downloaded: ${fileBuffer.length} bytes`)
+    }
+
+    if (!fileBuffer) {
+      return NextResponse.json({ error: 'File tidak tersedia untuk print pada mode dummy' }, { status: 503 })
+    }
 
     let pdfBuffer: Buffer
     let conversionMethod = 'none'

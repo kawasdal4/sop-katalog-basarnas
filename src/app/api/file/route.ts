@@ -22,13 +22,14 @@ export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies()
     const userId = cookieStore.get('userId')?.value
-    
+
     // Allow access without auth for public documents
     const action = request.nextUrl.searchParams.get('action') || 'preview'
     const documentId = request.nextUrl.searchParams.get('id')
-    
-    if (!documentId) {
-      return NextResponse.json({ error: 'Document ID diperlukan' }, { status: 400 })
+    const pathParam = request.nextUrl.searchParams.get('path')
+
+    if (!documentId && !pathParam) {
+      return NextResponse.json({ error: 'Document ID atau Path diperlukan' }, { status: 400 })
     }
 
     // Check R2 configuration
@@ -36,48 +37,74 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'R2 storage tidak terkonfigurasi' }, { status: 500 })
     }
 
-    // Get document from database
-    const document = await db.sopFile.findUnique({
-      where: { id: documentId }
-    })
+    let fileKey = ''
+    let fileName = 'document.pdf'
+    let judul = 'Dokumen'
+    let documentIdForLog = documentId
 
-    if (!document) {
-      return NextResponse.json({ error: 'Dokumen tidak ditemukan' }, { status: 404 })
+    if (documentId) {
+      // Get document from database
+      const document = await db.sopFile.findUnique({
+        where: { id: documentId }
+      })
+
+      if (!document) {
+        // Try sopPembuatan for builders
+        const sopPembuatan = await (db as any).sopPembuatan.findUnique({
+          where: { id: documentId }
+        })
+
+        if (!sopPembuatan) {
+          return NextResponse.json({ error: 'Dokumen tidak ditemukan' }, { status: 404 })
+        }
+
+        fileKey = sopPembuatan.combinedPdfPath
+        fileName = `sop-${sopPembuatan.judul}.pdf`
+        judul = sopPembuatan.judul
+      } else {
+        if (!document.filePath) {
+          return NextResponse.json({ error: 'File tidak tersedia' }, { status: 404 })
+        }
+        fileKey = document.filePath
+        fileName = document.fileName
+        judul = document.judul
+      }
+    } else if (pathParam) {
+      fileKey = decodeURIComponent(pathParam)
+      // Infer filename from path
+      const parts = fileKey.split('/')
+      fileName = parts[parts.length - 1]
+      judul = fileName.replace(/\.pdf$/i, '')
     }
 
-    if (!document.filePath) {
-      return NextResponse.json({ error: 'File tidak tersedia' }, { status: 404 })
-    }
-
-    const fileExtension = document.fileName.toLowerCase().split('.').pop() || 'pdf'
-    const fileKey = document.filePath
+    const fileExtension = fileName.toLowerCase().split('.').pop() || 'pdf'
     const publicUrl = getR2PublicUrl(fileKey)
 
-    console.log(`📄 File request: ${action} - ${document.judul} (${fileExtension})`)
+    console.log(`📄 File request: ${action} - ${judul} (${fileExtension})`)
     console.log(`   R2 key: ${fileKey}`)
     console.log(`   Public URL: ${publicUrl ? 'Available' : 'Not available (will serve directly)'}`)
 
     // Log activity increment counters
     const logActivity = async (activityType: 'PREVIEW' | 'DOWNLOAD') => {
-      if (userId) {
+      if (userId && documentIdForLog) {
         try {
           if (activityType === 'PREVIEW') {
             await db.sopFile.update({
-              where: { id: documentId },
+              where: { id: documentIdForLog },
               data: { previewCount: { increment: 1 } }
-            })
+            }).catch(() => { }) // Ignore if not in sopFile
           } else {
             await db.sopFile.update({
-              where: { id: documentId },
+              where: { id: documentIdForLog },
               data: { downloadCount: { increment: 1 } }
-            })
+            }).catch(() => { }) // Ignore if not in sopFile
           }
           await db.log.create({
             data: {
               userId,
               aktivitas: activityType,
-              deskripsi: `${activityType === 'PREVIEW' ? 'Preview' : 'Download'} ${document.jenis}: ${document.judul}`,
-              fileId: documentId
+              deskripsi: `${activityType === 'PREVIEW' ? 'Preview' : 'Download'} File: ${judul}`,
+              fileId: documentIdForLog
             }
           })
         } catch (logError) {
@@ -89,32 +116,15 @@ export async function GET(request: NextRequest) {
     // Log the activity
     await logActivity(action === 'download' ? 'DOWNLOAD' : 'PREVIEW')
 
-    // For Excel/Word files - check if we should use public URL or serve via preview-office
+    // For Excel/Word files - use Office Online via /api/preview-office flow (R2 -> OneDrive -> Office Online)
     if (['xlsx', 'xls', 'csv', 'docx', 'doc'].includes(fileExtension)) {
-      // If R2 has a public URL, use Office Online viewer
-      if (publicUrl) {
-        const encodedUrl = encodeURIComponent(publicUrl)
-        const officeViewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodedUrl}`
-        
-        console.log(`📊 Office Online Viewer URL: ${officeViewerUrl.substring(0, 100)}...`)
-        
-        return NextResponse.json({
-          success: true,
-          viewerUrl: officeViewerUrl,
-          viewerType: 'microsoft-office',
-          downloadUrl: `/api/download?id=${documentId}`,
-          fileName: document.fileName
-        })
-      }
-      
-      // No public R2 URL - tell frontend to use preview-office API
-      console.log('📊 R2 bucket is not public, frontend should use /api/preview-office')
+      console.log('📊 Office preview flow: R2 -> OneDrive -> Office Online')
       return NextResponse.json({
         success: true,
         usePreviewOffice: true,
         message: 'Gunakan /api/preview-office untuk preview file Office',
-        downloadUrl: `/api/download?id=${documentId}`,
-        fileName: document.fileName
+        downloadUrl: `/api/download?${documentId ? `id=${documentId}` : `path=${encodeURIComponent(fileKey)}`}`,
+        fileName: fileName
       })
     }
 
@@ -122,8 +132,8 @@ export async function GET(request: NextRequest) {
     if (action === 'download') {
       return NextResponse.json({
         success: true,
-        downloadUrl: `/api/download?id=${documentId}`,
-        fileName: document.fileName
+        downloadUrl: `/api/download?${documentId ? `id=${documentId}` : `path=${encodeURIComponent(fileKey)}`}`,
+        fileName: fileName
       })
     }
 
@@ -133,13 +143,13 @@ export async function GET(request: NextRequest) {
     const fileBuffer = result.buffer
     const contentType = CONTENT_TYPES[fileExtension] || 'application/octet-stream'
 
-    // Generate filename with format: {judul} - {tahun}.{extension}
-    const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
-    const customFileName = `${sanitizeFileName(document.judul)} - ${document.tahun}.${fileExtension}`
+    // Generate filename
+    const sanitizeFileNameLoc = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
+    const customFileName = `${sanitizeFileNameLoc(judul)}.${fileExtension}`
     const encodedFileName = encodeURIComponent(customFileName)
 
     // Return PDF file directly for preview
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(new Uint8Array(fileBuffer), {
       status: 200,
       headers: {
         'Content-Type': contentType,
@@ -155,7 +165,7 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('[File API] Error:', error)
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: 'Terjadi kesalahan saat mengakses file',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })

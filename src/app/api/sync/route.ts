@@ -33,9 +33,8 @@ export async function POST(request: NextRequest) {
         })
         
       case 'sync':
-        const syncResult = await syncStorages({
-          direction: direction || 'bidirectional',
-        })
+        // R2 -> Drive Backup Only (Strictly One-Way)
+        const syncResult = await syncStorages()
         return NextResponse.json({
           success: syncResult.success,
           action: 'sync',

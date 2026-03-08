@@ -42,7 +42,7 @@ function sanitizeFileName(name: string): string {
 /**
  * POST /api/excel-edit/download
  * 
- * Request body: { objectKey: string, fileId?: string, sopNumber?: string, sopTitle?: string }
+ * Request body: { objectKey: string, fileId?: string, sopTitle?: string, sopYear?: string | number }
  * Response: File download + session token in header
  */
 export async function POST(request: NextRequest) {
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     // STEP 2: Validate Request
     // ============================================
     const body = await request.json()
-    const { objectKey, fileId, sopNumber, sopTitle } = body
+    const { objectKey, fileId, sopTitle, sopYear } = body
 
     if (!objectKey) {
       return NextResponse.json({
@@ -190,10 +190,11 @@ export async function POST(request: NextRequest) {
     // STEP 9: Generate Custom Filename
     // ============================================
     let fileName: string
-    if (sopNumber && sopTitle) {
-      const sanitizedNumber = sanitizeFileName(sopNumber)
+    if (sopTitle) {
       const sanitizedTitle = sanitizeFileName(sopTitle)
-      fileName = `${sanitizedNumber} - ${sanitizedTitle}.${fileExt}`
+      const hasYear = sopYear !== undefined && sopYear !== null && String(sopYear).trim() !== ''
+      const sanitizedYear = hasYear ? sanitizeFileName(String(sopYear)) : ''
+      fileName = `${sanitizedYear ? `${sanitizedTitle} - ${sanitizedYear}` : sanitizedTitle}.${fileExt}`
       console.log(`📝 [Download] Custom filename: "${fileName}"`)
     } else {
       fileName = originalFileName
@@ -208,7 +209,7 @@ export async function POST(request: NextRequest) {
     console.log(`✅ [Download] Complete in ${Date.now() - startTime}ms`)
 
     // Return the file with session info in headers
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(new Uint8Array(fileBuffer), {
       status: 200,
       headers: {
         'Content-Type': contentType,

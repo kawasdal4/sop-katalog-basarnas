@@ -29,6 +29,11 @@ export async function getAzureAccessToken(): Promise<string> {
   const clientId = process.env.AZURE_CLIENT_ID || process.env.CLIENT_ID;
   const clientSecret = process.env.AZURE_CLIENT_SECRET || process.env.CLIENT_SECRET;
 
+  // Mock for development
+  if (process.env.NODE_ENV !== 'production' && clientId?.startsWith('dummy-')) {
+    return 'dummy-azure-token';
+  }
+
   if (!tenantId || !clientId || !clientSecret) {
     throw new Error('Azure AD credentials not configured. Set AZURE_TENANT_ID/TENANT_ID, AZURE_CLIENT_ID/CLIENT_ID, AZURE_CLIENT_SECRET/CLIENT_SECRET');
   }

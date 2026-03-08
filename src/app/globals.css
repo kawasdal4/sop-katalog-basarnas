@@ -822,3 +822,48 @@ td[role="button"] {
 [class*="Card"][onclick] {
   cursor: pointer !important;
 }
+/* ============================================
+   FLOWCHART & SWIMLANE STYLES
+   ============================================ */
+
+.clip-diamond {
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+
+.clip-document {
+  clip-path: polygon(0% 0%, 100% 0%, 100% 85%, 75% 100%, 50% 85%, 25% 100%, 0% 85%);
+}
+
+/* Swimlane column visual styling (if needed outside React Flow) */
+.swimlane-col {
+  @apply border-r border-slate-200 transition-colors duration-300;
+}
+
+.swimlane-col:nth-child(even) {
+  @apply bg-slate-50/50;
+}
+
+.swimlane-header {
+  @apply bg-slate-100 font-bold text-[10px] uppercase py-2 text-center border-b border-r border-slate-300;
+}
+
+/* React Flow Customizations */
+.react-flow__handle {
+  @apply !w-2.5 !h-2.5 !bg-slate-400 !border-slate-100 shadow-sm transition-all;
+}
+
+.react-flow__handle:hover {
+  @apply !scale-125 !bg-orange-500;
+}
+
+.react-flow__edge-path {
+  @apply stroke-slate-400 stroke-[2px];
+}
+
+.react-flow__controls {
+  @apply !bg-white/80 !backdrop-blur-sm !border-none !shadow-lg !rounded-lg overflow-hidden;
+}
+
+.react-flow__controls-button {
+  @apply !border-none !border-b border-slate-100 last:!border-b-0 hover:!bg-slate-50;
+}

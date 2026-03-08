@@ -1,0 +1,26 @@
+﻿--- FLOWCHART JSON (11 edges) ---
+[edge-1-next] src=bottom tgt=top-target
+[edge-2-next] src=bottom tgt=top-target
+[edge-3-next] src=bottom tgt=top-target
+[edge-flow-node-4-to-offpage] src=bottom tgt=top
+[edge-5-yes] src=bottom tgt=top-target
+[edge-6-next] src=bottom tgt=top-target
+[edge-7-next] src=bottom tgt=top-target
+[edge-flow-node-8-to-offpage] src=bottom tgt=top
+[edge-offpage-to-flow-node-5] src=bottom tgt=top-target
+[edge-9-next] src=bottom tgt=top-target
+[edge-offpage-to-flow-node-9] src=bottom tgt=top-target
+
+--- CONNECTOR PATHS JSON (11 edges) ---
+[edge-1-next] src=bottom tgt=top-target
+[edge-2-next] src=bottom tgt=top-target
+[edge-3-next] src=bottom tgt=top-target
+[edge-flow-node-4-to-offpage] src=bottom tgt=top
+[edge-5-yes] src=bottom tgt=top-target
+[edge-6-next] src=bottom tgt=top-target
+[edge-7-next] src=bottom tgt=top-target
+[edge-flow-node-8-to-offpage] src=bottom tgt=top
+[edge-offpage-to-flow-node-5] src=bottom tgt=top-target
+[edge-9-next] src=bottom tgt=top-target
+[edge-offpage-to-flow-node-9] src=bottom tgt=top-target
+

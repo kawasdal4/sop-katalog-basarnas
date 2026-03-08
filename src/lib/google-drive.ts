@@ -47,6 +47,17 @@ function getGoogleDriveConfig(): GoogleDriveConfig {
     throw new Error('GOOGLE_DRIVE_FOLDER_ID is required in .env')
   }
 
+  // Allow dummy credentials for development
+  if (process.env.NODE_ENV !== 'production' && clientId?.startsWith('dummy-')) {
+    return { 
+      clientId: clientId || 'dummy-id', 
+      clientSecret: clientSecret || 'dummy-secret', 
+      refreshToken: refreshToken || 'dummy-refresh', 
+      folderId, 
+      ownerEmail 
+    }
+  }
+
   if (clientId && clientSecret && refreshToken) {
     return { clientId, clientSecret, refreshToken, folderId, ownerEmail }
   }
@@ -62,10 +73,10 @@ export function isGoogleDriveConfigured(): boolean {
   const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID
   
   // Check if all required credentials are present and not placeholder values
-  const hasClientId = clientId && clientId !== 'your_google_client_id_here' && clientId.length > 10
-  const hasClientSecret = clientSecret && clientSecret !== 'your_google_client_secret_here' && clientSecret.length > 10
-  const hasRefreshToken = refreshToken && refreshToken !== 'your_refresh_token_here' && refreshToken.length > 10
-  const hasFolderId = folderId && folderId !== 'your_folder_id_here' && folderId.length > 10
+  const hasClientId = clientId && clientId !== 'your_google_client_id_here' && (clientId.length > 10 || clientId.startsWith('dummy-'))
+  const hasClientSecret = clientSecret && clientSecret !== 'your_google_client_secret_here' && (clientSecret.length > 10 || clientSecret.startsWith('dummy-'))
+  const hasRefreshToken = refreshToken && refreshToken !== 'your_refresh_token_here' && (refreshToken.length > 10 || refreshToken.startsWith('dummy-'))
+  const hasFolderId = folderId && folderId !== 'your_folder_id_here' && (folderId.length > 10 || folderId.startsWith('dummy-'))
   
   return !!(hasClientId && hasClientSecret && hasRefreshToken && hasFolderId)
 }
@@ -113,6 +124,11 @@ function createOAuth2Client() {
 
 // Get fresh access token with caching
 async function getFreshAccessToken(forceRefresh: boolean = false): Promise<string> {
+  const clientId = process.env.GOOGLE_CLIENT_ID
+  if (process.env.NODE_ENV !== 'production' && clientId?.startsWith('dummy-')) {
+    return 'dummy-access-token'
+  }
+
   const now = Date.now()
   
   // Return cached token if still valid (with 5 minute buffer)
@@ -403,7 +419,7 @@ export async function uploadChunk(
       'Content-Length': chunk.length.toString(),
       'Content-Range': `bytes ${startByte}-${endByte}/${totalSize}`,
     },
-    body: chunk,
+    body: new Uint8Array(chunk),
   })
 
   if (response.status === 308) {
@@ -452,11 +468,13 @@ export async function validateFilePermission(fileId: string): Promise<{
     if (error instanceof GoogleDriveError) {
       return {
         hasAccess: false,
+        isPublic: false,
         error: error.message
       }
     }
     return {
       hasAccess: false,
+      isPublic: false,
       error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
@@ -614,6 +632,21 @@ export async function testDriveConnection(): Promise<{
   details?: Record<string, unknown>
 }> {
   try {
+    const clientId = process.env.GOOGLE_CLIENT_ID
+    if (process.env.NODE_ENV !== 'production' && clientId?.startsWith('dummy-')) {
+      return {
+        success: true,
+        message: '✅ Google Drive Mock Mode (Development)',
+        details: {
+          folderId: 'dummy-folder-id',
+          folderName: 'Dummy Folder',
+          folderOwner: 'dummy-owner@example.com',
+          tokenValid: true,
+          mock: true
+        }
+      }
+    }
+
     const config = getGoogleDriveConfig()
     
     // Try to get fresh token first
@@ -656,6 +689,16 @@ export async function testDriveConnection(): Promise<{
 // Check token validity without full connection test
 export async function checkTokenValidity(): Promise<TokenStatus> {
   try {
+    const clientId = process.env.GOOGLE_CLIENT_ID
+    if (process.env.NODE_ENV !== 'production' && clientId?.startsWith('dummy-')) {
+      return {
+        valid: true,
+        expired: false,
+        message: 'Mock token is valid',
+        lastChecked: new Date()
+      }
+    }
+
     const token = await getFreshAccessToken()
     
     return {
@@ -819,7 +862,7 @@ export async function uploadFileToDriveFolder(
 // Watch for changes in Google Drive (returns changes token)
 export async function getDriveChangesStartToken(): Promise<string> {
   return withRetry(async (drive) => {
-    const response = await drive.changes.getStartToken({
+    const response = await drive.changes.getStartPageToken({
       supportsAllDrives: true,
     })
     return response.data.startPageToken || ''
@@ -878,5 +921,3 @@ export async function getDriveChanges(
   })
 }
 
-// Export the error class for use in other modules
-export { GoogleDriveError as GoogleDriveError }
