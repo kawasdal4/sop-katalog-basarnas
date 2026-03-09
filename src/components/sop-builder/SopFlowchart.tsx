@@ -727,7 +727,7 @@ interface SopFlowchartProps {
 }
 
 const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = false, onRefresh, onGenerateCover, isGeneratingCover, onBack, onDataUpdate }: SopFlowchartProps) => {
-    const { zoomIn, zoomOut, fitView, setViewport } = useReactFlow();
+    const { zoomIn, zoomOut, fitView, setViewport, getViewport } = useReactFlow();
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const [isManualMode, setIsManualMode] = useState(false);
     const [isSavingPaths, setIsSavingPaths] = useState(false);
@@ -735,6 +735,9 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
     const [readyPagesCount, setReadyPagesCount] = useState(0);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
+    const [isCaptureMode, setIsCaptureMode] = useState(false);
+
+    const effectivePrintMode = isPrintMode || isCaptureMode;
 
     const handleMouseMove = useCallback((e: any) => {
         if (!reactFlowWrapper.current) return;
@@ -770,25 +773,25 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                 let hdrX = 0;
                 nodesList.push({
                     id: `h-no-${idx}`, type: 'headerNode', position: { x: hdrX, y: 0 },
-                    data: { label: 'No', width: COL_NO_WIDTH, height: TOTAL_HEADER_HEIGHT, isPrintMode },
+                    data: { label: 'No', width: COL_NO_WIDTH, height: TOTAL_HEADER_HEIGHT, isPrintMode: effectivePrintMode },
                     draggable: false, zIndex: 100,
                 });
                 hdrX += COL_NO_WIDTH;
                 nodesList.push({
                     id: `h-kegiatan-${idx}`, type: 'headerNode', position: { x: hdrX, y: 0 },
-                    data: { label: 'Kegiatan', width: COL_KEGIATAN_WIDTH, height: TOTAL_HEADER_HEIGHT, isPrintMode },
+                    data: { label: 'Kegiatan', width: COL_KEGIATAN_WIDTH, height: TOTAL_HEADER_HEIGHT, isPrintMode: effectivePrintMode },
                     draggable: false, zIndex: 100,
                 });
                 hdrX += COL_KEGIATAN_WIDTH;
                 nodesList.push({
                     id: `h-group-pelaksana-${idx}`, type: 'headerNode', position: { x: hdrX, y: 0 },
-                    data: { label: 'Pelaksana (Flow Proses)', width: lanes.length * LANE_WIDTH, height: HEADER_GROUP_HEIGHT, isGroup: true, isPrintMode },
+                    data: { label: 'Pelaksana (Flow Proses)', width: lanes.length * LANE_WIDTH, height: HEADER_GROUP_HEIGHT, isGroup: true, isPrintMode: effectivePrintMode },
                     draggable: false, zIndex: 100,
                 });
                 lanes.forEach((lane: string, i: number) => {
                     nodesList.push({
                         id: `h-lane-${idx}-${i}`, type: 'headerNode', position: { x: hdrX + (i * LANE_WIDTH), y: HEADER_GROUP_HEIGHT },
-                        data: { label: lane, width: LANE_WIDTH, height: HEADER_SUB_HEIGHT, isPrintMode },
+                        data: { label: lane, width: LANE_WIDTH, height: HEADER_SUB_HEIGHT, isPrintMode: effectivePrintMode },
                         draggable: false, zIndex: 100,
                     });
                 });
@@ -796,7 +799,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                 const MUTU_WIDTHS = [120, 80, 100]; // Kelengkapan, Waktu, Output
                 nodesList.push({
                     id: `h-group-mutubaku-${idx}`, type: 'headerNode', position: { x: hdrX, y: 0 },
-                    data: { label: 'Mutu Baku', width: MUTU_WIDTHS.reduce((a, b) => a + b, 0), height: HEADER_GROUP_HEIGHT, isGroup: true, isPrintMode },
+                    data: { label: 'Mutu Baku', width: MUTU_WIDTHS.reduce((a, b) => a + b, 0), height: HEADER_GROUP_HEIGHT, isGroup: true, isPrintMode: effectivePrintMode },
                     draggable: false, zIndex: 100,
                 });
 
@@ -804,7 +807,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                 ['Kelengkapan', 'Waktu', 'Output'].forEach((label, i) => {
                     nodesList.push({
                         id: `h-mutu-${idx}-${label}`, type: 'headerNode', position: { x: currentMutuX, y: HEADER_GROUP_HEIGHT },
-                        data: { label, width: MUTU_WIDTHS[i], height: HEADER_SUB_HEIGHT, isPrintMode },
+                        data: { label, width: MUTU_WIDTHS[i], height: HEADER_SUB_HEIGHT, isPrintMode: effectivePrintMode },
                         draggable: false, zIndex: 100,
                     });
                     currentMutuX += MUTU_WIDTHS[i];
@@ -813,9 +816,19 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
 
                 nodesList.push({
                     id: `h-keterangan-${idx}`, type: 'headerNode', position: { x: hdrX, y: 0 },
-                    data: { label: 'Keterangan', width: COL_KETERANGAN_WIDTH, height: TOTAL_HEADER_HEIGHT, isPrintMode },
+                    data: { label: 'Keterangan', width: COL_KETERANGAN_WIDTH, height: TOTAL_HEADER_HEIGHT, isPrintMode: effectivePrintMode },
                     draggable: false, zIndex: 100,
                 });
+
+                // Gap Columns based on actual widths
+                let gapX = COL_NO_WIDTH + COL_KEGIATAN_WIDTH;
+                for (let i = 0; i < lanes.length; i++) {
+                    nodesList.push({
+                        id: `gap-${idx}-${i}`, type: 'gapColumnNode', position: { x: gapX + (i * LANE_WIDTH) + LANE_WIDTH, y: TOTAL_HEADER_HEIGHT },
+                        data: { width: 0, height: PAGE_HEIGHT, isPrintMode: effectivePrintMode },
+                        draggable: false, zIndex: -1,
+                    });
+                }
             };
 
             renderHeaders(pageIndex, currentPageNodes);
@@ -831,7 +844,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                         id: `off-page-out-${pageIndex}`,
                         type: 'offPageConnector',
                         position: { x: (flowchartWidth / 2) - 30, y: USABLE_HEIGHT - 20 },
-                        data: { label: offPageLabel, connectorType: 'page-break-bottom', isPrintMode },
+                        data: { label: offPageLabel, connectorType: 'page-break-bottom', isPrintMode: effectivePrintMode },
                         draggable: false, zIndex: 20
                     });
 
@@ -850,7 +863,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                         id: `off-page-in-${pageIndex}`,
                         type: 'offPageConnector',
                         position: { x: (flowchartWidth / 2) - 30, y: TOP_MARGIN },
-                        data: { label: offPageLabel, connectorType: 'page-break-top', isPrintMode },
+                        data: { label: offPageLabel, connectorType: 'page-break-top', isPrintMode: effectivePrintMode },
                         draggable: false, zIndex: 20
                     });
                     currentY += 80;
@@ -859,13 +872,13 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                 let rowX = 0;
                 currentPageNodes.push({
                     id: `row-no-${index}`, type: 'infoNode', position: { x: rowX, y: currentY },
-                    data: { type: 'no', value: step.order || index + 1, width: COL_NO_WIDTH, height: nodeHeight, isPrintMode },
+                    data: { type: 'no', value: step.order || index + 1, width: COL_NO_WIDTH, height: nodeHeight, isPrintMode: effectivePrintMode },
                     draggable: false, zIndex: 1,
                 });
                 rowX += COL_NO_WIDTH;
                 currentPageNodes.push({
                     id: `row-keg-${index}`, type: 'infoNode', position: { x: rowX, y: currentY },
-                    data: { type: 'aktivitas', value: step.aktivitas, width: COL_KEGIATAN_WIDTH, height: nodeHeight, isPrintMode },
+                    data: { type: 'aktivitas', value: step.aktivitas, width: COL_KEGIATAN_WIDTH, height: nodeHeight, isPrintMode: effectivePrintMode },
                     draggable: false, zIndex: 1,
                 });
                 rowX += COL_KEGIATAN_WIDTH;
@@ -894,7 +907,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                         nextStepNo: step.nextStepNo,
                         pageIndex: pageIndex,
                         dbId: step.id,
-                        isPrintMode,
+                        isPrintMode: effectivePrintMode,
                     },
                     draggable: false, zIndex: 10,
                 });
@@ -902,11 +915,11 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                 lanes.forEach((_: any, i: number) => {
                     currentPageNodes.push({
                         id: `bg-lane-${index}-${i}`, type: 'infoNode', position: { x: rowX + (i * LANE_WIDTH), y: currentY },
-                        data: { type: 'bg', width: LANE_WIDTH, height: nodeHeight, isPrintMode },
+                        data: { type: 'bg', width: LANE_WIDTH, height: nodeHeight, isPrintMode: effectivePrintMode },
                         draggable: false, selectable: false, zIndex: -1,
                         style: {
-                            borderRight: isPrintMode ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.05)',
-                            borderBottom: isPrintMode ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.05)',
+                            borderRight: effectivePrintMode ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.05)',
+                            borderBottom: effectivePrintMode ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.05)',
                             background: 'transparent'
                         }
                     });
@@ -918,7 +931,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                 ['mutuBakuKelengkapan', 'mutuBakuWaktu', 'mutuBakuOutput'].forEach((field, i) => {
                     currentPageNodes.push({
                         id: `row-${field}-${index}`, type: 'infoNode', position: { x: currentMutuX, y: currentY },
-                        data: { type: 'aktivitas', value: step[field] || '-', width: MUTU_WIDTHS[i], height: nodeHeight, isPrintMode },
+                        data: { type: 'aktivitas', value: step[field] || '-', width: MUTU_WIDTHS[i], height: nodeHeight, isPrintMode: effectivePrintMode },
                         draggable: false, zIndex: 1,
                     });
                     currentMutuX += MUTU_WIDTHS[i];
@@ -928,7 +941,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
 
                 currentPageNodes.push({
                     id: `row-ket-${index}`, type: 'infoNode', position: { x: rowX, y: currentY },
-                    data: { type: 'keterangan', value: step.keterangan || '-', width: COL_KETERANGAN_WIDTH, height: nodeHeight, isPrintMode },
+                    data: { type: 'keterangan', value: step.keterangan || '-', width: COL_KETERANGAN_WIDTH, height: nodeHeight, isPrintMode: effectivePrintMode },
                     draggable: false, zIndex: 1,
                 });
 
@@ -940,7 +953,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                         id: `gap-no-${index}`,
                         type: 'gapColumnNode',
                         position: { x: gapX, y: gapY },
-                        data: { width: COL_NO_WIDTH, height: VERTICAL_GAP, isPrintMode },
+                        data: { width: COL_NO_WIDTH, height: VERTICAL_GAP, isPrintMode: effectivePrintMode },
                         draggable: false,
                         selectable: false,
                         zIndex: 0,
@@ -951,7 +964,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                         id: `gap-keg-${index}`,
                         type: 'gapColumnNode',
                         position: { x: gapX, y: gapY },
-                        data: { width: COL_KEGIATAN_WIDTH, height: VERTICAL_GAP, isPrintMode },
+                        data: { width: COL_KEGIATAN_WIDTH, height: VERTICAL_GAP, isPrintMode: effectivePrintMode },
                         draggable: false,
                         selectable: false,
                         zIndex: 0,
@@ -963,7 +976,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                             id: `gap-lane-${index}-${i}`,
                             type: 'gapColumnNode',
                             position: { x: gapX + (i * LANE_WIDTH), y: gapY },
-                            data: { width: LANE_WIDTH, height: VERTICAL_GAP, isPrintMode },
+                            data: { width: LANE_WIDTH, height: VERTICAL_GAP, isPrintMode: effectivePrintMode },
                             draggable: false,
                             selectable: false,
                             zIndex: 0,
@@ -976,7 +989,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                             id: `${field}-${index}`,
                             type: 'gapColumnNode',
                             position: { x: gapX + (fieldIndex * COL_MUTU_WIDTH), y: gapY },
-                            data: { width: COL_MUTU_WIDTH, height: VERTICAL_GAP, isPrintMode },
+                            data: { width: COL_MUTU_WIDTH, height: VERTICAL_GAP, isPrintMode: effectivePrintMode },
                             draggable: false,
                             selectable: false,
                             zIndex: 0,
@@ -988,7 +1001,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                         id: `gap-ket-${index}`,
                         type: 'gapColumnNode',
                         position: { x: gapX, y: gapY },
-                        data: { width: COL_KETERANGAN_WIDTH, height: VERTICAL_GAP, isPrintMode },
+                        data: { width: COL_KETERANGAN_WIDTH, height: VERTICAL_GAP, isPrintMode: effectivePrintMode },
                         draggable: false,
                         selectable: false,
                         zIndex: 0,
@@ -1047,7 +1060,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                         const stroke = isNo ? '#f43f5e' : '#10b981';
                         return {
                             ...edge,
-                            animated: !isPrintMode,
+                            animated: !effectivePrintMode,
                             style: { ...edge.style, stroke, strokeWidth: 2.5 },
                             markerEnd: { type: MarkerType.ArrowClosed, color: stroke }
                         };
@@ -1091,7 +1104,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                     sourceHandle,
                     targetHandle,
                     type: 'sopEdge',
-                    animated: !isPrintMode,
+                    animated: !effectivePrintMode,
                     style: {
                         ...(edge.style || {}),
                         stroke,
@@ -1120,7 +1133,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                     })
                     .map(e => ({
                         ...normalizeDecisionEdge(e),
-                        data: { ...e.data, isPrintMode }
+                        data: { ...e.data, isPrintMode: effectivePrintMode }
                     }));
 
                 console.log(`[SopFlowchart] Using ${finalEdges.length} valid saved edges (from ${savedEdges.length} total)`);
@@ -1168,7 +1181,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                                         markerEnd: { type: MarkerType.ArrowClosed, color: '#10b981' },
                                         style: { stroke: '#10b981', strokeWidth: 2.5 },
                                         labelStyle: { fill: '#10b981', fontWeight: 600 },
-                                        data: { isPrintMode }
+                                        data: { isPrintMode: effectivePrintMode }
                                     });
                                 }
                             } else if (nodeIdx < pNodes.length - 1) {
@@ -1183,7 +1196,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                                     markerEnd: { type: MarkerType.ArrowClosed, color: '#10b981' },
                                     style: { stroke: '#10b981', strokeWidth: 2.5 },
                                     labelStyle: { fill: '#10b981', fontWeight: 600 },
-                                    data: { isPrintMode }
+                                    data: { isPrintMode: effectivePrintMode }
                                 });
                             }
 
@@ -1221,7 +1234,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                                             markerEnd: { type: MarkerType.ArrowClosed, color: '#f43f5e' },
                                             style: { stroke: '#f43f5e', strokeWidth: 2.5 },
                                             labelStyle: { fill: '#f43f5e', fontWeight: 600 },
-                                            data: { isPrintMode, isDecisionNo: true }
+                                            data: { isPrintMode: effectivePrintMode, isDecisionNo: true }
                                         });
                                     } else {
                                         // Cross-page routing via OffPage Connector
@@ -1252,7 +1265,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                                                     x: baseX + offsetX,
                                                     y: baseY + offsetY
                                                 },
-                                                data: { label: connectorLabel, connectorType: 'decision-out', isPrintMode },
+                                                data: { label: connectorLabel, connectorType: 'decision-out', isPrintMode: effectivePrintMode },
                                                 draggable: true, zIndex: 20
                                             };
                                             allNodes.push(outNode);
@@ -1269,7 +1282,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                                                 markerEnd: { type: MarkerType.ArrowClosed, color: '#f43f5e' },
                                                 style: { stroke: '#f43f5e', strokeWidth: 2.5 },
                                                 labelStyle: { fill: '#f43f5e', fontWeight: 600 },
-                                                data: { isPrintMode, isDecisionNo: true }
+                                                data: { isPrintMode: effectivePrintMode, isDecisionNo: true }
                                             });
                                         }
 
@@ -1294,7 +1307,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                                                     x: baseX + offsetX,
                                                     y: baseY + offsetY
                                                 },
-                                                data: { label: connectorLabel, connectorType: 'decision-in', isPrintMode },
+                                                data: { label: connectorLabel, connectorType: 'decision-in', isPrintMode: effectivePrintMode },
                                                 draggable: true, zIndex: 20
                                             };
                                             allNodes.push(inNode);
@@ -1309,7 +1322,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                                                 type: 'sopEdge',
                                                 markerEnd: { type: MarkerType.ArrowClosed, color: '#f43f5e' },
                                                 style: { stroke: '#f43f5e', strokeWidth: 2.5 },
-                                                data: { isPrintMode }
+                                                data: { isPrintMode: effectivePrintMode }
                                             });
                                         }
                                     }
@@ -1324,7 +1337,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                                 type: 'sopEdge',
                                 markerEnd: { type: MarkerType.ArrowClosed, color: '#334155' },
                                 style: { stroke: '#334155', strokeWidth: 2.5 },
-                                data: { isPrintMode }
+                                data: { isPrintMode: effectivePrintMode }
                             });
                         }
                     });
@@ -1338,7 +1351,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                                 id: `edge-${lastNode.id}-to-offpage`,
                                 source: lastNode.id, target: offPageOut.id,
                                 sourceHandle: 'bottom', targetHandle: 'top',
-                                type: 'sopEdge', data: { isPrintMode }
+                                type: 'sopEdge', data: { isPrintMode: effectivePrintMode }
                             });
                         }
                     }
@@ -1351,7 +1364,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                                 id: `edge-offpage-to-${firstNode.id}`,
                                 source: offPageIn.id, target: firstNode.id,
                                 sourceHandle: 'bottom', targetHandle: 'top-target',
-                                type: 'sopEdge', data: { isPrintMode }
+                                type: 'sopEdge', data: { isPrintMode: effectivePrintMode }
                             });
                         }
                     }
@@ -1392,7 +1405,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                 if (sPage === tPage) {
                     processedEdges.push({
                         ...edge,
-                        data: { ...edge.data, obstacles, isPrintMode, originalEdge: edge }
+                        data: { ...edge.data, obstacles, isPrintMode: effectivePrintMode, originalEdge: edge }
                     });
                 } else if (sPage < tPage) {
                     // Forward split across multiple boundaries
@@ -1410,7 +1423,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                             id: outId,
                             type: 'offPageConnector',
                             position: { x: intersectX - 32, y: boundaryY - 45 },
-                            data: { label, connectorType: 'auto-out', direction: 'down', isPrintMode },
+                            data: { label, connectorType: 'auto-out', direction: 'down', isPrintMode: effectivePrintMode },
                             draggable: false, zIndex: 20
                         };
                         processedNodes.push(outNode);
@@ -1423,7 +1436,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                             target: outId,
                             sourceHandle: currentSourceHandle,
                             targetHandle: 'top',
-                            data: { ...edge.data, obstacles, isPrintMode, originalEdge: edge }
+                            data: { ...edge.data, obstacles, isPrintMode: effectivePrintMode, originalEdge: edge }
                         });
 
                         const inId = `off-auto-in-${edge.id}-${p}`;
@@ -1787,44 +1800,89 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
             toast.info("Memulai proses ekspor PDF...");
 
             // --- PERFORMANCE OPTIMIZATION: Client-Side Capture ---
-            // This captures the flowchart image directly in the browser 
-            // to bypass slow Puppeteer rendering on the server.
             let flowchartImage: string | null = null;
+            let finalBreakpoints = { bottoms: [] as number[], tops: [] as number[] };
+
             try {
-                const el = document.querySelector('.react-flow__viewport') as HTMLElement;
-                if (el) {
-                    console.log("📸 [Frontend] Capturing flowchart image client-side...");
-                    flowchartImage = await toJpeg(el, {
-                        backgroundColor: 'white',
+                // Determine Flowchart Graph Size computationally
+                let lanes = smartParse(sopData?.pelaksana || sopData?.pelaksanaLanes, ['Pelaksana']);
+                if (!Array.isArray(lanes) || lanes.length === 0) lanes = ['Pelaksana'];
+                const flowchartWidth = COL_NO_WIDTH + COL_KEGIATAN_WIDTH + (lanes.length * LANE_WIDTH) + (3 * COL_MUTU_WIDTH) + COL_KETERANGAN_WIDTH;
+
+                // Get bottom-most Y coordinate
+                let highestY = 0;
+                nodes.forEach(n => {
+                    if (n.position.y + 100 > highestY) highestY = n.position.y + 100;
+                });
+                const flowchartHeight = highestY + 100;
+
+                // FORCE CAPTURE MODE (Disables SVGs filters, dark mode HUDs, and forces white theme)
+                setIsCaptureMode(true);
+
+                // Reset Viewport to fit content exactly at 1.0 zoom
+                const currentObj = getViewport();
+                setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 0 }); // Apply instantly
+
+                // Wait for React rendering pipeline and DOM transitions to complete
+                await new Promise(r => setTimeout(r, 600));
+
+                const viewportEl = document.querySelector('.react-flow__viewport') as HTMLElement;
+                if (viewportEl) {
+                    console.log("📸 [Frontend] Capturing optimized flowchart snapshot...");
+
+                    // We need to temporarily force the wrapper to layout exactly at 1:1 scale
+                    // without `transform: scale(x)` distorting the html-to-image capture frame
+                    const origTransform = viewportEl.style.transform;
+                    viewportEl.style.transform = 'translate(0px, 0px) scale(1)';
+
+                    flowchartImage = await toJpeg(viewportEl, {
+                        backgroundColor: '#ffffff',
                         quality: 0.9,
-                        pixelRatio: 1.5 // optimized from 2.0 to stay within Vercel limits
+                        pixelRatio: 1.5,
+                        width: flowchartWidth,
+                        height: flowchartHeight,
+                        style: {
+                            transform: 'translate(0px, 0px) scale(1)', // Ensure it renders flat
+                            background: '#ffffff'
+                        }
                     });
+
+                    // Restore transform
+                    viewportEl.style.transform = origTransform;
                     console.log("✅ [Frontend] Capture successful");
                 }
+
+                // Restore Viewport & Exit capture mode
+                setViewport(currentObj, { duration: 0 });
+                setIsCaptureMode(false);
+                await new Promise(r => setTimeout(r, 100)); // allow fade back to designer
+
+                // Extract breakpoints
+                const offPageNodes = nodes.filter((n: any) => n.type === 'offPageConnector');
+                finalBreakpoints = {
+                    bottoms: offPageNodes
+                        .filter((n: any) => n.data?.connectorType === 'page-break-bottom')
+                        .map((n: any) => (n.position.y + (n.measured?.height || 60)) + 60)
+                        .sort((a, b) => a - b),
+                    tops: offPageNodes
+                        .filter((n: any) => n.data?.connectorType === 'page-break-top')
+                        .map((n: any) => n.position.y - 80)
+                        .sort((a, b) => a - b)
+                };
+
             } catch (captureErr) {
                 console.warn("⚠️ Client-side capture failed, falling back to full Puppeteer export:", captureErr);
+                setIsCaptureMode(false);
             }
 
             // 1. Trigger Export
-            const offPageNodes = nodes.filter((n: any) => n.type === 'offPageConnector');
-            const breakpoints = {
-                bottoms: offPageNodes
-                    .filter((n: any) => n.data?.connectorType === 'page-break-bottom')
-                    .map((n: any) => (n.position.y + (n.measured?.height || 60)) + 60)
-                    .sort((a, b) => a - b),
-                tops: offPageNodes
-                    .filter((n: any) => n.data?.connectorType === 'page-break-top')
-                    .map((n: any) => n.position.y - 80)
-                    .sort((a, b) => a - b)
-            };
-
             const res = await fetch(`/api/sop-builder/${sopData.id}/export-final`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({
-                    flowchartImage, // Optional: if null, server will use Puppeteer fallback
-                    breakpoints     // Send calculated breakpoints to server
+                    flowchartImage,
+                    breakpoints: finalBreakpoints
                 })
             });
 
