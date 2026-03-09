@@ -10,11 +10,14 @@ export async function GET(
 ) {
     try {
         const { id: sopId } = await params
+        console.log(`🔍 Checking status for SOP ID: ${sopId}`)
 
         // Find job in database
         const job = await db.exportJob.findUnique({
             where: { sopId }
         })
+
+        console.log(`🔍 Job found in DB for ${sopId}: ${job ? 'Yes' : 'No'}`)
 
         if (!job) {
             return NextResponse.json(
