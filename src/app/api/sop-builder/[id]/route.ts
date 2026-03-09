@@ -8,10 +8,13 @@ export async function GET(
     { params }: { params: { id: string } }
 ) {
     try {
-        const { authenticated } = await validateRole(['ADMIN', 'DEVELOPER', 'STAF'])
+        const { authenticated, user, userId: detectedId } = await validateRole(['ADMIN', 'DEVELOPER', 'STAF'])
         if (!authenticated) {
-            console.log(`[Diagnostic] API GET /sop-builder/[id] - UNAUTHORIZED. User session invalid or role mismatched.`);
-            return NextResponse.json({ error: 'Unauthorized Session' }, { status: 401 })
+            console.log(`[Diagnostic] API GET /sop-builder/[id] - UNAUTHORIZED. Detected userId from cookie: ${detectedId || 'NONE'}`);
+            return NextResponse.json({
+                error: 'Unauthorized Session',
+                debug: { detectedUserId: detectedId || 'NONE' }
+            }, { status: 401 })
         }
 
         const { id } = await params

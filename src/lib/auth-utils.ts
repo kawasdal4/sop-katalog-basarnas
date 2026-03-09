@@ -26,13 +26,16 @@ export async function getUserRole(userId: string) {
 }
 
 export async function validateRole(allowedRoles: string[]) {
+    const cookieStore = await cookies()
+    const userId = cookieStore.get('userId')?.value
+
     const session = await getSession()
-    if (!session) return { authenticated: false, authorized: false }
+    if (!session) return { authenticated: false, authorized: false, userId }
 
     const user = session.user
     if (!user.role || !allowedRoles.includes(user.role)) {
-        return { authenticated: true, authorized: false, user, role: user.role }
+        return { authenticated: true, authorized: false, user, role: user.role, userId }
     }
 
-    return { authenticated: true, authorized: true, user, role: user.role }
+    return { authenticated: true, authorized: true, user, role: user.role, userId }
 }
