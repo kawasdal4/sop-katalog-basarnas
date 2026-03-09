@@ -27,11 +27,18 @@ export async function GET(request: Request) {
             orderBy: { updatedAt: 'desc' }
         })
 
+        const sops = await db.sopPembuatan.findMany({
+            take: 5,
+            select: { id: true, judul: true, nomorSop: true },
+            orderBy: { createdAt: 'desc' }
+        })
+
         return NextResponse.json({
             tableExists: true,
             jobCount: count,
             recentJobs: lastJobs,
-            sopCheck: checkSopId ? { id: checkSopId, found: !!sopExists } : null
+            sopCheck: checkSopId ? { id: checkSopId, found: !!sopExists } : null,
+            availableSops: sops
         })
     } catch (error: any) {
         return NextResponse.json({
