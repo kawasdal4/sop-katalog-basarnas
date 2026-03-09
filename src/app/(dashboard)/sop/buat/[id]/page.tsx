@@ -25,7 +25,7 @@ export default function EditSopPage({ params }: { params: Promise<{ id: string }
                     let errorMessage = "SOP tidak ditemukan";
                     try {
                         const errData = await res.json();
-                        errorMessage = errData.error || errData.message || `Error ${res.status}: ${res.statusText}`;
+                        errorMessage = errData.details || errData.error || errData.message || `Error ${res.status}: ${res.statusText}`;
                     } catch {
                         errorMessage = `Error ${res.status}: ${res.statusText}`;
                     }
