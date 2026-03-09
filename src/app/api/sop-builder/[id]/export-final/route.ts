@@ -98,7 +98,17 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
         console.log(`🚀 [Background] Starting Export Final SOP ID: ${sopId} (Hybrid: ${!!clientImage})`)
 
         // 1. DATA FETCH
-        const [sop, logoBase64, htmlSource, snapshot] = await Promise.all([
+        let validLogoBase64 = OFFICIAL_LOGO_URL;
+        try {
+            const logoRelPath = 'public/logo-sar.png';
+            const logoFullPath = path.join(process.cwd(), logoRelPath);
+            if (fs.existsSync(logoFullPath)) {
+                const logoBuffer = fs.readFileSync(logoFullPath);
+                validLogoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`;
+            }
+        } catch (e) { console.warn('Local logo read failed', e); }
+
+        const [sop, htmlSource, snapshot] = await Promise.all([
             db.sopPembuatan.findUnique({
                 where: { id: sopId },
                 include: {
@@ -106,7 +116,6 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
                     sopFlowchart: true
                 }
             }),
-            Promise.resolve(OFFICIAL_LOGO_URL),
             fs.promises.readFile(path.join(process.cwd(), 'src/lib/pdf-template.html'), 'utf8'),
             getStepSnapshot(sopId)
         ]);
@@ -167,7 +176,7 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
 
         // 3. Prepare Final HTML Content
         let finalHtml = htmlSource
-            .replace('{{LOGO_BASE64}}', logoBase64)
+            .replace('{{LOGO_BASE64}}', validLogoBase64)
             .replace('{{UNIT_KERJA}}', (sop.unitKerja || 'DIREKTORAT KESIAPSIAGAAN').toUpperCase())
             .replace('{{JUDUL_SOP}}', (sop.judul || 'DRAFT SOP').toUpperCase())
             .replace('{{NOMOR_SOP}}', sop.nomorSop || '-')
@@ -281,13 +290,13 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
         slicedResults.sort((a, b) => a.index - b.index);
 
         const flowchartPagesHtml = slicedResults.map((item, idx) => `
-            <div class="page" id="page-flowchart-${idx + 1}" style="padding: 5mm; display: flex; flex-direction: column; height: 100%;">
+            <div class="page" id="page-flowchart-${idx + 1}" style="padding: 5mm; display: flex; flex-direction: column; height: 100%; background: white;">
                 <div class="header-simple">
-                    <img src="${logoBase64}" alt="Logo" class="logo-small">
+                    <img src="${validLogoBase64}" alt="Logo" class="logo-small">
                     <div class="title-small">FLOWCHART SOP: ${(sop.judul || 'BASARNAS').toUpperCase()} (Hal. ${idx + 1})</div>
                 </div>
-                <div class="flow-container-smart" style="flex: 1; display: flex; align-items: flex-start; justify-content: center; border: none; overflow: hidden; padding-top: 10px;">
-                    <img src="file://${item.path}" style="width: 100%; height: auto; object-fit: contain; object-position: top center;" alt="Flowchart Page ${idx + 1}">
+                <div class="flow-container-smart" style="flex: 1; display: flex; align-items: flex-start; justify-content: center; border: none; overflow: hidden; padding-top: 10px; width: 100%;">
+                    <img src="file://${item.path}" style="width: 100%; height: auto; max-height: 100%; object-fit: contain; object-position: top center; display: block;" alt="Flowchart Page ${idx + 1}">
                 </div>
                 <div class="footer-simple" style="margin-top: auto;">BADAN NASIONAL PENCARIAN DAN PERTOLONGAN</div>
             </div>
