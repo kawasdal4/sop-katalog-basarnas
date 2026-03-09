@@ -1,6 +1,6 @@
 const fs = require('fs');
 const { marked } = require('marked');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 const path = require('path');
 
 (async () => {

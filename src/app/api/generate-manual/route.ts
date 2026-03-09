@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server'
-import puppeteer from 'puppeteer'
+import puppeteer from 'puppeteer-core'
+import chromium from '@sparticuz/chromium'
 import path from 'path'
 import fs from 'fs'
 
+export const maxDuration = 300;
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
+    let browser: any = null;
     try {
         const logoRelPath = 'public/logo-sar.png'
         const logoFullPath = path.join(process.cwd(), logoRelPath)
@@ -368,10 +373,14 @@ export async function GET() {
 </html>
     `
 
-        const browser = await puppeteer.launch({
-            headless: true, // Use headless: true instead of 'new' for latest versions
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        })
+        const isProd = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+
+        browser = await puppeteer.launch({
+            args: isProd ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
+            defaultViewport: chromium.defaultViewport,
+            executablePath: isProd ? await chromium.executablePath() : undefined,
+            headless: isProd ? chromium.headless : true,
+        });
 
         const page = await browser.newPage()
         await page.setContent(htmlContent, { waitUntil: 'networkidle0' })
@@ -398,5 +407,9 @@ export async function GET() {
     } catch (error: any) {
         console.error('PDF Generation Error:', error)
         return NextResponse.json({ error: error.message }, { status: 500 })
+    } finally {
+        if (browser) {
+            await browser.close().catch(() => { });
+        }
     }
 }
