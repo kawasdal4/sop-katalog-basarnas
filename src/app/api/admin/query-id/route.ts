@@ -32,9 +32,15 @@ export async function GET(request: NextRequest) {
             sop.langkahLangkah = mergeStepsWithSnapshot(sop.langkahLangkah || [], snapshot)
         }
 
+        const userTest = await db.user.findUnique({
+            where: { id: 'cmm9u5n240000l104j3328euy' },
+            select: { id: true, email: true, role: true }
+        })
+
         return NextResponse.json({
             id: id,
-            sop: sop
+            sop: sop,
+            userTest: userTest
         })
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 500 })
