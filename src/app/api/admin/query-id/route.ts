@@ -11,13 +11,11 @@ export async function GET(request: NextRequest) {
     if (!id) return NextResponse.json({ error: 'Missing ID' })
 
     try {
-        const inPembuatan = await db.sopPembuatan.findUnique({ where: { id } })
-        const inFile = await db.sopFile.findUnique({ where: { id } })
+        const users = await db.user.findMany({ select: { id: true, email: true, role: true }, take: 5 })
+
         return NextResponse.json({
-            id,
-            foundInPembuatan: !!inPembuatan,
-            foundInFile: !!inFile,
-            pembuatanData: inPembuatan ? { judul: inPembuatan.judul, nomorSop: inPembuatan.nomorSop } : null
+            id: id,
+            users: users
         })
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 500 })
