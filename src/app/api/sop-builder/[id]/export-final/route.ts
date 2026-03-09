@@ -178,6 +178,7 @@ async function processExport(sopId: string, baseUrl: string) {
         });
 
         // --- STEP A: CAPTURE FLOWCHART ---
+        await setJobStatus(sopId, 'capturing')
         const page = await browser.newPage();
         await page.setViewport({ width: 1600, height: 1200, deviceScaleFactor: 2 });
         const serializableSop = JSON.parse(JSON.stringify(sop));
@@ -237,6 +238,7 @@ async function processExport(sopId: string, baseUrl: string) {
         await page.close();
 
         // --- STEP B: SLICE IMAGE ---
+        await setJobStatus(sopId, 'slicing')
         console.log('✂️ Slicing images...');
         const metadata = await sharp(imgBuffer).metadata();
         const fullWidth = metadata.width || 1600;
@@ -292,6 +294,7 @@ async function processExport(sopId: string, baseUrl: string) {
         finalHtml = finalHtml.replace('{{FLOWCHART_PAGES_HTML}}', flowchartPagesHtml)
 
         // --- STEP C: GENERATE PDF ---
+        await setJobStatus(sopId, 'generating_pdf')
         console.log('📄 Generating PDF...');
         const pdfPage = await browser.newPage();
         await pdfPage.setContent(finalHtml, { waitUntil: 'load', timeout: 60000 });
@@ -312,6 +315,7 @@ async function processExport(sopId: string, baseUrl: string) {
         const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 50)
         const finalFileName = `sop-${sanitizeFileName(sop.judul)}-final-${sopId.slice(0, 6)}.pdf`
 
+        await setJobStatus(sopId, 'uploading')
         console.log('☁️ Uploading to R2...');
         const r2Result = await uploadToR2(Buffer.from(pdfBuffer), finalFileName, 'application/pdf', {
             folder: 'sop-builder-finals'
