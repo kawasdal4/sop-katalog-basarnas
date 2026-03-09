@@ -12,6 +12,14 @@ export async function GET(request: Request) {
     }
 
     try {
+        const { searchParams } = new URL(request.url)
+        const checkSopId = searchParams.get('sopId')
+
+        let sopExists = null
+        if (checkSopId) {
+            sopExists = await db.sopPembuatan.findUnique({ where: { id: checkSopId } })
+        }
+
         // Check if table exists by querying count
         const count = await db.exportJob.count()
         const lastJobs = await db.exportJob.findMany({
@@ -22,7 +30,8 @@ export async function GET(request: Request) {
         return NextResponse.json({
             tableExists: true,
             jobCount: count,
-            recentJobs: lastJobs
+            recentJobs: lastJobs,
+            sopCheck: checkSopId ? { id: checkSopId, found: !!sopExists } : null
         })
     } catch (error: any) {
         return NextResponse.json({
