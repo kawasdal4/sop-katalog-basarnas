@@ -18,7 +18,7 @@ const OFFICIAL_LOGO_URL = 'https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/L
 // Helper for job tracking in DB
 async function setJobStatus(sopId: string, status: string, data: any = {}) {
     const { result, error } = data;
-    await db.exportJob.upsert({
+    await (db as any).exportJob.upsert({
         where: { sopId },
         update: {
             status,

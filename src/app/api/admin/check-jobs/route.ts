@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+// Deployment Anchor: 2026-03-09-v2
 import { db } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
     }
 
     try {
-        const jobs = await db.exportJob.findMany({
+        const jobs = await (db as any).exportJob.findMany({
             take: 20,
             orderBy: { updatedAt: 'desc' },
             where: sopId ? { sopId } : undefined

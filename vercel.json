@@ -27,7 +27,7 @@
   ],
   "functions": {
     "src/app/api/sop-builder/[id]/export-final/route.ts": {
-      "memory": 512
+      "memory": 3008
     },
     "src/app/api/sop-builder/[id]/export-run/route.ts": {
       "memory": 3008
