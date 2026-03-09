@@ -243,7 +243,7 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
         await setJobStatus(sopId, 'slicing')
         console.log('✂️ [Step B] Slicing images efficiently...');
 
-        const sharpInstance = sharp(imgBuffer);
+        const sharpInstance = sharp(imgBuffer).flatten({ background: '#ffffff' });
         const metadata = await sharpInstance.metadata();
         const fullWidth = metadata.width || 1200;
         const fullHeight = metadata.height || 1000;
@@ -281,15 +281,15 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
         slicedResults.sort((a, b) => a.index - b.index);
 
         const flowchartPagesHtml = slicedResults.map((item, idx) => `
-            <div class="page" id="page-flowchart-${idx + 1}" style="padding: 5mm;">
+            <div class="page" id="page-flowchart-${idx + 1}" style="padding: 5mm; display: flex; flex-direction: column; height: 100%;">
                 <div class="header-simple">
                     <img src="${logoBase64}" alt="Logo" class="logo-small">
                     <div class="title-small">FLOWCHART SOP: ${(sop.judul || 'BASARNAS').toUpperCase()} (Hal. ${idx + 1})</div>
                 </div>
-                <div class="flow-container-smart" style="flex: 1; display: flex; align-items: flex-start; justify-content: center; border: none; overflow: visible;">
-                    <img src="file://${item.path}" style="width: 100%; height: auto; max-height: 100%; object-fit: contain;" alt="Flowchart Page ${idx + 1}">
+                <div class="flow-container-smart" style="flex: 1; display: flex; align-items: flex-start; justify-content: center; border: none; overflow: hidden; padding-top: 10px;">
+                    <img src="file://${item.path}" style="width: 100%; height: auto; object-fit: contain; object-position: top center;" alt="Flowchart Page ${idx + 1}">
                 </div>
-                <div class="footer-simple">BADAN NASIONAL PENCARIAN DAN PERTOLONGAN</div>
+                <div class="footer-simple" style="margin-top: auto;">BADAN NASIONAL PENCARIAN DAN PERTOLONGAN</div>
             </div>
         `).join('');
 
