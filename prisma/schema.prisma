@@ -126,7 +126,7 @@ model SopFlowchart {
   updatedAt     DateTime @updatedAt
 
   // Relasi
-  sopPembuatan  SopPembuatan @relation(fields: [sopId], references: [id], onDelete: Cascade)
+  sopPembuatan  SopPembuatan @relation("SopToFlowchart", fields: [sopId], references: [id], onDelete: Cascade)
 }
 
 // Counter for auto-generate nomor SOP
@@ -266,7 +266,7 @@ model SopPembuatan {
   // Relasi
   author                User         @relation(fields: [authorId], references: [id])
   langkahLangkah        SopLangkah[]
-  sopFlowchart          SopFlowchart?
+  sopFlowchart          SopFlowchart? @relation("SopToFlowchart")
 }
 
 model SopLangkah {
