@@ -48,20 +48,23 @@ export async function POST(
     // Mark as processing immediately
     await setJobStatus(sopId, 'processing')
 
-    // Trigger the heavy Puppeteer work in a separate serverless function call.
-    // This ensures the client gets statusUrl immediately without waiting for Puppeteer.
-    const runUrl = `${baseUrl}/api/sop-builder/${sopId}/export-run`
-    fetch(runUrl, {
-        method: 'POST',
-        headers: { 'x-internal-secret': process.env.INTERNAL_SECRET || 'basarnas-internal-2026' },
-    }).catch(err => console.error('[export-final] Failed to trigger run:', err));
+    // Await the export process. On Vercel with maxDuration=300, this is fine.
+    // The client will poll /export-status while waiting and will see the 'completed' state.
+    // statusUrl is included so the client can poll.
+    await processExport(sopId, baseUrl).catch(async err => {
+        console.error('❌ Export Error:', err)
+        await setJobStatus(sopId, 'failed', {
+            error: err instanceof Error ? err.message : 'Unknown error'
+        });
+    })
 
     return NextResponse.json({
         success: true,
-        message: 'Export started',
+        message: 'Export completed',
         statusUrl: `/api/sop-builder/${sopId}/export-status`
     })
 }
+
 
 async function processExport(sopId: string, baseUrl: string) {
     let browser: any = null;
