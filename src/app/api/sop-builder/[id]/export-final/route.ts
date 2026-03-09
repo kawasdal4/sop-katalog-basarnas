@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { uploadToR2 } from '@/lib/r2-storage'
+import { uploadToR2, getR2PresignedUrl } from '@/lib/r2-storage'
 import puppeteer from 'puppeteer-core'
 import chromium from '@sparticuz/chromium'
 import path from 'path'
@@ -397,7 +397,24 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
             data: { combinedPdfPath: r2Result.key, status: 'FINAL' }
         });
 
-        await setJobStatus(sopId, 'completed', { result: { finalPdfPath: r2Result.key } });
+        let publicUrl = r2Result.publicUrl || '';
+        if (!publicUrl) {
+            try {
+                publicUrl = await getR2PresignedUrl(r2Result.key, 24 * 60 * 60);
+            } catch (urlErr) {
+                console.warn('⚠️ Failed to generate presigned URL, fallback to key only:', urlErr);
+            }
+        }
+
+        const appDownloadUrl = `${baseUrl}/api/file?action=preview&id=${sopId}`;
+
+        await setJobStatus(sopId, 'completed', {
+            result: {
+                finalPdfPath: r2Result.key,
+                publicUrl,
+                appDownloadUrl
+            }
+        });
 
         console.log('✅ Export Completed Successfully');
 

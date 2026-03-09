@@ -1940,16 +1940,18 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
 
                         let finalPath = "";
                         let publicUrl = "";
+                        let appDownloadUrl = "";
                         try {
                             if (statusData?.result) {
                                 finalPath = statusData.result.finalPdfPath || "";
                                 publicUrl = statusData.result.publicUrl || "";
+                                appDownloadUrl = statusData.result.appDownloadUrl || "";
                             }
                         } catch (err) {
                             console.error("Error accessing result:", err);
                         }
 
-                        const downloadUrl = publicUrl || (
+                        const downloadUrl = appDownloadUrl || publicUrl || (
                             finalPath
                                 ? (finalPath.startsWith('http')
                                     ? finalPath
@@ -1960,7 +1962,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                         if (downloadUrl) {
                             setIsExportingState(false);
                             toast.success("PDF berhasil dibuat!");
-                            window.open(downloadUrl, '_blank');
+                            window.location.href = downloadUrl;
                             if (onExportFinal) onExportFinal(downloadUrl);
                             return;
                         } else {
