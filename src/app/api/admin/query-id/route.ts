@@ -11,18 +11,30 @@ export async function GET(request: NextRequest) {
     if (!id) return NextResponse.json({ error: 'Missing ID' })
 
     try {
-        const inPembuatan = await db.sopPembuatan.findUnique({ where: { id } })
-        const inFile = await db.sopFile.findUnique({ where: { id } })
+        const sop = await db.sopPembuatan.findUnique({
+            where: { id },
+            include: {
+                langkahLangkah: {
+                    orderBy: { order: 'asc' }
+                },
+                author: { select: { name: true, email: true } },
+                sopFlowchart: true
+            }
+        })
+
+        if (!sop) {
+            return NextResponse.json({ error: 'SOP not found by findUnique', id })
+        }
+
+        const { getStepSnapshot, mergeStepsWithSnapshot } = await import('@/lib/sop-flowchart-snapshot')
+        const snapshot = await getStepSnapshot(id)
+        if (Array.isArray(snapshot) && snapshot.length > 0) {
+            sop.langkahLangkah = mergeStepsWithSnapshot(sop.langkahLangkah || [], snapshot)
+        }
 
         return NextResponse.json({
             id: id,
-            foundInPembuatan: !!inPembuatan,
-            foundInFile: !!inFile,
-            pembuatanData: inPembuatan ? {
-                judul: inPembuatan.judul,
-                nomorSop: inPembuatan.nomorSop,
-                id: inPembuatan.id
-            } : null
+            sop: sop
         })
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 500 })
