@@ -25,7 +25,16 @@ export default function FlowchartPage({ params }: { params: Promise<{ id: string
             if (!id) return;
             try {
                 const res = await fetch(`/api/sop-builder/${id}`)
-                if (!res.ok) throw new Error("SOP tidak ditemukan")
+                if (!res.ok) {
+                    let errorMessage = "SOP tidak ditemukan";
+                    try {
+                        const errData = await res.json();
+                        errorMessage = errData.error || errData.message || `Error ${res.status}: ${res.statusText}`;
+                    } catch {
+                        errorMessage = `Error ${res.status}: ${res.statusText}`;
+                    }
+                    throw new Error(errorMessage);
+                }
                 const json = await res.json()
                 setData(json.data)
             } catch (err: any) {
