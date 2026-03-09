@@ -1786,10 +1786,46 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
         try {
             toast.info("Memulai proses ekspor PDF...");
 
+            // --- PERFORMANCE OPTIMIZATION: Client-Side Capture ---
+            // This captures the flowchart image directly in the browser 
+            // to bypass slow Puppeteer rendering on the server.
+            let flowchartImage: string | null = null;
+            try {
+                const el = document.querySelector('.react-flow__viewport') as HTMLElement;
+                if (el) {
+                    console.log("📸 [Frontend] Capturing flowchart image client-side...");
+                    flowchartImage = await toJpeg(el, {
+                        backgroundColor: 'white',
+                        quality: 0.9,
+                        pixelRatio: 1.5 // optimized from 2.0 to stay within Vercel limits
+                    });
+                    console.log("✅ [Frontend] Capture successful");
+                }
+            } catch (captureErr) {
+                console.warn("⚠️ Client-side capture failed, falling back to full Puppeteer export:", captureErr);
+            }
+
             // 1. Trigger Export
+            const offPageNodes = nodes.filter((n: any) => n.type === 'offPageConnector');
+            const breakpoints = {
+                bottoms: offPageNodes
+                    .filter((n: any) => n.data?.connectorType === 'page-break-bottom')
+                    .map((n: any) => (n.position.y + (n.measured?.height || 60)) + 60)
+                    .sort((a, b) => a - b),
+                tops: offPageNodes
+                    .filter((n: any) => n.data?.connectorType === 'page-break-top')
+                    .map((n: any) => n.position.y - 80)
+                    .sort((a, b) => a - b)
+            };
+
             const res = await fetch(`/api/sop-builder/${sopData.id}/export-final`, {
                 method: 'POST',
-                credentials: 'include'
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    flowchartImage, // Optional: if null, server will use Puppeteer fallback
+                    breakpoints     // Send calculated breakpoints to server
+                })
             });
 
             if (!res.ok) {

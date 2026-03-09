@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { uploadToR2 } from '@/lib/r2-storage'
 import puppeteer from 'puppeteer-core'
-import chromium from '@sparticuz/chromium-min'
+import chromium from '@sparticuz/chromium'
 import path from 'path'
 import fs from 'fs'
 import { format } from 'date-fns'
@@ -40,23 +40,47 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> }
 ) {
     const { id: sopId } = await params
+    const body = await request.json().catch(() => ({}));
+    const { flowchartImage, breakpoints } = body;
+
     const headersList = await headers()
     const host = headersList.get('host') || 'localhost:3000'
     const protocol = host.includes('localhost') ? 'http' : 'https'
     const baseUrl = `${protocol}://${host}`
 
+    console.log(`[EXPORT-POST] Request for SOP: ${sopId} (Hybrid: ${!!flowchartImage})`);
+
+    // Check for existing job
+    const existingJob: any = await (db as any).exportJob.findUnique({
+        where: { sopId }
+    });
+
+    if (existingJob && existingJob.status === 'processing') {
+        const lastUpdate = new Date(existingJob.updatedAt).getTime();
+        const now = Date.now();
+        const diffMinutes = (now - lastUpdate) / (1000 * 60);
+
+        if (diffMinutes < 5) {
+            console.log(`[EXPORT-POST] Job already processing (${Math.round(diffMinutes)}m ago), returning statusUrl.`);
+            return NextResponse.json({
+                success: true,
+                message: 'Export is already processing',
+                statusUrl: `/api/sop-builder/${sopId}/export-status`
+            });
+        }
+    }
+
     // Mark as processing immediately
     await setJobStatus(sopId, 'processing')
 
-    // Await the export process. On Vercel with maxDuration=300, this is fine.
-    // The client will poll /export-status while waiting and will see the 'completed' state.
-    // statusUrl is included so the client can poll.
-    await processExport(sopId, baseUrl).catch(async err => {
+    // Await the export process. With maxDuration=300 on Vercel, this is now safe
+    // and prevents the function from terminating before background tasks finish.
+    await processExport(sopId, baseUrl, flowchartImage, breakpoints).catch(async err => {
         console.error('❌ Export Error:', err)
         await setJobStatus(sopId, 'failed', {
             error: err instanceof Error ? err.message : 'Unknown error'
         });
-    })
+    });
 
     return NextResponse.json({
         success: true,
@@ -66,13 +90,13 @@ export async function POST(
 }
 
 
-async function processExport(sopId: string, baseUrl: string) {
+async function processExport(sopId: string, baseUrl: string, clientImage?: string, clientBreakpoints?: any) {
     let browser: any = null;
 
     try {
-        console.log('🚀 [Background] Starting Export Final SOP ID:', sopId)
+        console.log(`🚀 [Background] Starting Export Final SOP ID: ${sopId} (Hybrid: ${!!clientImage})`)
 
-        // 1. PARALLEL FETCH
+        // 1. DATA FETCH
         const [sop, logoBase64, htmlSource, snapshot] = await Promise.all([
             db.sopPembuatan.findUnique({
                 where: { id: sopId },
@@ -161,122 +185,97 @@ async function processExport(sopId: string, baseUrl: string) {
             .replace('{{PENCATATAN}}', formatAsList(sop.pencatatanPendataan))
             .replace('{{STEPS_HTML}}', stepsHtml)
 
-        // 4. LAUNCH BROWSER (Vercel Compatible)
-        console.log('🚀 Launching Puppeteer on Vercel...');
+        // 4. GET FLOWCHART IMAGE & BREAKPOINTS
+        let imgBuffer: Buffer;
+        let allBreakpoints: any;
 
         const isProd = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
 
-        browser = await puppeteer.launch({
-            args: isProd ? chromium.args : [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-web-security',
-                '--disable-dev-shm-usage'
-            ],
-            defaultViewport: isProd ? chromium.defaultViewport : { width: 1600, height: 1200 },
-            executablePath: isProd ? await chromium.executablePath() : undefined,
-            headless: (isProd ? chromium.headless : true) as any,
-        });
+        if (clientImage && clientBreakpoints) {
+            console.log('🖼️ [Hybrid] Using client-provided flowchart image and breakpoints');
+            imgBuffer = Buffer.from(clientImage.split(',')[1], 'base64');
+            allBreakpoints = clientBreakpoints;
+        } else {
+            console.log('🚀 [Legacy] Launching Puppeteer for flowchart capture...');
+            browser = await puppeteer.launch({
+                args: isProd ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
+                defaultViewport: isProd ? chromium.defaultViewport : { width: 1600, height: 1200 },
+                executablePath: isProd ? await chromium.executablePath() : undefined,
+                headless: (isProd ? chromium.headless : true) as any,
+            });
 
-        // --- STEP A: CAPTURE FLOWCHART ---
-        await setJobStatus(sopId, 'capturing')
-        const page = await browser.newPage();
-        await page.setViewport({ width: 1600, height: 1200, deviceScaleFactor: 2 });
-        const serializableSop = JSON.parse(JSON.stringify(sop));
-        await page.evaluateOnNewDocument((data: any) => {
-            (window as any).PRELOADED_SOP_DATA = data;
-        }, serializableSop);
+            const page = await browser.newPage();
+            await page.setViewport({ width: 1600, height: 1200, deviceScaleFactor: 2 });
+            await page.evaluateOnNewDocument((data: any) => { (window as any).PRELOADED_SOP_DATA = data; }, JSON.parse(JSON.stringify(sop)));
 
-        const printUrl = `${baseUrl}/print-flowchart/${sopId}?export=1&t=${Date.now()}`;
-        console.log(`🔗 Navigating to: ${printUrl}`);
+            const printUrl = `${baseUrl}/print-flowchart/${sopId}?export=1&t=${Date.now()}`;
+            await page.goto(printUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            try {
+                await page.waitForFunction('window.flowchartReady === true', { timeout: 15000, polling: 200 });
+            } catch { console.warn('⚠️ flowchartReady timeout'); }
 
-        await page.goto(printUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            const flowchartEl = await page.$('#flowchart-container');
+            if (!flowchartEl) throw new Error('Flowchart container not found');
 
-        try {
-            await page.waitForFunction('window.flowchartReady === true', { timeout: 15000, polling: 200 });
-        } catch {
-            console.warn('⚠️ flowchartReady signal timeout, proceeding...');
+            const boundingBox = await flowchartEl.boundingBox();
+            let scaleFactor = 2;
+            if (boundingBox) {
+                if (boundingBox.height > 8000) scaleFactor = 1.5;
+                await page.setViewport({ width: 1600, height: Math.ceil(boundingBox.height) + 100, deviceScaleFactor: scaleFactor });
+            }
+
+            imgBuffer = await flowchartEl.screenshot({ type: 'jpeg', quality: 85 }) as Buffer;
+
+            allBreakpoints = await page.evaluate((scale) => {
+                const nodes = (window as any).__FLOWCHART_NODES__ || [];
+                return {
+                    bottoms: nodes.filter((n: any) => n.data?.connectorType === 'page-break-bottom').map((n: any) => ((n.position.y + (n.measured?.height || 60)) + 60) * scale).sort((a: any, b: any) => a - b),
+                    tops: nodes.filter((n: any) => n.data?.connectorType === 'page-break-top').map((n: any) => (n.position.y - 80) * scale).sort((a: any, b: any) => a - b)
+                };
+            }, scaleFactor);
+
+            await page.close();
         }
-
-        await new Promise(r => setTimeout(r, 200));
-
-        const flowchartEl = await page.$('#flowchart-container');
-        if (!flowchartEl) throw new Error('Flowchart container not found');
-
-        await page.evaluate(() => {
-            document.body.style.backgroundColor = 'white';
-            const el = document.getElementById('flowchart-container');
-            if (el) el.style.backgroundColor = 'white';
-        });
-
-        const boundingBox = await flowchartEl.boundingBox();
-        let scaleFactor = 2;
-        if (boundingBox && boundingBox.height > 8000) {
-            scaleFactor = 1.5;
-            await page.setViewport({ width: 1600, height: Math.ceil(boundingBox.height) + 100, deviceScaleFactor: scaleFactor });
-        } else if (boundingBox) {
-            await page.setViewport({ width: 1600, height: Math.ceil(boundingBox.height) + 100, deviceScaleFactor: 2 });
-        }
-
-        console.log('📸 Taking screenshot...');
-        const imgBuffer = await flowchartEl.screenshot({ type: 'jpeg', quality: 85, omitBackground: false });
-
-        const allBreakpoints = await page.evaluate((scale) => {
-            const nodes = (window as any).__FLOWCHART_NODES__ || [];
-            const bottoms = nodes
-                .filter((n: any) => n.type === 'offPageConnector' && n.data?.connectorType === 'page-break-bottom')
-                .map((n: any) => ((n.position.y + (n.measured?.height || 60)) + 60) * scale)
-                .sort((a: number, b: number) => a - b);
-
-            const tops = nodes
-                .filter((n: any) => n.type === 'offPageConnector' && n.data?.connectorType === 'page-break-top')
-                .map((n: any) => (n.position.y - 80) * scale)
-                .sort((a: number, b: number) => a - b);
-
-            return { bottoms, tops };
-        }, scaleFactor);
-
-        await page.close();
 
         // --- STEP B: SLICE IMAGE ---
         await setJobStatus(sopId, 'slicing')
-        console.log('✂️ Slicing images...');
-        const metadata = await sharp(imgBuffer).metadata();
-        const fullWidth = metadata.width || 1600;
+        console.log('✂️ [Step B] Slicing images efficiently...');
+
+        const sharpInstance = sharp(imgBuffer);
+        const metadata = await sharpInstance.metadata();
+        const fullWidth = metadata.width || 1200;
         const fullHeight = metadata.height || 1000;
 
         const { bottoms, tops } = allBreakpoints;
         const segments: { top: number, bottom: number }[] = [];
-
         const firstBottom = (bottoms && bottoms.length > 0) ? bottoms[0] : fullHeight;
         segments.push({ top: 0, bottom: firstBottom });
 
         if (tops && bottoms) {
             for (let i = 0; i < tops.length; i++) {
-                const top = Math.max(0, tops[i]);
-                const bottom = bottoms[i + 1] || fullHeight;
-                segments.push({ top, bottom });
+                segments.push({ top: Math.max(0, tops[i]), bottom: bottoms[i + 1] || fullHeight });
             }
         }
 
         const slicePromises = segments.map(async (seg, i) => {
             const extractHeight = Math.min(seg.bottom - seg.top, fullHeight - seg.top);
             if (extractHeight <= 0) return null;
+            const slicePath = path.join('/tmp', `sop-${sopId}-slice-${i}.jpg`);
 
-            const buffer = await sharp(imgBuffer)
+            // USE CLONE TO AVOID RE-DECODING THE FULL BUFFER
+            await sharpInstance.clone()
                 .extract({
                     left: 0,
                     top: Math.floor(seg.top),
                     width: Math.floor(fullWidth),
                     height: Math.floor(extractHeight)
                 })
-                .toFormat('jpeg', { quality: 90, force: true })
-                .toBuffer();
-
-            return { index: i, base64: buffer.toString('base64') };
+                .toFormat('jpeg', { quality: 75, force: true })
+                .toFile(slicePath);
+            return { index: i, path: slicePath };
         });
 
-        const slicedResults = (await Promise.all(slicePromises)).filter(Boolean) as { index: number, base64: string }[];
+        const slicedResults = (await Promise.all(slicePromises)).filter(Boolean) as { index: number, path: string }[];
         slicedResults.sort((a, b) => a.index - b.index);
 
         const flowchartPagesHtml = slicedResults.map((item, idx) => `
@@ -286,7 +285,7 @@ async function processExport(sopId: string, baseUrl: string) {
                     <div class="title-small">FLOWCHART SOP: ${(sop.judul || 'BASARNAS').toUpperCase()} (Hal. ${idx + 1})</div>
                 </div>
                 <div class="flow-container-smart" style="flex: 1; display: flex; align-items: flex-start; justify-content: center; border: none; overflow: visible;">
-                    <img src="data:image/jpeg;base64,${item.base64}" style="width: 100%; height: auto; max-height: 100%; object-fit: contain;" alt="Flowchart Page ${idx + 1}">
+                    <img src="file://${item.path}" style="width: 100%; height: auto; max-height: 100%; object-fit: contain;" alt="Flowchart Page ${idx + 1}">
                 </div>
                 <div class="footer-simple">BADAN NASIONAL PENCARIAN DAN PERTOLONGAN</div>
             </div>
@@ -296,9 +295,27 @@ async function processExport(sopId: string, baseUrl: string) {
 
         // --- STEP C: GENERATE PDF ---
         await setJobStatus(sopId, 'generating_pdf')
-        console.log('📄 Generating PDF...');
+        console.log('📄 [Step C] Generating PDF...');
+
+        // LAZY INIT BROWSER if not already launched (Hybrid Mode fix)
+        if (!browser) {
+            console.log('🚀 [Step C] Launching browser for PDF generation...');
+            browser = await puppeteer.launch({
+                args: isProd ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
+                defaultViewport: isProd ? chromium.defaultViewport : { width: 1600, height: 1200 },
+                executablePath: isProd ? await chromium.executablePath() : undefined,
+                headless: (isProd ? chromium.headless : true) as any,
+            });
+        }
+
         const pdfPage = await browser.newPage();
-        await pdfPage.setContent(finalHtml, { waitUntil: 'load', timeout: 60000 });
+
+        // OPTIMIZATION: Use temp file instead of setContent (much faster for large HTML)
+        const tempFilePath = path.join('/tmp', `sop-export-${sopId}.html`);
+        await fs.promises.writeFile(tempFilePath, finalHtml, 'utf8');
+        console.log(`📝 [Step C] HTML written to ${tempFilePath}`);
+
+        await pdfPage.goto(`file://${tempFilePath}`, { waitUntil: 'load', timeout: 60000 });
 
         await pdfPage.addStyleTag({
             content: `@page { size: Legal landscape; margin: 0; } body { margin: 0; padding: 0; }`
@@ -312,12 +329,20 @@ async function processExport(sopId: string, baseUrl: string) {
             margin: { top: 0, right: 0, bottom: 0, left: 0 }
         });
 
+        // Cleanup temp files
+        fs.promises.unlink(tempFilePath).catch(() => { });
+        if (slicedResults && slicedResults.length > 0) {
+            slicedResults.forEach(item => {
+                if (item.path) fs.promises.unlink(item.path).catch(() => { });
+            });
+        }
+
         // Upload
         const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 50)
         const finalFileName = `sop-${sanitizeFileName(sop.judul)}-final-${sopId.slice(0, 6)}.pdf`
 
         await setJobStatus(sopId, 'uploading')
-        console.log('☁️ Uploading to R2...');
+        console.log('☁️ [Step D] Uploading to R2...');
         const r2Result = await uploadToR2(Buffer.from(pdfBuffer), finalFileName, 'application/pdf', {
             folder: 'sop-builder-finals'
         });

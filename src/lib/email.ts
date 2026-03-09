@@ -8,8 +8,16 @@
 import { Resend } from 'resend'
 import { db } from '@/lib/db'
 
-// Resend Configuration
-const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key')
+// Resend Configuration (Lazy initialization to avoid build-time errors)
+let resendInstance: Resend | null = null;
+function getResend() {
+  if (!resendInstance) {
+    const apiKey = process.env.RESEND_API_KEY || 're_dummy_key_for_build';
+    resendInstance = new Resend(apiKey);
+  }
+  return resendInstance;
+}
+
 const EMAIL_FROM = process.env.EMAIL_FROM || 'notifikasi@e-katalog-sop.cloud'
 const EMAIL_FROM_NAME = 'SOP Katalog'
 const APP_URL = 'https://e-katalog-sop.cloud'
@@ -44,7 +52,7 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
   try {
     const from = options.from || `${EMAIL_FROM_NAME} <${EMAIL_FROM}>`
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from,
       to: options.to,
       subject: options.subject,

@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
   },
   reactStrictMode: false,
   // Ensure server-side packages are not bundled
-  serverExternalPackages: ['googleapis'],
+  serverExternalPackages: ['googleapis', '@sparticuz/chromium', 'puppeteer-core'],
   // Increase body size limit for API routes
   experimental: {
     serverActions: {
