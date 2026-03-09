@@ -80,28 +80,34 @@ export async function POST(request: NextRequest) {
             const currentMonth = now.getMonth() + 1
             const currentYear = now.getFullYear()
 
+            // Find all SOPs for this year to get the highest sequence number
+            // We use a more robust way by counting or looking at similar prefixes
+            const prefixSearch = `SOP-%`;
+            const sopsThisYear = await db.sopPembuatan.findMany({
+                where: {
+                    nomorSop: {
+                        startsWith: 'SOP-',
+                        contains: `/${currentYear}`
+                    }
+                },
+                select: { nomorSop: true }
+            });
+
+            let maxSeq = 0;
+            sopsThisYear.forEach(s => {
+                const m = s.nomorSop?.match(/^[A-Z]+-(\d+)/);
+                if (m) {
+                    const seq = parseInt(m[1], 10);
+                    if (seq > maxSeq) maxSeq = seq;
+                }
+            });
+
             let isUnique = false
             let attempts = 0
-            while (!isUnique && attempts < 10) {
-                // Find the latest SOP in builder to get the next number
-                // Since SopPembuatan doesn't have a 'jenis' field, we'll prefix with SOP by default
-                const lastSop = await db.sopPembuatan.findFirst({
-                    orderBy: { createdAt: 'desc' },
-                    select: { nomorSop: true }
-                })
+            let nextNumber = maxSeq + 1
 
-                let nextNumber = 1
-                if (lastSop && lastSop.nomorSop) {
-                    const matches = lastSop.nomorSop.match(/^[A-Z]+-(\d+)/)
-                    if (matches) {
-                        nextNumber = parseInt(matches[1], 10) + 1 + attempts
-                    } else {
-                        const count = await db.sopPembuatan.count()
-                        nextNumber = count + 1 + attempts
-                    }
-                }
-
-                finalNomorSop = generateSopNumber('SOP', nextNumber, 'DIT.SIAGA', currentMonth, currentYear)
+            while (!isUnique && attempts < 50) {
+                finalNomorSop = generateSopNumber('SOP', nextNumber + attempts, 'DIT.SIAGA', currentMonth, currentYear)
 
                 const existing = await db.sopPembuatan.findUnique({
                     where: { nomorSop: finalNomorSop }
@@ -109,10 +115,12 @@ export async function POST(request: NextRequest) {
 
                 if (!existing) {
                     isUnique = true
+                } else {
+                    attempts++
                 }
-                attempts++
             }
-        } else {
+        }
+        else {
             // Check if nomorSop already exists (for manually entered ones)
             const existingSop = await db.sopPembuatan.findUnique({
                 where: { nomorSop: finalNomorSop }
