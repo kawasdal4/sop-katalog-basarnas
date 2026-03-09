@@ -32,7 +32,14 @@ export async function GET(request: Request) {
 
         return NextResponse.json({
             sopCheck: { id: checkSopId, found: !!sop, data: sop },
-            latestJob: lastJob
+            latestJob: lastJob,
+            env: {
+                node: process.version,
+                platform: process.platform,
+                arch: process.arch,
+                vercel: process.env.VERCEL,
+                node_env: process.env.NODE_ENV
+            }
         })
     } catch (error: any) {
         return NextResponse.json({
