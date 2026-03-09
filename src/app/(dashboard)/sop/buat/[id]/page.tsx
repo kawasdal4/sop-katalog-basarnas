@@ -18,7 +18,9 @@ export default function EditSopPage({ params }: { params: Promise<{ id: string }
         async function fetchData() {
             if (!id) return;
             try {
-                const res = await fetch(`/api/sop-builder/${id}`)
+                const res = await fetch(`/api/sop-builder/${id}`, {
+                    credentials: 'include'
+                })
                 if (!res.ok) {
                     let errorMessage = "SOP tidak ditemukan";
                     try {

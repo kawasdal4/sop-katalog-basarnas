@@ -179,6 +179,7 @@ export default function SopBuilderForm({
             const res = await fetch(endpoint, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify(data)
             })
 

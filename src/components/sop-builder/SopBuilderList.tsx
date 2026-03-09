@@ -35,7 +35,9 @@ export default function SopBuilderList() {
     const fetchSops = async (targetPage = page) => {
         setLoading(true)
         try {
-            const res = await fetch(`/api/sop-builder?page=${targetPage}&limit=10`)
+            const res = await fetch(`/api/sop-builder?page=${targetPage}&limit=10`, {
+                credentials: 'include'
+            })
             const json = await res.json()
             if (res.ok) {
                 setSops(json.data)
@@ -56,7 +58,10 @@ export default function SopBuilderList() {
         if (!confirm("Yakin ingin menghapus draf SOP ini?")) return
 
         try {
-            const res = await fetch(`/api/sop-builder/${id}`, { method: 'DELETE' })
+            const res = await fetch(`/api/sop-builder/${id}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            })
             if (res.ok) {
                 toast.success("Draf SOP berhasil dihapus")
                 fetchSops()

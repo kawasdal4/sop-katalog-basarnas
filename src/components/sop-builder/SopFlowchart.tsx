@@ -1728,6 +1728,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
             const res = await fetch(`/api/sop-flowchart/save`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ sop_id: sopData.id, nodes, edges: normalizedEdges })
             });
             if (res.ok) {
