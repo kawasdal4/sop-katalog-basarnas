@@ -40,7 +40,10 @@ export async function GET(
         return NextResponse.json({ data: sop })
     } catch (error) {
         console.error('Fetch detail SOP Builder error:', error)
-        return NextResponse.json({ error: 'Terjadi kesalahan' }, { status: 500 })
+        return NextResponse.json({
+            error: 'Terjadi kesalahan',
+            details: error instanceof Error ? error.message : String(error)
+        }, { status: 500 })
     }
 }
 

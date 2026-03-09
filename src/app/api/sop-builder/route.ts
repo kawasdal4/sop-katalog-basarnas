@@ -239,7 +239,7 @@ export async function POST(request: NextRequest) {
         console.error('Create SOP Builder error:', error)
         return NextResponse.json({
             error: 'Terjadi kesalahan saat menyimpan SOP',
-            details: error instanceof Error ? error.message : 'Unknown error'
+            details: error instanceof Error ? error.message : String(error)
         }, { status: 500 })
     }
 }
