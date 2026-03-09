@@ -173,7 +173,7 @@ async function processExport(sopId: string, baseUrl: string) {
                 '--disable-dev-shm-usage'
             ],
             defaultViewport: isProd ? chromium.defaultViewport : { width: 1600, height: 1200 },
-            executablePath: isProd ? await chromium.executablePath('https://github.com/Sparticuz/chromium/releases/download/v132.0.0/chromium-v132.0.0-pack.tar') : undefined,
+            executablePath: isProd ? await chromium.executablePath() : undefined,
             headless: (isProd ? chromium.headless : true) as any,
         });
 

@@ -378,7 +378,7 @@ export async function GET() {
         browser = await puppeteer.launch({
             args: isProd ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
             defaultViewport: chromium.defaultViewport,
-            executablePath: isProd ? await chromium.executablePath('https://github.com/Sparticuz/chromium/releases/download/v132.0.0/chromium-v132.0.0-pack.tar') : undefined,
+            executablePath: isProd ? await chromium.executablePath() : undefined,
             headless: (isProd ? chromium.headless : true) as any,
         });
 
