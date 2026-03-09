@@ -27,7 +27,9 @@ export default function PrintFlowchartPage() {
         async function fetchSop() {
             try {
                 // Use the correct API endpoint that returns the full SOP data including connectorPaths
-                const res = await fetch(`/api/sop-builder/${id}`)
+                const res = await fetch(`/api/sop-builder/${id}`, {
+                    credentials: 'include'
+                })
                 const json = await res.json()
                 if (json.data) {
                     setSop(json.data)
