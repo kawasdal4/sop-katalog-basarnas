@@ -152,14 +152,10 @@ export async function POST(
         const isProd = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
 
         browser = await puppeteer.launch({
-            args: isProd ? chromium.args : [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-web-security',
-                '--disable-dev-shm-usage'
-            ],
+            args: isProd ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
             defaultViewport: isProd ? chromium.defaultViewport : { width: 1600, height: 1200 },
             executablePath: isProd ? await chromium.executablePath() : undefined,
+            channel: isProd ? undefined : 'chrome',
             headless: (isProd ? chromium.headless : true) as any,
         });
 

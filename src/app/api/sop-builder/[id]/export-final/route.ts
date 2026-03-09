@@ -202,6 +202,7 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
                 args: isProd ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
                 defaultViewport: isProd ? chromium.defaultViewport : { width: 1600, height: 1200 },
                 executablePath: isProd ? await chromium.executablePath() : undefined,
+                channel: isProd ? undefined : 'chrome',
                 headless: (isProd ? chromium.headless : true) as any,
             });
 
@@ -305,6 +306,7 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
                 args: isProd ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
                 defaultViewport: isProd ? chromium.defaultViewport : { width: 1600, height: 1200 },
                 executablePath: isProd ? await chromium.executablePath() : undefined,
+                channel: isProd ? undefined : 'chrome',
                 headless: (isProd ? chromium.headless : true) as any,
             });
         }

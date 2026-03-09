@@ -379,6 +379,7 @@ export async function GET() {
             args: isProd ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
             defaultViewport: chromium.defaultViewport,
             executablePath: isProd ? await chromium.executablePath() : undefined,
+            channel: isProd ? undefined : 'chrome',
             headless: (isProd ? chromium.headless : true) as any,
         });
 
