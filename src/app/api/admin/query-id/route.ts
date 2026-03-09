@@ -11,36 +11,15 @@ export async function GET(request: NextRequest) {
     if (!id) return NextResponse.json({ error: 'Missing ID' })
 
     try {
-        const sop = await db.sopPembuatan.findUnique({
-            where: { id },
-            include: {
-                langkahLangkah: {
-                    orderBy: { order: 'asc' }
-                },
-                author: { select: { name: true, email: true } },
-                sopFlowchart: true
-            }
-        })
-
-        if (!sop) {
-            return NextResponse.json({ error: 'SOP not found by findUnique', id })
-        }
-
-        const { getStepSnapshot, mergeStepsWithSnapshot } = await import('@/lib/sop-flowchart-snapshot')
-        const snapshot = await getStepSnapshot(id)
-        if (Array.isArray(snapshot) && snapshot.length > 0) {
-            sop.langkahLangkah = mergeStepsWithSnapshot(sop.langkahLangkah || [], snapshot)
-        }
-
-        const userTest = await db.user.findUnique({
-            where: { id: 'cmm9u5n240000l104j3328euy' },
-            select: { id: true, email: true, role: true }
-        })
+        const tables = await db.$queryRawUnsafe(`
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public'
+        `)
 
         return NextResponse.json({
             id: id,
-            sop: sop,
-            userTest: userTest
+            tables: tables
         })
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 500 })
