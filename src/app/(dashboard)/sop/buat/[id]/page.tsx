@@ -53,7 +53,7 @@ export default function EditSopPage() {
     }
 
     return (
-        <div className="container mx-auto py-8">
+        <div className="w-full min-h-screen">
             <SopBuilderForm initialData={data} id={id} />
         </div>
     )

@@ -6,6 +6,7 @@ import { validateRole } from '@/lib/auth-utils'
 import { v4 as uuidv4 } from 'uuid'
 import path from 'path'
 import { mkdir, writeFile } from 'fs/promises'
+import { generateSopNumber } from '@/lib/date-utils'
 
 // Set runtime and max duration for Vercel
 export const runtime = 'nodejs'
@@ -235,29 +236,34 @@ export async function POST(request: NextRequest) {
     // Format: SOP-0001, IK-0001, LAINNYA-0001
     // ============================================
     const getPrefix = (jenis: string) => {
-      if (jenis === 'SOP') return 'SOP-'
-      if (jenis === 'IK') return 'IK-'
-      return 'LAINNYA-'
+      if (jenis === 'SOP') return 'SOP'
+      if (jenis === 'IK') return 'IK'
+      return 'LNY'
     }
 
     const prefix = getPrefix(jenis)
 
     // Function to generate unique nomorSop with retry
     const generateUniqueNomorSop = async (maxRetries = 5): Promise<string> => {
+      const now = new Date()
+      const currentMonth = now.getMonth() + 1
+      const currentYear = now.getFullYear()
+
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         // Get the latest SOP of the same jenis to determine the next number
+        // We look for any SOP of this jenis, regardless of the month/year in the number
         const lastSop = await db.sopFile.findFirst({
           where: { jenis },
-          orderBy: { nomorSop: 'desc' },
+          orderBy: { uploadedAt: 'desc' }, // Use uploadedAt to find the actual last one robustly
           select: { nomorSop: true }
         })
 
         let nextNumber = 1
         if (lastSop && lastSop.nomorSop) {
-          // Extract the numeric part (e.g., from "SOP-0012" extract "0012")
-          const matches = lastSop.nomorSop.match(/\d+$/)
+          // Extract the numeric part (e.g., from "SOP-001/..." extract "001")
+          const matches = lastSop.nomorSop.match(/^[A-Z]+-(\d+)/)
           if (matches) {
-            nextNumber = parseInt(matches[0], 10) + 1 + attempt
+            nextNumber = parseInt(matches[1], 10) + 1 + attempt
           } else {
             // Fallback if parsing fails
             const existingCount = await db.sopFile.count({ where: { jenis } })
@@ -265,8 +271,8 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Generate new nomorSop (incremental)
-        const nomorSop = `${prefix}${String(nextNumber).padStart(4, '0')}`
+        // Generate new nomorSop (incremental) using the target format
+        const nomorSop = generateSopNumber(prefix as any, nextNumber, 'DIT.SIAGA', currentMonth, currentYear)
 
         // Check if this nomorSop already exists
         const existing = await db.sopFile.findUnique({
@@ -282,8 +288,8 @@ export async function POST(request: NextRequest) {
       }
 
       // If all retries fail, use timestamp-based number as fallback
-      const fallbackNumber = Date.now().toString().slice(-6)
-      return `${prefix}${fallbackNumber}`
+      const fallbackSeq = Math.floor(100 + Math.random() * 899)
+      return generateSopNumber(prefix as any, fallbackSeq, 'DIT.SIAGA', currentMonth, currentYear)
     }
 
     const nomorSop = await generateUniqueNomorSop()

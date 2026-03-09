@@ -72,11 +72,6 @@ export async function PUT(
             langkahLangkah
         } = body
 
-        console.log(`[API PUT] SOP ID: ${id}`);
-        if (connectorPaths) {
-            console.log(`[API PUT] Received connectorPaths keys:`, Object.keys(connectorPaths));
-            console.log(`[API PUT] Raw connectorPaths:`, JSON.stringify(connectorPaths).substring(0, 200) + "...");
-        }
 
         const existingSop = await db.sopPembuatan.findUnique({ where: { id } })
         if (!existingSop) {
@@ -186,13 +181,14 @@ export async function PUT(
 
             if (connectorPaths !== undefined && hasSopField('connectorPaths')) {
                 updateData.connectorPaths = safeStringify(connectorPaths)
-            } else if (langkahLangkah && Array.isArray(langkahLangkah) && hasSopField('connectorPaths')) {
-                // Force reset connectorPaths if steps changed via form to ensure flowchart sync
-                updateData.connectorPaths = "[]"
             }
 
             // Only update steps if they are explicitly provided
             if (langkahLangkah && Array.isArray(langkahLangkah)) {
+                // Fetch existing snapshot to preserve logical metadata during form save
+                const snapshot = await getStepSnapshot(id);
+                const mergedLangkah = mergeStepsWithSnapshot(langkahLangkah, snapshot);
+
                 // Delete old steps
                 await tx.sopLangkah.deleteMany({
                     where: { sopPembuatanId: id }
@@ -200,7 +196,7 @@ export async function PUT(
 
                 // Add to create relational data
                 updateData.langkahLangkah = {
-                    create: langkahLangkah.map((step: any, index: number) => {
+                    create: mergedLangkah.map((step: any, index: number) => {
                         const data: any = {
                             order: index + 1,
                             aktivitas: step.aktivitas,
@@ -245,10 +241,6 @@ export async function PUT(
                 throw new Error('Gagal mengupdate SOP: argumen tidak kompatibel dengan schema aktif')
             }
 
-            console.log(`[API PUT] Update successful. Saved connectorPaths length: ${result.connectorPaths?.length || 0}`);
-            if (result.connectorPaths) {
-                console.log(`[API PUT] Saved data snippet: ${result.connectorPaths.substring(0, 100)}...`);
-            }
 
             return result;
         })

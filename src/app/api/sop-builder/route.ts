@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { validateRole } from '@/lib/auth-utils'
 import { upsertStepSnapshot } from '@/lib/sop-flowchart-snapshot'
+import { generateSopNumber } from '@/lib/date-utils'
 
 export async function GET(request: NextRequest) {
     try {
@@ -75,11 +76,32 @@ export async function POST(request: NextRequest) {
         // Generate Nomor SOP if not provided or empty
         let finalNomorSop = nomorSop
         if (!finalNomorSop) {
+            const now = new Date()
+            const currentMonth = now.getMonth() + 1
+            const currentYear = now.getFullYear()
+
             let isUnique = false
             let attempts = 0
             while (!isUnique && attempts < 10) {
-                const randomPart = Math.floor(100000 + Math.random() * 900000).toString()
-                finalNomorSop = `SOP-${randomPart}`
+                // Find the latest SOP in builder to get the next number
+                // Since SopPembuatan doesn't have a 'jenis' field, we'll prefix with SOP by default
+                const lastSop = await db.sopPembuatan.findFirst({
+                    orderBy: { createdAt: 'desc' },
+                    select: { nomorSop: true }
+                })
+
+                let nextNumber = 1
+                if (lastSop && lastSop.nomorSop) {
+                    const matches = lastSop.nomorSop.match(/^[A-Z]+-(\d+)/)
+                    if (matches) {
+                        nextNumber = parseInt(matches[1], 10) + 1 + attempts
+                    } else {
+                        const count = await db.sopPembuatan.count()
+                        nextNumber = count + 1 + attempts
+                    }
+                }
+
+                finalNomorSop = generateSopNumber('SOP', nextNumber, 'DIT.SIAGA', currentMonth, currentYear)
 
                 const existing = await db.sopPembuatan.findUnique({
                     where: { nomorSop: finalNomorSop }
@@ -147,6 +169,7 @@ export async function POST(request: NextRequest) {
                 aktivitas: step.aktivitas,
                 pelaksana: step.pelaksana,
             }
+            if (step.stepType !== undefined && step.stepType !== null) data.stepType = step.stepType
             if (step.nextStepYes !== undefined && step.nextStepYes !== null) data.nextStepYes = parseInt(step.nextStepYes)
             if (step.nextStepNo !== undefined && step.nextStepNo !== null) data.nextStepNo = parseInt(step.nextStepNo)
             if (step.mutuBakuKelengkapan !== undefined) data.mutuBakuKelengkapan = step.mutuBakuKelengkapan

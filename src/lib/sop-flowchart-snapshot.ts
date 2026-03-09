@@ -87,9 +87,25 @@ export const upsertStepSnapshot = async (sopId: string, langkahLangkah: any[]) =
     try {
         const existingRaw = await readFlowchartJson(sopId)
         const existingPayload = parseFlowchartJson(existingRaw)
-        const stepsSnapshot = (Array.isArray(langkahLangkah) ? langkahLangkah : []).map((step, index) =>
-            normalizeStepSnapshot(step || {}, index)
-        )
+        const stepsSnapshot = (Array.isArray(langkahLangkah) ? langkahLangkah : []).map((step, index) => {
+            const normalized = normalizeStepSnapshot(step || {}, index);
+            const order = normalized.order;
+
+            // Try to find existing metadata for this step in the current snapshot
+            const existingSteps = Array.isArray(existingPayload.stepsSnapshot) ? existingPayload.stepsSnapshot : [];
+            const existing = existingSteps.find((s: any) => (Number(s.order) || -1) === order);
+
+            if (existing) {
+                // If the new step has generic/missing metadata, but existing has specific ones, merge them
+                return {
+                    ...normalized,
+                    stepType: (step.stepType && step.stepType !== 'process') ? step.stepType : (existing.stepType || normalized.stepType),
+                    nextStepYes: step.nextStepYes !== undefined ? toNumberOrNull(step.nextStepYes) : toNumberOrNull(existing.nextStepYes),
+                    nextStepNo: step.nextStepNo !== undefined ? toNumberOrNull(step.nextStepNo) : toNumberOrNull(existing.nextStepNo),
+                };
+            }
+            return normalized;
+        })
         const payload = JSON.stringify({
             nodes: Array.isArray(existingPayload.nodes) ? existingPayload.nodes : [],
             edges: Array.isArray(existingPayload.edges) ? existingPayload.edges : [],

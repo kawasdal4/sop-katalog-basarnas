@@ -579,6 +579,141 @@ const isPathBlocked = (source: any, target: any, nodes: any[]) => {
     });
 };
 
+const ExportLoadingOverlay = ({ isVisible }: { isVisible: boolean }) => {
+    const labels = [
+        "Initializing Tactical Render...",
+        "Optimizing Flow Geometry...",
+        "Syncing Neural Path Matrix...",
+        "Compiling PDF Data Structures...",
+        "Finalizing Document Fidelity...",
+        "Transmitting to Satellite Uplink..."
+    ];
+
+    const [labelIndex, setLabelIndex] = React.useState(0);
+
+    React.useEffect(() => {
+        if (!isVisible) return;
+        const interval = setInterval(() => {
+            setLabelIndex((prev) => (prev + 1) % labels.length);
+        }, 2500);
+        return () => clearInterval(interval);
+    }, [isVisible]);
+
+    return (
+        <AnimatePresence>
+            {isVisible && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 z-[1000] flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md overflow-hidden"
+                >
+                    {/* Background Energy Vortex */}
+                    <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500/20 rounded-full blur-[120px] animate-pulse" />
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-orange-500/10 rounded-full blur-[80px]" />
+                    </div>
+
+                    <div className="relative z-10 flex flex-col items-center">
+                        {/* Orbital Loader Complex */}
+                        <div className="relative w-40 h-40 mb-12">
+                            {/* Inner Pulsing Core */}
+                            <motion.div
+                                animate={{ scale: [1, 1.1, 1], opacity: [0.5, 0.8, 0.5] }}
+                                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                                className="absolute inset-8 rounded-3xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center shadow-[0_0_30px_rgba(99,102,241,0.3)]"
+                            >
+                                <Download className="w-8 h-8 text-indigo-400" />
+                            </motion.div>
+
+                            {/* Rotating Ring 1 */}
+                            <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                                className="absolute inset-0 border-t-2 border-r-2 border-indigo-500/30 rounded-full"
+                            />
+
+                            {/* Rotating Ring 2 */}
+                            <motion.div
+                                animate={{ rotate: -360 }}
+                                transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
+                                className="absolute inset-2 border-b-2 border-l-2 border-orange-500/20 rounded-full"
+                            />
+
+                            {/* Rotating Ring 3 */}
+                            <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                                className="absolute inset-4 border-t border-white/10 border-dashed rounded-full"
+                            />
+
+                            {/* Energy Particles */}
+                            {[...Array(8)].map((_, i) => (
+                                <motion.div
+                                    key={i}
+                                    className="absolute w-1.5 h-1.5 bg-indigo-400 rounded-full"
+                                    animate={{
+                                        rotate: 360,
+                                        opacity: [0, 1, 0],
+                                        scale: [0.5, 1, 0.5]
+                                    }}
+                                    transition={{
+                                        duration: 2,
+                                        repeat: Infinity,
+                                        delay: i * 0.25,
+                                        ease: "linear"
+                                    }}
+                                    style={{
+                                        top: '50%',
+                                        left: '50%',
+                                        transformOrigin: `${70 + Math.random() * 10}px center`,
+                                    }}
+                                />
+                            ))}
+                        </div>
+
+                        {/* Static Text Core */}
+                        <div className="text-center">
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="flex flex-col items-center"
+                            >
+                                <div className="text-slate-500 font-black text-[10px] uppercase tracking-[0.6em] mb-3">System Processing</div>
+                                <h3 className="text-white font-black text-2xl mb-4 tracking-tighter uppercase">Exporting PDF</h3>
+
+                                {/* Dynamic Status Labels */}
+                                <div className="h-6 flex items-center justify-center">
+                                    <AnimatePresence mode="wait">
+                                        <motion.div
+                                            key={labelIndex}
+                                            initial={{ opacity: 0, y: 5 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -5 }}
+                                            className="text-indigo-400 text-[11px] font-bold uppercase tracking-widest bg-indigo-500/10 px-4 py-1.5 rounded-full border border-indigo-500/20"
+                                        >
+                                            {labels[labelIndex]}
+                                        </motion.div>
+                                    </AnimatePresence>
+                                </div>
+                            </motion.div>
+                        </div>
+                    </div>
+
+                    {/* Progress Bar Accent (Simulated) */}
+                    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-64 h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/10">
+                        <motion.div
+                            animate={{ x: ['-100%', '100%'] }}
+                            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                            className="w-1/3 h-full bg-gradient-to-r from-transparent via-indigo-500 to-transparent shadow-[0_0_10px_rgba(99,102,241,0.5)]"
+                        />
+                    </div>
+                </motion.div>
+            )}
+        </AnimatePresence>
+    );
+};
+
 interface SopFlowchartProps {
     sopData: any;
     onExportFinal?: (imageBase64: string | null) => void;
@@ -1646,12 +1781,6 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
             return;
         }
 
-        // Open a new tab immediately (MUST be done before any await to avoid popup blocker)
-        const downloadTab = window.open('', '_blank');
-        if (downloadTab) {
-            downloadTab.document.write('<html><body><p style="font-family:sans-serif;padding:2rem;">⏳ Membuat PDF... Mohon tunggu sebentar.</p></body></html>');
-        }
-
         setIsExportingState(true);
         try {
             toast.info("Memulai proses ekspor PDF...");
@@ -1664,7 +1793,6 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
 
             if (!res.ok) {
                 const errorData = await res.json();
-                if (downloadTab) downloadTab.close();
                 throw new Error(errorData.error || 'Gagal memulai ekspor');
             }
 
@@ -1674,19 +1802,13 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
             if (resData.downloadUrl) {
                 setIsExportingState(false);
                 toast.success("PDF berhasil dibuat!");
-                // Navigate the pre-opened tab to the download URL
-                if (downloadTab) {
-                    downloadTab.location.href = resData.downloadUrl;
-                } else {
-                    window.location.href = resData.downloadUrl;
-                }
+                window.location.href = resData.downloadUrl;
                 if (onExportFinal) onExportFinal(resData.downloadUrl);
                 return;
             }
 
             const { statusUrl } = resData;
             if (!statusUrl) {
-                if (downloadTab) downloadTab.close();
                 throw new Error('Respons server tidak valid');
             }
 
@@ -1729,15 +1851,10 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                             setIsExportingState(false);
                             toast.success("PDF berhasil dibuat!");
                             const downloadUrl = `/api/download?path=${encodeURIComponent(finalPath)}`;
-                            if (downloadTab) {
-                                downloadTab.location.href = downloadUrl;
-                            } else {
-                                window.location.href = downloadUrl;
-                            }
+                            window.location.href = downloadUrl;
                             if (onExportFinal) onExportFinal(finalPath);
                             return;
                         } else {
-                            if (downloadTab) downloadTab.close();
                             toast.error("Gagal mendapatkan path file PDF");
                             return;
                         }
@@ -1750,13 +1867,11 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                 } catch (innerErr) {
                     console.warn("Polling glitch:", innerErr);
                     if (innerErr instanceof Error && (innerErr.message.startsWith('Ekspor gagal') || innerErr.message.startsWith('Status job') || innerErr.message.startsWith('Sesi tidak'))) {
-                        if (downloadTab) downloadTab.close();
                         throw innerErr;
                     }
                 }
             }
 
-            if (downloadTab) downloadTab.close();
             throw new Error("Waktu tunggu ekspor habis (timeout)");
 
         } catch (error) {
@@ -1860,7 +1975,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                             {/* Text */}
                             <h2 className="text-center text-white font-black text-xl mb-3 tracking-wide">Cover Belum Dibuat</h2>
                             <p className="text-center text-slate-400 text-sm leading-relaxed mb-8">
-                                Untuk menerbitkan SOP sebagai PDF, Anda harus <span className="text-amber-300 font-bold">membuat halaman cover</span> terlebih dahulu menggunakan tombol <span className="text-amber-300 font-bold">Genesis Cover</span>.
+                                Untuk menerbitkan SOP sebagai PDF, Anda harus <span className="text-amber-300 font-bold">membuat halaman cover</span> terlebih dahulu menggunakan tombol <span className="text-amber-300 font-bold">Generate Cover</span>.
                             </p>
 
                             {/* Actions */}
@@ -2001,7 +2116,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                                     className="h-14 px-8 rounded-[1.5rem] bg-amber-600 hover:bg-amber-500 shadow-[0_0_20px_rgba(217,119,6,0.4)] text-white font-black text-[11px] uppercase tracking-[0.2em] group transition-all"
                                 >
                                     {isGeneratingCover ? <Loader2 className="w-4 h-4 animate-spin mr-3" /> : <FileCheck className="w-4 h-4 mr-3 group-hover:rotate-12 transition-transform" />}
-                                    Genesis Cover
+                                    Generate Cover
                                 </Button>
                             )}
 
@@ -2011,7 +2126,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                                 className="h-14 px-8 rounded-[1.5rem] bg-slate-800 hover:bg-slate-700 border border-white/10 text-white font-black text-[11px] uppercase tracking-[0.2em] group"
                             >
                                 {isSavingPaths ? <Loader2 className="w-4 h-4 animate-spin mr-3" /> : <Save className="w-4 h-4 mr-3 group-hover:scale-110 transition-transform" />}
-                                Sync Matrix
+                                Sync Flow
                             </Button>
 
                             <Button
@@ -2102,6 +2217,8 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                         <EnergyBeamFilters />
                         <Background color="#94a3b8" gap={40} size={1} variant={BackgroundVariant.Dots} className="opacity-[0.15]" />
                         <Controls showInteractive={false} showZoom={false} showFitView={false} className="!hidden" />
+
+                        <ExportLoadingOverlay isVisible={!!(isExportingState || isExporting)} />
 
 
                     </ReactFlow>

@@ -7,7 +7,7 @@ export const metadata = {
 
 export default function BuatSopPage() {
     return (
-        <div className="container mx-auto py-8">
+        <div className="w-full min-h-screen">
             <SopBuilderForm />
         </div>
     )

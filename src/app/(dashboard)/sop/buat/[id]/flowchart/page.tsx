@@ -58,9 +58,6 @@ export default function FlowchartPage() {
     const handleExportFinal = async (finalPdfPath: string | null) => {
         if (!finalPdfPath) return;
 
-        // Auto Download
-        window.open(`/api/file?action=download&path=${encodeURIComponent(finalPdfPath)}`, '_blank')
-
         setData({ ...data, combinedPdfPath: finalPdfPath, status: 'FINAL' })
     }
 
