@@ -5,6 +5,9 @@ import { cookies } from 'next/headers'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
+// Secret key for direct API access (no session needed)
+const MIGRATION_SECRET = 'BASARNAS-MIGRATE-2026'
+
 function toRoman(num: number): string {
     const roman: Record<string, number> = {
         M: 1000, CM: 900, D: 500, CD: 400, C: 100, XC: 90,
@@ -29,15 +32,18 @@ function generateSopNumber(prefix: 'SOP' | 'IK' | 'LNY', sequence: number, unit:
 // GET - Check migration status
 export async function GET(request: NextRequest) {
     try {
-        const cookieStore = await cookies()
-        const sessionCookie = cookieStore.get('session')
-        if (!sessionCookie?.value) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
-        const session = JSON.parse(sessionCookie.value)
-        if (!['ADMIN', 'DEVELOPER'].includes(session.role)) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        // Allow access via secret key header OR valid session
+        const secretHeader = request.headers.get('x-migration-secret')
+        if (secretHeader !== MIGRATION_SECRET) {
+            const cookieStore = await cookies()
+            const sessionCookie = cookieStore.get('session')
+            if (!sessionCookie?.value) {
+                return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            }
+            const session = JSON.parse(sessionCookie.value)
+            if (!['ADMIN', 'DEVELOPER'].includes(session.role)) {
+                return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+            }
         }
 
         // Sample a few records to show current state
@@ -59,15 +65,18 @@ export async function GET(request: NextRequest) {
 // POST - Run migration
 export async function POST(request: NextRequest) {
     try {
-        const cookieStore = await cookies()
-        const sessionCookie = cookieStore.get('session')
-        if (!sessionCookie?.value) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
-        const session = JSON.parse(sessionCookie.value)
-        if (!['ADMIN', 'DEVELOPER'].includes(session.role)) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        // Allow access via secret key header OR valid session
+        const secretHeader = request.headers.get('x-migration-secret')
+        if (secretHeader !== MIGRATION_SECRET) {
+            const cookieStore = await cookies()
+            const sessionCookie = cookieStore.get('session')
+            if (!sessionCookie?.value) {
+                return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            }
+            const session = JSON.parse(sessionCookie.value)
+            if (!['ADMIN', 'DEVELOPER'].includes(session.role)) {
+                return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+            }
         }
 
         const results: string[] = []
