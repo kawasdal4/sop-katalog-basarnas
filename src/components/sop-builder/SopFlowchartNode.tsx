@@ -128,7 +128,7 @@ const SopFlowchartNode = ({ data, selected }: { data: any, selected?: boolean })
                         y="54%"
                         textAnchor="middle"
                         dominantBaseline="middle"
-                        fill={data?.isPrintMode ? "#0f172a" : "white"}
+                        fill={data?.isPrintMode ? "#000000" : "white"}
                         fontSize="18"
                         fontWeight="950"
                         className={`select-none tracking-tight ${data?.isPrintMode ? '' : 'drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]'}`}
@@ -157,7 +157,7 @@ const SopFlowchartNode = ({ data, selected }: { data: any, selected?: boolean })
                         y="54%"
                         textAnchor="middle"
                         dominantBaseline="middle"
-                        fill={data?.isPrintMode ? "#0f172a" : "white"}
+                        fill={data?.isPrintMode ? "#000000" : "white"}
                         fontSize="16"
                         fontWeight="950"
                         className={`select-none tracking-tight ${data?.isPrintMode ? '' : 'drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]'}`}
@@ -185,7 +185,7 @@ const SopFlowchartNode = ({ data, selected }: { data: any, selected?: boolean })
                         y="54%"
                         textAnchor="middle"
                         dominantBaseline="middle"
-                        fill={data?.isPrintMode ? "#0f172a" : "white"}
+                        fill={data?.isPrintMode ? "#000000" : "white"}
                         fontSize="18"
                         fontWeight="950"
                         className={`select-none tracking-tight ${data?.isPrintMode ? '' : 'drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]'}`}
@@ -213,10 +213,10 @@ const SopFlowchartNode = ({ data, selected }: { data: any, selected?: boolean })
                         y="46%"
                         textAnchor="middle"
                         dominantBaseline="middle"
-                        fill={data?.isPrintMode ? "#0f172a" : "white"}
+                        fill={data?.isPrintMode ? "#000000" : "white"}
                         fontSize="18"
                         fontWeight="950"
-                        className={`select-none tracking-tight ${data?.isPrintMode ? 'sop-node-text-print' : 'drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]'}`}
+                        className={`select-none tracking-tight ${data?.isPrintMode ? '' : 'drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]'}`}
                     >
                         {data.no}
                     </text>
@@ -231,7 +231,7 @@ const SopFlowchartNode = ({ data, selected }: { data: any, selected?: boolean })
             // Define brown color specifically for Input/Output shape
             const brownFill = currentStyle.bg;
             const brownStroke = currentStyle.border;
-            
+
             return (
                 <svg width={pW} height={pH} viewBox={`0 0 ${pW} ${pH}`}>
                     <path
@@ -245,7 +245,7 @@ const SopFlowchartNode = ({ data, selected }: { data: any, selected?: boolean })
                         y="54%"
                         textAnchor="middle"
                         dominantBaseline="middle"
-                        fill={data?.isPrintMode ? "#0f172a" : "white"}
+                        fill={data?.isPrintMode ? "#000000" : "white"}
                         fontSize="18"
                         fontWeight="950"
                         className={`select-none tracking-tight ${data?.isPrintMode ? '' : 'drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]'}`}
@@ -274,7 +274,7 @@ const SopFlowchartNode = ({ data, selected }: { data: any, selected?: boolean })
                     y="54%"
                     textAnchor="middle"
                     dominantBaseline="middle"
-                    fill={data?.isPrintMode ? "#0f172a" : "white"}
+                    fill={data?.isPrintMode ? "#000000" : "white"}
                     fontSize="18"
                     fontWeight="950"
                     className={`select-none tracking-tight ${data?.isPrintMode ? 'sop-node-text-print' : 'drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]'}`}
@@ -323,10 +323,12 @@ const SopFlowchartNode = ({ data, selected }: { data: any, selected?: boolean })
             </AnimatePresence>
 
             {/* Custom Background Glow (Ambient) */}
-            <div
-                className="absolute inset-[-5px] rounded-full transition-all duration-700 opacity-20 group-hover:opacity-40 pointer-events-none blur-2xl"
-                style={{ backgroundColor: currentStyle.glow }}
-            />
+            {!data?.isPrintMode && (
+                <div
+                    className="absolute inset-[-5px] rounded-full transition-all duration-700 opacity-20 group-hover:opacity-40 pointer-events-none blur-2xl"
+                    style={{ backgroundColor: currentStyle.glow }}
+                />
+            )}
 
             {/* Universal Handles - Standard IDs for maximum reliability - Kept in DOM for connections but hidden in Print Mode */}
             <div style={{ opacity: data?.isPrintMode ? 0 : 1, pointerEvents: data?.isPrintMode ? 'none' : 'auto' }}>
@@ -347,7 +349,7 @@ const SopFlowchartNode = ({ data, selected }: { data: any, selected?: boolean })
 
             <div className={`flex items-center justify-center transition-all duration-500 ${selected ? 'scale-110' : ''}`}
                 style={{
-                    filter: selected ? `drop-shadow(0 0 25px ${currentStyle.glow})` : `drop-shadow(0 0 10px ${currentStyle.glow}66)`
+                    filter: data?.isPrintMode ? 'none' : (selected ? `drop-shadow(0 0 25px ${currentStyle.glow})` : `drop-shadow(0 0 10px ${currentStyle.glow}66)`)
                 }}
             >
                 {renderShape()}

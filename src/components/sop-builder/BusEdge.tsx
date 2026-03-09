@@ -44,58 +44,63 @@ export default function BusEdge(props: EdgeProps) {
   return (
     <>
       {/* Ambient Energy Glow */}
-      <path
-        d={d}
-        fill="none"
-        stroke={edgeColor}
-        strokeWidth={5}
-        className="opacity-10 blur-[6px]"
-        style={{ filter: 'url(#electric-distortion)' }}
-      />
+      {!props.data?.isPrintMode && (
+        <path
+          d={d}
+          fill="none"
+          stroke={edgeColor}
+          strokeWidth={5}
+          className="opacity-10 blur-[6px]"
+          style={{ filter: 'url(#electric-distortion)' }}
+        />
+      )}
       <BaseEdge
         id={id}
         path={d}
+        fill="none"
         style={{
           ...style,
           strokeWidth: 2.5,
-          filter: `drop-shadow(0 0 4px ${edgeColor}44)`
+          filter: props.data?.isPrintMode ? 'none' : `drop-shadow(0 0 4px ${edgeColor}44)`
         }}
         markerEnd={markerEnd}
       />
 
       {/* --- COMET PACKET ANIMATION --- */}
-      <g style={{ filter: 'url(#comet-glow)' }}>
-        <motion.g
-          initial={{ ["--comet-offset" as any]: "0%" }}
-          animate={{ ["--comet-offset" as any]: "100%" }}
-          transition={{
-            duration: 5,
-            repeat: Infinity,
-            ease: "linear",
-            delay: Math.random() * 5
-          }}
-          style={{
-            offsetPath: `path("${d}")`,
-            offsetDistance: "var(--comet-offset)",
-          } as any}
-        >
-          {/* Trail */}
-          <rect
-            x="-30"
-            y="-1.5"
-            width="30"
-            height="3"
-            fill="url(#comet-trail-default)"
-            rx="1.5"
-          />
-          {/* Glowing Head */}
-          <circle
-            r="2.5"
-            fill="white"
-            className="shadow-[0_0_10px_white]"
-          />
-        </motion.g>
-      </g>
+      {!props.data?.isPrintMode && (
+        <g style={{ filter: 'url(#comet-glow)' }}>
+          <motion.g
+            initial={{ ["--comet-offset" as any]: "0%" }}
+            animate={{ ["--comet-offset" as any]: "100%" }}
+            transition={{
+              duration: 5,
+              repeat: Infinity,
+              ease: "linear",
+              delay: Math.random() * 5
+            }}
+            style={{
+              offsetPath: `path("${d}")`,
+              offsetDistance: "var(--comet-offset)",
+            } as any}
+          >
+            {/* Trail */}
+            <rect
+              x="-30"
+              y="-1.5"
+              width="30"
+              height="3"
+              fill="url(#comet-trail-default)"
+              rx="1.5"
+            />
+            {/* Glowing Head */}
+            <circle
+              r="2.5"
+              fill="white"
+              className="shadow-[0_0_10px_white]"
+            />
+          </motion.g>
+        </g>
+      )}
 
       {label ? (
         <EdgeLabelRenderer>

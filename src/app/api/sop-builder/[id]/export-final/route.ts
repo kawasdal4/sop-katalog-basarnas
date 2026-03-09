@@ -49,7 +49,8 @@ export async function POST(
     const protocol = host.includes('localhost') ? 'http' : 'https'
     const baseUrl = `${protocol}://${host}`
 
-    console.log(`[EXPORT-POST] Request for SOP: ${sopId} (Hybrid: ${!!flowchartImage})`);
+    const forceServerCapture = true;
+    console.log(`[EXPORT-POST] Request for SOP: ${sopId} (Hybrid payload: ${!!flowchartImage}, forceServerCapture: ${forceServerCapture})`);
 
     // Check for existing job
     const existingJob: any = await (db as any).exportJob.findUnique({
@@ -76,7 +77,12 @@ export async function POST(
 
     // Await the export process. With maxDuration=300 on Vercel, this is now safe
     // and prevents the function from terminating before background tasks finish.
-    await processExport(sopId, baseUrl, flowchartImage, breakpoints).catch(async err => {
+    await processExport(
+        sopId,
+        baseUrl,
+        forceServerCapture ? undefined : flowchartImage,
+        forceServerCapture ? undefined : breakpoints
+    ).catch(async err => {
         console.error('❌ Export Error:', err)
         await setJobStatus(sopId, 'failed', {
             error: err instanceof Error ? err.message : 'Unknown error'
@@ -105,7 +111,8 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
                 where: { id: sopId },
                 include: {
                     langkahLangkah: { orderBy: { order: 'asc' } },
-                    sopFlowchart: true
+                    sopFlowchart: true,
+                    author: { select: { name: true } }
                 }
             }),
             fs.promises.readFile(path.join(process.cwd(), 'src/lib/pdf-template.html'), 'utf8'),
@@ -227,7 +234,32 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
                 await page.setViewport({ width: 1600, height: Math.ceil(boundingBox.height) + 100, deviceScaleFactor: scaleFactor });
             }
 
-            imgBuffer = await flowchartEl.screenshot({ type: 'jpeg', quality: 85 }) as Buffer;
+            await page.evaluate(() => {
+                document.body.style.backgroundColor = 'white';
+                const el = document.getElementById('flowchart-container');
+                if (el) {
+                    (el as HTMLElement).style.backgroundColor = 'white';
+                    (el as HTMLElement).style.overflow = 'visible';
+                }
+            });
+
+            const refreshedBox = await flowchartEl.boundingBox();
+            if (!refreshedBox) throw new Error('Flowchart bounding box not available');
+            const capturePadding = 24;
+            const clipLeft = Math.max(0, Math.floor(refreshedBox.x - capturePadding));
+            const clipTop = Math.max(0, Math.floor(refreshedBox.y - capturePadding));
+            const clipWidth = Math.ceil(refreshedBox.width + (capturePadding * 2));
+            const clipHeight = Math.ceil(refreshedBox.height + (capturePadding * 2));
+
+            imgBuffer = await page.screenshot({
+                type: 'png',
+                clip: {
+                    x: clipLeft,
+                    y: clipTop,
+                    width: clipWidth,
+                    height: clipHeight
+                }
+            }) as Buffer;
 
             allBreakpoints = await page.evaluate((scale) => {
                 const nodes = (window as any).__FLOWCHART_NODES__ || [];
@@ -263,7 +295,7 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
         const slicePromises = segments.map(async (seg, i) => {
             const extractHeight = Math.min(seg.bottom - seg.top, fullHeight - seg.top);
             if (extractHeight <= 0) return null;
-            const slicePath = path.join(os.tmpdir(), `sop-${sopId}-slice-${i}.jpg`);
+            const slicePath = path.join(os.tmpdir(), `sop-${sopId}-slice-${i}.png`);
 
             // USE CLONE TO AVOID RE-DECODING THE FULL BUFFER
             await sharpInstance.clone()
@@ -273,7 +305,7 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
                     width: Math.floor(fullWidth),
                     height: Math.floor(extractHeight)
                 })
-                .toFormat('jpeg', { quality: 75, force: true })
+                .toFormat('png', { compressionLevel: 6, force: true })
                 .toFile(slicePath);
             return { index: i, path: slicePath };
         });
@@ -282,15 +314,14 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
         slicedResults.sort((a, b) => a.index - b.index);
 
         const flowchartPagesHtml = slicedResults.map((item, idx) => `
-            <div class="page" id="page-flowchart-${idx + 1}" style="padding: 5mm; display: flex; flex-direction: column; height: 100%; background: white;">
+            <div class="page" id="page-flowchart-${idx + 1}" style="padding: 5mm; display: flex; flex-direction: column; height: 100%; max-height: 215mm; overflow: hidden; background: white;">
                 <div class="header-simple">
                     <img src="${validLogoBase64}" alt="Logo" class="logo-small">
                     <div class="title-small">FLOWCHART SOP: ${(sop.judul || 'BASARNAS').toUpperCase()} (Hal. ${idx + 1})</div>
                 </div>
-                <div class="flow-container-smart" style="flex: 1; display: flex; align-items: flex-start; justify-content: center; border: none; overflow: hidden; padding-top: 10px; width: 100%;">
+                <div class="flow-container-smart" style="flex: 1; display: flex; align-items: flex-start; justify-content: center; border: none; overflow: visible; padding-top: 10px; width: 100%;">
                     <img src="file://${item.path}" style="width: 100%; height: auto; max-height: 100%; object-fit: contain; object-position: top center; display: block;" alt="Flowchart Page ${idx + 1}">
                 </div>
-                <div class="footer-simple" style="margin-top: auto;">BADAN NASIONAL PENCARIAN DAN PERTOLONGAN</div>
             </div>
         `).join('');
 
@@ -341,13 +372,23 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
             });
         }
 
+        // Add exact Katalog SOP footer to PDF
+        console.log('📄 [Step C.5] Adding Katalog SOP footer...');
+        const { addPdfFooter } = await import('@/lib/pdf-footer');
+        const userName = sop.author?.name || 'Sistem';
+        const pdfWithFooter = await addPdfFooter(
+            pdfBuffer.buffer.slice(pdfBuffer.byteOffset, pdfBuffer.byteOffset + pdfBuffer.byteLength) as ArrayBuffer,
+            userName,
+            userName
+        );
+
         // Upload
         const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 50)
         const finalFileName = `sop-${sanitizeFileName(sop.judul)}-final-${sopId.slice(0, 6)}.pdf`
 
         await setJobStatus(sopId, 'uploading')
         console.log('☁️ [Step D] Uploading to R2...');
-        const r2Result = await uploadToR2(Buffer.from(pdfBuffer), finalFileName, 'application/pdf', {
+        const r2Result = await uploadToR2(Buffer.from(pdfWithFooter), finalFileName, 'application/pdf', {
             folder: 'sop-builder-finals'
         });
 
