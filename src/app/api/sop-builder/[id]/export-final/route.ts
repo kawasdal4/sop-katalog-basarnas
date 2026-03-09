@@ -4,6 +4,7 @@ import { uploadToR2 } from '@/lib/r2-storage'
 import puppeteer from 'puppeteer-core'
 import chromium from '@sparticuz/chromium'
 import path from 'path'
+import os from 'os'
 import fs from 'fs'
 import { format } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
@@ -260,7 +261,7 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
         const slicePromises = segments.map(async (seg, i) => {
             const extractHeight = Math.min(seg.bottom - seg.top, fullHeight - seg.top);
             if (extractHeight <= 0) return null;
-            const slicePath = path.join('/tmp', `sop-${sopId}-slice-${i}.jpg`);
+            const slicePath = path.join(os.tmpdir(), `sop-${sopId}-slice-${i}.jpg`);
 
             // USE CLONE TO AVOID RE-DECODING THE FULL BUFFER
             await sharpInstance.clone()
@@ -311,7 +312,7 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
         const pdfPage = await browser.newPage();
 
         // OPTIMIZATION: Use temp file instead of setContent (much faster for large HTML)
-        const tempFilePath = path.join('/tmp', `sop-export-${sopId}.html`);
+        const tempFilePath = path.join(os.tmpdir(), `sop-export-${sopId}.html`);
         await fs.promises.writeFile(tempFilePath, finalHtml, 'utf8');
         console.log(`📝 [Step C] HTML written to ${tempFilePath}`);
 
