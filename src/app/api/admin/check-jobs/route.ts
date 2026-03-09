@@ -20,25 +20,19 @@ export async function GET(request: Request) {
             sopExists = await db.sopPembuatan.findUnique({ where: { id: checkSopId } })
         }
 
-        // Check if table exists by querying count
-        const count = await db.exportJob.count()
-        const lastJobs = await db.exportJob.findMany({
-            take: 5,
+        const lastJob = await db.exportJob.findFirst({
+            where: { sopId: checkSopId || undefined },
             orderBy: { updatedAt: 'desc' }
         })
 
-        const sops = await db.sopPembuatan.findMany({
-            take: 5,
-            select: { id: true, judul: true, nomorSop: true },
-            orderBy: { createdAt: 'desc' }
-        })
+        const sop = checkSopId ? await db.sopPembuatan.findUnique({
+            where: { id: checkSopId },
+            select: { id: true, judul: true }
+        }) : null
 
         return NextResponse.json({
-            tableExists: true,
-            jobCount: count,
-            recentJobs: lastJobs,
-            sopCheck: checkSopId ? { id: checkSopId, found: !!sopExists } : null,
-            availableSops: sops
+            sopCheck: { id: checkSopId, found: !!sop, data: sop },
+            latestJob: lastJob
         })
     } catch (error: any) {
         return NextResponse.json({
