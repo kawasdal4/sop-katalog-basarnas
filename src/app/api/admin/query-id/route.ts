@@ -11,15 +11,22 @@ export async function GET(request: NextRequest) {
     if (!id) return NextResponse.json({ error: 'Missing ID' })
 
     try {
-        const tables = await db.$queryRawUnsafe(`
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_schema = 'public'
-        `)
+        const sop = await db.sopPembuatan.findUnique({
+            where: { id },
+            include: {
+                langkahLangkah: {
+                    orderBy: { order: 'asc' }
+                },
+                author: { select: { name: true, email: true } },
+                sopFlowchart: true
+            }
+        })
+
+        if (!sop) return NextResponse.json({ error: 'SOP not found', id })
 
         return NextResponse.json({
             id: id,
-            tables: tables
+            sop: sop
         })
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 500 })
