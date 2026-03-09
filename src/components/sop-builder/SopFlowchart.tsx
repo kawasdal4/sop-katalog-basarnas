@@ -1840,23 +1840,33 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                         console.log("✅ Export Job Response:", statusData);
 
                         let finalPath = "";
+                        let publicUrl = "";
                         try {
                             if (statusData?.result) {
                                 finalPath = statusData.result.finalPdfPath || "";
+                                publicUrl = statusData.result.publicUrl || "";
                             }
                         } catch (err) {
                             console.error("Error accessing result:", err);
                         }
 
-                        if (finalPath) {
+                        const downloadUrl = publicUrl || (
+                            finalPath
+                                ? (finalPath.startsWith('http')
+                                    ? finalPath
+                                    : `https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/${finalPath}`)
+                                : null
+                        );
+
+                        if (downloadUrl) {
                             setIsExportingState(false);
                             toast.success("PDF berhasil dibuat!");
-                            const downloadUrl = `/api/download?path=${encodeURIComponent(finalPath)}`;
-                            window.location.href = downloadUrl;
-                            if (onExportFinal) onExportFinal(finalPath);
+                            window.open(downloadUrl, '_blank');
+                            if (onExportFinal) onExportFinal(downloadUrl);
                             return;
                         } else {
-                            toast.error("Gagal mendapatkan path file PDF");
+                            toast.error("Gagal mendapatkan URL file PDF");
+                            setIsExportingState(false);
                             return;
                         }
                     } else if (statusData && statusData.status === 'failed') {

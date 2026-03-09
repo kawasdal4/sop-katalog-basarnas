@@ -14,8 +14,8 @@ import { headers } from 'next/headers'
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
 const OFFICIAL_LOGO_URL = 'https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/Logo_Basarnas.png'
+const R2_PUBLIC_BASE = 'https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev'
 
-// Helper for job tracking in DB
 async function setJobStatus(sopId: string, status: string, data: any = {}) {
     const { result, error } = data;
     await db.exportJob.upsert({
@@ -41,36 +41,25 @@ export async function POST(
 ) {
     const { id: sopId } = await params
     const headersList = await headers()
+
+    // Security: only allow internal calls
+    const internalSecret = headersList.get('x-internal-secret')
+    const expectedSecret = process.env.INTERNAL_SECRET || 'basarnas-internal-2026'
+    if (internalSecret !== expectedSecret) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const host = headersList.get('host') || 'localhost:3000'
     const protocol = host.includes('localhost') ? 'http' : 'https'
     const baseUrl = `${protocol}://${host}`
 
-    // Mark as processing immediately
-    await setJobStatus(sopId, 'processing')
-
-    // Trigger the heavy Puppeteer work in a separate serverless function call.
-    // This ensures the client gets statusUrl immediately without waiting for Puppeteer.
-    const runUrl = `${baseUrl}/api/sop-builder/${sopId}/export-run`
-    fetch(runUrl, {
-        method: 'POST',
-        headers: { 'x-internal-secret': process.env.INTERNAL_SECRET || 'basarnas-internal-2026' },
-    }).catch(err => console.error('[export-final] Failed to trigger run:', err));
-
-    return NextResponse.json({
-        success: true,
-        message: 'Export started',
-        statusUrl: `/api/sop-builder/${sopId}/export-status`
-    })
-}
-
-async function processExport(sopId: string, baseUrl: string) {
     let browser: any = null;
 
     try {
-        console.log('🚀 [Background] Starting Export Final SOP ID:', sopId)
+        console.log('🚀 [export-run] Starting Export for SOP ID:', sopId)
 
         // 1. PARALLEL FETCH
-        const [sop, logoBase64, htmlSource, snapshot] = await Promise.all([
+        const [sop, htmlSource, snapshot] = await Promise.all([
             db.sopPembuatan.findUnique({
                 where: { id: sopId },
                 include: {
@@ -78,14 +67,13 @@ async function processExport(sopId: string, baseUrl: string) {
                     sopFlowchart: true
                 }
             }),
-            Promise.resolve(OFFICIAL_LOGO_URL),
             fs.promises.readFile(path.join(process.cwd(), 'src/lib/pdf-template.html'), 'utf8'),
             getStepSnapshot(sopId)
         ]);
 
         if (!sop) {
             await setJobStatus(sopId, 'failed', { error: 'SOP tidak ditemukan' })
-            return
+            return NextResponse.json({ error: 'SOP tidak ditemukan' }, { status: 404 })
         }
 
         // --- SNAPSHOT MERGE ---
@@ -139,7 +127,7 @@ async function processExport(sopId: string, baseUrl: string) {
 
         // 3. Prepare Final HTML Content
         let finalHtml = htmlSource
-            .replace('{{LOGO_BASE64}}', logoBase64)
+            .replace('{{LOGO_BASE64}}', OFFICIAL_LOGO_URL)
             .replace('{{UNIT_KERJA}}', (sop.unitKerja || 'DIREKTORAT KESIAPSIAGAAN').toUpperCase())
             .replace('{{JUDUL_SOP}}', (sop.judul || 'DRAFT SOP').toUpperCase())
             .replace('{{NOMOR_SOP}}', sop.nomorSop || '-')
@@ -218,7 +206,7 @@ async function processExport(sopId: string, baseUrl: string) {
         console.log('📸 Taking screenshot...');
         const imgBuffer = await flowchartEl.screenshot({ type: 'jpeg', quality: 85, omitBackground: false });
 
-        const allBreakpoints = await page.evaluate((scale) => {
+        const allBreakpoints = await page.evaluate((scale: number) => {
             const nodes = (window as any).__FLOWCHART_NODES__ || [];
             const bottoms = nodes
                 .filter((n: any) => n.type === 'offPageConnector' && n.data?.connectorType === 'page-break-bottom')
@@ -279,7 +267,7 @@ async function processExport(sopId: string, baseUrl: string) {
         const flowchartPagesHtml = slicedResults.map((item, idx) => `
             <div class="page" id="page-flowchart-${idx + 1}" style="padding: 5mm;">
                 <div class="header-simple">
-                    <img src="${logoBase64}" alt="Logo" class="logo-small">
+                    <img src="${OFFICIAL_LOGO_URL}" alt="Logo" class="logo-small">
                     <div class="title-small">FLOWCHART SOP: ${(sop.judul || 'BASARNAS').toUpperCase()} (Hal. ${idx + 1})</div>
                 </div>
                 <div class="flow-container-smart" style="flex: 1; display: flex; align-items: flex-start; justify-content: center; border: none; overflow: visible;">
@@ -324,9 +312,11 @@ async function processExport(sopId: string, baseUrl: string) {
             data: { combinedPdfPath: r2Result.key, status: 'FINAL' }
         });
 
-        await setJobStatus(sopId, 'completed', { result: { finalPdfPath: r2Result.key } });
+        // Store the full public URL in the result so frontend can open it directly
+        const publicUrl = `${R2_PUBLIC_BASE}/${r2Result.key}`
+        await setJobStatus(sopId, 'completed', { result: { finalPdfPath: r2Result.key, publicUrl } });
 
-        console.log('✅ Export Completed Successfully');
+        console.log('✅ Export Completed Successfully:', publicUrl);
 
         // Backup Drive (Optional/Background)
         import('@/lib/google-drive').then(async (gd) => {
@@ -351,11 +341,14 @@ async function processExport(sopId: string, baseUrl: string) {
             }
         }).catch(() => { })
 
+        return NextResponse.json({ success: true, publicUrl })
+
     } catch (error) {
-        console.error('❌ CRITICAL: Background Export Error:', error)
+        console.error('❌ CRITICAL: export-run Error:', error)
         await setJobStatus(sopId, 'failed', {
             error: error instanceof Error ? error.message : 'Unknown error'
         });
+        return NextResponse.json({ error: 'Export failed' }, { status: 500 })
     } finally {
         if (browser) {
             await browser.close().catch(() => { });
