@@ -8,54 +8,36 @@ export async function GET(
     { params }: { params: { id: string } }
 ) {
     try {
-        const { authenticated, user, userId: detectedId } = await validateRole(['ADMIN', 'DEVELOPER', 'STAF'])
+        const { authenticated, user } = await validateRole(['ADMIN', 'DEVELOPER', 'STAF'])
         if (!authenticated) {
-            console.log(`[Diagnostic] API GET /sop-builder/[id] - UNAUTHORIZED. Detected userId from cookie: ${detectedId || 'NONE'}`);
-            return NextResponse.json({
-                error: 'Unauthorized Session',
-                debug: { detectedUserId: detectedId || 'NONE' }
-            }, { status: 401 })
+            return NextResponse.json({ error: 'Unauthorized Session' }, { status: 401 })
         }
 
         const { id } = await params
 
-        let sop: any = null;
-        try {
-            sop = await db.sopPembuatan.findUnique({
-                where: { id },
-                include: {
-                    langkahLangkah: {
-                        orderBy: { order: 'asc' }
-                    },
-                    author: { select: { name: true, email: true } },
-                    sopFlowchart: true
-                }
-            })
-        } catch (dbError: any) {
-            console.error('[Diagnostic] DB Fetch main record error:', dbError);
-            throw new Error(`Gagal memuat data utama SOP: ${dbError.message}`);
-        }
+        const sop = await db.sopPembuatan.findUnique({
+            where: { id },
+            include: {
+                langkahLangkah: {
+                    orderBy: { order: 'asc' }
+                },
+                author: { select: { name: true, email: true } },
+                sopFlowchart: true
+            }
+        })
 
         if (!sop) {
-            console.log(`[Diagnostic] API GET /sop-builder/${id} - SOP NOT FOUND in DB. Returning 404.`);
             return NextResponse.json({ error: `SOP tidak ditemukan dengan ID: ${id}` }, { status: 404 })
         }
 
-        try {
-            const snapshot = await getStepSnapshot(id)
-            if (Array.isArray(snapshot) && snapshot.length > 0) {
-                sop.langkahLangkah = mergeStepsWithSnapshot(sop.langkahLangkah || [], snapshot)
-            }
-        } catch (snapError: any) {
-            console.error('[Diagnostic] Snapshot merge error:', snapError);
-            // Non-critical: allow continuing without snapshot if only this fails?
-            // For now, fail explicitly so we know.
-            throw new Error(`Gagal memroses snapshot flowchart: ${snapError.message}`);
+        const snapshot = await getStepSnapshot(id)
+        if (Array.isArray(snapshot) && snapshot.length > 0) {
+            sop.langkahLangkah = mergeStepsWithSnapshot(sop.langkahLangkah || [], snapshot)
         }
 
         return NextResponse.json({ data: sop })
     } catch (error: any) {
-        console.error('Fetch detail SOP Builder crash:', error)
+        console.error('Fetch detail SOP Builder error:', error)
         return NextResponse.json({
             error: 'Terjadi kesalahan',
             details: error instanceof Error ? error.message : String(error)
