@@ -1,16 +1,18 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useEffect, useState, use } from "react"
+import { useRouter } from "next/navigation"
 import { ArrowLeft, Loader2, FileSpreadsheet, FileCheck, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import SopFlowchart from "@/components/sop-builder/SopFlowchart"
 
-export default function FlowchartPage() {
-    const params = useParams()
+export default function FlowchartPage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter()
-    const id = params.id as string
+
+    // In Next.js 15, page params are a Promise that must be unwrapped
+    const resolvedParams = use(params)
+    const id = resolvedParams.id
 
     const [data, setData] = useState<any>(null)
     const [loading, setLoading] = useState(true)
@@ -20,19 +22,21 @@ export default function FlowchartPage() {
 
     useEffect(() => {
         async function fetchData() {
+            if (!id) return;
             try {
                 const res = await fetch(`/api/sop-builder/${id}`)
                 if (!res.ok) throw new Error("SOP tidak ditemukan")
                 const json = await res.json()
                 setData(json.data)
             } catch (err: any) {
+                console.error("Fetch Data Error:", err);
                 setError(err.message)
             } finally {
                 setLoading(false)
             }
         }
 
-        if (id) fetchData()
+        fetchData()
     }, [id])
 
     const handleGenerateCover = async () => {

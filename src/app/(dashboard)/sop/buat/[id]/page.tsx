@@ -1,19 +1,22 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
+import { useEffect, useState, use } from "react"
+import { useRouter } from "next/navigation"
 import SopBuilderForm from "@/components/sop-builder/SopBuilderForm"
 import { Loader2 } from "lucide-react"
 
-export default function EditSopPage() {
-    const params = useParams()
-    const id = params.id as string
+export default function EditSopPage({ params }: { params: Promise<{ id: string }> }) {
+    // In Next.js 15, page params are a Promise that must be unwrapped
+    const resolvedParams = use(params)
+    const id = resolvedParams.id
+
     const [data, setData] = useState<any>(null)
     const [error, setError] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
         async function fetchData() {
+            if (!id) return;
             try {
                 const res = await fetch(`/api/sop-builder/${id}`)
                 if (!res.ok) {
@@ -22,6 +25,7 @@ export default function EditSopPage() {
                 const json = await res.json()
                 setData(json.data)
             } catch (err: any) {
+                console.error("Fetch Data Error:", err);
                 setError(err.message)
             } finally {
                 setLoading(false)
