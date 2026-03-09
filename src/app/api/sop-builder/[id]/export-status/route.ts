@@ -1,29 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { db } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
-
-const activeJobs = ((globalThis as any).__sopExportJobs ??= new Map<string, {
-    status: 'processing' | 'completed' | 'failed',
-    result?: any,
-    error?: string
-}>())
-
-export function getJob(id: string) {
-    return activeJobs.get(id)
-}
-
-export function createJob(id: string) {
-    activeJobs.set(id, { status: 'processing' })
-    return id
-}
-
-export function updateJob(id: string, data: any) {
-    const job = activeJobs.get(id)
-    if (job) {
-        Object.assign(job, data)
-    }
-}
 
 export async function GET(
     request: NextRequest,
@@ -31,7 +10,11 @@ export async function GET(
 ) {
     try {
         const { id: sopId } = await params
-        const job = activeJobs.get(sopId)
+
+        // Find job in database
+        const job = await db.exportJob.findUnique({
+            where: { sopId }
+        })
 
         if (!job) {
             return NextResponse.json(
@@ -47,7 +30,11 @@ export async function GET(
             )
         }
 
-        return NextResponse.json(job, {
+        return NextResponse.json({
+            status: job.status,
+            result: job.result ? JSON.parse(job.result) : undefined,
+            error: job.error
+        }, {
             headers: {
                 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
                 'Pragma': 'no-cache',
@@ -56,6 +43,7 @@ export async function GET(
         })
 
     } catch (error) {
+        console.error('Status check error:', error)
         return NextResponse.json({ error: 'Status check failed' }, { status: 500 })
     }
 }

@@ -289,3 +289,13 @@ model SopLangkah {
   // Relasi
   sopPembuatan        SopPembuatan @relation(fields: [sopPembuatanId], references: [id], onDelete: Cascade)
 }
+
+model ExportJob {
+  id        String   @id @default(cuid())
+  sopId     String   @unique
+  status    String   // processing, completed, failed
+  result    String?  // JSON string for result data (e.g., r2 key)
+  error     String?  // Error message if failed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

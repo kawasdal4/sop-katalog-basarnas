@@ -1,35 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { uploadToR2 } from '@/lib/r2-storage'
-import puppeteer from 'puppeteer'
+import puppeteer from 'puppeteer-core'
+import chromium from '@sparticuz/chromium'
 import path from 'path'
 import fs from 'fs'
 import { format } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 import sharp from 'sharp'
-import { createJob, updateJob } from '../export-status/route'
 import { getStepSnapshot, mergeStepsWithSnapshot } from '@/lib/sop-flowchart-snapshot'
+import { headers } from 'next/headers'
 
-export const maxDuration = 300; // 5 minutes max duration for Server Actions/API Routes in Next.js
+export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
 const OFFICIAL_LOGO_URL = 'https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/Logo_Basarnas.png'
+
+// Helper for job tracking in DB
+async function setJobStatus(sopId: string, status: string, data: any = {}) {
+    const { result, error } = data;
+    await db.exportJob.upsert({
+        where: { sopId },
+        update: {
+            status,
+            result: result ? JSON.stringify(result) : undefined,
+            error: error || null,
+            updatedAt: new Date()
+        },
+        create: {
+            sopId,
+            status,
+            result: result ? JSON.stringify(result) : undefined,
+            error: error || null
+        }
+    });
+}
 
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     const { id: sopId } = await params
+    const headersList = await headers()
+    const host = headersList.get('host') || 'localhost:3000'
+    const protocol = host.includes('localhost') ? 'http' : 'https'
+    const baseUrl = `${protocol}://${host}`
 
     // Start async process
-    createJob(sopId)
+    await setJobStatus(sopId, 'processing')
 
-    // Run in background without awaiting
-    processExport(sopId).catch(err => {
+    // Run in background 
+    // On Vercel, fire-and-forget is risky. We await for the core part if duration allows,
+    // but here we follow the existing background pattern while trying to be robust.
+    processExport(sopId, baseUrl).catch(async err => {
         console.error('❌ Background Export Error:', err)
-        updateJob(sopId, {
-            status: 'failed',
+        await setJobStatus(sopId, 'failed', {
             error: err instanceof Error ? err.message : 'Unknown error'
-        })
+        });
     })
 
     return NextResponse.json({
@@ -39,54 +65,37 @@ export async function POST(
     }, { status: 202 })
 }
 
-async function processExport(sopId: string) {
+async function processExport(sopId: string, baseUrl: string) {
     let browser: any = null;
 
     try {
         console.log('🚀 [Background] Starting Export Final SOP ID:', sopId)
 
-        // 1. PARALLEL FETCH: DB, Logo, Template, Snapshot
+        // 1. PARALLEL FETCH
         const [sop, logoBase64, htmlSource, snapshot] = await Promise.all([
-            // DB Fetch
-            (db as any).sopPembuatan.findUnique({
+            db.sopPembuatan.findUnique({
                 where: { id: sopId },
                 include: {
                     langkahLangkah: { orderBy: { order: 'asc' } },
                     sopFlowchart: true
                 }
             }),
-            // Logo Fetch
             Promise.resolve(OFFICIAL_LOGO_URL),
-            // Template Fetch
             fs.promises.readFile(path.join(process.cwd(), 'src/lib/pdf-template.html'), 'utf8'),
-            // Snapshot Fetch
             getStepSnapshot(sopId)
         ]);
 
         if (!sop) {
-            updateJob(sopId, { status: 'failed', error: 'SOP tidak ditemukan' })
+            await setJobStatus(sopId, 'failed', { error: 'SOP tidak ditemukan' })
             return
         }
 
         // --- SNAPSHOT MERGE ---
-        if (snapshot.length > 0) {
-            sop.langkahLangkah = mergeStepsWithSnapshot(sop.langkahLangkah, snapshot);
+        if (Array.isArray(snapshot) && snapshot.length > 0) {
+            sop.langkahLangkah = mergeStepsWithSnapshot(sop.langkahLangkah || [], snapshot);
         }
 
-        // --- CONNECTOR PATHS ---
-        if (typeof sop.connectorPaths === 'undefined' || sop.connectorPaths === null) {
-            try {
-                const isSqlite = (process.env.DATABASE_URL || '').startsWith('file:')
-                const query = isSqlite
-                    ? `SELECT "connectorPaths" FROM "SopPembuatan" WHERE "id" = ? LIMIT 1`
-                    : `SELECT "connectorPaths" FROM "SopPembuatan" WHERE "id" = $1 LIMIT 1`;
-
-                const raw = await (db as any).$queryRawUnsafe(query, sopId) as Array<{ connectorPaths?: string | null }>;
-                sop.connectorPaths = raw?.[0]?.connectorPaths || null;
-            } catch { }
-        }
-
-        // 2. Format Data & Steps (Synchronous)
+        // 2. Format Data & Steps
         const printDate = format(new Date(), 'dd MMMM yyyy', { locale: localeId })
         const effectiveDate = sop.tanggalEfektif ? format(new Date(sop.tanggalEfektif), 'dd MMMM yyyy', { locale: localeId }) : '-'
 
@@ -151,91 +160,80 @@ async function processExport(sopId: string) {
             .replace('{{PENCATATAN}}', formatAsList(sop.pencatatanPendataan))
             .replace('{{STEPS_HTML}}', stepsHtml)
 
-        // 4. LAUNCH BROWSER ONCE
-        console.log('🚀 Launching Puppeteer...');
+        // 4. LAUNCH BROWSER (Vercel Compatible)
+        console.log('🚀 Launching Puppeteer on Vercel...');
+
+        const isProd = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+
         browser = await puppeteer.launch({
-            headless: true,
-            args: [
+            args: isProd ? chromium.args : [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-web-security',
-                '--disable-features=IsolateOrigins,site-per-process',
-                '--font-render-hinting=none',
                 '--disable-dev-shm-usage'
             ],
-            protocolTimeout: 60000,
-            timeout: 60000
+            defaultViewport: isProd ? chromium.defaultViewport : { width: 1600, height: 1200 },
+            executablePath: isProd ? await chromium.executablePath() : undefined,
+            headless: isProd ? chromium.headless : true,
         });
 
         // --- STEP A: CAPTURE FLOWCHART ---
         const page = await browser.newPage();
         await page.setViewport({ width: 1600, height: 1200, deviceScaleFactor: 2 });
-        // Make sure it's completely JSON serializable for the CDP bridge (Dates, undefined -> removed)
         const serializableSop = JSON.parse(JSON.stringify(sop));
         await page.evaluateOnNewDocument((data: any) => {
             (window as any).PRELOADED_SOP_DATA = data;
         }, serializableSop);
 
-        const printUrl = `http://localhost:3000/print-flowchart/${sopId}?export=1&t=${Date.now()}`;
+        const printUrl = `${baseUrl}/print-flowchart/${sopId}?export=1&t=${Date.now()}`;
         console.log(`🔗 Navigating to: ${printUrl}`);
 
         await page.goto(printUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-        // Optimized Wait
         try {
             await page.waitForFunction('window.flowchartReady === true', { timeout: 15000, polling: 200 });
         } catch {
             console.warn('⚠️ flowchartReady signal timeout, proceeding...');
         }
 
-        // Small stabilization buffer
         await new Promise(r => setTimeout(r, 200));
 
         const flowchartEl = await page.$('#flowchart-container');
         if (!flowchartEl) throw new Error('Flowchart container not found');
 
-        // Force white bg
         await page.evaluate(() => {
             document.body.style.backgroundColor = 'white';
             const el = document.getElementById('flowchart-container');
             if (el) el.style.backgroundColor = 'white';
         });
 
-        // Smart Scaling
         const boundingBox = await flowchartEl.boundingBox();
         let scaleFactor = 2;
         if (boundingBox && boundingBox.height > 8000) {
-            console.warn('⚠️ Flowchart very tall, reducing scale to 1.5x');
             scaleFactor = 1.5;
             await page.setViewport({ width: 1600, height: Math.ceil(boundingBox.height) + 100, deviceScaleFactor: scaleFactor });
         } else if (boundingBox) {
             await page.setViewport({ width: 1600, height: Math.ceil(boundingBox.height) + 100, deviceScaleFactor: 2 });
         }
 
-        // Capture Screenshot
         console.log('📸 Taking screenshot...');
         const imgBuffer = await flowchartEl.screenshot({ type: 'jpeg', quality: 85, omitBackground: false });
 
-        // Get Breakpoints
         const allBreakpoints = await page.evaluate((scale) => {
             const nodes = (window as any).__FLOWCHART_NODES__ || [];
-            const SAFE_MARGIN_BOTTOM = 60;
-            const SAFE_MARGIN_TOP = 80;
-
             const bottoms = nodes
                 .filter((n: any) => n.type === 'offPageConnector' && n.data?.connectorType === 'page-break-bottom')
-                .map((n: any) => ((n.position.y + (n.measured?.height || 60)) + SAFE_MARGIN_BOTTOM) * scale)
+                .map((n: any) => ((n.position.y + (n.measured?.height || 60)) + 60) * scale)
                 .sort((a: number, b: number) => a - b);
 
             const tops = nodes
                 .filter((n: any) => n.type === 'offPageConnector' && n.data?.connectorType === 'page-break-top')
-                .map((n: any) => (n.position.y - SAFE_MARGIN_TOP) * scale)
+                .map((n: any) => (n.position.y - 80) * scale)
                 .sort((a: number, b: number) => a - b);
 
             return { bottoms, tops };
         }, scaleFactor);
 
-        // Close capture page to free memory
         await page.close();
 
         // --- STEP B: SLICE IMAGE ---
@@ -244,7 +242,6 @@ async function processExport(sopId: string) {
         const fullWidth = metadata.width || 1600;
         const fullHeight = metadata.height || 1000;
 
-        const screenshots: string[] = [];
         const { bottoms, tops } = allBreakpoints;
         const segments: { top: number, bottom: number }[] = [];
 
@@ -259,7 +256,6 @@ async function processExport(sopId: string) {
             }
         }
 
-        // Parallel Slicing
         const slicePromises = segments.map(async (seg, i) => {
             const extractHeight = Math.min(seg.bottom - seg.top, fullHeight - seg.top);
             if (extractHeight <= 0) return null;
@@ -278,9 +274,8 @@ async function processExport(sopId: string) {
         });
 
         const slicedResults = (await Promise.all(slicePromises)).filter(Boolean) as { index: number, base64: string }[];
-        slicedResults.sort((a, b) => a.index - b.index); // Ensure order
+        slicedResults.sort((a, b) => a.index - b.index);
 
-        // Generate Flowchart HTML
         const flowchartPagesHtml = slicedResults.map((item, idx) => `
             <div class="page" id="page-flowchart-${idx + 1}" style="padding: 5mm;">
                 <div class="header-simple">
@@ -322,68 +317,43 @@ async function processExport(sopId: string) {
             folder: 'sop-builder-finals'
         });
 
-        await (db as any).sopPembuatan.update({
+        await db.sopPembuatan.update({
             where: { id: sopId },
             data: { combinedPdfPath: r2Result.key, status: 'FINAL' }
         });
 
-        updateJob(sopId, {
-            status: 'completed',
-            result: { finalPdfPath: r2Result.key }
-        });
+        await setJobStatus(sopId, 'completed', { result: { finalPdfPath: r2Result.key } });
 
         console.log('✅ Export Completed Successfully');
 
-        // ============================================
-        // STEP D: BACKGROUND Backup to Google Drive
-        // (Async, no await - runs AFTER R2 success)
-        // ============================================
+        // Backup Drive (Optional/Background)
         import('@/lib/google-drive').then(async (gd) => {
             if (gd.isGoogleDriveConfigured()) {
-                try {
-                    console.log(`📤 [Background] Starting backup to Google Drive: ${finalFileName}`)
-
-                    const driveResult = await gd.uploadFileToDriveFolder(
-                        Buffer.from(pdfBuffer),
-                        finalFileName,
-                        'application/pdf'
-                    )
-
-                    // Update SOP record with driveFileId (if applicable field exists for generated pdf)
-                    // Note: combinedPdfDriveId might not exist in schema, but we can log it or use fileSync
-
-                    // Create FileSync record to track this backup
-                    const { db } = await import('@/lib/db')
-                    await db.fileSync.create({
-                        data: {
-                            filename: finalFileName,
-                            mimeType: 'application/pdf',
-                            fileSize: pdfBuffer.length,
-                            r2Key: r2Result.key,
-                            driveFileId: driveResult.id,
-                            source: 'both',
-                            syncStatus: 'synced',
-                            r2ModifiedAt: new Date(),
-                            driveModifiedAt: new Date(),
-                            lastSyncedAt: new Date(),
-                        }
-                    }).catch(e => console.warn('⚠️ FileSync create failed:', e))
-
-                    console.log(`✅ [Background] Backup to Google Drive completed: ${driveResult.id}`)
-                } catch (backupError) {
-                    console.warn('⚠️ [Background] Backup to Google Drive failed:', backupError)
-                }
+                const driveResult = await gd.uploadFileToDriveFolder(
+                    Buffer.from(pdfBuffer),
+                    finalFileName,
+                    'application/pdf'
+                )
+                await db.fileSync.create({
+                    data: {
+                        filename: finalFileName,
+                        mimeType: 'application/pdf',
+                        fileSize: pdfBuffer.length,
+                        r2Key: r2Result.key,
+                        driveFileId: driveResult.id,
+                        source: 'both',
+                        syncStatus: 'synced',
+                        lastSyncedAt: new Date(),
+                    }
+                }).catch(() => { })
             }
-        }).catch(err => {
-            console.warn('⚠️ [Background] Failed to start backup:', err)
-        })
+        }).catch(() => { })
 
     } catch (error) {
         console.error('❌ CRITICAL: Background Export Error:', error)
-        updateJob(sopId, {
-            status: 'failed',
+        await setJobStatus(sopId, 'failed', {
             error: error instanceof Error ? error.message : 'Unknown error'
-        })
+        });
     } finally {
         if (browser) {
             await browser.close().catch(() => { });
