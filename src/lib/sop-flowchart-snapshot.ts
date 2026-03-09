@@ -36,18 +36,11 @@ const isSqlite = () => (process.env.DATABASE_URL || '').startsWith('file:')
 
 const readFlowchartJson = async (sopId: string) => {
     try {
-        if (isSqlite()) {
-            const rows = await db.$queryRawUnsafe(
-                `SELECT "flowchartJson" FROM "SopFlowchart" WHERE "sopId" = ? LIMIT 1`,
-                sopId
-            ) as Array<{ flowchartJson?: string | null }>
-            return rows?.[0]?.flowchartJson || ''
-        }
-        const rows = await db.$queryRawUnsafe(
-            `SELECT "flowchartJson" FROM "SopFlowchart" WHERE "sopId" = $1 LIMIT 1`,
-            sopId
-        ) as Array<{ flowchartJson?: string | null }>
-        return rows?.[0]?.flowchartJson || ''
+        const row = await db.sopFlowchart.findUnique({
+            where: { sopId },
+            select: { flowchartJson: true }
+        })
+        return row?.flowchartJson || ''
     } catch {
         return ''
     }
@@ -91,12 +84,10 @@ export const upsertStepSnapshot = async (sopId: string, langkahLangkah: any[]) =
             const normalized = normalizeStepSnapshot(step || {}, index);
             const order = normalized.order;
 
-            // Try to find existing metadata for this step in the current snapshot
             const existingSteps = Array.isArray(existingPayload.stepsSnapshot) ? existingPayload.stepsSnapshot : [];
             const existing = existingSteps.find((s: any) => (Number(s.order) || -1) === order);
 
             if (existing) {
-                // If the new step has generic/missing metadata, but existing has specific ones, merge them
                 return {
                     ...normalized,
                     stepType: (step.stepType && step.stepType !== 'process') ? step.stepType : (existing.stepType || normalized.stepType),
@@ -106,50 +97,23 @@ export const upsertStepSnapshot = async (sopId: string, langkahLangkah: any[]) =
             }
             return normalized;
         })
+
         const payload = JSON.stringify({
             nodes: Array.isArray(existingPayload.nodes) ? existingPayload.nodes : [],
             edges: Array.isArray(existingPayload.edges) ? existingPayload.edges : [],
             ...existingPayload,
             stepsSnapshot,
         })
-        const now = new Date()
 
-        if (isSqlite()) {
-            const updatedCount = await db.$executeRawUnsafe(
-                `UPDATE "SopFlowchart" SET "flowchartJson" = ?, "updatedAt" = ? WHERE "sopId" = ?`,
-                payload,
-                now,
-                sopId
-            )
-            if (!updatedCount) {
-                await db.$executeRawUnsafe(
-                    `INSERT INTO "SopFlowchart" ("id", "sopId", "flowchartJson", "createdAt", "updatedAt") VALUES (?, ?, ?, ?, ?)`,
-                    randomUUID(),
-                    sopId,
-                    payload,
-                    now,
-                    now
-                )
-            }
-            return
-        }
-
-        const updatedCount = await db.$executeRawUnsafe(
-            `UPDATE "SopFlowchart" SET "flowchartJson" = $1, "updatedAt" = $2 WHERE "sopId" = $3`,
-            payload,
-            now,
-            sopId
-        )
-        if (!updatedCount) {
-            await db.$executeRawUnsafe(
-                `INSERT INTO "SopFlowchart" ("id", "sopId", "flowchartJson", "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, $5)`,
-                randomUUID(),
+        await db.sopFlowchart.upsert({
+            where: { sopId },
+            update: { flowchartJson: payload },
+            create: {
                 sopId,
-                payload,
-                now,
-                now
-            )
-        }
-    } catch {
+                flowchartJson: payload
+            }
+        })
+    } catch (error) {
+        console.error('Failed to upsert step snapshot:', error)
     }
 }
