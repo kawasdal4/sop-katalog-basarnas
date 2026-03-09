@@ -48,10 +48,11 @@ export async function POST(
     // Start async process
     await setJobStatus(sopId, 'processing')
 
-    // Run in background 
-    // On Vercel, fire-and-forget is risky. We await for the core part if duration allows,
-    // but here we follow the existing background pattern while trying to be robust.
-    processExport(sopId, baseUrl).catch(async err => {
+    // On Vercel serverless, we MUST await the promise to ensure the function
+    // doesn't terminate before the background task (Puppeteer) finishes.
+    // The client will poll /export-status, so if this POST times out for the client,
+    // the polling will eventually pick up the 'completed' status from DB.
+    await processExport(sopId, baseUrl).catch(async err => {
         console.error('❌ Background Export Error:', err)
         await setJobStatus(sopId, 'failed', {
             error: err instanceof Error ? err.message : 'Unknown error'
@@ -60,9 +61,8 @@ export async function POST(
 
     return NextResponse.json({
         success: true,
-        message: 'Export started',
-        statusUrl: `/api/sop-builder/${sopId}/export-status`
-    }, { status: 202 })
+        message: 'Export completed'
+    })
 }
 
 async function processExport(sopId: string, baseUrl: string) {
