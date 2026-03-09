@@ -98,15 +98,7 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
         console.log(`🚀 [Background] Starting Export Final SOP ID: ${sopId} (Hybrid: ${!!clientImage})`)
 
         // 1. DATA FETCH
-        let validLogoBase64 = OFFICIAL_LOGO_URL;
-        try {
-            const logoRelPath = 'public/logo-sar.png';
-            const logoFullPath = path.join(process.cwd(), logoRelPath);
-            if (fs.existsSync(logoFullPath)) {
-                const logoBuffer = fs.readFileSync(logoFullPath);
-                validLogoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`;
-            }
-        } catch (e) { console.warn('Local logo read failed', e); }
+        let validLogoBase64 = 'https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/Logo_Basarnas.png';
 
         const [sop, htmlSource, snapshot] = await Promise.all([
             db.sopPembuatan.findUnique({
