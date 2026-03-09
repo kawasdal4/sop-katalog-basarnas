@@ -19,30 +19,43 @@ export async function GET(
 
         const { id } = await params
 
-        const sop = await db.sopPembuatan.findUnique({
-            where: { id },
-            include: {
-                langkahLangkah: {
-                    orderBy: { order: 'asc' }
-                },
-                author: { select: { name: true, email: true } },
-                sopFlowchart: true
-            }
-        })
+        let sop: any = null;
+        try {
+            sop = await db.sopPembuatan.findUnique({
+                where: { id },
+                include: {
+                    langkahLangkah: {
+                        orderBy: { order: 'asc' }
+                    },
+                    author: { select: { name: true, email: true } },
+                    sopFlowchart: true
+                }
+            })
+        } catch (dbError: any) {
+            console.error('[Diagnostic] DB Fetch main record error:', dbError);
+            throw new Error(`Gagal memuat data utama SOP: ${dbError.message}`);
+        }
 
         if (!sop) {
             console.log(`[Diagnostic] API GET /sop-builder/${id} - SOP NOT FOUND in DB. Returning 404.`);
             return NextResponse.json({ error: `SOP tidak ditemukan dengan ID: ${id}` }, { status: 404 })
         }
 
-        const snapshot = await getStepSnapshot(id)
-        if (Array.isArray(snapshot) && snapshot.length > 0) {
-            sop.langkahLangkah = mergeStepsWithSnapshot(sop.langkahLangkah || [], snapshot)
+        try {
+            const snapshot = await getStepSnapshot(id)
+            if (Array.isArray(snapshot) && snapshot.length > 0) {
+                sop.langkahLangkah = mergeStepsWithSnapshot(sop.langkahLangkah || [], snapshot)
+            }
+        } catch (snapError: any) {
+            console.error('[Diagnostic] Snapshot merge error:', snapError);
+            // Non-critical: allow continuing without snapshot if only this fails?
+            // For now, fail explicitly so we know.
+            throw new Error(`Gagal memroses snapshot flowchart: ${snapError.message}`);
         }
 
         return NextResponse.json({ data: sop })
-    } catch (error) {
-        console.error('Fetch detail SOP Builder error:', error)
+    } catch (error: any) {
+        console.error('Fetch detail SOP Builder crash:', error)
         return NextResponse.json({
             error: 'Terjadi kesalahan',
             details: error instanceof Error ? error.message : String(error)
