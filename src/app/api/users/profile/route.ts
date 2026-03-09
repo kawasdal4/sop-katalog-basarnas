@@ -193,36 +193,16 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ message: 'Tidak ada perubahan' })
     }
 
-    // Update using raw SQL to bypass Prisma model sync issues if regenerate failed
+    // Update using Prisma's update method with any casting to bypass type issues
     try {
-      console.log('[Profile API] Executing DB update via Raw SQL:', updateData)
+      console.log('[Profile API] Executing DB update via Prisma update:', updateData)
 
-      const setClauses: string[] = []
-      const params: any[] = []
+      const updatedUser = await (db as any).user.update({
+        where: { id: userId },
+        data: updateData
+      })
 
-      for (const [key, value] of Object.entries(updateData)) {
-        setClauses.push(`"${key}" = ?`)
-        params.push(value)
-      }
-
-      // Always update updatedAt
-      setClauses.push(`"updatedAt" = ?`)
-      params.push(new Date())
-
-      // Final query construction
-      const sql = `UPDATE "User" SET ${setClauses.join(', ')} WHERE "id" = ?`
-      console.log('[Profile API] Raw SQL Update:', sql)
-
-      await (db as any).$executeRawUnsafe(sql, ...params, userId)
-      console.log('[Profile API] Raw SQL update successful')
-
-      // Fetch updated user using raw SQL to ensure we get all fields
-      const users = await (db as any).$queryRawUnsafe(`SELECT * FROM "User" WHERE "id" = ? LIMIT 1`, userId)
-      const updatedUser = users && users.length > 0 ? users[0] : null
-
-      if (!updatedUser) {
-        throw new Error('User tidak ditemukan setelah update')
-      }
+      console.log('[Profile API] DB update successful')
 
       const updatedUserAny = updatedUser as any
       let profilePhotoUrl: string | null = null
@@ -232,7 +212,6 @@ export async function PUT(request: NextRequest) {
           profilePhotoUrl = updatedUserAny.profilePhoto
         } else {
           const r2Url = getR2PublicUrl(updatedUserAny.profilePhoto)
-          // Handle updatedAt which might be a string or Date from raw query
           const updatedAtTime = updatedUserAny.updatedAt
             ? new Date(updatedUserAny.updatedAt).getTime()
             : Date.now()
@@ -270,6 +249,7 @@ export async function PUT(request: NextRequest) {
         details: dbError instanceof Error ? dbError.message : String(dbError)
       }, { status: 500 })
     }
+
   } catch (error) {
     console.error('Update profile error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Terjadi kesalahan saat memperbarui profil'
