@@ -2,6 +2,9 @@
   "name": "sop-katalog-basarnas",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "prisma generate --schema=./prisma/schema.prod.prisma && prisma db push --schema=./prisma/schema.prod.prisma --accept-data-loss && next build",
@@ -51,7 +54,7 @@
     "@radix-ui/react-toggle-group": "^1.1.10",
     "@radix-ui/react-tooltip": "^1.2.7",
     "@reactuses/core": "^6.0.5",
-    "@sparticuz/chromium": "^132.0.0",
+    "@sparticuz/chromium-min": "^132.0.0",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.98.0",
     "@tanstack/react-query": "^5.82.0",

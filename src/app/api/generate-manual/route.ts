@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import puppeteer from 'puppeteer-core'
-import chromium from '@sparticuz/chromium'
+import chromium from '@sparticuz/chromium-min'
 import path from 'path'
 import fs from 'fs'
 
@@ -378,8 +378,8 @@ export async function GET() {
         browser = await puppeteer.launch({
             args: isProd ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
             defaultViewport: chromium.defaultViewport,
-            executablePath: isProd ? await chromium.executablePath() : undefined,
-            headless: isProd ? chromium.headless : true,
+            executablePath: isProd ? await chromium.executablePath('https://github.com/Sparticuz/chromium/releases/download/v132.0.0/chromium-v132.0.0-pack.tar') : undefined,
+            headless: (isProd ? chromium.headless : true) as any,
         });
 
         const page = await browser.newPage()
