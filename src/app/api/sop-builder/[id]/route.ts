@@ -10,7 +10,8 @@ export async function GET(
     try {
         const { authenticated } = await validateRole(['ADMIN', 'DEVELOPER', 'STAF'])
         if (!authenticated) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            console.log(`[Diagnostic] API GET /sop-builder/[id] - UNAUTHORIZED. User session invalid or role mismatched.`);
+            return NextResponse.json({ error: 'Unauthorized Session' }, { status: 401 })
         }
 
         const { id } = await params
@@ -27,7 +28,8 @@ export async function GET(
         })
 
         if (!sop) {
-            return NextResponse.json({ error: 'SOP tidak ditemukan' }, { status: 404 })
+            console.log(`[Diagnostic] API GET /sop-builder/${id} - SOP NOT FOUND in DB. Returning 404.`);
+            return NextResponse.json({ error: `SOP tidak ditemukan dengan ID: ${id}` }, { status: 404 })
         }
 
         const snapshot = await getStepSnapshot(id)
