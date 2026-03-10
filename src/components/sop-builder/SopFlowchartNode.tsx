@@ -2,113 +2,82 @@ import React, { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// Hyper-Premium Color Palette & Effects
+const colors: any = {
+    start: {
+        bg: 'rgba(59, 130, 246, 0.15)',
+        border: '#60a5fa',
+        text: '#e2e8f0',
+        glow: 'rgba(59, 130, 246, 0.8)',
+        accent: '#93c5fd'
+    },
+    end: {
+        bg: 'rgba(37, 99, 235, 0.15)',
+        border: '#3b82f6',
+        text: '#e2e8f0',
+        glow: 'rgba(37, 99, 235, 0.8)',
+        accent: '#60a5fa'
+    },
+    process: {
+        bg: 'rgba(99, 102, 241, 0.1)',
+        border: '#818cf8',
+        text: '#f8fafc',
+        glow: 'rgba(99, 102, 241, 0.5)',
+        accent: '#a5b4fc'
+    },
+    decision: {
+        bg: 'rgba(249, 115, 22, 0.15)',
+        border: '#fb923c',
+        text: '#fff7ed',
+        glow: 'rgba(249, 115, 22, 0.9)',
+        accent: '#fdba74'
+    },
+    document: {
+        bg: 'rgba(245, 158, 11, 0.15)',
+        border: '#fbbf24',
+        text: '#fffbeb',
+        glow: 'rgba(245, 158, 11, 0.7)',
+        accent: '#fcd34d'
+    },
+    input_output: {
+        bg: 'rgba(6, 182, 212, 0.15)',
+        border: '#22d3ee',
+        text: '#ecfeff',
+        glow: 'rgba(6, 182, 212, 0.7)',
+        accent: '#67e8f9'
+    },
+    connector: { // New connector style
+        bg: 'rgba(168, 85, 247, 0.15)',
+        border: '#c084fc',
+        text: '#f3e8ff',
+        glow: 'rgba(168, 85, 247, 0.8)',
+        accent: '#d8b4fe'
+    }
+};
+
+// Standard Black & White styles for official printing (Permenpan RB No. 35/2012)
+const printStyles = {
+    bg: '#ffffff',
+    border: '#000000',
+    text: '#000000',
+    glow: 'transparent',
+    accent: '#000000'
+};
+
+const strokeWidth = 2.5;
+const nodeWidth = 84;
+const nodeHeight = 48;
+
+const handleClass = "!bg-slate-500 !border-white !border-2 !w-3 !h-3 transition-all hover:!scale-150 hover:!bg-indigo-500 !z-[60] shadow-[0_0_10px_rgba(0,0,0,0.5)]";
+const targetHandleClass = "!w-4 !h-4 !opacity-0 !z-40";
+
 const SopFlowchartNode = ({ data, selected }: { data: any, selected?: boolean }) => {
     const stepType = data.stepType || 'process';
     const isPrintMode = data?.isPrintMode;
 
-    // Hyper-Premium Color Palette & Effects
-    const colors: any = {
-        start: {
-            bg: 'rgba(59, 130, 246, 0.15)',
-            border: '#60a5fa',
-            text: '#e2e8f0',
-            glow: 'rgba(59, 130, 246, 0.8)',
-            accent: '#93c5fd'
-        },
-        end: {
-            bg: 'rgba(37, 99, 235, 0.15)',
-            border: '#3b82f6',
-            text: '#e2e8f0',
-            glow: 'rgba(37, 99, 235, 0.8)',
-            accent: '#60a5fa'
-        },
-        process: {
-            bg: 'rgba(99, 102, 241, 0.1)',
-            border: '#818cf8',
-            text: '#f8fafc',
-            glow: 'rgba(99, 102, 241, 0.5)',
-            accent: '#a5b4fc'
-        },
-        decision: {
-            bg: 'rgba(249, 115, 22, 0.15)',
-            border: '#fb923c',
-            text: '#fff7ed',
-            glow: 'rgba(249, 115, 22, 0.9)',
-            accent: '#fdba74'
-        },
-        document: {
-            bg: 'rgba(245, 158, 11, 0.15)',
-            border: '#fbbf24',
-            text: '#fffbeb',
-            glow: 'rgba(245, 158, 11, 0.7)',
-            accent: '#fcd34d'
-        },
-        input_output: {
-            bg: 'rgba(6, 182, 212, 0.15)',
-            border: '#22d3ee',
-            text: '#ecfeff',
-            glow: 'rgba(6, 182, 212, 0.7)',
-            accent: '#67e8f9'
-        },
-        connector: { // New connector style
-            bg: 'rgba(168, 85, 247, 0.15)',
-            border: '#c084fc',
-            text: '#f3e8ff',
-            glow: 'rgba(168, 85, 247, 0.8)',
-            accent: '#d8b4fe'
-        }
-    };
-
-    // Standard Black & White styles for official printing (Permenpan RB No. 35/2012)
-    const printStyles = {
-        bg: '#ffffff',
-        border: '#000000',
-        text: '#000000',
-        glow: 'transparent',
-        accent: '#000000'
-    };
-
     const currentStyle = data?.isPrintMode ? printStyles : (colors[stepType as keyof typeof colors] || colors.process);
-    const strokeWidth = 2.5;
-    const nodeWidth = 84;
-    const nodeHeight = 48;
 
     const renderShape = () => {
-        const commonProps = {
-            stroke: currentStyle.border,
-            strokeWidth: strokeWidth,
-        };
-
-        const renderCircuitCore = (w: number, h: number, rx = 0) => (
-            <g opacity="0.4">
-                <defs>
-                    <pattern id={`circuit-${data.no}-${stepType}`} x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-                        <path d="M 10 0 L 10 10 M 0 10 L 20 10" stroke={currentStyle.border} strokeWidth="0.5" strokeOpacity="0.2" />
-                        <circle cx="10" cy="10" r="1" fill={currentStyle.border} fillOpacity="0.3" />
-                    </pattern>
-                </defs>
-                <rect x="0" y="0" width={w} height={h} rx={rx} fill={`url(#circuit-${data.no}-${stepType})`} />
-                {/* Central Energy Gem */}
-                <rect
-                    x={(w / 2) - 8}
-                    y={(h / 2) - 8}
-                    width="16"
-                    height="16"
-                    rx="4"
-                    fill={currentStyle.glow}
-                    className="animate-pulse"
-                    style={{ filter: 'blur(8px)', opacity: 0.3 }}
-                />
-                <path
-                    d={`M ${w / 2} ${(h / 2) - 10} L ${(w / 2) + 10} ${h / 2} L ${w / 2} ${(h / 2) + 10} L ${(w / 2) - 10} ${h / 2} Z`}
-                    fill="none"
-                    stroke={currentStyle.accent}
-                    strokeWidth="0.5"
-                    strokeOpacity="0.5"
-                />
-            </g>
-        );
-
         if (stepType === 'start' || stepType === 'end') {
             return (
                 <svg width={nodeWidth} height={nodeHeight} viewBox={`0 0 ${nodeWidth} ${nodeHeight}`}>
@@ -228,16 +197,12 @@ const SopFlowchartNode = ({ data, selected }: { data: any, selected?: boolean })
             const pW = 90;
             const pH = 48;
             const offset = 15;
-            // Define brown color specifically for Input/Output shape
-            const brownFill = currentStyle.bg;
-            const brownStroke = currentStyle.border;
-
             return (
                 <svg width={pW} height={pH} viewBox={`0 0 ${pW} ${pH}`}>
                     <path
                         d={`M ${offset + strokeWidth} ${strokeWidth} L ${pW - strokeWidth} ${strokeWidth} L ${pW - offset - strokeWidth} ${pH - strokeWidth} L ${strokeWidth} ${pH - strokeWidth} Z`}
-                        fill={brownFill}
-                        stroke={brownStroke}
+                        fill={currentStyle.bg}
+                        stroke={currentStyle.border}
                         strokeWidth={strokeWidth}
                     />
                     <text
@@ -284,9 +249,6 @@ const SopFlowchartNode = ({ data, selected }: { data: any, selected?: boolean })
             </svg>
         );
     };
-
-    const handleClass = "!bg-slate-500 !border-white !border-2 !w-3 !h-3 transition-all hover:!scale-150 hover:!bg-indigo-500 !z-[60] shadow-[0_0_10px_rgba(0,0,0,0.5)]";
-    const targetHandleClass = "!w-4 !h-4 !opacity-0 !z-40";
 
     return (
         <motion.div
@@ -377,4 +339,14 @@ const SopFlowchartNode = ({ data, selected }: { data: any, selected?: boolean })
     );
 };
 
-export default memo(SopFlowchartNode);
+// Deep equality check for React.memo to prevent re-renders when dragging the canvas
+export default memo(SopFlowchartNode, (prevProps, nextProps) => {
+    return (
+        prevProps.selected === nextProps.selected &&
+        prevProps.data.no === nextProps.data.no &&
+        prevProps.data.stepType === nextProps.data.stepType &&
+        prevProps.data.aktivitas === nextProps.data.aktivitas &&
+        prevProps.data.pelaksana === nextProps.data.pelaksana &&
+        prevProps.data.isPrintMode === nextProps.data.isPrintMode
+    );
+});

@@ -24,6 +24,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import '@xyflow/react/dist/style.css';
 import SopFlowchartNode from './SopFlowchartNode';
+import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { Button } from '@/components/ui/button';
 import {
     Download, Loader2, FileCheck, Save, RotateCcw, ArrowLeft,
@@ -260,12 +261,26 @@ const SopEdge = ({
 
         // Simple check: does the horizontal/vertical segment hit any obstacle?
         // For SopEdge, we'll check if path hits any node in obstacles
+        // AABB box optimization - discard checks before full segment intersection math
         const isBlocked = obstacles.some((node: any) => {
             if (node.id === source || node.id === target) return false;
-            const rect = { x: node.position.x, y: node.position.y, width: node.width, height: node.height };
+            
+            const minX = Math.min(sourceX, targetX);
+            const maxX = Math.max(sourceX, targetX);
+            const minY = Math.min(sourceY, targetY);
+            const maxY = Math.max(sourceY, targetY);
+            
+            // Fast AABB Reject
+            if (
+                maxX < node.position.x ||
+                minX > node.position.x + node.width ||
+                maxY < node.position.y ||
+                minY > node.position.y + node.height
+            ) {
+                return false;
+            }
 
-            // Check if source or target point of path segments hit rect
-            // This is a rough approximation for performance
+            const rect = { x: node.position.x, y: node.position.y, width: node.width, height: node.height };
             const pathPoints = [
                 { x: sourceX, y: sourceY },
                 { x: targetX, y: targetY }
@@ -739,6 +754,12 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
     const [readyPagesCount, setReadyPagesCount] = useState(0);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
     const [isCaptureMode, setIsCaptureMode] = useState(false);
+    
+    // Performance optimized history hook integration
+    const historyManager = useUndoRedo<{ nodes: any[], edges: any[] }>(
+        { nodes: [], edges: [] },
+        50 // Keep max 50 history steps
+    );
 
     const effectivePrintMode = isPrintMode || isCaptureMode;
 
@@ -1530,6 +1551,66 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
     const [nodes, setNodes, onNodesChange] = useNodesState(allNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(allEdges);
     const [showCoverWarning, setShowCoverWarning] = useState(false);
+    
+    // History sync mechanics: Push to history stack only when user ends drag/interact
+    const onNodesChangeWithHistory = useCallback((changes: any) => {
+        onNodesChange(changes);
+        const positionChange = changes.find((c: any) => c.type === 'position' && !c.dragging);
+        const removalChange = changes.find((c: any) => c.type === 'remove');
+        if (positionChange || removalChange) {
+            historyManager.set({ nodes, edges });
+        }
+    }, [nodes, edges, historyManager, onNodesChange]);
+
+    const onEdgesChangeWithHistory = useCallback((changes: any) => {
+        onEdgesChange(changes);
+        const hasAddOrRemove = changes.find((c: any) => c.type === 'add' || c.type === 'remove');
+        if (hasAddOrRemove) {
+             historyManager.set({ nodes, edges });
+        }
+    }, [nodes, edges, historyManager, onEdgesChange]);
+    
+    // Ctrl+Z Keyboard integration
+    useEffect(() => {
+        if (isPrintMode) return;
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                if (e.shiftKey) {
+                    if (historyManager.canRedo) {
+                        e.preventDefault();
+                        historyManager.redo();
+                        const nextState = historyManager.future[0]; // peek
+                        if(nextState) {
+                           setNodes(nextState.nodes);
+                           setEdges(nextState.edges);
+                        }
+                    }
+                } else if (historyManager.canUndo) {
+                    e.preventDefault();
+                    historyManager.undo();
+                    const previous = historyManager.past[historyManager.past.length - 1]; // peek 
+                    if(previous) {
+                        setNodes(previous.nodes);
+                        setEdges(previous.edges);
+                    }
+                }
+            } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+                if (historyManager.canRedo) {
+                    e.preventDefault();
+                    historyManager.redo();
+                    const nextState = historyManager.future[0]; // peek
+                    if(nextState) {
+                        setNodes(nextState.nodes);
+                        setEdges(nextState.edges);
+                    }
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isPrintMode, historyManager, setNodes, setEdges]);
 
     const handleResetEdge = useCallback((edgeId: string) => {
         const defaultEdge = allEdges.find(e => e.id === edgeId);
@@ -1622,6 +1703,10 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
         }
 
         setNodes(allNodes);
+        
+        // Setup initial history
+        historyManager.set({ nodes: allNodes, edges: allEdges });
+        
         isInitialLoad.current = false;
     }, [sopData?.id, sopData?.sopFlowchart, isPrintMode]);
 
@@ -2307,8 +2392,8 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                     <ReactFlow
                         nodes={nodes}
                         edges={edges}
-                        onNodesChange={onNodesChange}
-                        onEdgesChange={onEdgesChange}
+                        onNodesChange={onNodesChangeWithHistory}
+                        onEdgesChange={onEdgesChangeWithHistory}
                         onConnect={onConnect}
                         onReconnect={onReconnect}
                         connectionMode={ConnectionMode.Loose}
@@ -2316,6 +2401,8 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                         edgeTypes={edgeTypes}
                         onInit={onInit}
                         fitView
+                        onlyRenderVisibleElements={true}
+                        nodeDragThreshold={5}
                         className="bg-transparent"
                     >
                         <EnergyBeamFilters />
