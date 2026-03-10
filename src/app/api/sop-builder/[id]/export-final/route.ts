@@ -198,7 +198,8 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
         let imgBuffer: Buffer;
         let allBreakpoints: any;
 
-        const isProd = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+        const isVercel = process.env.VERCEL === '1';
+        const isWin = process.platform === 'win32';
 
         if (clientImage && clientBreakpoints) {
             console.log('🖼️ [Hybrid] Using client-provided flowchart image and breakpoints');
@@ -207,11 +208,11 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
         } else {
             console.log('🚀 [Legacy] Launching Puppeteer for flowchart capture...');
             browser = await puppeteer.launch({
-                args: isProd ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
-                defaultViewport: isProd ? chromium.defaultViewport : { width: 1600, height: 1200 },
-                executablePath: isProd ? await chromium.executablePath() : undefined,
-                channel: isProd ? undefined : 'chrome',
-                headless: (isProd ? chromium.headless : true) as any,
+                args: (isVercel && !isWin) ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+                defaultViewport: (isVercel && !isWin) ? chromium.defaultViewport : { width: 1600, height: 1200 },
+                executablePath: (isVercel && !isWin) ? await chromium.executablePath() : undefined,
+                channel: isWin ? 'chrome' : ((isVercel && !isWin) ? undefined : 'chrome'),
+                headless: (isVercel && !isWin) ? chromium.headless : true,
             });
 
             const page = await browser.newPage();
@@ -335,11 +336,11 @@ async function processExport(sopId: string, baseUrl: string, clientImage?: strin
         if (!browser) {
             console.log('🚀 [Step C] Launching browser for PDF generation...');
             browser = await puppeteer.launch({
-                args: isProd ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
-                defaultViewport: isProd ? chromium.defaultViewport : { width: 1600, height: 1200 },
-                executablePath: isProd ? await chromium.executablePath() : undefined,
-                channel: isProd ? undefined : 'chrome',
-                headless: (isProd ? chromium.headless : true) as any,
+                args: (isVercel && !isWin) ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+                defaultViewport: (isVercel && !isWin) ? chromium.defaultViewport : { width: 1600, height: 1200 },
+                executablePath: (isVercel && !isWin) ? await chromium.executablePath() : undefined,
+                channel: isWin ? 'chrome' : ((isVercel && !isWin) ? undefined : 'chrome'),
+                headless: (isVercel && !isWin) ? chromium.headless : true,
             });
         }
 

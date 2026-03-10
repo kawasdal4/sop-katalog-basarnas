@@ -835,10 +835,10 @@ export default function SopBuilderForm({
                                             {/* Matrix Header Labels - Hidden on Mobile */}
                                             <div className="hidden lg:grid lg:grid-cols-[repeat(16,minmax(0,1fr))] gap-4 px-10 py-5 bg-white/[0.03] border-b border-white/5 text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] relative overflow-hidden">
                                                 <div className="col-span-1 flex items-center justify-center border-r border-white/5">NO</div>
-                                                <div className="col-span-4">Aktivitas Prosedur</div>
-                                                <div className="col-span-2">Pelaksana</div>
+                                                <div className="col-span-3">Aktivitas Prosedur</div>
+                                                <div className="col-span-4">Pelaksana</div>
                                                 <div className="col-span-3">Mutu Baku (Kelengkapan)</div>
-                                                <div className="col-span-2">Mutu Baku (Waktu)</div>
+                                                <div className="col-span-1">Mutu Baku (Waktu)</div>
                                                 <div className="col-span-2">Mutu Baku (Output)</div>
                                                 <div className="col-span-2">Keterangan</div>
                                             </div>
@@ -853,7 +853,7 @@ export default function SopBuilderForm({
                                                             animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                                                             exit={{ opacity: 0, scale: 0.9, filter: 'blur(20px)' }}
                                                             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                                                            className="relative p-10 flex flex-col lg:grid lg:grid-cols-[repeat(16,minmax(0,1fr))] gap-4 items-start group/row hover:bg-white/[0.02] transition-colors duration-500"
+                                                            className="relative p-10 flex flex-col lg:grid lg:grid-cols-[repeat(16,minmax(0,1fr))] gap-4 items-stretch group/row hover:bg-white/[0.02] transition-colors duration-500"
                                                         >
                                                             {/* Row Selection Glow */}
                                                             <div className="absolute inset-y-0 left-0 w-1 bg-orange-500 opacity-0 group-hover/row:opacity-100 transition-opacity" />
@@ -909,7 +909,7 @@ export default function SopBuilderForm({
                                                             </div>
 
                                                             {/* Activity Core */}
-                                                            <div className="col-span-4 space-y-6 w-full">
+                                                            <div className="col-span-3 space-y-6 w-full min-w-0">
                                                                 <div className="space-y-3">
                                                                     <div className="flex items-center gap-2 mb-2 lg:hidden">
                                                                         <div className="w-1 h-3 bg-orange-500 rounded-full" />
@@ -964,7 +964,7 @@ export default function SopBuilderForm({
                                                             </div>
 
                                                             {/* Secondary Grids */}
-                                                            <div className="col-span-2 space-y-4 w-full">
+                                                            <div className="col-span-4 space-y-4 w-full min-w-0">
                                                                 <div className="flex items-center gap-2 mb-2 lg:hidden">
                                                                     <div className="w-1 h-3 bg-blue-500 rounded-full" />
                                                                     <Label className="text-[10px] font-black uppercase tracking-widest text-slate-100">Pelaksana</Label>
@@ -988,7 +988,7 @@ export default function SopBuilderForm({
                                                                 {errors?.langkahLangkah?.[index]?.pelaksana && <p className="text-[9px] text-red-400 font-black uppercase tracking-widest pl-2">Assignee Required</p>}
                                                             </div>
 
-                                                            <div className="col-span-3 w-full space-y-4">
+                                                            <div className="col-span-3 w-full space-y-4 min-w-0">
                                                                 <div className="flex items-center gap-2 mb-2 lg:hidden">
                                                                     <div className="w-1 h-3 bg-indigo-500 rounded-full" />
                                                                     <Label className="text-[10px] font-black uppercase tracking-widest text-slate-100">Kelengkapan</Label>
@@ -998,17 +998,17 @@ export default function SopBuilderForm({
                                                                 </AuditPreview>
                                                             </div>
 
-                                                            <div className="col-span-2 w-full space-y-4">
+                                                            <div className="col-span-1 w-full space-y-4 min-w-0">
                                                                 <div className="flex items-center gap-2 mb-2 lg:hidden">
                                                                     <div className="w-1 h-3 bg-cyan-500 rounded-full" />
                                                                     <Label className="text-[10px] font-black uppercase tracking-widest text-slate-100">Waktu</Label>
                                                                 </div>
                                                                 <AuditPreview content={watch(`langkahLangkah.${index}.mutuBakuWaktu`)} title="CRYPTO: Time Complexity">
-                                                                    <Input {...register(`langkahLangkah.${index}.mutuBakuWaktu`)} placeholder="5 mnt" className="bg-white/5 border-white/10 text-white rounded-2xl h-14 text-sm font-black px-2 focus:border-cyan-500/50 placeholder:text-slate-700 transition-all text-center" />
+                                                                    <Input {...register(`langkahLangkah.${index}.mutuBakuWaktu`)} placeholder="5 mnt" className="bg-white/5 border-white/10 text-white rounded-2xl h-14 text-sm font-black px-1 focus:border-cyan-500/50 placeholder:text-slate-700 transition-all text-center" />
                                                                 </AuditPreview>
                                                             </div>
 
-                                                            <div className="col-span-2 w-full space-y-4">
+                                                            <div className="col-span-2 w-full space-y-4 min-w-0">
                                                                 <div className="flex items-center gap-2 mb-2 lg:hidden">
                                                                     <div className="w-1 h-3 bg-emerald-500 rounded-full" />
                                                                     <Label className="text-[10px] font-black uppercase tracking-widest text-slate-100">Output</Label>
@@ -1018,7 +1018,7 @@ export default function SopBuilderForm({
                                                                 </AuditPreview>
                                                             </div>
 
-                                                            <div className="col-span-2 w-full space-y-4">
+                                                            <div className="col-span-2 w-full space-y-4 min-w-0">
                                                                 <div className="flex items-center gap-2 mb-2 lg:hidden">
                                                                     <div className="w-1 h-3 bg-purple-500 rounded-full" />
                                                                     <Label className="text-[10px] font-black uppercase tracking-widest text-slate-100">Keterangan</Label>

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useRef, useState, useEffect, memo } from 'react';
 import {
     ReactFlow,
     useNodesState,
@@ -185,11 +185,11 @@ const OffPageConnector = ({ data }: any) => {
 
 const nodeTypes = {
     sopNode: SopFlowchartNode,
-    headerNode: HeaderNode,
-    infoNode: InfoNode,
-    gapColumnNode: GapColumnNode,
-    waypointNode: WaypointNode,
-    offPageConnector: OffPageConnector,
+    headerNode: memo(HeaderNode),
+    infoNode: memo(InfoNode),
+    gapColumnNode: memo(GapColumnNode),
+    waypointNode: memo(WaypointNode),
+    offPageConnector: memo(OffPageConnector),
 };
 
 // --- ENERGY BEAM FILTERS ---
@@ -495,7 +495,7 @@ const SopEdge = ({
 };
 
 const edgeTypes = {
-    sopEdge: SopEdge,
+    sopEdge: memo(SopEdge),
 };
 
 // --- LAYOUT CONSTANTS ---
@@ -737,20 +737,10 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
     const [isSavingPaths, setIsSavingPaths] = useState(false);
     const [isExportingState, setIsExportingState] = useState(false);
     const [readyPagesCount, setReadyPagesCount] = useState(0);
-    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
     const [isCaptureMode, setIsCaptureMode] = useState(false);
 
     const effectivePrintMode = isPrintMode || isCaptureMode;
-
-    const handleMouseMove = useCallback((e: any) => {
-        if (!reactFlowWrapper.current) return;
-        const rect = reactFlowWrapper.current.getBoundingClientRect();
-        setMousePos({
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
-        });
-    }, []);
 
     const { pagesData, allNodes, allEdges } = useMemo(() => {
         try {
@@ -2126,7 +2116,6 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     className="flex-1 relative w-full h-full"
-                    onMouseMove={handleMouseMove}
                 >
                     {/* --- HOLOGRAPHIC NEBULA INFRASTRUCTURE --- */}
                     <div className="absolute inset-0 z-0 bg-[#00020a] overflow-hidden">
@@ -2177,9 +2166,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                                             width: i % 5 === 0 ? '4px' : '2px',
                                             height: i % 5 === 0 ? '4px' : '2px',
                                             backgroundColor: i % 3 === 0 ? '#fb923c' : i % 3 === 1 ? '#818cf8' : '#fff',
-                                            filter: 'blur(1px)',
-                                            left: (mousePos.x / (40 + i * 2)) + 'px',
-                                            top: (mousePos.y / (40 + i * 2)) + 'px'
+                                            filter: 'blur(1px)'
                                         }}
                                     />
                                 ))}
