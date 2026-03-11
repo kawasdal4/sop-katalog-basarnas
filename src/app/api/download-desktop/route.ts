@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client'
 
 // Use existing prisma instance if in global or create a new one
 // Based on typical nextjs prisma setups
-import prisma from '@/lib/prisma'
+import { db as prisma } from '@/lib/db'
 
 export async function GET(request: Request) {
   try {
