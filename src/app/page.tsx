@@ -8449,10 +8449,10 @@ export default function ESOPApp() {
                                                 )
                                               ) : (
                                                 /* Web Edit Flow (Manual Sync Button) */
-                                                <TooltipProvider delayDuration={300}>
-                                                  <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                      <div className="flex items-center gap-1">
+                                                <div className="flex items-center gap-1">
+                                                  <TooltipProvider delayDuration={300}>
+                                                    <Tooltip>
+                                                      <TooltipTrigger asChild>
                                                         <Button 
                                                           size="icon" 
                                                           variant="ghost" 
@@ -8461,6 +8461,14 @@ export default function ESOPApp() {
                                                         >
                                                           <RefreshCw className={`w-4 h-4 ${desktopSyncing ? 'animate-spin' : ''}`} />
                                                         </Button>
+                                                      </TooltipTrigger>
+                                                      <TooltipContent className="bg-slate-900 border-slate-700 text-white font-bold">
+                                                        Upload & Sync
+                                                      </TooltipContent>
+                                                    </Tooltip>
+
+                                                    <Tooltip>
+                                                      <TooltipTrigger asChild>
                                                         <Button 
                                                           size="icon" 
                                                           variant="ghost" 
@@ -8469,13 +8477,13 @@ export default function ESOPApp() {
                                                         >
                                                           <X className="w-4 h-4" />
                                                         </Button>
-                                                      </div>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent className="bg-slate-900 border-slate-700 text-white font-bold">
-                                                      Sync Manual / Selesai
-                      </TooltipContent>
-                                                  </Tooltip>
-                                                </TooltipProvider>
+                                                      </TooltipTrigger>
+                                                      <TooltipContent className="bg-slate-900 border-slate-700 text-white font-bold">
+                                                        Selesai Edit
+                                                      </TooltipContent>
+                                                    </Tooltip>
+                                                  </TooltipProvider>
+                                                </div>
                                               )
                                             ) : (
                                               /* Fallback / Excel Online (if applicable) */
