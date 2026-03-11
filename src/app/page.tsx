@@ -9828,10 +9828,7 @@ export default function ESOPApp() {
                         </>
                       )}
                     </div>
-                  </div>
-
                 </div>
-
                 {/* Info Alert (Only show if we have excelEditData) */}
                 {excelEditData && (
                   <Alert className="bg-amber-50 border-amber-200">
