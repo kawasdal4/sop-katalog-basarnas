@@ -66,10 +66,10 @@ jobs:
           # Construct the notification payload
           # Note: In a real scenario, you'd fetch the actual asset URLs from the GH API 
           # but here we point to the expected release asset path.
-          $downloadUrl = "https://github.com/$repo/releases/download/$tag/E-Katalog-SOP_${version}_x64_en-US.msi"
+          $downloadUrl = "https://github.com/$repo/releases/download/$tag/E-Katalog.SOP_${version}_x64_en-US.msi"
           # Tauri uses .msi or .exe depending on config. Current config is ["msi", "nsis"]
           # If using NSIS, it's .exe
-          $downloadUrl = "https://github.com/$repo/releases/download/$tag/E-Katalog-SOP_${version}_x64-setup.exe"
+          $downloadUrl = "https://github.com/$repo/releases/download/$tag/E-Katalog.SOP_${version}_x64-setup.exe"
           
           # Signatures are usually in the same place with .sig extension
           $sigUrl = "$downloadUrl.sig"
