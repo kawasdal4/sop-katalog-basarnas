@@ -1,0 +1,49 @@
+{
+  "productName": "E-Katalog SOP",
+  "version": "1.0.0",
+  "identifier": "com.basarnas.ekatalogsop",
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "devUrl": "http://localhost:3005",
+    "frontendDist": "https://e-katalog-sop.cloud"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "E-Katalog SOP",
+        "width": 1300,
+        "height": 850,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi", "nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "compression": "lzma"
+      }
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    },
+    "notification": {},
+    "clipboard": {},
+    "sql": {}
+  }
+}

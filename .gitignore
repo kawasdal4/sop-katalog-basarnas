@@ -58,7 +58,8 @@ server.log
 /worklog.md// redeploy trigger 1772344137
 
 /tmp/
-/desktop/
+/desktop/src-tauri/target/
+/desktop/node_modules/
 
 .env*.local
 .vercel

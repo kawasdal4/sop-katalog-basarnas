@@ -1,0 +1,11 @@
+{
+  "name": "desktop-wrapper",
+  "version": "1.0.0",
+  "description": "Tauri wrapper for E-Katalog SOP",
+  "scripts": {
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^1.6.0"
+  }
+}
