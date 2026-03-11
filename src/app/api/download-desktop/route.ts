@@ -48,12 +48,22 @@ export async function GET(request: Request) {
     }
 
     // Redirect the user's browser to the installer file directly
-    return NextResponse.redirect(latestRelease.downloadUrl)
+    if (!latestRelease.downloadUrl) {
+        throw new Error('Download URL is empty');
+    }
+    
+    // Ensure the URL is absolute
+    const targetUrl = latestRelease.downloadUrl.startsWith('http') 
+        ? latestRelease.downloadUrl 
+        : `https://${latestRelease.downloadUrl}`;
+
+    return NextResponse.redirect(targetUrl, 302)
 
   } catch (error) {
     console.error('Download Desktop Error:', error)
+    // Return standard error to avoid Vercel 503 crashes
     return NextResponse.json(
-      { error: 'Terjadi kesalahan sistem saat mengambil path unduhan.' },
+      { error: 'Terjadi kesalahan sistem saat mengambil path unduhan.', details: String(error) },
       { status: 500 }
     )
   }

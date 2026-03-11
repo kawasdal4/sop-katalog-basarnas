@@ -68,7 +68,8 @@ const handleNativePreview = async (url: string) => {
             }
         }
     }
-    window.location.href = url;
+    // Web version: use window.open instead of location.href to preserve current page
+    window.open(url, '_blank');
     return false;
 };
 
@@ -1927,6 +1928,13 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
         }
 
         setIsExportingState(true);
+
+        // Web popup bypass: Pre-open blank tab
+        let exportTab: Window | null = null;
+        if (!isTauri) {
+            exportTab = window.open('about:blank', '_blank');
+        }
+
         try {
             toast.info("Memulai proses ekspor PDF...");
 
@@ -2029,7 +2037,15 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
             if (resData.downloadUrl) {
                 setIsExportingState(false);
                 toast.success("PDF berhasil dibuat!");
-                await handleNativePreview(resData.downloadUrl);
+                
+                if (isTauri) {
+                    await handleNativePreview(resData.downloadUrl);
+                } else if (exportTab) {
+                    exportTab.location.href = resData.downloadUrl;
+                } else {
+                    window.open(resData.downloadUrl, '_blank');
+                }
+
                 if (onExportFinal) onExportFinal(resData.downloadUrl);
                 return;
             }
@@ -2089,7 +2105,15 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                         if (downloadUrl) {
                             setIsExportingState(false);
                             toast.success("PDF berhasil dibuat!");
-                            await handleNativePreview(downloadUrl);
+
+                            if (isTauri) {
+                                await handleNativePreview(downloadUrl);
+                            } else if (exportTab) {
+                                exportTab.location.href = downloadUrl;
+                            } else {
+                                window.open(downloadUrl, '_blank');
+                            }
+
                             if (onExportFinal) onExportFinal(downloadUrl);
                             return;
                         } else {

@@ -153,8 +153,8 @@ export default function PrintLoadingDialog({ open, onClose, fileId, fileName, fi
 
       if (onComplete) onComplete()
 
-      const isTauri = typeof window !== 'undefined' && ((window as any).__TAURI__ !== undefined || (window as any).__TAURI_INTERNALS__ !== undefined);
-      if (isTauri) {
+      const isTauriEnv = typeof window !== 'undefined' && ((window as any).__TAURI__ !== undefined || (window as any).__TAURI_INTERNALS__ !== undefined);
+      if (isTauriEnv) {
         const tauri = (window as any).__TAURI__;
         const invoke = tauri?.core?.invoke || tauri?.invoke;
         
@@ -172,6 +172,7 @@ export default function PrintLoadingDialog({ open, onClose, fileId, fileName, fi
             if (filePath) {
                console.log('[Native Print] Opening path:', filePath);
                await invoke('native_open', { path: filePath });
+               // Auto-close dialog for desktop after success
                setTimeout(() => onClose(), 2000);
                return;
             }
@@ -181,6 +182,8 @@ export default function PrintLoadingDialog({ open, onClose, fileId, fileName, fi
         }
       }
 
+      // Web behavior: Manual preview button available, but we attempt to open
+      // Most browsers will block this window.open if it wasn't triggered by direct click
       const newTab = window.open(blobUrl, '_blank')
       if (newTab) {
         setTimeout(() => onClose(), 2000)

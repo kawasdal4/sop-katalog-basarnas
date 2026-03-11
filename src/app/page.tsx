@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { isTauri } from '@tauri-apps/api/core';
+import { isTauri as isTauriFn } from '@tauri-apps/api/core';
+const isTauri = typeof window !== 'undefined' && ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined);
 import { readDir, BaseDirectory, watch } from '@tauri-apps/plugin-fs';
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -251,6 +252,10 @@ const openExternal = async (url: string) => {
       console.warn('[Native] Tauri invoke not found, falling back to window.open');
     }
   }
+  
+  // Web fallback with popup blocker bypass check
+  // Note: For true bypass, window.open should be called BEFORE async work.
+  // This helper is a late-stage fallback.
   window.open(url, '_blank');
   return false;
 };
@@ -2772,6 +2777,12 @@ export default function ESOPApp() {
 
     const fileExtension = sop.fileName.toLowerCase().split('.').pop()
     setPreviewLoading(id) // Start loading animation
+    
+    // Web popup bypass: Pre-open blank tab
+    let previewTab: Window | null = null;
+    if (!isTauri) {
+      previewTab = window.open('about:blank', '_blank');
+    }
 
     try {
       // For PDF files - download directly from R2 and open
@@ -2782,12 +2793,21 @@ export default function ESOPApp() {
         if (res.ok && (contentType.includes('application/pdf') || contentType === '')) {
           const blob = await res.blob()
           if (blob.size === 0) {
+            if (previewTab) previewTab.close();
             toast({ title: '⚠️ File Kosong', description: 'File ini tidak memiliki isi (0 bytes).', variant: 'destructive' })
             setPreviewLoading(null)
             return
           }
           const url = window.URL.createObjectURL(blob)
-          await openExternal(url)
+          
+          if (isTauri) {
+            await openExternal(url)
+          } else if (previewTab) {
+            previewTab.location.href = url;
+          } else {
+            window.open(url, '_blank');
+          }
+          
           setPreviewLoading(null)
           fetchStats()
           return
@@ -3385,13 +3405,6 @@ export default function ESOPApp() {
       const sanitizeFileName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100)
       const customFileName = `${sanitizeFileName(sop.judul)}.${fileExt}`
 
-      console.log('🔍 [Desktop Edit] SOP Data:', {
-        id: sop.id,
-        judul: sop.judul,
-        fileName: sop.fileName,
-        customFileName
-      })
-
       // Download file with session
       const res = await fetch('/api/excel-edit/download', {
         method: 'POST',
@@ -3416,85 +3429,41 @@ export default function ESOPApp() {
       }
 
       if (!res.ok) {
-        let errorMessage = 'Gagal mengunduh file'
-        let errorDetails = ''
-
-        try {
-          const contentType = res.headers.get('content-type')
-          if (contentType && contentType.includes('application/json')) {
-            const errorData = await res.json()
-            errorMessage = errorData.error || errorMessage
-            errorDetails = errorData.details || ''
-          } else {
-            // Handle non-JSON response
-            const textError = await res.text()
-            console.error('Non-JSON error response:', textError)
-            errorMessage = `Server error (${res.status})`
-          }
-        } catch (parseError) {
-          console.error('Error parsing response:', parseError)
-          errorMessage = `Gagal mengunduh file (${res.status})`
-        }
-
-        console.error('❌ [Desktop Edit] Download error:', {
-          status: res.status,
-          statusText: res.statusText,
-          errorMessage,
-          errorDetails
-        })
-
-        throw new Error(errorDetails ? `${errorMessage}: ${errorDetails}` : errorMessage)
+        throw new Error(`Gagal mengunduh file (${res.status})`)
       }
 
       // Get session info from headers
       const sessionId = res.headers.get('X-Edit-Session-Id')
-      const sessionExpires = res.headers.get('X-Edit-Session-Expires')
       const originalHash = res.headers.get('X-Original-Hash')
       const serverFilename = res.headers.get('X-Custom-Filename')
-      const lastEditorEmail = res.headers.get('X-Last-Editor-Email')
-      const lastEditorName = res.headers.get('X-Last-Editor-Name')
-      const lastEditorTime = res.headers.get('X-Last-Editor-Time')
-
-      console.log('📥 [Desktop Edit] Response headers:', {
-        sessionId: sessionId ? 'received' : 'missing',
-        sessionExpires,
-        originalHash: originalHash ? 'received' : 'missing',
-        serverFilename,
-        lastEditorEmail
-      })
-
-      if (!sessionId) {
-        throw new Error('Session ID tidak diterima')
-      }
-
-      // Use server filename as primary, fallback to local customFileName
       const finalFileName = serverFilename || customFileName
-      console.log(`📁 [Desktop Edit] Final filename: "${finalFileName}"`)
 
-      // Store session
+      if (!sessionId) throw new Error('Session ID tidak diterima')
+
+      // Store session metadata
       setDesktopEditSessionToken(sessionId)
       setDesktopEditOriginalHash(originalHash)
       setExcelEditData(sop)
-
-      // Persist to localStorage to survive page reloads
       localStorage.setItem('desktopEditSessionToken', sessionId || '')
       localStorage.setItem('desktopEditOriginalHash', originalHash || '')
       localStorage.setItem('excelEditData', JSON.stringify(sop))
 
-      // Get file blob
       const blob = await res.blob()
 
-      // Native download for Tauri
+      // Desktop/Tauri Flow: Auto-open and Watch
       if (isTauri) {
-        const filePath = await handleNativeDownload(blob, finalFileName || 'document')
-        if (filePath === null) return // User cancelled
+        const filePath = await handleNativeDownload(blob, finalFileName)
+        if (filePath === null) {
+          setPreviewLoading(null)
+          return
+        }
+        
         if (filePath) {
           setDesktopEditLocalPath(filePath)
-          
           const fileTypeLabel = sop.fileType === 'docx' || sop.fileType === 'doc' ? 'Word' : 'Excel'
           toast({ 
             title: '✅ File Diunduh & Dibuka', 
-            description: `File sedang dibuka di ${fileTypeLabel}. Kami memantau file ini. Setiap kali Anda menekan Save (Ctrl+S), aplikasi akan otomatis Sync ke R2.`, 
+            description: `File sedang dibuka di ${fileTypeLabel}. Sistem akan otomatis sinkronisasi saat Anda menekan Save (Ctrl+S).`, 
             duration: 10000 
           })
 
@@ -3504,82 +3473,43 @@ export default function ESOPApp() {
           if (invoke) {
             try {
                await invoke('native_open', { path: filePath });
-               
-               // Start watching the file
                const { watch } = await import('@tauri-apps/plugin-fs');
                const unwatch = await watch(filePath, async (event) => {
-                 console.log('[Watcher] Event detected:', event);
-                 
-                 // If event.type is Modify or contains Modify (varies by OS/Tauri version)
                  const typeStr = JSON.stringify(event.type);
                  if (typeStr.includes('modify') || typeStr.includes('Modify') || typeStr.includes('any') || typeStr.includes('Any')) {
-                     console.log('[Watcher] File modified, triggering Auto-Sync...');
-                     
-                     // Debounce or slight delay to ensure write is complete
                      setTimeout(async () => {
                         try {
                            const { readFile } = await import('@tauri-apps/plugin-fs');
                            const fileBytes = await readFile(filePath);
-                           
-                           // Create blob/file from bytes
                            const updatedBlob = new Blob([fileBytes]);
-                           const fileToSync = new File([updatedBlob], finalFileName || 'document.xlsx');
-                           
-                           // Set the file to trigger sync
+                           const fileToSync = new File([updatedBlob], finalFileName);
                            setDesktopSyncFile(fileToSync);
-                           
-                           // Auto call handleDesktopSync (Need to make sure state is accessible or pass directly)
-                           // Because we are in a closure, we use the stored sessionId
                            autoSync(fileToSync, sessionId, sop);
-                           
-                        } catch(readErr) {
-                           console.error('[Watcher] Error reading modified file:', readErr);
-                        }
-                     }, 1000); // 1 second delay to avoid read locks
+                        } catch(readErr) { console.error('[Watcher] Read error:', readErr); }
+                     }, 1000);
                  }
                });
-               
                setUnwatchDesktopFile(() => unwatch);
-
-            } catch (err) {
-               console.error('[Desktop Edit] Failed to native_open or watch:', err);
-            }
+            } catch (err) { console.error('[Desktop] Failed to open or watch:', err); }
           }
-          return
         }
+      } else {
+        // Web Flow: Standard Download
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = finalFileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        toast({ title: '✅ File Diunduh', description: 'Buka file dari folder Download Anda untuk mengedit.', duration: 8000 });
       }
-
-      // Fallback for browser
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = finalFileName || 'document'
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(url)
-
-      // Show session info
-      const fileTypeLabel = sop.fileType === 'docx' || sop.fileType === 'doc' ? 'Word' : 'Excel'
-      let description = `Edit file di ${fileTypeLabel} Desktop, lalu klik "Selesai Edit & Sync" untuk upload. Sesi tidak ada batas waktu.`
-      if (lastEditorEmail) {
-        description += ` Terakhir diedit oleh ${lastEditorName || lastEditorEmail}.`
-      }
-
-      toast({
-        title: '✅ File Diunduh',
-        description,
-        duration: 8000
-      })
-
     } catch (error) {
       console.error('Desktop edit error:', error)
-      toast({
-        title: '❌ Error',
-        description: error instanceof Error ? error.message : 'Gagal mengunduh file',
-        variant: 'destructive',
-        duration: 5000
-      })
+      toast({ title: '❌ Error', description: error instanceof Error ? error.message : 'Gagal mengunduh file', variant: 'destructive', duration: 5000 })
+    } finally {
+      setPreviewLoading(null)
     }
   }
 
