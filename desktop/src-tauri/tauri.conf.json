@@ -20,7 +20,8 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "withGlobalTauri": true
     }
   },
   "bundle": {
@@ -45,6 +46,8 @@
     },
     "notification": null,
     "clipboard-manager": null,
-    "sql": null
+    "sql": null,
+    "dialog": {},
+    "fs": {}
   }
 }

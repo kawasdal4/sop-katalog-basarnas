@@ -32,7 +32,27 @@ import {
 } from 'lucide-react';
 import { toPng, toJpeg } from 'html-to-image';
 import { toast } from 'sonner';
-import { isTauri, syncService } from '@/lib/sync/syncService';
+import { isTauri as isTauriSync, syncService } from '@/lib/sync/syncService';
+
+// Tauri Detection
+const isTauri = typeof window !== 'undefined' && ((window as any).__TAURI__ !== undefined || (window as any).__TAURI_INTERNALS__ !== undefined);
+
+const handleNativePreview = async (url: string) => {
+    if (isTauri) {
+        const tauri = (window as any).__TAURI__;
+        const shellOpen = tauri?.shell?.open || tauri?.plugins?.shell?.open;
+        if (shellOpen) {
+            try {
+                await shellOpen(url);
+                return true;
+            } catch (err) {
+                console.error('Tauri shell.open failed:', err);
+            }
+        }
+    }
+    window.location.href = url;
+    return false;
+};
 
 // --- CUSTOM NODES ---
 
@@ -1991,7 +2011,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
             if (resData.downloadUrl) {
                 setIsExportingState(false);
                 toast.success("PDF berhasil dibuat!");
-                window.location.href = resData.downloadUrl;
+                await handleNativePreview(resData.downloadUrl);
                 if (onExportFinal) onExportFinal(resData.downloadUrl);
                 return;
             }
@@ -2051,7 +2071,7 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                         if (downloadUrl) {
                             setIsExportingState(false);
                             toast.success("PDF berhasil dibuat!");
-                            window.location.href = downloadUrl;
+                            await handleNativePreview(downloadUrl);
                             if (onExportFinal) onExportFinal(downloadUrl);
                             return;
                         } else {

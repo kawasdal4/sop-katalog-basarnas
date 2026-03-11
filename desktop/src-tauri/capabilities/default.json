@@ -16,6 +16,8 @@
     "notification:default",
     "clipboard-manager:default",
     "sql:default",
-    "log:default"
+    "log:default",
+    "dialog:default",
+    "fs:default"
   ]
 }

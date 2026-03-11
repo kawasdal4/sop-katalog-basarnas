@@ -153,6 +153,21 @@ export default function PrintLoadingDialog({ open, onClose, fileId, fileName, fi
 
       if (onComplete) onComplete()
 
+      const isTauri = typeof window !== 'undefined' && ((window as any).__TAURI__ !== undefined || (window as any).__TAURI_INTERNALS__ !== undefined);
+      if (isTauri) {
+        const tauri = (window as any).__TAURI__;
+        const shellOpen = tauri?.shell?.open || tauri?.plugins?.shell?.open;
+        if (shellOpen) {
+          try {
+            await shellOpen(blobUrl);
+            setTimeout(() => onClose(), 2000);
+            return;
+          } catch (err) {
+            console.error('Tauri shell.open failed:', err);
+          }
+        }
+      }
+
       const newTab = window.open(blobUrl, '_blank')
       if (newTab) {
         setTimeout(() => onClose(), 2000)

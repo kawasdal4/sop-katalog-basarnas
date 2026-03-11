@@ -201,6 +201,60 @@ const COLORS = ['#f97316', '#eab308', '#22c55e', '#ef4444', '#3b82f6']
 
 const LINGKUP_COLORS = ['#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#22c55e', '#eab308', '#ef4444']
 
+// Tauri Detection & Native Helpers
+const isTauri = typeof window !== 'undefined' && ((window as any).__TAURI__ !== undefined || (window as any).__TAURI_INTERNALS__ !== undefined);
+
+const openExternal = async (url: string) => {
+  if (isTauri) {
+    const tauri = (window as any).__TAURI__;
+    const shellOpen = tauri?.shell?.open || tauri?.plugins?.shell?.open;
+    if (shellOpen) {
+      try {
+        // Don't use shell.open for blob URLs, it won't work
+        if (url.startsWith('blob:')) {
+           window.open(url, '_blank');
+           return true;
+        }
+        await shellOpen(url);
+        return true;
+      } catch (err) {
+        console.error('Tauri shell.open failed:', err);
+      }
+    }
+  }
+  window.open(url, '_blank');
+  return false;
+};
+
+const handleNativeDownload = async (blob: Blob, fileName: string) => {
+  if (isTauri) {
+    const tauri = (window as any).__TAURI__;
+    const save = tauri?.dialog?.save || tauri?.plugins?.dialog?.save;
+    const writeFile = tauri?.fs?.writeFile || tauri?.plugins?.fs?.writeFile;
+    
+    if (save && writeFile) {
+      try {
+        const fileExt = fileName.split('.').pop() || '';
+        const filePath = await save({
+          defaultPath: fileName,
+          filters: [{ name: 'Document', extensions: [fileExt] }]
+        });
+        
+        if (filePath) {
+          const bytes = new Uint8Array(await blob.arrayBuffer());
+          await writeFile(filePath, bytes);
+          return true;
+        }
+        return null; // User cancelled
+      } catch (err) {
+        console.error('Native download failed:', err);
+      }
+    }
+  }
+  return false;
+};
+
+
 const STATUS_COLORS: Record<string, string> = {
   'AKTIF': 'bg-green-100 text-green-800 border-green-200',
   'REVIEW': 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -2626,7 +2680,22 @@ export default function ESOPApp() {
       // Get file blob
       const blob = await res.blob()
 
-      // Create download link with custom filename
+      // Native download for Tauri
+      if (isTauri) {
+        const success = await handleNativeDownload(blob, customFileName)
+        if (success === null) {
+          setDownloadLoading(null)
+          return // User cancelled
+        }
+        if (success) {
+          setDownloadLoading(null)
+          toast({ title: '✅ Download Selesai', description: `File: ${customFileName}` })
+          fetchStats()
+          return
+        }
+      }
+
+      // Fallback for browser
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -2679,7 +2748,7 @@ export default function ESOPApp() {
             return
           }
           const url = window.URL.createObjectURL(blob)
-          window.open(url, '_blank')
+          await openExternal(url)
           setPreviewLoading(null)
           fetchStats()
           return
@@ -2700,7 +2769,7 @@ export default function ESOPApp() {
           }
           const data = JSON.parse(text)
           if (data.downloadUrl) {
-            window.open(data.downloadUrl, '_blank')
+            await openExternal(data.downloadUrl)
           }
         } catch (e) {
           console.error('[Preview PDF] Failed to parse JSON. Status:', res.status, 'Raw text:', text)
@@ -3308,7 +3377,17 @@ export default function ESOPApp() {
       // Get file blob
       const blob = await res.blob()
 
-      // Create download link with custom filename
+      // Native download for Tauri
+      if (isTauri) {
+        const success = await handleNativeDownload(blob, finalFileName || 'document')
+        if (success === null) return // User cancelled
+        if (success) {
+          toast({ title: '✅ File Diunduh', description, duration: 8000 })
+          return
+        }
+      }
+
+      // Fallback for browser
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -3533,7 +3612,7 @@ export default function ESOPApp() {
   // Open Excel Online in new tab
   const handleOpenExcelOnline = () => {
     if (!excelEditUrl) return
-    window.open(excelEditUrl, '_blank')
+    openExternal(excelEditUrl)
     toast({
       title: '📊 Excel Online Dibuka',
       description: 'Edit file di Excel Online. Setelah selesai dan disimpan, kembali ke sini untuk sync.',

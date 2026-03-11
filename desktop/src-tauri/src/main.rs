@@ -1,5 +1,5 @@
-// // Prevents additional console window on Windows in release, DO NOT REMOVE!!
-// #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+// Prevents additional console window on Windows in release, DO NOT REMOVE!!
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use tauri_plugin_log::{Target, TargetKind};
 
@@ -17,6 +17,8 @@ fn main() {
     .plugin(tauri_plugin_shell::init())
     .plugin(tauri_plugin_notification::init())
     .plugin(tauri_plugin_clipboard_manager::init())
+    .plugin(tauri_plugin_dialog::init())
+    .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_sql::Builder::default().build())
     .setup(|app| {
       log::info!("Application is starting up...");
