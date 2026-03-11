@@ -1,0 +1,41 @@
+name: "Release Desktop App"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/desktop-release.yml'
+  workflow_dispatch:
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Build and Release Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: "./desktop"
+          tagName: "desktop-v1.0.0-${{ github.run_id }}"
+          releaseName: "E-Katalog SOP Desktop v1.0.0"
+          releaseBody: "Automated desktop release generated via GitHub Actions."
+          releaseDraft: false
+          prerelease: false
