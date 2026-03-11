@@ -73,6 +73,7 @@ function RunningTitle() {
 }
 
 import { ClientSyncProvider } from "@/components/layout/ClientSyncProvider";
+import DesktopUpdateNotification from "@/components/DesktopUpdateNotification";
 
 export default function RootLayout({
   children,
@@ -90,6 +91,7 @@ export default function RootLayout({
       >
         <ClientSyncProvider>
           {children}
+          <DesktopUpdateNotification />
           <Toaster />
         </ClientSyncProvider>
       </body>
