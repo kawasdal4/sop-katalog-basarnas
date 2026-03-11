@@ -3492,9 +3492,10 @@ export default function ESOPApp() {
         toast({ title: '✅ File Diunduh', description: 'Buka file dari folder Download Anda untuk mengedit. Setelah selesai, upload file kembali di dialog sync.', duration: 8000 });
         
         // Kembalikan dialog sync untuk memilih file yang sudah di edit
-        setTimeout(() => {
-          setShowDesktopSyncDialog(true);
-        }, 1500);
+        // Disabled: User wants to open it manually via the sync button
+        // setTimeout(() => {
+        //   setShowDesktopSyncDialog(true);
+        // }, 1500);
       }
     } catch (error) {
       console.error('Desktop edit error:', error)

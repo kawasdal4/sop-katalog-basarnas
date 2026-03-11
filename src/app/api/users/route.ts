@@ -44,9 +44,9 @@ export async function GET() {
     const users = await db.$queryRawUnsafe(`
       SELECT 
         u.*, 
-        (SELECT COUNT(*) FROM Log l WHERE l.userId = u.id) as logCount
-      FROM User u
-      ORDER BY u.createdAt DESC
+        (SELECT COUNT(*) FROM "Log" l WHERE l."userId" = u."id") as "logCount"
+      FROM "User" u
+      ORDER BY u."createdAt" DESC
     `) as any[]
 
     // Transform users to include only needed fields and profile photo URLs
