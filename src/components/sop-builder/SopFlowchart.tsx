@@ -43,8 +43,25 @@ const handleNativePreview = async (url: string) => {
         const shellOpen = tauri?.shell?.open || tauri?.plugins?.shell?.open;
         if (shellOpen) {
             try {
-                await shellOpen(url);
-                return true;
+                if (url.startsWith('blob:')) {
+                    const res = await fetch(url);
+                    const blob = await res.blob();
+                    const bytes = new Uint8Array(await blob.arrayBuffer());
+                    const tempDir = await (tauri?.path?.tempDir || tauri?.plugins?.path?.tempDir)();
+                    const fs = tauri?.fs || tauri?.plugins?.fs;
+                    const join = tauri?.path?.join || tauri?.plugins?.path?.join;
+
+                    if (tempDir && fs && join) {
+                        const fileName = `flowchart_${Date.now()}.pdf`;
+                        const filePath = await join(tempDir, fileName);
+                        await fs.writeFile(filePath, bytes);
+                        await shellOpen(filePath);
+                        return true;
+                    }
+                } else {
+                    await shellOpen(url);
+                    return true;
+                }
             } catch (err) {
                 console.error('Tauri shell.open failed:', err);
             }

@@ -15,12 +15,22 @@
     "core:menu:default",
     "core:tray:default",
     "shell:default",
-    "shell:allow-open",
+    {
+      "identifier": "shell:allow-open",
+      "allow": [
+        { "schemes": ["http", "https", "mailto", "tel"] },
+        { "url": "https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/*" },
+        { "url": "https://*.sharepoint.com/*" },
+        { "url": "https://*.onedrive.live.com/*" },
+        { "url": "https://*.office.com/*" }
+      ]
+    },
     "notification:default",
     "clipboard-manager:default",
     "sql:default",
     "log:default",
     "dialog:default",
-    "fs:default"
+    "fs:default",
+    "path:default"
   ]
 }

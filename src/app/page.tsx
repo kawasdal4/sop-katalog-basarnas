@@ -208,15 +208,39 @@ const openExternal = async (url: string) => {
   if (isTauri) {
     const tauri = (window as any).__TAURI__;
     const shellOpen = tauri?.shell?.open || tauri?.plugins?.shell?.open;
+    const saveBlobToTemp = async (blobUrl: string) => {
+      try {
+        const res = await fetch(blobUrl);
+        const blob = await res.blob();
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        const tempDir = await (tauri?.path?.tempDir || tauri?.plugins?.path?.tempDir)();
+        const fs = tauri?.fs || tauri?.plugins?.fs;
+        const join = tauri?.path?.join || tauri?.plugins?.path?.join;
+        
+        if (tempDir && fs && join) {
+          const fileName = `preview_${Date.now()}.pdf`;
+          const filePath = await join(tempDir, fileName);
+          await fs.writeFile(filePath, bytes);
+          return filePath;
+        }
+      } catch (e) {
+        console.error('Failed to save blob to temp:', e);
+      }
+      return null;
+    };
+
     if (shellOpen) {
       try {
-        // Don't use shell.open for blob URLs, it won't work
         if (url.startsWith('blob:')) {
-           window.open(url, '_blank');
-           return true;
+           const tempPath = await saveBlobToTemp(url);
+           if (tempPath) {
+             await shellOpen(tempPath);
+             return true;
+           }
+        } else {
+          await shellOpen(url);
+          return true;
         }
-        await shellOpen(url);
-        return true;
       } catch (err) {
         console.error('Tauri shell.open failed:', err);
       }
@@ -9590,8 +9614,30 @@ export default function ESOPApp() {
                                   id="desktop-sync-file"
                                 />
                                 <label
-                                  htmlFor="desktop-sync-file"
                                   className="cursor-pointer"
+                                  onClick={async (e) => {
+                                    if (isTauri) {
+                                      e.preventDefault();
+                                      const tauri = (window as any).__TAURI__;
+                                      const open = tauri?.dialog?.open || tauri?.plugins?.dialog?.open;
+                                      const readFile = tauri?.fs?.readFile || tauri?.plugins?.fs?.readFile;
+                                      if (open && readFile) {
+                                        try {
+                                          const selected = await open({
+                                            filters: [{ name: 'Document', extensions: ['xlsx', 'xls', 'xlsm', 'docx', 'doc'] }]
+                                          });
+                                          if (selected && typeof selected === 'string') {
+                                            const bytes = await readFile(selected);
+                                            const file = new File([bytes], selected.split(/[\\/]/).pop() || 'document', { type: 'application/octet-stream' });
+                                            setDesktopSyncFile(file);
+                                          }
+                                        } catch (err) {
+                                          console.error('Native file open failed:', err);
+                                        }
+                                      }
+                                    }
+                                  }}
+                                  htmlFor={isTauri ? undefined : "desktop-sync-file"}
                                 >
                                   {desktopSyncFile ? (
                                     <div className="flex items-center justify-center gap-2">

@@ -159,11 +159,24 @@ export default function PrintLoadingDialog({ open, onClose, fileId, fileName, fi
         const shellOpen = tauri?.shell?.open || tauri?.plugins?.shell?.open;
         if (shellOpen) {
           try {
-            await shellOpen(blobUrl);
-            setTimeout(() => onClose(), 2000);
-            return;
+            // Save blob to temp path first
+            const res = await fetch(blobUrl);
+            const blob = await res.blob();
+            const bytes = new Uint8Array(await blob.arrayBuffer());
+            const tempDir = await (tauri?.path?.tempDir || tauri?.plugins?.path?.tempDir)();
+            const fs = tauri?.fs || tauri?.plugins?.fs;
+            const join = tauri?.path?.join || tauri?.plugins?.path?.join;
+
+            if (tempDir && fs && join) {
+               const fileName = `print_${Date.now()}.pdf`;
+               const filePath = await join(tempDir, fileName);
+               await fs.writeFile(filePath, bytes);
+               await shellOpen(filePath);
+               setTimeout(() => onClose(), 2000);
+               return;
+            }
           } catch (err) {
-            console.error('Tauri shell.open failed:', err);
+            console.error('Tauri native print preview failed:', err);
           }
         }
       }
