@@ -5,6 +5,8 @@ import { PrismaClient } from '@prisma/client'
 // Based on typical nextjs prisma setups
 import { db as prisma } from '@/lib/db'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: Request) {
   try {
     // Fetch the latest published desktop release

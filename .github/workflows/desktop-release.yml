@@ -4,8 +4,9 @@ on:
   push:
     branches:
       - main
-    paths:
-      - '.github/workflows/desktop-release.yml'
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
   workflow_dispatch:
 
 jobs:
@@ -33,14 +34,56 @@ jobs:
           targets: x86_64-pc-windows-msvc
 
       - name: Build and Release Tauri app
+        id: tauri_build
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: "./desktop"
           tauriScript: "npm run tauri"
-          tagName: "desktop-v1.0.0-${{ github.run_id }}"
-          releaseName: "E-Katalog SOP Desktop v1.0.0"
+          tagName: "desktop-v__VERSION__" # Placeholder, tauri-action handles this or we can use run_id
+          releaseName: "E-Katalog SOP Desktop v__VERSION__"
           releaseBody: "Automated desktop release generated via GitHub Actions."
           releaseDraft: false
           prerelease: false
+
+      - name: Notify Web App API
+        shell: pwsh
+        env:
+          CI_RELEASE_TOKEN: ${{ secrets.CI_RELEASE_TOKEN }}
+          API_URL: "https://e-katalog-sop.cloud/api/admin/release" # Update this to your production URL
+        run: |
+          # The tauri-action doesn't explicitly output the asset URLs in a simple way for the API.
+          # We'll extract the version from tauri.conf.json and construct the data.
+          $config = Get-Content "./desktop/src-tauri/tauri.conf.json" | ConvertFrom-Json
+          $version = $config.version
+          
+          # We need to find the signature file and installer URL
+          # For Tauri GitHub Actions, assets are usually published to the release tagged with the version.
+          $repo = "${{ github.repository }}"
+          $tag = "desktop-v$version"
+          
+          # Construct the notification payload
+          # Note: In a real scenario, you'd fetch the actual asset URLs from the GH API 
+          # but here we point to the expected release asset path.
+          $downloadUrl = "https://github.com/$repo/releases/download/$tag/E-Katalog-SOP_${version}_x64_en-US.msi"
+          # Tauri uses .msi or .exe depending on config. Current config is ["msi", "nsis"]
+          # If using NSIS, it's .exe
+          $downloadUrl = "https://github.com/$repo/releases/download/$tag/E-Katalog-SOP_${version}_x64-setup.exe"
+          
+          # Signatures are usually in the same place with .sig extension
+          $sigUrl = "$downloadUrl.sig"
+          try {
+            $sig = Invoke-RestMethod -Uri $sigUrl
+          } catch {
+            $sig = "NOSIG" # Fallback if not found, though Tauri needs it
+          }
+
+          $body = @{
+            version = $version
+            notes = "Automated build from commit ${{ github.sha }}"
+            signature = $sig
+            downloadUrl = $downloadUrl
+          }
+
+          Invoke-RestMethod -Method Post -Uri $ENV:API_URL -Headers @{ "Authorization" = "Bearer $ENV:CI_RELEASE_TOKEN" } -Form $body

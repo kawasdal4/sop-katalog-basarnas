@@ -3960,6 +3960,20 @@ export default function ESOPApp() {
   }
   // Handle navigation with notification clearing and loading state
   const handleNavigation = useCallback((page: PageView) => {
+    // Role protection for restricted pages
+    const restrictedForStaff = ['import-sop', 'buat-sop-baru', 'verifikasi', 'arsip', 'logs', 'users'];
+    const isStaff = user?.role === 'STAF';
+    const isDeveloperOrAdmin = user?.role === 'DEVELOPER' || user?.role === 'ADMIN';
+
+    if (restrictedForStaff.includes(page) && !isDeveloperOrAdmin) {
+      toast({
+        title: 'Akses Ditolak',
+        description: 'Anda tidak memiliki izin untuk mengakses fitur ini.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     if (page === 'import-sop') {
       window.location.href = '/sop/import'
       return
@@ -3996,8 +4010,8 @@ export default function ESOPApp() {
   const menuItems = [
     { id: 'dashboard' as PageView, label: 'Laporan Analitik', icon: LayoutDashboard, roles: ['ADMIN', 'STAF', 'DEVELOPER'] },
     { id: 'katalog' as PageView, label: 'Katalog SOP', icon: FileText, roles: ['ADMIN', 'STAF', 'DEVELOPER'] },
-    { id: 'import-sop' as PageView, label: 'Import SOP Excel', icon: FileSpreadsheet, roles: ['ADMIN', 'STAF', 'DEVELOPER'] },
-    { id: 'buat-sop-baru' as PageView, label: 'Buat SOP Baru', icon: FileSpreadsheet, roles: ['ADMIN', 'STAF', 'DEVELOPER'] },
+    { id: 'import-sop' as PageView, label: 'Import SOP Excel', icon: FileSpreadsheet, roles: ['ADMIN', 'DEVELOPER'] },
+    { id: 'buat-sop-baru' as PageView, label: 'Buat SOP Baru', icon: FileSpreadsheet, roles: ['ADMIN', 'DEVELOPER'] },
     { id: 'verifikasi' as PageView, label: 'Verifikasi SOP', icon: CheckCircle, roles: ['ADMIN', 'DEVELOPER'] },
     { id: 'arsip' as PageView, label: 'Arsip', icon: FolderOpen, roles: ['ADMIN', 'DEVELOPER'] },
     { id: 'logs' as PageView, label: 'Log Aktivitas', icon: History, roles: ['ADMIN', 'DEVELOPER'] },

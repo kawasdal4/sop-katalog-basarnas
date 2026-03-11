@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
+export const dynamic = 'force-dynamic'
+
 // API endpoint that Tauri's auto-updater calls to check for updates.
 export async function GET(request: Request) {
   try {
