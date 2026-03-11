@@ -21,7 +21,11 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+
+      - name: Install npm dependencies
+        working-directory: ./desktop
+        run: npm install
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -34,6 +38,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: "./desktop"
+          tauriScript: "npm run tauri"
           tagName: "desktop-v1.0.0-${{ github.run_id }}"
           releaseName: "E-Katalog SOP Desktop v1.0.0"
           releaseBody: "Automated desktop release generated via GitHub Actions."
