@@ -114,6 +114,7 @@ import ImageCropper from '@/components/ImageCropper'
 import SARLoadingOverlay, { StatCardSkeleton, TableRowSkeleton } from '@/components/SARLoadingOverlay'
 import SopBuilderList from '@/components/sop-builder/SopBuilderList'
 import { SyncStatusIndicator } from '@/components/layout/SyncStatusIndicator'
+import DesktopDownloadButton from '@/components/DesktopDownloadButton'
 
 // Types
 type UserRole = 'ADMIN' | 'STAF' | 'DEVELOPER' | null
@@ -4287,21 +4288,28 @@ export default function ESOPApp() {
               </Card>
 
               {/* Quick Info - Compact */}
-              <div
-                className="p-3 rounded-xl bg-orange-500/10 border border-white/5 flex items-center gap-3 backdrop-blur-sm cursor-pointer hover:bg-orange-500/20 hover:border-orange-500/30 transition-all group/help"
-                onClick={() => window.open('/User_Manual_E-Katalog_SOP.pdf', '_blank')}
-              >
-                <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center group-hover/help:scale-110 transition-transform">
-                  <FileText className="w-4 h-4 text-orange-400" />
+                <div
+                  className="p-3 rounded-xl bg-orange-500/10 border border-white/5 flex items-center gap-3 backdrop-blur-sm cursor-pointer hover:bg-orange-500/20 hover:border-orange-500/30 transition-all group/help"
+                  onClick={() => window.open('/User_Manual_E-Katalog_SOP.pdf', '_blank')}
+                >
+                  <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center group-hover/help:scale-110 transition-transform">
+                    <FileText className="w-4 h-4 text-orange-400" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-white uppercase tracking-tight group-hover/help:text-orange-400 transition-colors">Butuh Bantuan?</p>
+                    <p className="text-[9px] text-gray-500">Buka Panduan Sistem (PDF)</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[10px] font-black text-white uppercase tracking-tight group-hover/help:text-orange-400 transition-colors">Butuh Bantuan?</p>
-                  <p className="text-[9px] text-gray-500">Buka Panduan Sistem (PDF)</p>
+
+                {/* Desktop Download Button - Inserted below Butuh Bantuan */}
+                <div className="mt-4 flex justify-center w-full">
+                  <div className="w-full scale-90 origin-top">
+                    <DesktopDownloadButton />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Right Side: The Form - Compressed Padding/Gaps */}
+              {/* Right Side: The Form - Compressed Padding/Gaps */}
             <div className="lg:col-span-8 w-full">
               <Card className="bg-white/5 backdrop-blur-2xl shadow-2xl border border-white/10 overflow-hidden rounded-[1.5rem]">
                 {/* Header Section - Compact */}
