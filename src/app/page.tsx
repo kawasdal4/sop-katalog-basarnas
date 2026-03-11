@@ -8479,12 +8479,7 @@ export default function ESOPApp() {
                                                   </TooltipProvider>
                                                 </div>
                                               )
-                                            ) : (
-                                              /* Fallback / Excel Online (if applicable) */
-                                              <Button size="icon" variant="ghost" onClick={handleOpenDesktopSync} className="w-9 h-9 rounded-lg bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white ml-1">
-                                                <RefreshCw className="w-4 h-4" />
-                                              </Button>
-                                            )}
+                                            ) : null}
                                           </motion.div>
                                         )}
                                       </div>
