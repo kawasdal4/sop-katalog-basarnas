@@ -79,10 +79,19 @@ export async function POST(request: Request) {
     }
 
     // 2. Save the release metadata to the database
-    console.log('[AdminRelease] Saving to DB...')
+    console.log('[AdminRelease] Saving to DB (Upsert)...')
     try {
-      const release = await db.desktopRelease.create({
-        data: {
+      const release = await db.desktopRelease.upsert({
+        where: { version },
+        update: {
+          notes,
+          signature,
+          downloadUrl,
+          fileSize: file ? file.size : 0,
+          isPublished: true,
+          updatedAt: new Date()
+        },
+        create: {
           version,
           notes,
           signature,
@@ -92,12 +101,12 @@ export async function POST(request: Request) {
           isMandatory: false
         }
       })
-      console.log('[AdminRelease] DB Save success:', release.id)
+      console.log('[AdminRelease] DB Upsert success:', release.id)
       return NextResponse.json({ success: true, release })
     } catch (dbError) {
       console.error('[AdminRelease] Database error:', dbError)
       return NextResponse.json({ 
-        error: 'Database error while creating release', 
+        error: 'Database error while creating/updating release', 
         details: (dbError as Error).message 
       }, { status: 500 })
     }
