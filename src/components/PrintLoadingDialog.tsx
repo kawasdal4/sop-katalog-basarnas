@@ -153,37 +153,44 @@ export default function PrintLoadingDialog({ open, onClose, fileId, fileName, fi
 
       if (onComplete) onComplete()
 
-      const isTauriEnv = typeof window !== 'undefined' && ((window as any).__TAURI__ !== undefined || (window as any).__TAURI_INTERNALS__ !== undefined);
-      if (isTauriEnv) {
-        const tauri = (window as any).__TAURI__;
-        const invoke = tauri?.core?.invoke || tauri?.invoke;
-        
-        if (invoke) {
-          try {
-            console.log('[Native Print] Preparing blob...');
-            const res = await fetch(blobUrl);
-            const blob = await res.blob();
-            const arrayBuffer = await blob.arrayBuffer();
-            const bytes = Array.from(new Uint8Array(arrayBuffer));
-            const fileName = `print_${Date.now()}.pdf`;
+      // Detect Tauri environment
+      const isTauriEnv = typeof window !== 'undefined' && 
+        ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined);
 
-            console.log('[Native Print] Saving to temp...');
-            const filePath = await invoke('save_temp_file', { bytes, fileName });
-            if (filePath) {
-               console.log('[Native Print] Opening path:', filePath);
-               await invoke('native_open', { path: filePath });
-               // Auto-close dialog for desktop after success
-               setTimeout(() => onClose(), 2000);
-               return;
-            }
-          } catch (err) {
-            console.error('[Native Print] Operation failed:', err);
+      if (isTauriEnv) {
+        // Desktop: save blob to temp file then open with native app (no popup blocker issue)
+        try {
+          const { invoke } = await import('@tauri-apps/api/core');
+          console.log('[Native Print] Preparing blob...');
+          const res = await fetch(blobUrl);
+          const blob = await res.blob();
+          const arrayBuffer = await blob.arrayBuffer();
+          const bytes = Array.from(new Uint8Array(arrayBuffer));
+          const tempFileName = `print_${Date.now()}.pdf`;
+
+          console.log('[Native Print] Saving to temp...');
+          const filePath = await invoke<string>('save_temp_file', { bytes, fileName: tempFileName });
+          if (filePath) {
+            console.log('[Native Print] Opening path:', filePath);
+            await invoke('native_open', { path: filePath });
+            setTimeout(() => onClose(), 1500);
+            return;
+          }
+        } catch (err) {
+          console.error('[Native Print] Operation failed, trying shell fallback:', err);
+          // Fallback: try opening the blobUrl with shell open
+          try {
+            const { invoke } = await import('@tauri-apps/api/core');
+            await invoke('native_open', { path: blobUrl });
+            setTimeout(() => onClose(), 1500);
+            return;
+          } catch (err2) {
+            console.error('[Native Print] Shell fallback also failed:', err2);
           }
         }
       }
 
-      // Web behavior: Manual preview button available, but we attempt to open
-      // Most browsers will block this window.open if it wasn't triggered by direct click
+      // Web behavior: attempt window.open (may be blocked by browser)
       const newTab = window.open(blobUrl, '_blank')
       if (newTab) {
         setTimeout(() => onClose(), 2000)

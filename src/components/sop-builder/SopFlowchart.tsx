@@ -37,38 +37,46 @@ import { isTauri as isTauriSync, syncService } from '@/lib/sync/syncService';
 // Tauri Detection
 const isTauri = typeof window !== 'undefined' && ((window as any).__TAURI__ !== undefined || (window as any).__TAURI_INTERNALS__ !== undefined);
 
-const handleNativePreview = async (url: string) => {
-    if (isTauri) {
-        const tauri = (window as any).__TAURI__;
-        const invoke = tauri?.core?.invoke || tauri?.invoke;
-        
-        if (invoke) {
-            try {
-                if (url.startsWith('blob:')) {
-                    console.log('[Native Flowchart] Processing blob preview...');
-                    const res = await fetch(url);
-                    const blob = await res.blob();
-                    const arrayBuffer = await blob.arrayBuffer();
-                    const bytes = Array.from(new Uint8Array(arrayBuffer));
-                    const fileName = `flowchart_${Date.now()}.pdf`;
-
-                    const filePath = await invoke('save_temp_file', { bytes, fileName });
-                    if (filePath) {
-                        console.log('[Native Flowchart] Opening temp path:', filePath);
-                        await invoke('native_open', { path: filePath });
-                        return true;
-                    }
-                } else {
-                    console.log('[Native Flowchart] Opening URL directly:', url);
-                    await invoke('native_open', { path: url });
-                    return true;
-                }
-            } catch (err) {
-                console.error('[Native Flowchart] Operation failed:', err);
-            }
-        }
+const handleNativePreview = async (url: string): Promise<boolean> => {
+    if (!isTauri) {
+        window.open(url, '_blank');
+        return false;
     }
-    // Web version: use window.open instead of location.href to preserve current page
+
+    try {
+        const { invoke } = await import('@tauri-apps/api/core');
+
+        if (url.startsWith('blob:')) {
+            // Blob URL: download bytes, save to temp, open with native app
+            console.log('[Native Flowchart] Processing blob URL...');
+            const res = await fetch(url);
+            const blob = await res.blob();
+            const arrayBuffer = await blob.arrayBuffer();
+            const bytes = Array.from(new Uint8Array(arrayBuffer));
+            const fileName = `flowchart_${Date.now()}.pdf`;
+            const filePath = await invoke<string>('save_temp_file', { bytes, fileName });
+            if (filePath) {
+                console.log('[Native Flowchart] Opening temp path:', filePath);
+                await invoke('native_open', { path: filePath });
+                return true;
+            }
+        } else if (url.startsWith('http://') || url.startsWith('https://')) {
+            // HTTPS URL: use shell plugin (native_open/explorer won't handle HTTP/S on Windows)
+            console.log('[Native Flowchart] Opening HTTPS URL via shell...');
+            const { open } = await import('@tauri-apps/plugin-shell');
+            await open(url);
+            return true;
+        } else {
+            // Local file path
+            console.log('[Native Flowchart] Opening local path:', url);
+            await invoke('native_open', { path: url });
+            return true;
+        }
+    } catch (err) {
+        console.error('[Native Flowchart] Operation failed:', err);
+    }
+
+    // Fallback
     window.open(url, '_blank');
     return false;
 };

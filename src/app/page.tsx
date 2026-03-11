@@ -205,87 +205,85 @@ const COLORS = ['#f97316', '#eab308', '#22c55e', '#ef4444', '#3b82f6']
 const LINGKUP_COLORS = ['#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#22c55e', '#eab308', '#ef4444']
 
 // Tauri Detection & Native Helpers
-const openExternal = async (url: string) => {
-  if (isTauri) {
-    const tauri = (window as any).__TAURI__;
-    const invoke = tauri?.core?.invoke || tauri?.invoke;
-    
-    const saveBlobToTemp = async (blobUrl: string) => {
-      try {
-        console.log('[Native] Fetching blob for URL:', blobUrl);
-        const res = await fetch(blobUrl);
-        const blob = await res.blob();
-        const arrayBuffer = await blob.arrayBuffer();
-        const bytes = Array.from(new Uint8Array(arrayBuffer));
-        const fileName = `preview_${Date.now()}.pdf`;
-        
-        if (invoke) {
-          console.log('[Native] Invoking save_temp_file with filename:', fileName);
-          const filePath = await invoke('save_temp_file', { bytes, fileName });
-          console.log('[Native] Save result:', filePath);
-          return filePath;
-        }
-      } catch (e) {
-        console.error('[Native] saveBlobToTemp failed:', e);
-      }
-      return null;
-    };
+//
+// CRITICAL: In Tauri, window.open() and blob: URLs in window.open are BLOCKED.
+// - For HTTPS URLs -> use @tauri-apps/plugin-shell open()
+// - For blob: URLs -> fetch bytes, save to temp via save_temp_file, then open temp file
+// - For local file paths -> native_open command (explorer/open/xdg-open)
 
-    if (invoke) {
-      try {
-        if (url.startsWith('blob:')) {
-           const tempPath = await saveBlobToTemp(url);
-           if (tempPath) {
-             console.log('[Native] Invoking native_open for temp path:', tempPath);
-             await invoke('native_open', { path: tempPath });
-             return true;
-           }
-        } else {
-          console.log('[Native] Invoking native_open for URL:', url);
-          await invoke('native_open', { path: url });
-          return true;
-        }
-      } catch (err) {
-        console.error('[Native] native_open failed:', err);
-      }
-    } else {
-      console.warn('[Native] Tauri invoke not found, falling back to window.open');
-    }
+const tauriInvoke = (): ((cmd: string, args?: object) => Promise<any>) | null => {
+  if (typeof window === 'undefined') return null;
+  const tauri = (window as any).__TAURI__;
+  return tauri?.core?.invoke || tauri?.invoke || null;
+};
+
+const openExternal = async (url: string): Promise<boolean> => {
+  if (!isTauri) {
+    window.open(url, '_blank');
+    return false;
   }
-  
-  // Web fallback with popup blocker bypass check
-  // Note: For true bypass, window.open should be called BEFORE async work.
-  // This helper is a late-stage fallback.
-  window.open(url, '_blank');
+
+  const invoke = tauriInvoke();
+  if (!invoke) {
+    console.warn('[Native] Tauri invoke not found');
+    return false;
+  }
+
+  try {
+    if (url.startsWith('blob:')) {
+      // Blob URL: must save to temp file first, then open with native_open
+      console.log('[Native] Processing blob URL...');
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const arrayBuffer = await blob.arrayBuffer();
+      const bytes = Array.from(new Uint8Array(arrayBuffer));
+      const fileName = `preview_${Date.now()}.pdf`;
+      const tempPath = await invoke('save_temp_file', { bytes, fileName });
+      if (tempPath) {
+        console.log('[Native] Opening temp file:', tempPath);
+        await invoke('native_open', { path: tempPath });
+        return true;
+      }
+    } else if (url.startsWith('http://') || url.startsWith('https://')) {
+      // HTTPS URL: use shell plugin to open in default browser
+      // native_open (explorer) does NOT reliably handle HTTP/S URLs on Windows
+      console.log('[Native] Opening HTTPS URL via shell plugin:', url);
+      const { open } = await import('@tauri-apps/plugin-shell');
+      await open(url);
+      return true;
+    } else {
+      // Local file path
+      console.log('[Native] Opening local path:', url);
+      await invoke('native_open', { path: url });
+      return true;
+    }
+  } catch (err) {
+    console.error('[Native] openExternal failed:', err);
+  }
   return false;
 };
 
-const handleNativeDownload = async (blob: Blob, fileName: string) => {
-  if (isTauri) {
-    const tauri = (window as any).__TAURI__;
-    const save = tauri?.dialog?.save || tauri?.plugins?.dialog?.save;
-    const writeFile = tauri?.fs?.writeFile || tauri?.plugins?.fs?.writeFile;
-    
-    if (save && writeFile) {
-      try {
-        const fileExt = fileName.split('.').pop() || '';
-        const filePath = await save({
-          defaultPath: fileName,
-          filters: [{ name: 'Document', extensions: [fileExt] }]
-        });
-        
-        if (filePath) {
-          const bytes = new Uint8Array(await blob.arrayBuffer());
-          await writeFile(filePath, bytes);
-          return filePath; // Changed: return string path instead of true
-        }
-        return null; // User cancelled
-      } catch (err) {
-        console.error('Native download failed:', err);
-      }
-    }
+const handleNativeDownload = async (blob: Blob, fileName: string): Promise<string | null | false> => {
+  if (!isTauri) return false;
+
+  try {
+    // Use the Tauri dialog plugin to show a Save As dialog
+    const { save } = await import('@tauri-apps/plugin-dialog');
+    const { writeFile } = await import('@tauri-apps/plugin-fs');
+    const fileExt = fileName.split('.').pop() || 'xlsx';
+    const filePath = await save({
+      defaultPath: fileName,
+      filters: [{ name: 'Document', extensions: [fileExt] }]
+    });
+    if (!filePath) return null; // User cancelled
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    await writeFile(filePath, bytes);
+    console.log('[Native] File saved to:', filePath);
+    return filePath;
+  } catch (err) {
+    console.error('[Native] handleNativeDownload failed:', err);
+    return false;
   }
-  return false;
 };
 
 
@@ -3467,31 +3465,29 @@ export default function ESOPApp() {
             duration: 10000 
           })
 
-          const tauri = (window as any).__TAURI__;
-          const invoke = tauri?.core?.invoke || tauri?.invoke;
-          
-          if (invoke) {
-            try {
-               await invoke('native_open', { path: filePath });
-               const { watch } = await import('@tauri-apps/plugin-fs');
-               const unwatch = await watch(filePath, async (event) => {
-                 const typeStr = JSON.stringify(event.type);
-                 if (typeStr.includes('modify') || typeStr.includes('Modify') || typeStr.includes('any') || typeStr.includes('Any')) {
-                     setTimeout(async () => {
-                        try {
-                           const { readFile } = await import('@tauri-apps/plugin-fs');
-                           const fileBytes = await readFile(filePath);
-                           const updatedBlob = new Blob([fileBytes]);
-                           const fileToSync = new File([updatedBlob], finalFileName);
-                           setDesktopSyncFile(fileToSync);
-                           autoSync(fileToSync, sessionId, sop);
-                        } catch(readErr) { console.error('[Watcher] Read error:', readErr); }
-                     }, 1000);
-                 }
-               });
-               setUnwatchDesktopFile(() => unwatch);
-            } catch (err) { console.error('[Desktop] Failed to open or watch:', err); }
-          }
+          try {
+             // Use @tauri-apps/api/core invoke — more reliable than window.__TAURI__ in production
+             const { invoke } = await import('@tauri-apps/api/core');
+             await invoke('native_open', { path: filePath });
+             const { watch } = await import('@tauri-apps/plugin-fs');
+             const unwatch = await watch(filePath, async (event) => {
+               const typeStr = JSON.stringify(event.type);
+               if (typeStr.includes('modify') || typeStr.includes('Modify') || typeStr.includes('any') || typeStr.includes('Any')) {
+                   setTimeout(async () => {
+                      try {
+                         const { readFile } = await import('@tauri-apps/plugin-fs');
+                         const fileBytes = await readFile(filePath);
+                         const updatedBlob = new Blob([fileBytes]);
+                         const fileToSync = new File([updatedBlob], finalFileName);
+                         setDesktopSyncFile(fileToSync);
+                         autoSync(fileToSync, sessionId, sop);
+                      } catch(readErr) { console.error('[Watcher] Read error:', readErr); }
+                   }, 1000);
+               }
+             });
+             setUnwatchDesktopFile(() => unwatch);
+          } catch (err) { console.error('[Desktop] Failed to open or watch:', err); }
+
         }
       } else {
         // Web Flow: Standard Download
