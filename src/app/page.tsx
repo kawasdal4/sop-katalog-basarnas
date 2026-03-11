@@ -2776,12 +2776,6 @@ export default function ESOPApp() {
     const fileExtension = sop.fileName.toLowerCase().split('.').pop()
     setPreviewLoading(id) // Start loading animation
     
-    // Web popup bypass: Pre-open blank tab
-    let previewTab: Window | null = null;
-    if (!isTauri) {
-      previewTab = window.open('about:blank', '_blank');
-    }
-
     try {
       // For PDF files - download directly from R2 and open
       if (fileExtension === 'pdf') {
@@ -2791,7 +2785,6 @@ export default function ESOPApp() {
         if (res.ok && (contentType.includes('application/pdf') || contentType === '')) {
           const blob = await res.blob()
           if (blob.size === 0) {
-            if (previewTab) previewTab.close();
             toast({ title: '⚠️ File Kosong', description: 'File ini tidak memiliki isi (0 bytes).', variant: 'destructive' })
             setPreviewLoading(null)
             return
@@ -2800,8 +2793,6 @@ export default function ESOPApp() {
           
           if (isTauri) {
             await openExternal(url)
-          } else if (previewTab) {
-            previewTab.location.href = url;
           } else {
             window.open(url, '_blank');
           }
@@ -2824,11 +2815,7 @@ export default function ESOPApp() {
           if (!text.trim()) throw new Error('Empty response body')
           const data = JSON.parse(text)
           if (data.downloadUrl) {
-            if (previewTab && !previewTab.closed) {
-              previewTab.location.href = data.downloadUrl;
-            } else {
-              await openExternal(data.downloadUrl);
-            }
+            await openExternal(data.downloadUrl);
           }
         } catch (e) {
           console.error('[Preview PDF] Failed to parse JSON. Status:', res.status, 'Raw text:', text)
@@ -2873,38 +2860,37 @@ export default function ESOPApp() {
         if (data.viewerUrl) {
           console.log('🔗 [Preview] Opening URL:', data.viewerUrl.substring(0, 150))
 
-          // ✅ Use the pre-opened blank tab — popup blockers allow this because
-          // the tab was opened synchronously during the user's click event.
-          if (previewTab && !previewTab.closed) {
-            previewTab.location.href = data.viewerUrl;
-          } else if (isTauri) {
+          if (isTauri) {
             await openExternal(data.viewerUrl);
           } else {
-            // Last resort fallback
-            const fallback = window.open(data.viewerUrl, '_blank');
-            if (!fallback) {
+            const previewWindow = window.open(data.viewerUrl, '_blank')
+            if (!previewWindow || previewWindow.closed) {
               toast({
-                title: '⚠️ Popup Diblokir Browser',
-                description: 'Izinkan popup untuk situs ini di address bar browser.',
-                variant: 'destructive',
-                duration: 8000
-              });
-            }
-          }
+                title: '⚠️ Popup Diblokir',
+                description: `Klik link ini untuk membuka: ${data.viewerUrl}`,
+                duration: 30000
+              })
+            } else {
+              toast({
+                title: '📊 Preview Dibuka',
+                description: 'File dibuka di Microsoft Office Online. File temp akan dihapus setelah ditutup.',
+                duration: 5000
+              })
 
-          // Track the window and clean up when closed
-          const trackWindow = (previewTab && !previewTab.closed) ? previewTab : null;
-          if (data.driveItemId && trackWindow) {
-            const checkClosed = setInterval(() => {
-              if (trackWindow.closed) {
-                clearInterval(checkClosed)
-                fetch('/api/preview-office', {
-                  method: 'DELETE',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ driveItemId: data.driveItemId })
-                }).catch(err => console.warn('Failed to cleanup temp file:', err))
+              // Track the window and clean up when closed for web
+              if (data.driveItemId) {
+                const checkClosed = setInterval(() => {
+                  if (previewWindow.closed) {
+                    clearInterval(checkClosed)
+                    fetch('/api/preview-office', {
+                      method: 'DELETE',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ driveItemId: data.driveItemId })
+                    }).catch(err => console.warn('Failed to cleanup temp file:', err))
+                  }
+                }, 2000)
               }
-            }, 2000)
+            }
           }
         }
 
@@ -8445,22 +8431,53 @@ export default function ESOPApp() {
                                             transition={{ duration: 1.5, repeat: Infinity }}
                                           >
                                             {desktopEditSessionToken ? (
-                                              /* Desktop Edit Flow (Auto-Sync) */
-                                              desktopSyncing ? (
-                                                <Button size="icon" variant="ghost" disabled className="w-9 h-9 rounded-lg bg-orange-500/10 text-orange-400 ml-1 cursor-wait">
-                                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                                </Button>
+                                              isTauri ? (
+                                                /* Desktop Edit Flow (Auto-Sync) */
+                                                desktopSyncing ? (
+                                                  <Button size="icon" variant="ghost" disabled className="w-9 h-9 rounded-lg bg-orange-500/10 text-orange-400 ml-1 cursor-wait">
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                  </Button>
+                                                ) : (
+                                                  <TooltipProvider delayDuration={300}>
+                                                    <Tooltip>
+                                                      <TooltipTrigger asChild>
+                                                        <Button size="icon" variant="ghost" onClick={handleCancelSession} className="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white ml-1">
+                                                          <Check className="w-4 h-4" />
+                                                        </Button>
+                                                      </TooltipTrigger>
+                                                      <TooltipContent className="bg-slate-900 border-slate-700 text-white font-bold">
+                                                        Selesai Edit
+                                                      </TooltipContent>
+                                                    </Tooltip>
+                                                  </TooltipProvider>
+                                                )
                                               ) : (
+                                                /* Web Edit Flow (Manual Sync Button) */
                                                 <TooltipProvider delayDuration={300}>
                                                   <Tooltip>
                                                     <TooltipTrigger asChild>
-                                                      <Button size="icon" variant="ghost" onClick={handleCancelSession} className="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white ml-1">
-                                                        <Check className="w-4 h-4" />
-                                                      </Button>
+                                                      <div className="flex items-center gap-1">
+                                                        <Button 
+                                                          size="icon" 
+                                                          variant="ghost" 
+                                                          onClick={handleOpenDesktopSync} 
+                                                          className="w-9 h-9 rounded-lg bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white"
+                                                        >
+                                                          <RefreshCw className={`w-4 h-4 ${desktopSyncing ? 'animate-spin' : ''}`} />
+                                                        </Button>
+                                                        <Button 
+                                                          size="icon" 
+                                                          variant="ghost" 
+                                                          onClick={handleCancelSession} 
+                                                          className="w-9 h-9 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white"
+                                                        >
+                                                          <X className="w-4 h-4" />
+                                                        </Button>
+                                                      </div>
                                                     </TooltipTrigger>
                                                     <TooltipContent className="bg-slate-900 border-slate-700 text-white font-bold">
-                                                      Selesai Edit
-                                                    </TooltipContent>
+                                                      Sync Manual / Selesai
+                      </TooltipContent>
                                                   </Tooltip>
                                                 </TooltipProvider>
                                               )
