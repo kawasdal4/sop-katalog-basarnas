@@ -30,12 +30,8 @@
     "sql:default",
     "log:default",
     "dialog:default",
-    "fs:default",
-    "app:allow-get-temp-dir",
-    "app:allow-save-temp-file",
-    "app:allow-native-open"
+    "fs:default"
   ]
 }
-
 
 
