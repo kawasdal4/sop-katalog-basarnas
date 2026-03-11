@@ -84,6 +84,6 @@ jobs:
             notes = "Automated build from commit ${{ github.sha }}"
             signature = $sig
             downloadUrl = $downloadUrl
-          }
+          } | ConvertTo-Json
 
-          Invoke-RestMethod -Method Post -Uri $ENV:API_URL -Headers @{ "Authorization" = "Bearer $ENV:CI_RELEASE_TOKEN" } -Form $body
+          Invoke-RestMethod -Method Post -Uri $ENV:API_URL -Headers @{ "Authorization" = "Bearer $ENV:CI_RELEASE_TOKEN" } -ContentType "application/json" -Body $body

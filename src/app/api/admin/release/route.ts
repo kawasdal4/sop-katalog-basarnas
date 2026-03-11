@@ -24,15 +24,29 @@ export async function POST(request: Request) {
        }
     }
 
-    const formData = await request.formData()
-    
-    const version = formData.get('version') as string
-    const notes = formData.get('notes') as string
-    const file = formData.get('file') as File | null
-    const signature = formData.get('signature') as string 
-    const directDownloadUrl = formData.get('downloadUrl') as string | null
-    
-    console.log('[AdminRelease] Received data:', { version, notes, signature: signature ? 'PRESENT' : 'MISSING', directDownloadUrl })
+    const contentType = request.headers.get('content-type') || ''
+    let version: string = ''
+    let notes: string = ''
+    let signature: string = ''
+    let directDownloadUrl: string | null = null
+    let file: File | null = null
+
+    if (contentType.includes('application/json')) {
+      const json = await request.json()
+      version = json.version
+      notes = json.notes
+      signature = json.signature
+      directDownloadUrl = json.downloadUrl
+      console.log('[AdminRelease] Received JSON data:', { version, notes, signature: signature ? 'PRESENT' : 'MISSING', directDownloadUrl })
+    } else {
+      const formData = await request.formData()
+      version = formData.get('version') as string
+      notes = formData.get('notes') as string
+      file = formData.get('file') as File | null
+      signature = formData.get('signature') as string 
+      directDownloadUrl = formData.get('downloadUrl') as string | null
+      console.log('[AdminRelease] Received Form data:', { version, notes, signature: signature ? 'PRESENT' : 'MISSING', directDownloadUrl })
+    }
 
     if (!version || !notes || !signature) {
       console.error('[AdminRelease] Missing required fields:', { version, notes, signature: !!signature })
