@@ -207,42 +207,48 @@ const isTauri = typeof window !== 'undefined' && ((window as any).__TAURI__ !== 
 const openExternal = async (url: string) => {
   if (isTauri) {
     const tauri = (window as any).__TAURI__;
-    const shellOpen = tauri?.shell?.open || tauri?.plugins?.shell?.open;
+    const invoke = tauri?.core?.invoke || tauri?.invoke;
+    
     const saveBlobToTemp = async (blobUrl: string) => {
       try {
+        console.log('[Native] Fetching blob for URL:', blobUrl);
         const res = await fetch(blobUrl);
         const blob = await res.blob();
         const arrayBuffer = await blob.arrayBuffer();
-        const bytes = Array.from(new Uint8Array(arrayBuffer)); // tauri invoke needs serializable array
+        const bytes = Array.from(new Uint8Array(arrayBuffer));
         const fileName = `preview_${Date.now()}.pdf`;
         
-        const tauri = (window as any).__TAURI__;
-        const invoke = tauri?.core?.invoke || tauri?.invoke;
         if (invoke) {
+          console.log('[Native] Invoking save_temp_file with filename:', fileName);
           const filePath = await invoke('save_temp_file', { bytes, fileName });
+          console.log('[Native] Save result:', filePath);
           return filePath;
         }
       } catch (e) {
-        console.error('Failed to save blob to temp via Rust:', e);
+        console.error('[Native] saveBlobToTemp failed:', e);
       }
       return null;
     };
 
-    if (shellOpen) {
+    if (invoke) {
       try {
         if (url.startsWith('blob:')) {
            const tempPath = await saveBlobToTemp(url);
            if (tempPath) {
-             await shellOpen(tempPath);
+             console.log('[Native] Invoking native_open for temp path:', tempPath);
+             await invoke('native_open', { path: tempPath });
              return true;
            }
         } else {
-          await shellOpen(url);
+          console.log('[Native] Invoking native_open for URL:', url);
+          await invoke('native_open', { path: url });
           return true;
         }
       } catch (err) {
-        console.error('Tauri shell.open failed:', err);
+        console.error('[Native] native_open failed:', err);
       }
+    } else {
+      console.warn('[Native] Tauri invoke not found, falling back to window.open');
     }
   }
   window.open(url, '_blank');

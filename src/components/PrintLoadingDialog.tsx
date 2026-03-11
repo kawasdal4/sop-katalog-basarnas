@@ -156,26 +156,27 @@ export default function PrintLoadingDialog({ open, onClose, fileId, fileName, fi
       const isTauri = typeof window !== 'undefined' && ((window as any).__TAURI__ !== undefined || (window as any).__TAURI_INTERNALS__ !== undefined);
       if (isTauri) {
         const tauri = (window as any).__TAURI__;
-        const shellOpen = tauri?.shell?.open || tauri?.plugins?.shell?.open;
         const invoke = tauri?.core?.invoke || tauri?.invoke;
         
-        if (shellOpen && invoke) {
+        if (invoke) {
           try {
-            // Save blob to temp path first via custom Rust command
+            console.log('[Native Print] Preparing blob...');
             const res = await fetch(blobUrl);
             const blob = await res.blob();
             const arrayBuffer = await blob.arrayBuffer();
             const bytes = Array.from(new Uint8Array(arrayBuffer));
             const fileName = `print_${Date.now()}.pdf`;
 
+            console.log('[Native Print] Saving to temp...');
             const filePath = await invoke('save_temp_file', { bytes, fileName });
             if (filePath) {
-               await shellOpen(filePath);
+               console.log('[Native Print] Opening path:', filePath);
+               await invoke('native_open', { path: filePath });
                setTimeout(() => onClose(), 2000);
                return;
             }
           } catch (err) {
-            console.error('Tauri native print preview failed:', err);
+            console.error('[Native Print] Operation failed:', err);
           }
         }
       }

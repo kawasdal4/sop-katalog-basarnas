@@ -40,12 +40,12 @@ const isTauri = typeof window !== 'undefined' && ((window as any).__TAURI__ !== 
 const handleNativePreview = async (url: string) => {
     if (isTauri) {
         const tauri = (window as any).__TAURI__;
-        const shellOpen = tauri?.shell?.open || tauri?.plugins?.shell?.open;
         const invoke = tauri?.core?.invoke || tauri?.invoke;
         
-        if (shellOpen && invoke) {
+        if (invoke) {
             try {
                 if (url.startsWith('blob:')) {
+                    console.log('[Native Flowchart] Processing blob preview...');
                     const res = await fetch(url);
                     const blob = await res.blob();
                     const arrayBuffer = await blob.arrayBuffer();
@@ -54,15 +54,17 @@ const handleNativePreview = async (url: string) => {
 
                     const filePath = await invoke('save_temp_file', { bytes, fileName });
                     if (filePath) {
-                        await shellOpen(filePath);
+                        console.log('[Native Flowchart] Opening temp path:', filePath);
+                        await invoke('native_open', { path: filePath });
                         return true;
                     }
                 } else {
-                    await shellOpen(url);
+                    console.log('[Native Flowchart] Opening URL directly:', url);
+                    await invoke('native_open', { path: url });
                     return true;
                 }
             } catch (err) {
-                console.error('Tauri shell.open failed:', err);
+                console.error('[Native Flowchart] Operation failed:', err);
             }
         }
     }
