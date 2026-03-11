@@ -51,7 +51,7 @@ jobs:
         shell: pwsh
         env:
           CI_RELEASE_TOKEN: ${{ secrets.CI_RELEASE_TOKEN }}
-          API_URL: "https://e-katalog-sop.cloud/api/admin/release" # Update this to your production URL
+          API_URL: ${{ secrets.API_URL }}
         run: |
           # The tauri-action doesn't explicitly output the asset URLs in a simple way for the API.
           # We'll extract the version from tauri.conf.json and construct the data.
