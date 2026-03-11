@@ -47,7 +47,8 @@
     "notification": null,
     "clipboard-manager": null,
     "sql": null,
-    "dialog": {},
-    "fs": {}
+    "dialog": null,
+    "fs": null
   }
 }
+
