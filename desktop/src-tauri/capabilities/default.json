@@ -2,6 +2,9 @@
   "$schema": "../gen/schemas/capability.json",
   "identifier": "main-capability",
   "description": "Capability for the main window",
+  "remote": {
+    "urls": ["https://e-katalog-sop.cloud/*"]
+  },
   "windows": ["main"],
   "permissions": [
     "core:path:default",
