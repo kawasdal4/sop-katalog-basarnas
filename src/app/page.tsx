@@ -107,8 +107,7 @@ import {
   Copy,
   Stethoscope,
   CloudOff,
-  FilePlus,
-  Upload
+  FilePlus
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { StorageStatus } from '@/components/storage'
