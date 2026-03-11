@@ -30,7 +30,7 @@
     "sql:default",
     "log:default",
     "dialog:default",
-    "fs:default",
-    "path:default"
+    "fs:default"
   ]
 }
+

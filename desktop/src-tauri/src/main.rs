@@ -2,6 +2,24 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use tauri_plugin_log::{Target, TargetKind};
+use tauri::Manager;
+use std::fs;
+
+#[tauri::command]
+async fn get_temp_dir(app: tauri::AppHandle) -> Result<String, String> {
+  app.path()
+    .temp_dir()
+    .map(|p| p.to_string_lossy().to_string())
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn save_temp_file(app: tauri::AppHandle, bytes: Vec<u8>, file_name: String) -> Result<String, String> {
+  let temp_dir = app.path().temp_dir().map_err(|e| e.to_string())?;
+  let file_path = temp_dir.join(file_name);
+  fs::write(&file_path, bytes).map_err(|e| e.to_string())?;
+  Ok(file_path.to_string_lossy().to_string())
+}
 
 fn main() {
   tauri::Builder::default()
@@ -19,8 +37,8 @@ fn main() {
     .plugin(tauri_plugin_clipboard_manager::init())
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_fs::init())
-    .plugin(tauri_plugin_path::init())
     .plugin(tauri_plugin_sql::Builder::default().build())
+    .invoke_handler(tauri::generate_handler![get_temp_dir, save_temp_file])
     .setup(|app| {
       log::info!("Application is starting up...");
       log::info!("Identifier: {}", app.package_info().name);

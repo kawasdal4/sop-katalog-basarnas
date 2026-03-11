@@ -157,20 +157,19 @@ export default function PrintLoadingDialog({ open, onClose, fileId, fileName, fi
       if (isTauri) {
         const tauri = (window as any).__TAURI__;
         const shellOpen = tauri?.shell?.open || tauri?.plugins?.shell?.open;
-        if (shellOpen) {
+        const invoke = tauri?.core?.invoke || tauri?.invoke;
+        
+        if (shellOpen && invoke) {
           try {
-            // Save blob to temp path first
+            // Save blob to temp path first via custom Rust command
             const res = await fetch(blobUrl);
             const blob = await res.blob();
-            const bytes = new Uint8Array(await blob.arrayBuffer());
-            const tempDir = await (tauri?.path?.tempDir || tauri?.plugins?.path?.tempDir)();
-            const fs = tauri?.fs || tauri?.plugins?.fs;
-            const join = tauri?.path?.join || tauri?.plugins?.path?.join;
+            const arrayBuffer = await blob.arrayBuffer();
+            const bytes = Array.from(new Uint8Array(arrayBuffer));
+            const fileName = `print_${Date.now()}.pdf`;
 
-            if (tempDir && fs && join) {
-               const fileName = `print_${Date.now()}.pdf`;
-               const filePath = await join(tempDir, fileName);
-               await fs.writeFile(filePath, bytes);
+            const filePath = await invoke('save_temp_file', { bytes, fileName });
+            if (filePath) {
                await shellOpen(filePath);
                setTimeout(() => onClose(), 2000);
                return;

@@ -41,20 +41,19 @@ const handleNativePreview = async (url: string) => {
     if (isTauri) {
         const tauri = (window as any).__TAURI__;
         const shellOpen = tauri?.shell?.open || tauri?.plugins?.shell?.open;
-        if (shellOpen) {
+        const invoke = tauri?.core?.invoke || tauri?.invoke;
+        
+        if (shellOpen && invoke) {
             try {
                 if (url.startsWith('blob:')) {
                     const res = await fetch(url);
                     const blob = await res.blob();
-                    const bytes = new Uint8Array(await blob.arrayBuffer());
-                    const tempDir = await (tauri?.path?.tempDir || tauri?.plugins?.path?.tempDir)();
-                    const fs = tauri?.fs || tauri?.plugins?.fs;
-                    const join = tauri?.path?.join || tauri?.plugins?.path?.join;
+                    const arrayBuffer = await blob.arrayBuffer();
+                    const bytes = Array.from(new Uint8Array(arrayBuffer));
+                    const fileName = `flowchart_${Date.now()}.pdf`;
 
-                    if (tempDir && fs && join) {
-                        const fileName = `flowchart_${Date.now()}.pdf`;
-                        const filePath = await join(tempDir, fileName);
-                        await fs.writeFile(filePath, bytes);
+                    const filePath = await invoke('save_temp_file', { bytes, fileName });
+                    if (filePath) {
                         await shellOpen(filePath);
                         return true;
                     }

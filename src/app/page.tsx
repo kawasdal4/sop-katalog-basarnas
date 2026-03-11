@@ -212,19 +212,18 @@ const openExternal = async (url: string) => {
       try {
         const res = await fetch(blobUrl);
         const blob = await res.blob();
-        const bytes = new Uint8Array(await blob.arrayBuffer());
-        const tempDir = await (tauri?.path?.tempDir || tauri?.plugins?.path?.tempDir)();
-        const fs = tauri?.fs || tauri?.plugins?.fs;
-        const join = tauri?.path?.join || tauri?.plugins?.path?.join;
+        const arrayBuffer = await blob.arrayBuffer();
+        const bytes = Array.from(new Uint8Array(arrayBuffer)); // tauri invoke needs serializable array
+        const fileName = `preview_${Date.now()}.pdf`;
         
-        if (tempDir && fs && join) {
-          const fileName = `preview_${Date.now()}.pdf`;
-          const filePath = await join(tempDir, fileName);
-          await fs.writeFile(filePath, bytes);
+        const tauri = (window as any).__TAURI__;
+        const invoke = tauri?.core?.invoke || tauri?.invoke;
+        if (invoke) {
+          const filePath = await invoke('save_temp_file', { bytes, fileName });
           return filePath;
         }
       } catch (e) {
-        console.error('Failed to save blob to temp:', e);
+        console.error('Failed to save blob to temp via Rust:', e);
       }
       return null;
     };
@@ -9601,61 +9600,80 @@ export default function ESOPApp() {
                                 Pilih File Hasil Edit
                               </Label>
                               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
-                                <input
-                                  type="file"
-                                  accept=".xlsx,.xls,.xlsm,.docx,.doc"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0]
-                                    if (file) {
-                                      setDesktopSyncFile(file)
-                                    }
-                                  }}
-                                  className="hidden"
-                                  id="desktop-sync-file"
-                                />
-                                <label
-                                  className="cursor-pointer"
-                                  onClick={async (e) => {
-                                    if (isTauri) {
-                                      e.preventDefault();
-                                      const tauri = (window as any).__TAURI__;
-                                      const open = tauri?.dialog?.open || tauri?.plugins?.dialog?.open;
-                                      const readFile = tauri?.fs?.readFile || tauri?.plugins?.fs?.readFile;
-                                      if (open && readFile) {
-                                        try {
-                                          const selected = await open({
-                                            filters: [{ name: 'Document', extensions: ['xlsx', 'xls', 'xlsm', 'docx', 'doc'] }]
-                                          });
-                                          if (selected && typeof selected === 'string') {
-                                            const bytes = await readFile(selected);
-                                            const file = new File([bytes], selected.split(/[\\/]/).pop() || 'document', { type: 'application/octet-stream' });
-                                            setDesktopSyncFile(file);
-                                          }
-                                        } catch (err) {
-                                          console.error('Native file open failed:', err);
-                                        }
-                                      }
-                                    }
-                                  }}
-                                  htmlFor={isTauri ? undefined : "desktop-sync-file"}
-                                >
-                                  {desktopSyncFile ? (
-                                    <div className="flex items-center justify-center gap-2">
-                                      <CheckCircle className="w-5 h-5 text-green-600" />
-                                      <span className="text-sm text-gray-700">{desktopSyncFile.name}</span>
+                              <div
+                                className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-orange-300 hover:bg-orange-50/30 transition-all cursor-default"
+                              >
+                                {desktopSyncFile ? (
+                                  <div className="flex flex-col items-center gap-3">
+                                    <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                                      <CheckCircle className="w-6 h-6 text-green-600" />
                                     </div>
-                                  ) : (
-                                    <>
-                                      <Upload className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                                      <p className="text-sm text-gray-600">
-                                        Klik untuk memilih file
-                                      </p>
-                                      <p className="text-xs text-gray-400 mt-1">
-                                        Format: .xlsx, .xls, .xlsm, .docx, .doc
-                                      </p>
-                                    </>
-                                  )}
-                                </label>
+                                    <div className="text-center">
+                                      <p className="text-sm font-bold text-gray-900">{desktopSyncFile.name}</p>
+                                      <p className="text-xs text-gray-500 mt-1">File siap diunggah</p>
+                                    </div>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm" 
+                                      onClick={() => setDesktopSyncFile(null)}
+                                      className="mt-2 text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
+                                    >
+                                      Ganti File
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <Upload className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                                    <p className="text-sm text-gray-600 font-medium mb-1">
+                                      Pilih file hasil pengeditan
+                                    </p>
+                                    <p className="text-xs text-gray-400 mb-4">
+                                      Format pendukung: .xlsx, .xls, .docx, .doc
+                                    </p>
+                                    <Button
+                                      variant="secondary"
+                                      className="bg-orange-100 text-orange-700 hover:bg-orange-200 border-orange-200"
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        if (isTauri) {
+                                          const tauri = (window as any).__TAURI__;
+                                          const open = tauri?.dialog?.open || tauri?.plugins?.dialog?.open;
+                                          const readFile = tauri?.fs?.readFile || tauri?.plugins?.fs?.readFile;
+                                          if (open && readFile) {
+                                            try {
+                                              const selected = await open({
+                                                filters: [{ name: 'Document', extensions: ['xlsx', 'xls', 'xlsm', 'docx', 'doc'] }]
+                                              });
+                                              if (selected && typeof selected === 'string') {
+                                                const bytes = await readFile(selected);
+                                                const file = new File([bytes], selected.split(/[\\/]/).pop() || 'document', { type: 'application/octet-stream' });
+                                                setDesktopSyncFile(file);
+                                              }
+                                            } catch (err) {
+                                              console.error('Native file open failed:', err);
+                                            }
+                                          }
+                                        } else {
+                                          document.getElementById('desktop-sync-file')?.click();
+                                        }
+                                      }}
+                                    >
+                                      <FilePlus className="w-4 h-4 mr-2" />
+                                      Pilih File
+                                    </Button>
+                                    <input
+                                      type="file"
+                                      accept=".xlsx,.xls,.xlsm,.docx,.doc"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0]
+                                        if (file) setDesktopSyncFile(file)
+                                      }}
+                                      className="hidden"
+                                      id="desktop-sync-file"
+                                    />
+                                  </>
+                                )}
+                              </div>
                               </div>
                             </div>
 
