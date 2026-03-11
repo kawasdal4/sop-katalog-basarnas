@@ -11,6 +11,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "E-Katalog SOP",
         "width": 1300,
         "height": 850,
