@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { toPng, toJpeg } from 'html-to-image';
 import { toast } from 'sonner';
+import { isTauri, syncService } from '@/lib/sync/syncService';
 
 // --- CUSTOM NODES ---
 
@@ -1817,11 +1818,24 @@ const FlowchartCore = ({ sopData, onExportFinal, isExporting, isPrintMode = fals
                     }
                 };
             });
+            const saveBody = { sop_id: sopData.id, nodes, edges: normalizedEdges };
+
+            if (isTauri) {
+                try {
+                    await syncService.enqueueOperation('sop_flowchart', 'UPDATE', saveBody);
+                    if (!silent) toast.success("Rute flowchart berhasil disimpan (Offline)");
+                    setLastSaved(new Date());
+                    return;
+                } catch (err) {
+                    console.error('Offline save error:', err);
+                }
+            }
+
             const res = await fetch(`/api/sop-flowchart/save`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ sop_id: sopData.id, nodes, edges: normalizedEdges })
+                body: JSON.stringify(saveBody)
             });
             if (res.ok) {
                 const resData = await res.json();

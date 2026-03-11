@@ -67,7 +67,8 @@ model SopFile {
   uploadedAt   DateTime @default(now())
   
   // Last edit info
-  updatedBy    String?  // User who made the last edit
+  updatedBy    String?  // User ID who made the last edit
+  updatedAt    DateTime @updatedAt
   
   // For public submissions
   isPublicSubmission Boolean   @default(false)
@@ -82,10 +83,7 @@ model SopFile {
   
   // Relations
   user          User     @relation(fields: [uploadedBy], references: [id], name: "UploadedBy")
-  updatedByUser User?    @relation(fields: [updatedBy], references: [id], name: "UpdatedBy")
   logs          Log[]
-  
-  updatedAt DateTime @updatedAt
 }
 
 // Activity Log model
@@ -96,7 +94,7 @@ model Log {
   deskripsi   String
   fileId      String?
   metadata    String?  // JSON string for additional data
-  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   
   // Relations
   user    User     @relation(fields: [userId], references: [id])
@@ -112,6 +110,7 @@ model AuditLog {
   ipAddress String?
   userAgent String?
   createdAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   
   // Relations
   user    User     @relation(fields: [userId], references: [id])

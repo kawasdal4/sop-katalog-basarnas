@@ -8,10 +8,16 @@ import { downloadFromR2, isR2Configured } from '@/lib/r2-storage'
  */
 export async function GET(request: NextRequest) {
     try {
-        const key = request.nextUrl.searchParams.get('key')
-
+        let key = request.nextUrl.searchParams.get('key')
+        
         if (!key) {
             return NextResponse.json({ error: 'Image key missing' }, { status: 400 })
+        }
+
+        // Clean the key (remove leading slash or double prefixes)
+        key = key.replace(/^\/+/, '')
+        if (key.startsWith('profile-photos/profile-photos/')) {
+            key = key.replace('profile-photos/profile-photos/', 'profile-photos/')
         }
 
         // Check R2 configuration

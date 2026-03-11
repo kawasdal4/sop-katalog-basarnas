@@ -28,16 +28,12 @@ export async function GET() {
     const userAny = user as any
     let profilePhotoUrl: string | null = null
     if (userAny.profilePhoto) {
-      if (userAny.profilePhoto.startsWith('http')) {
+      const cacheBuster = user.updatedAt ? new Date(user.updatedAt).getTime() : Date.now()
+      if (userAny.profilePhoto.toString().startsWith('http')) {
         profilePhotoUrl = userAny.profilePhoto
       } else {
-        const r2Url = getR2PublicUrl(userAny.profilePhoto)
-        const cacheBuster = user.updatedAt ? new Date(user.updatedAt).getTime() : Date.now()
-        if (r2Url) {
-          profilePhotoUrl = `${r2Url}?v=${cacheBuster}`
-        } else {
-          profilePhotoUrl = `/api/users/photo?key=${encodeURIComponent(userAny.profilePhoto)}&v=${cacheBuster}`
-        }
+        // Always use proxy for better reliability and to handle private buckets/CORS
+        profilePhotoUrl = `/api/users/photo?key=${encodeURIComponent(userAny.profilePhoto)}&v=${cacheBuster}`
       }
     }
 
@@ -208,19 +204,14 @@ export async function PUT(request: NextRequest) {
       let profilePhotoUrl: string | null = null
 
       if (updatedUserAny.profilePhoto) {
+        const updatedAtTime = updatedUserAny.updatedAt
+          ? new Date(updatedUserAny.updatedAt).getTime()
+          : Date.now()
         if (updatedUserAny.profilePhoto.startsWith('http')) {
           profilePhotoUrl = updatedUserAny.profilePhoto
         } else {
-          const r2Url = getR2PublicUrl(updatedUserAny.profilePhoto)
-          const updatedAtTime = updatedUserAny.updatedAt
-            ? new Date(updatedUserAny.updatedAt).getTime()
-            : Date.now()
-
-          if (r2Url) {
-            profilePhotoUrl = `${r2Url}?v=${updatedAtTime}`
-          } else {
-            profilePhotoUrl = `/api/users/photo?key=${encodeURIComponent(updatedUserAny.profilePhoto)}&v=${updatedAtTime}`
-          }
+          // Always use proxy for better reliability
+          profilePhotoUrl = `/api/users/photo?key=${encodeURIComponent(updatedUserAny.profilePhoto)}&v=${updatedAtTime}`
         }
       }
 

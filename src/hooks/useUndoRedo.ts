@@ -72,6 +72,8 @@ export function useUndoRedo<T>(initialState: T, maxHistory: number = 50) {
 
   return {
     state: state.present,
+    past: state.past,
+    future: state.future,
     set,
     undo,
     redo,

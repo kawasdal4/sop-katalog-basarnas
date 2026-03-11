@@ -8,6 +8,7 @@ import { format } from "date-fns"
 import { id as localeId } from "date-fns/locale"
 import { ShimmerTitle } from "@/components/ui/shimmer-title"
 import { toast } from "sonner"
+import { syncService, isTauri } from "@/lib/sync/syncService"
 
 // --- Premium UI Components ---
 
@@ -56,6 +57,17 @@ export default function SopBuilderList() {
 
     const handleDelete = async (id: string) => {
         if (!confirm("Yakin ingin menghapus draf SOP ini?")) return
+
+        if (isTauri) {
+            try {
+                await syncService.enqueueOperation('sop_pembuatan', 'DELETE', { id })
+                toast.success("Penghapusan SOP telah dijadwalkan (Offline)")
+                setSops(prev => prev.filter(s => s.id !== id))
+                return
+            } catch (err) {
+                console.error('Offline delete error:', err)
+            }
+        }
 
         try {
             const res = await fetch(`/api/sop-builder/${id}`, {

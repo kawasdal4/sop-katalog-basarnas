@@ -1,39 +1,17 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "next build",
+  "buildCommand": "npm run build",
   "installCommand": "npm install",
   "regions": [
     "sin1"
   ],
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, PUT, DELETE, OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type, Authorization"
-        }
-      ]
-    }
-  ],
   "functions": {
     "src/app/api/sop-builder/[id]/export-final/route.ts": {
-      "memory": 2048
+      "maxDuration": 60
     },
     "src/app/api/sop-builder/[id]/export-run/route.ts": {
-      "memory": 2048
-    },
-    "src/app/api/generate-manual/route.ts": {
-      "memory": 1024
+      "maxDuration": 60
     }
   }
 }

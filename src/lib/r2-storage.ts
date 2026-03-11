@@ -76,13 +76,25 @@ export function getR2Config(): R2Config {
 
   const sanitize = (val?: string) => val ? val.replace(/['"]/g, '').trim() : ''
 
-  return {
+  const config = {
     accountId: sanitize(accountId),
     accessKeyId: sanitize(accessKeyId),
     secretAccessKey: sanitize(secretAccessKey),
     bucketName: sanitize(bucketName) || 'sop-katalog-basarnas',
     publicUrl: sanitize(publicUrl)
   }
+
+  if (process.env.VERCEL) {
+    console.log('[R2 Config] Verified on Vercel:', {
+      bucket: config.bucketName,
+      hasAccountId: !!config.accountId,
+      hasAccessKey: !!config.accessKeyId,
+      hasSecretKey: !!config.secretAccessKey,
+      isMock: isStorageMockMode()
+    });
+  }
+
+  return config
 }
 
 /**
@@ -505,6 +517,10 @@ export function getR2PublicUrl(key: string): string | null {
     return `/temp_uploads/${key}`
   }
   const config = getR2Config()
+  // On Vercel, we always use the local proxy to avoid CORS/Public bucket issues
+  if (process.env.VERCEL) {
+    return null
+  }
   if (config.publicUrl) {
     return `${config.publicUrl}/${key}`
   }

@@ -57,5 +57,8 @@ server.log
 /uploads/
 /worklog.md// redeploy trigger 1772344137
 
+/tmp/
+/desktop/
+
 .env*.local
 .vercel

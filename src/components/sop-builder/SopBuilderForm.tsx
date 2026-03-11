@@ -45,6 +45,7 @@ import { ShimmerTitle } from "@/components/ui/shimmer-title"
 import { toast } from "sonner"
 import { useRouter, useParams } from "next/navigation"
 import { generateSopNumber, toRoman } from "@/lib/date-utils"
+import { isTauri, syncService } from "@/lib/sync/syncService"
 
 const PELAKSANA_OPTIONS = [
     "Pelapor",
@@ -175,6 +176,30 @@ export default function SopBuilderForm({
         try {
             const endpoint = id ? `/api/sop-builder/${id}` : '/api/sop-builder'
             const method = id ? 'PUT' : 'POST'
+
+            if (isTauri) {
+                try {
+                    const table = 'sop_files'
+                    const action = id ? 'UPDATE' : 'INSERT'
+                    const payload = id ? { ...data, id } : data
+
+                    await syncService.enqueueOperation(table, action, payload)
+                    toast.success(id ? "SOP berhasil diperbarui (Offline)" : "SOP berhasil dibuat (Offline)")
+
+                    if (!id) {
+                        // For new SOPs in offline mode, we might need a way to redirect to the flowchart
+                        // But since we don't have the server-generated ID yet, we might need to 
+                        // use a temporary client-side ID or wait for sync.
+                        // For now, let's just stay on the page or redirect to list.
+                        router.push('/?tab=buat-sop-baru')
+                    } else {
+                        router.push(`/sop/buat/${id}/flowchart`)
+                    }
+                    return
+                } catch (err) {
+                    console.error('Offline save error:', err)
+                }
+            }
 
             const res = await fetch(endpoint, {
                 method,

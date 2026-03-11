@@ -113,6 +113,7 @@ import LogoutAnimation from '@/components/LogoutAnimation'
 import ImageCropper from '@/components/ImageCropper'
 import SARLoadingOverlay, { StatCardSkeleton, TableRowSkeleton } from '@/components/SARLoadingOverlay'
 import SopBuilderList from '@/components/sop-builder/SopBuilderList'
+import { SyncStatusIndicator } from '@/components/layout/SyncStatusIndicator'
 
 // Types
 type UserRole = 'ADMIN' | 'STAF' | 'DEVELOPER' | null
@@ -221,6 +222,7 @@ function UserAvatar({
   className?: string;
 }) {
   const [error, setError] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   const sizeClasses = {
     sm: 'w-8 h-8 text-xs',
@@ -242,9 +244,10 @@ function UserAvatar({
   return (
     <div className={`rounded-full bg-gray-200 flex items-center justify-center shadow-lg overflow-hidden shrink-0 ${sizeClasses[size]} ${className}`}>
       <img
-        src={src}
+        src={typeof src === 'string' ? src : ''}
         alt={name || "Profile"}
-        className="w-full h-full object-cover"
+        className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        onLoad={() => setLoaded(true)}
         onError={() => setError(true)}
       />
     </div>
@@ -385,113 +388,37 @@ function ShimmerTitle({ children, subtitle, size = 'md' }: { children: React.Rea
     </div>
   )
 }
-
-// SAR Logo — cahaya putih berputar mengikuti outline logo (mask-composite benar)
+// SAR Logo — cahaya putih berputar mengikuti outline logo
 function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
   const sizeClasses = { sm: 'w-8 h-8', md: 'w-12 h-12', lg: 'w-16 h-16' }
-  const logoUrl = 'https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev/logo.png'
-  // maskUrl — path lokal, HARUS lokal agar CSS mask-image tidak diblokir CORS
-  const maskUrl = '/logo.png'
-
-  // Mask penuh logo (untuk clip shimmer & logo layer)
-  const fullMask: React.CSSProperties = {
-    WebkitMaskImage: `url(${maskUrl})`,
-    WebkitMaskSize: 'contain',
-    WebkitMaskRepeat: 'no-repeat',
-    WebkitMaskPosition: 'center',
-    maskImage: `url(${maskUrl})`,
-    maskSize: 'contain',
-    maskRepeat: 'no-repeat',
-    maskPosition: 'center',
-  }
-
-  // Outline ring mask: outer logo (100%) MINUS inner logo (80%)
-  //   → hanya ring tipis ~10% di tepi logo yang terlihat → efek benar mengikuti silhouette
-  // Chrome/Safari: WebkitMaskComposite: 'source-out'
-  // Firefox:       maskComposite: 'subtract'
-  const outlineRingMask: React.CSSProperties = {
-    WebkitMaskImage: `url(${maskUrl}), url(${maskUrl})`,
-    WebkitMaskSize: '100% 100%, 80% 80%',
-    WebkitMaskRepeat: 'no-repeat, no-repeat',
-    WebkitMaskPosition: 'center, center',
-    WebkitMaskComposite: 'source-out',
-    maskImage: `url(${maskUrl}), url(${maskUrl})`,
-    maskSize: '100% 100%, 80% 80%',
-    maskRepeat: 'no-repeat, no-repeat',
-    maskPosition: 'center, center',
-    maskComposite: 'subtract',
-  }
+  const logoUrl = '/logo.png?v=2'
 
   return (
     <motion.div
       className={`relative ${sizeClasses[size]}`}
-      style={{ overflow: 'visible', isolation: 'auto' }}
-      whileHover={{ scale: 1.08 }}
+      whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
     >
-      {/* ── z:8 GLOW: drop-shadow mengikuti alpha PNG logo ─────────────────── */}
-      <motion.img
-        src={logoUrl} alt="" aria-hidden="true"
-        className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
-        style={{ zIndex: 8 }}
-        animate={{
-          filter: [
-            'drop-shadow(0 0 3px rgba(251,191,36,0.6)) drop-shadow(0 0 10px rgba(251,191,36,0.3))',
-            'drop-shadow(0 0 8px rgba(251,191,36,1.0)) drop-shadow(0 0 22px rgba(251,191,36,0.65))',
-            'drop-shadow(0 0 3px rgba(251,191,36,0.6)) drop-shadow(0 0 10px rgba(251,191,36,0.3))',
-          ],
+      {/* Simple shadow fallback */}
+      <img
+        src={logoUrl}
+        alt="BASARNAS Logo"
+        className="w-full h-full object-contain filter drop-shadow(0 2px 4px rgba(0,0,0,0.1))"
+        onError={(e) => {
+          console.error('[SARLogo] Failed to load logo image:', logoUrl);
         }}
-        transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
       />
-
-      {/* ── z:15 OUTLINE RING CAHAYA PUTIH BERPUTAR ───────────────────────────
-          outlineRingMask = mask-composite subtract → isolasi area ring tepi logo.
-          Conic-gradient: transparan 80%, putih cerah di arc ~20%.
-          Rotasi 360° → cahaya berputar mengelilingi outline logo persis. */}
+      {/* Shimmer effect without masking for now to ensure visibility */}
       <motion.div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          zIndex: 15,
-          background: 'conic-gradient(from 0deg, transparent 0%, transparent 60%, rgba(255,255,255,0.25) 72%, rgba(255,255,255,0.9) 80%, white 84%, rgba(255,255,255,0.9) 88%, rgba(255,255,255,0.25) 96%, transparent 100%)',
-          ...outlineRingMask,
-        }}
-        animate={{ rotate: [0, 360] }}
-        transition={{ duration: 2.8, repeat: Infinity, ease: 'linear' }}
-      />
-
-      {/* Kilap kedua berlawanan arah — efek berkilau silang */}
-      <motion.div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          zIndex: 16,
-          background: 'conic-gradient(from 180deg, transparent 0%, transparent 75%, rgba(255,255,255,0.5) 84%, white 88%, rgba(255,255,255,0.5) 93%, transparent 100%)',
-          ...outlineRingMask,
-        }}
-        animate={{ rotate: [360, 0] }}
-        transition={{ duration: 5.0, repeat: Infinity, ease: 'linear' }}
-      />
-
-      {/* ── z:20 LOGO + SHIMMER dalam masked container ─────────────────────── */}
-      <div className="absolute inset-0" style={{ zIndex: 20, ...fullMask }}>
-        <img
-          src={logoUrl} alt="BASARNAS Logo"
-          className="w-full h-full object-contain"
-          style={{ position: 'relative', zIndex: 1, display: 'block' }}
-        />
-        {/* Shimmer diagonal: band putih kanan-bawah → kiri-atas */}
+        className="absolute inset-0 pointer-events-none overflow-hidden rounded-lg"
+        style={{ zIndex: 5 }}
+      >
         <motion.div
-          className="absolute pointer-events-none"
-          style={{
-            zIndex: 2,
-            width: '45%', height: '300%',
-            top: '-100%', left: '27.5%',
-            background: 'linear-gradient(to right, transparent 0%, rgba(255,255,255,0.5) 30%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,0.5) 70%, transparent 100%)',
-            rotate: '35deg',
-          }}
-          animate={{ x: ['120%', '-170%'], y: ['80%', '-80%'] }}
-          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut', repeatDelay: 2.5 }}
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+          animate={{ x: ['-100%', '100%'] }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'linear', repeatDelay: 3 }}
         />
-      </div>
+      </motion.div>
     </motion.div>
   )
 }
@@ -847,6 +774,7 @@ function SARBackground() {
 
 // Main App Component
 export default function ESOPApp() {
+  const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ !== undefined
   const { toast } = useToast()
 
   // Auth state
@@ -3151,6 +3079,28 @@ export default function ESOPApp() {
 
   const handleStatusChange = async (id: string, status: string) => {
     try {
+      // Offline-First Check
+      if (isTauri) {
+        const { syncService } = await import('@/lib/sync/syncService')
+        
+        // Update local database first
+        await syncService.addLocalData('sop_files', { id, status, updatedAt: new Date().toISOString() })
+        
+        // Enqueue sync operation
+        await syncService.enqueueOperation({
+          table: 'sop_files',
+          action: 'UPDATE',
+          data: { id, status }
+        })
+        
+        toast({ title: 'Berhasil (Local)', description: 'Status disimpan secara lokal dan akan disinkronkan saat online.' })
+        
+        // Update local state if needed (refetch or manual update)
+        fetchSopFiles()
+        fetchStats()
+        return
+      }
+
       const res = await fetch('/api/sop', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -3911,6 +3861,22 @@ export default function ESOPApp() {
   const handleDeleteSop = async (id: string, fileName: string) => {
     if (!confirm(`Yakin ingin menghapus file "${fileName}"?\n\nFile akan dihapus permanen dari sistem dan storage.`)) return
 
+    if (isTauri) {
+      try {
+        const { syncService } = await import('@/lib/sync/syncService')
+        await syncService.enqueueOperation('sop_files', 'DELETE', { id })
+        toast({
+          title: '✅ Berhasil (Offline)',
+          description: `Penghapusan "${fileName}" telah dijadwalkan.`,
+        })
+        // Update local state proactively
+        setSopFiles(prev => prev.filter(sop => sop.id !== id))
+        return
+      } catch (err) {
+        console.error('Offline delete error:', err)
+      }
+    }
+
     try {
       const res = await fetch(`/api/sop?id=${id}`, { method: 'DELETE' })
       const data = await res.json()
@@ -4074,11 +4040,14 @@ export default function ESOPApp() {
               transition={{ delay: 0.3 }}
             >
               {/* Simple Storage Status for Public Page */}
-              <div className="flex items-center gap-2">
-                <div className={`w - 2 h - 2 rounded - full ${r2Status?.connected ? 'bg-green-500' : 'bg-red-500'} `} />
-                <span className={`text - sm font - medium ${r2Status?.connected ? 'text-green-400' : 'text-red-400'} `}>
-                  Storage {r2Status?.connected ? 'OK' : 'Tidak Tersedia'}
-                </span>
+              <div className="flex items-center gap-4">
+                <SyncStatusIndicator />
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${r2Status?.connected ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <span className={`text-sm font-medium ${r2Status?.connected ? 'text-green-400' : 'text-red-400'}`}>
+                    Cloud {r2Status?.connected ? 'OK' : 'Tidak Tersedia'}
+                  </span>
+                </div>
               </div>
               <Button
                 onClick={() => setShowLogin(true)}
@@ -5780,6 +5749,7 @@ export default function ESOPApp() {
             </motion.div>
           </div>
           <div className="flex items-center gap-4">
+            <SyncStatusIndicator />
             <StorageStatus
               compact
               syncStatus={syncStatus}
