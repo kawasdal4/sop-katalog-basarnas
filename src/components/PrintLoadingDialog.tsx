@@ -412,28 +412,8 @@ export default function PrintLoadingDialog({ open, onClose, fileId, fileName, fi
                 )}
               </AnimatePresence>
 
-              {/* Success Message / Preview Button */}
-              <AnimatePresence>
-                {readyUrl && !error && progressPercent === 100 && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, height: 0 }}
-                    animate={{ opacity: 1, y: 0, height: 'auto' }}
-                    className="mt-2"
-                  >
-                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex flex-col sm:flex-row items-center gap-4 justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                        </div>
-                        <p className="text-sm text-emerald-300 font-medium leading-tight">Dokumen siap! Klik tombol berikut jika dokumen tidak otomatis terbuka.</p>
-                      </div>
-                      <Button size="sm" onClick={() => window.open(readyUrl, '_blank')} className="shrink-0 w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-500/20">
-                        Buka Preview
-                      </Button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {/* Auto-closes after PDF opens — no manual button needed */}
+
             </div>
           </div>
         </div>

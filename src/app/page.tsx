@@ -2821,12 +2821,14 @@ export default function ESOPApp() {
         }
 
         try {
-          if (!text.trim()) {
-            throw new Error('Empty response body')
-          }
+          if (!text.trim()) throw new Error('Empty response body')
           const data = JSON.parse(text)
           if (data.downloadUrl) {
-            await openExternal(data.downloadUrl)
+            if (previewTab && !previewTab.closed) {
+              previewTab.location.href = data.downloadUrl;
+            } else {
+              await openExternal(data.downloadUrl);
+            }
           }
         } catch (e) {
           console.error('[Preview PDF] Failed to parse JSON. Status:', res.status, 'Raw text:', text)
@@ -2871,36 +2873,38 @@ export default function ESOPApp() {
         if (data.viewerUrl) {
           console.log('🔗 [Preview] Opening URL:', data.viewerUrl.substring(0, 150))
 
-          const previewWindow = window.open(data.viewerUrl, '_blank')
-
-          // Handle popup blocker
-          if (!previewWindow || previewWindow.closed) {
-            toast({
-              title: '⚠️ Popup Diblokir',
-              description: `Klik link ini untuk membuka: ${data.viewerUrl}`,
-              duration: 30000
-            })
+          // ✅ Use the pre-opened blank tab — popup blockers allow this because
+          // the tab was opened synchronously during the user's click event.
+          if (previewTab && !previewTab.closed) {
+            previewTab.location.href = data.viewerUrl;
+          } else if (isTauri) {
+            await openExternal(data.viewerUrl);
           } else {
-            toast({
-              title: '📊 Preview Dibuka',
-              description: 'File dibuka di Microsoft Office Online. File temp akan dihapus setelah ditutup.',
-              duration: 5000
-            })
-
-            // Track the window and clean up when closed
-            if (data.driveItemId) {
-              const checkClosed = setInterval(() => {
-                if (previewWindow.closed) {
-                  clearInterval(checkClosed)
-                  // Delete temp file from OneDrive
-                  fetch('/api/preview-office', {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ driveItemId: data.driveItemId })
-                  }).catch(err => console.warn('Failed to cleanup temp file:', err))
-                }
-              }, 2000) // Check every 2 seconds
+            // Last resort fallback
+            const fallback = window.open(data.viewerUrl, '_blank');
+            if (!fallback) {
+              toast({
+                title: '⚠️ Popup Diblokir Browser',
+                description: 'Izinkan popup untuk situs ini di address bar browser.',
+                variant: 'destructive',
+                duration: 8000
+              });
             }
+          }
+
+          // Track the window and clean up when closed
+          const trackWindow = (previewTab && !previewTab.closed) ? previewTab : null;
+          if (data.driveItemId && trackWindow) {
+            const checkClosed = setInterval(() => {
+              if (trackWindow.closed) {
+                clearInterval(checkClosed)
+                fetch('/api/preview-office', {
+                  method: 'DELETE',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ driveItemId: data.driveItemId })
+                }).catch(err => console.warn('Failed to cleanup temp file:', err))
+              }
+            }, 2000)
           }
         }
 
