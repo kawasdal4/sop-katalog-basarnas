@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { isTauri } from '@tauri-apps/api/core';
+import { readDir, BaseDirectory, watch } from '@tauri-apps/plugin-fs';
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -202,8 +204,6 @@ const COLORS = ['#f97316', '#eab308', '#22c55e', '#ef4444', '#3b82f6']
 const LINGKUP_COLORS = ['#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#22c55e', '#eab308', '#ef4444']
 
 // Tauri Detection & Native Helpers
-const isTauri = typeof window !== 'undefined' && ((window as any).__TAURI__ !== undefined || (window as any).__TAURI_INTERNALS__ !== undefined);
-
 const openExternal = async (url: string) => {
   if (isTauri) {
     const tauri = (window as any).__TAURI__;
@@ -272,7 +272,7 @@ const handleNativeDownload = async (blob: Blob, fileName: string) => {
         if (filePath) {
           const bytes = new Uint8Array(await blob.arrayBuffer());
           await writeFile(filePath, bytes);
-          return true;
+          return filePath; // Changed: return string path instead of true
         }
         return null; // User cancelled
       } catch (err) {
@@ -858,7 +858,6 @@ function SARBackground() {
 
 // Main App Component
 export default function ESOPApp() {
-  const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ !== undefined
   const { toast } = useToast()
 
   // Auth state
@@ -1024,6 +1023,17 @@ export default function ESOPApp() {
   const [showDesktopSyncDialog, setShowDesktopSyncDialog] = useState(false)
   const [desktopSyncFile, setDesktopSyncFile] = useState<File | null>(null)
   const [desktopSyncing, setDesktopSyncing] = useState(false)
+  const [desktopEditLocalPath, setDesktopEditLocalPath] = useState<string | null>(null)
+  const [unwatchDesktopFile, setUnwatchDesktopFile] = useState<(() => void) | null>(null)
+
+  // Clear unwatch on unmount
+  useEffect(() => {
+    return () => {
+      if (unwatchDesktopFile) {
+        unwatchDesktopFile()
+      }
+    }
+  }, [unwatchDesktopFile])
 
   // Conflict handling for Desktop Sync
   const [showConflictDialog, setShowConflictDialog] = useState(false)
@@ -3273,6 +3283,74 @@ export default function ESOPApp() {
     setExcelEditLoading(false)
   }
 
+  // Background Auto-Sync for Desktop
+  const autoSync = async (fileToSync: File, sessionId: string, sop: SopData) => {
+    setDesktopSyncing(true)
+    toast({
+      title: '🔄 Auto-Sync Berjalan...',
+      description: `Mendeteksi perubahan pada ${sop.fileName}, sedang mengunggah ke R2...`,
+      duration: 3000
+    })
+
+    try {
+      const formData = new FormData()
+      formData.append('file', fileToSync)
+      formData.append('sessionId', sessionId)
+
+      const res = await fetch('/api/excel-edit/desktop-sync', {
+        method: 'POST',
+        body: formData
+      })
+
+      const data = await res.json()
+
+      // Handle conflict detected (status 409)
+      if (res.status === 409 && data.error === 'CONFLICT_DETECTED') {
+        console.log('⚠️ [Auto-Sync] Conflict detected:', data)
+        setConflictData({
+          sessionId: sessionId,
+          message: data.message,
+          lastEditor: data.conflict?.lastEditor,
+          originalHash: data.conflict?.originalHash,
+          currentHash: data.conflict?.currentHash
+        })
+        setShowConflictDialog(true)
+        setDesktopSyncing(false)
+        return
+      }
+
+      if (data.success) {
+        if (!data.unchanged) {
+          toast({
+            title: '✅ Auto-Sync Berhasil!',
+            description: `Perubahan pada ${sop.fileName} telah disimpan ke R2.`,
+            duration: 5000
+          })
+          fetchSopFiles()
+          fetchStats()
+        } else {
+          toast({
+            title: 'ℹ️ File Tidak Berubah',
+            description: `Auto-Sync mendeteksi save, tapi tidak ada konten yang berubah.`,
+            duration: 3000
+          })
+        }
+      } else {
+        throw new Error(data.error || 'Gagal sync file')
+      }
+    } catch (error) {
+      console.error('[Auto-Sync] Error:', error)
+      toast({
+        title: '❌ Auto-Sync Gagal',
+        description: error instanceof Error ? error.message : 'Terjadi kesalahan sistem',
+        variant: 'destructive',
+        duration: 5000
+      })
+    } finally {
+      setDesktopSyncing(false)
+    }
+  }
+
   // Handle Desktop Excel/Word Edit - Download file for local editing
   const handleDesktopEdit = async (id: string) => {
     const sop = sopFiles.find(s => s.id === id)
@@ -3408,10 +3486,65 @@ export default function ESOPApp() {
 
       // Native download for Tauri
       if (isTauri) {
-        const success = await handleNativeDownload(blob, finalFileName || 'document')
-        if (success === null) return // User cancelled
-        if (success) {
-          toast({ title: '✅ File Diunduh', description, duration: 8000 })
+        const filePath = await handleNativeDownload(blob, finalFileName || 'document')
+        if (filePath === null) return // User cancelled
+        if (filePath) {
+          setDesktopEditLocalPath(filePath)
+          
+          const fileTypeLabel = sop.fileType === 'docx' || sop.fileType === 'doc' ? 'Word' : 'Excel'
+          toast({ 
+            title: '✅ File Diunduh & Dibuka', 
+            description: `File sedang dibuka di ${fileTypeLabel}. Kami memantau file ini. Setiap kali Anda menekan Save (Ctrl+S), aplikasi akan otomatis Sync ke R2.`, 
+            duration: 10000 
+          })
+
+          const tauri = (window as any).__TAURI__;
+          const invoke = tauri?.core?.invoke || tauri?.invoke;
+          
+          if (invoke) {
+            try {
+               await invoke('native_open', { path: filePath });
+               
+               // Start watching the file
+               const { watch } = await import('@tauri-apps/plugin-fs');
+               const unwatch = await watch(filePath, async (event) => {
+                 console.log('[Watcher] Event detected:', event);
+                 
+                 // If event.type is Modify or contains Modify (varies by OS/Tauri version)
+                 const typeStr = JSON.stringify(event.type);
+                 if (typeStr.includes('modify') || typeStr.includes('Modify') || typeStr.includes('any') || typeStr.includes('Any')) {
+                     console.log('[Watcher] File modified, triggering Auto-Sync...');
+                     
+                     // Debounce or slight delay to ensure write is complete
+                     setTimeout(async () => {
+                        try {
+                           const { readFile } = await import('@tauri-apps/plugin-fs');
+                           const fileBytes = await readFile(filePath);
+                           
+                           // Create blob/file from bytes
+                           const updatedBlob = new Blob([fileBytes]);
+                           const fileToSync = new File([updatedBlob], finalFileName || 'document.xlsx');
+                           
+                           // Set the file to trigger sync
+                           setDesktopSyncFile(fileToSync);
+                           
+                           // Auto call handleDesktopSync (Need to make sure state is accessible or pass directly)
+                           // Because we are in a closure, we use the stored sessionId
+                           autoSync(fileToSync, sessionId, sop);
+                           
+                        } catch(readErr) {
+                           console.error('[Watcher] Error reading modified file:', readErr);
+                        }
+                     }, 1000); // 1 second delay to avoid read locks
+                 }
+               });
+               
+               setUnwatchDesktopFile(() => unwatch);
+
+            } catch (err) {
+               console.error('[Desktop Edit] Failed to native_open or watch:', err);
+            }
+          }
           return
         }
       }
@@ -3602,7 +3735,28 @@ export default function ESOPApp() {
   }
 
   // Handle Cancel Session - User cancels the entire edit session
-  const handleCancelSession = () => {
+  const handleCancelSession = async () => {
+    // 1. Cleanup Watcher
+    if (unwatchDesktopFile) {
+        console.log('[Watcher] Stopping file watch...');
+        unwatchDesktopFile();
+        setUnwatchDesktopFile(null);
+    }
+    setDesktopEditLocalPath(null);
+
+    // 2. Call API to clear session lock
+    if (desktopEditSessionToken) {
+        try {
+            await fetch('/api/excel-edit/desktop-cancel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId: desktopEditSessionToken })
+            })
+        } catch (e) {
+            console.error('Failed to clear desktop session lock', e)
+        }
+    }
+
     setShowConflictDialog(false)
     setShowDesktopSyncDialog(false)
     setConflictData(null)
@@ -3618,7 +3772,7 @@ export default function ESOPApp() {
 
     toast({
       title: '🚫 Sesi Dibatalkan',
-      description: 'Anda dapat memulai edit ulang kapan saja',
+      description: 'Pemantauan file dan kunci sesi (lock) telah dilepas.',
       duration: 3000
     })
   }
@@ -8357,12 +8511,35 @@ export default function ESOPApp() {
                                         {/* Session Sync Shortcut */}
                                         {(user?.role === 'ADMIN' || user?.role === 'DEVELOPER') && excelEditData?.id === sop.id && (
                                           <motion.div
-                                            animate={{ x: [0, 2, 0] }}
+                                            animate={desktopSyncing ? { x: [0, 2, 0] } : {}}
                                             transition={{ duration: 1.5, repeat: Infinity }}
                                           >
-                                            <Button size="icon" variant="ghost" onClick={handleOpenDesktopSync} className="w-9 h-9 rounded-lg bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white ml-1">
-                                              <RefreshCw className="w-4 h-4" />
-                                            </Button>
+                                            {desktopEditSessionToken ? (
+                                              /* Desktop Edit Flow (Auto-Sync) */
+                                              desktopSyncing ? (
+                                                <Button size="icon" variant="ghost" disabled className="w-9 h-9 rounded-lg bg-orange-500/10 text-orange-400 ml-1 cursor-wait">
+                                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                                </Button>
+                                              ) : (
+                                                <TooltipProvider delayDuration={300}>
+                                                  <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                      <Button size="icon" variant="ghost" onClick={handleCancelSession} className="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white ml-1">
+                                                        <Check className="w-4 h-4" />
+                                                      </Button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="bg-slate-900 border-slate-700 text-white font-bold">
+                                                      Selesai Edit
+                                                    </TooltipContent>
+                                                  </Tooltip>
+                                                </TooltipProvider>
+                                              )
+                                            ) : (
+                                              /* Fallback / Excel Online (if applicable) */
+                                              <Button size="icon" variant="ghost" onClick={handleOpenDesktopSync} className="w-9 h-9 rounded-lg bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white ml-1">
+                                                <RefreshCw className="w-4 h-4" />
+                                              </Button>
+                                            )}
                                           </motion.div>
                                         )}
                                       </div>

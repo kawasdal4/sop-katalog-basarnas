@@ -20,7 +20,8 @@ tauri-plugin-clipboard-manager = "2.0"
 tauri-plugin-sql = { version = "2.0", features = ["sqlite"] }
 tauri-plugin-log = "2.0"
 tauri-plugin-dialog = "2.0"
-tauri-plugin-fs = "2.0"
+tauri-plugin-fs = { version = "2.0", features = ["watch"] }
+
 
 
 
