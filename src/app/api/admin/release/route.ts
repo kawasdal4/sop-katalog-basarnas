@@ -32,14 +32,18 @@ export async function POST(request: Request) {
     const signature = formData.get('signature') as string 
     const directDownloadUrl = formData.get('downloadUrl') as string | null
     
+    console.log('[AdminRelease] Received data:', { version, notes, signature: signature ? 'PRESENT' : 'MISSING', directDownloadUrl })
+
     if (!version || !notes || !signature) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+      console.error('[AdminRelease] Missing required fields:', { version, notes, signature: !!signature })
+      return NextResponse.json({ error: 'Missing required fields (version, notes, signature)' }, { status: 400 })
     }
 
     let downloadUrl = directDownloadUrl || ''
 
     // 1. If a file is provided, upload to R2 (Browser/Manual Upload)
     if (file && !downloadUrl) {
+      console.log('[AdminRelease] Uploading file to R2:', file.name)
       const arrayBuffer = await file.arrayBuffer()
       const fileBuffer = Buffer.from(arrayBuffer)
       const objectKey = `desktop-releases/${version}/${file.name}`
@@ -48,34 +52,45 @@ export async function POST(request: Request) {
       try {
           const result = await uploadToR2(fileBuffer, file.name, mimeType, { key: objectKey })
           downloadUrl = result.publicUrl || result.url
+          console.log('[AdminRelease] R2 Upload success:', downloadUrl)
       } catch (e) {
-          console.error("R2 Upload failed:", e)
-          return NextResponse.json({ error: 'Failed to upload file to storage' }, { status: 500 })
+          console.error("[AdminRelease] R2 Upload failed:", e)
+          return NextResponse.json({ error: 'Failed to upload file to storage: ' + (e as Error).message }, { status: 500 })
       }
     }
 
     if (!downloadUrl) {
+      console.error('[AdminRelease] No download URL determined')
       return NextResponse.json({ error: 'Missing file or downloadUrl' }, { status: 400 })
     }
 
     // 2. Save the release metadata to the database
-    const release = await db.desktopRelease.create({
-      data: {
-        version,
-        notes,
-        signature,
-        downloadUrl,
-        fileSize: file ? file.size : 0,
-        isPublished: true,
-        isMandatory: false
-      }
-    })
-
-    return NextResponse.json({ success: true, release })
+    console.log('[AdminRelease] Saving to DB...')
+    try {
+      const release = await db.desktopRelease.create({
+        data: {
+          version,
+          notes,
+          signature,
+          downloadUrl,
+          fileSize: file ? file.size : 0,
+          isPublished: true,
+          isMandatory: false
+        }
+      })
+      console.log('[AdminRelease] DB Save success:', release.id)
+      return NextResponse.json({ success: true, release })
+    } catch (dbError) {
+      console.error('[AdminRelease] Database error:', dbError)
+      return NextResponse.json({ 
+        error: 'Database error while creating release', 
+        details: (dbError as Error).message 
+      }, { status: 500 })
+    }
 
   } catch (error) {
-    console.error('[AdminRelease] Error creating release:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('[AdminRelease] Unexpected error:', error)
+    return NextResponse.json({ error: 'Internal server error: ' + (error as Error).message }, { status: 500 })
   }
 }
 
