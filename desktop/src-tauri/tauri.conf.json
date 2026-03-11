@@ -21,19 +21,7 @@
       }
     ],
     "security": {
-      "csp": null,
-      "dangerousRemoteDomainIpcAccess": [
-        {
-          "domain": "e-katalog-sop.cloud",
-          "enableTauriAPI": true,
-          "windows": ["main"]
-        },
-        {
-          "domain": "localhost",
-          "enableTauriAPI": true,
-          "windows": ["main"]
-        }
-      ]
+      "csp": null
     }
 
   },
