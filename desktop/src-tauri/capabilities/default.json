@@ -31,10 +31,11 @@
     "log:default",
     "dialog:default",
     "fs:default",
-    "app:get_temp_dir",
-    "app:save_temp_file",
-    "app:native_open"
+    "app:allow-get-temp-dir",
+    "app:allow-save-temp-file",
+    "app:allow-native-open"
   ]
 }
+
 
 
