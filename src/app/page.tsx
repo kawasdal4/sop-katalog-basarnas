@@ -3489,7 +3489,12 @@ export default function ESOPApp() {
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
-        toast({ title: '✅ File Diunduh', description: 'Buka file dari folder Download Anda untuk mengedit.', duration: 8000 });
+        toast({ title: '✅ File Diunduh', description: 'Buka file dari folder Download Anda untuk mengedit. Setelah selesai, upload file kembali di dialog sync.', duration: 8000 });
+        
+        // Kembalikan dialog sync untuk memilih file yang sudah di edit
+        setTimeout(() => {
+          setShowDesktopSyncDialog(true);
+        }, 1500);
       }
     } catch (error) {
       console.error('Desktop edit error:', error)
@@ -5965,18 +5970,9 @@ export default function ESOPApp() {
                 className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/20 border border-orange-500/50 rounded-lg"
               >
                 <FileSpreadsheet className="w-4 h-4 text-orange-400" />
-                <span className="text-xs text-orange-300 font-medium">
+                <span className="text-xs text-orange-300 font-medium whitespace-nowrap">
                   Edit: {excelEditData.fileName?.slice(0, 20)}...
                 </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleCancelSession}
-                  className="h-6 px-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                >
-                  <X className="w-3 h-3 mr-1" />
-                  Batal
-                </Button>
               </motion.div>
             )}
 
