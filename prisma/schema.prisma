@@ -328,3 +328,12 @@ model DesktopRelease {
   @@index([version])
   @@index([isPublished])
 }
+
+// Download analytics tracking
+model DesktopDownload {
+  id        String   @id @default(cuid())
+  ip        String?
+  country   String?
+  device    String?
+  createdAt DateTime @default(now())
+}

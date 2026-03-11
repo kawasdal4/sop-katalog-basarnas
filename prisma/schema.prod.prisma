@@ -301,3 +301,40 @@ model ExportJob {
   updatedAt DateTime @updatedAt
 }
 
+// ---------------------------------------------------------------------------
+// DESKTOP AUTO-UPDATE & DISTRIBUTION
+// ---------------------------------------------------------------------------
+
+// Desktop Release model for managing auto-updates and installer distribution
+model DesktopRelease {
+  id      String   @id @default(cuid())
+  version String   @unique // e.g., "1.0.0"
+  notes   String? // Release notes / changelog
+  pubDate DateTime @default(now()) // Publication date for manifest
+
+  // Download metrics mapped to this release (optional tracking)
+  downloadUrl String // Signed or public R2 URL for the .msi/.exe installer
+  signature   String // Signature required by Tauri updater (.sig content)
+
+  // File metadata
+  fileSize Int? // Size in bytes
+
+  // Administration
+  isPublished Boolean @default(false)
+  isMandatory Boolean @default(false) // If true, clients must update
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([version])
+  @@index([isPublished])
+}
+
+// Download analytics tracking
+model DesktopDownload {
+  id        String   @id @default(cuid())
+  ip        String?
+  country   String?
+  device    String?
+  createdAt DateTime @default(now())
+}

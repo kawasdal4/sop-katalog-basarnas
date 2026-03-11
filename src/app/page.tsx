@@ -4302,11 +4302,7 @@ export default function ESOPApp() {
                 </div>
 
                 {/* Desktop Download Button - Inserted below Butuh Bantuan */}
-                <div className="mt-4 flex justify-center w-full">
-                  <div className="w-full scale-90 origin-top">
-                    <DesktopDownloadButton />
-                  </div>
-                </div>
+                <DesktopDownloadButton />
               </div>
 
               {/* Right Side: The Form - Compressed Padding/Gaps */}
