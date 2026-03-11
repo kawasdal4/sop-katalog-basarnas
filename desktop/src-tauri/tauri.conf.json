@@ -43,8 +43,8 @@
     "shell": {
       "open": true
     },
-    "notification": {},
-    "clipboard": {},
-    "sql": {}
+    "notification": null,
+    "clipboard-manager": null,
+    "sql": null
   }
 }
