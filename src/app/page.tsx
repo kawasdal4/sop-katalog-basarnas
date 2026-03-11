@@ -9595,168 +9595,9 @@ export default function ESOPApp() {
                       </DialogContent>
                     </Dialog>
 
-                    {/* Desktop Sync Dialog - Upload edited file */}
-                    <Dialog open={showDesktopSyncDialog} onOpenChange={setShowDesktopSyncDialog}>
-                      <DialogContent className="sm:max-w-none w-fit max-w-[95vw] bg-white border-2 border-orange-200 shadow-xl overflow-visible" aria-describedby={undefined}>
-                        <DialogHeader>
-                          <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                            <RefreshCw className="w-5 h-5 text-orange-600" />
-                            Selesai Edit & Sync
-                          </DialogTitle>
-                          <DialogDescription className="text-gray-600">
-                            Upload file hasil edit untuk disinkronkan ke storage
-                          </DialogDescription>
-                        </DialogHeader>
-
-                        {excelEditData && (
-                          <div className="space-y-4">
-                            {/* File Info */}
-                            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                              <div className="flex items-start gap-3">
-                                {['docx', 'doc'].includes(excelEditData.fileType || '') ? (
-                                  <FileText className="w-10 h-10 text-blue-600 mt-1" />
-                                ) : (
-                                  <FileSpreadsheet className="w-10 h-10 text-green-600 mt-1" />
-                                )}
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-bold text-gray-900 whitespace-nowrap">{excelEditData.fileName}</p>
-                                  <p className="text-sm text-gray-600 font-medium whitespace-nowrap">{excelEditData.judul}</p>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Session Info */}
-                            {desktopEditSessionToken && (
-                              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                <p className="text-sm text-blue-800">
-                                  <strong>Session aktif:</strong> Tanpa batas waktu
-                                </p>
-                                <p className="text-xs text-blue-600 mt-1">
-                                  Original hash: {desktopEditOriginalHash?.slice(0, 16)}...
-                                </p>
-                              </div>
-                            )}
-
-                            {/* File Picker */}
-                            <div className="space-y-3">
-                              <Label className="text-sm font-semibold text-gray-700">
-                                Pilih File Hasil Edit
-                              </Label>
-                              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
-                              <div
-                                className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-orange-300 hover:bg-orange-50/30 transition-all cursor-default"
-                              >
-                                {desktopSyncFile ? (
-                                  <div className="flex flex-col items-center gap-3">
-                                    <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
-                                      <CheckCircle className="w-6 h-6 text-green-600" />
-                                    </div>
-                                    <div className="text-center">
-                                      <p className="text-sm font-bold text-gray-900">{desktopSyncFile.name}</p>
-                                      <p className="text-xs text-gray-500 mt-1">File siap diunggah</p>
-                                    </div>
-                                    <Button 
-                                      variant="outline" 
-                                      size="sm" 
-                                      onClick={() => setDesktopSyncFile(null)}
-                                      className="mt-2 text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
-                                    >
-                                      Ganti File
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <Upload className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                                    <p className="text-sm text-gray-600 font-medium mb-1">
-                                      Pilih file hasil pengeditan
-                                    </p>
-                                    <p className="text-xs text-gray-400 mb-4">
-                                      Format pendukung: .xlsx, .xls, .docx, .doc
-                                    </p>
-                                    <Button
-                                      variant="secondary"
-                                      className="bg-orange-100 text-orange-700 hover:bg-orange-200 border-orange-200"
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        if (isTauri) {
-                                          const tauri = (window as any).__TAURI__;
-                                          const open = tauri?.dialog?.open || tauri?.plugins?.dialog?.open;
-                                          const readFile = tauri?.fs?.readFile || tauri?.plugins?.fs?.readFile;
-                                          if (open && readFile) {
-                                            try {
-                                              const selected = await open({
-                                                filters: [{ name: 'Document', extensions: ['xlsx', 'xls', 'xlsm', 'docx', 'doc'] }]
-                                              });
-                                              if (selected && typeof selected === 'string') {
-                                                const bytes = await readFile(selected);
-                                                const file = new File([bytes], selected.split(/[\\/]/).pop() || 'document', { type: 'application/octet-stream' });
-                                                setDesktopSyncFile(file);
-                                              }
-                                            } catch (err) {
-                                              console.error('Native file open failed:', err);
-                                            }
-                                          }
-                                        } else {
-                                          document.getElementById('desktop-sync-file')?.click();
-                                        }
-                                      }}
-                                    >
-                                      <FilePlus className="w-4 h-4 mr-2" />
-                                      Pilih File
-                                    </Button>
-                                    <input
-                                      type="file"
-                                      accept=".xlsx,.xls,.xlsm,.docx,.doc"
-                                      onChange={(e) => {
-                                        const file = e.target.files?.[0]
-                                        if (file) setDesktopSyncFile(file)
-                                      }}
-                                      className="hidden"
-                                      id="desktop-sync-file"
-                                    />
-                                  </>
-                                )}
-                              </div>
-                              </div>
-                            </div>
-
-                            {/* Info */}
-                            <Alert className="bg-amber-50 border-amber-200">
-                              <AlertTriangle className="w-4 h-4 text-amber-600" />
-                              <AlertDescription className="text-amber-800 text-sm">
-                                <strong>Penting:</strong> File akan di-checksum dan dibandingkan dengan file asli.
-                                Jika tidak ada perubahan, file tidak akan di-upload.
-                              </AlertDescription>
-                            </Alert>
-                          </div>
-                        )}
-
-                        <DialogFooter className="gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setShowDesktopSyncDialog(false)}
-                            className="border-gray-300 text-gray-700 hover:bg-gray-100"
-                          >
-                            Batal
-                          </Button>
-                          <Button
-                            type="button"
-                            onClick={handleDesktopSync}
-                            disabled={!desktopSyncFile || desktopSyncing}
-                            className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
-                          >
-                            {desktopSyncing ? (
-                              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Syncing...</>
-                            ) : (
-                              <><RefreshCw className="w-4 h-4 mr-2" /> Sync ke R2</>
-                            )}
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
 
                   </div>
+
 
                   <Card className="bg-white border-2 border-orange-200 shadow-xl overflow-hidden">
                     <CardContent className="p-0">
@@ -9875,6 +9716,163 @@ export default function ESOPApp() {
               )
             }
           </AnimatePresence >
+
+          {/* Desktop Sync Dialog - Upload edited file (Global, not page-scoped) */}
+          <Dialog open={showDesktopSyncDialog} onOpenChange={setShowDesktopSyncDialog}>
+            <DialogContent className="sm:max-w-none w-fit max-w-[95vw] bg-white border-2 border-orange-200 shadow-xl overflow-visible" aria-describedby={undefined}>
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <RefreshCw className="w-5 h-5 text-orange-600" />
+                  Selesai Edit & Sync
+                </DialogTitle>
+                <DialogDescription className="text-gray-600">
+                  Upload file hasil edit untuk disinkronkan ke storage
+                </DialogDescription>
+              </DialogHeader>
+
+              {excelEditData && (
+                <div className="space-y-4">
+                  {/* File Info */}
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      {['docx', 'doc'].includes(excelEditData.fileType || '') ? (
+                        <FileText className="w-10 h-10 text-blue-600 mt-1" />
+                      ) : (
+                        <FileSpreadsheet className="w-10 h-10 text-green-600 mt-1" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-gray-900 whitespace-nowrap">{excelEditData.fileName}</p>
+                        <p className="text-sm text-gray-600 font-medium whitespace-nowrap">{excelEditData.judul}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Session Info */}
+                  {desktopEditSessionToken && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <p className="text-sm text-blue-800">
+                        <strong>Session aktif:</strong> Tanpa batas waktu
+                      </p>
+                      <p className="text-xs text-blue-600 mt-1">
+                        Original hash: {desktopEditOriginalHash?.slice(0, 16)}...
+                      </p>
+                    </div>
+                  )}
+
+                  {/* File Picker */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold text-gray-700">
+                      Pilih File Hasil Edit
+                    </Label>
+                    <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-orange-300 hover:bg-orange-50/30 transition-all cursor-default">
+                      {desktopSyncFile ? (
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                            <CheckCircle className="w-6 h-6 text-green-600" />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-bold text-gray-900">{desktopSyncFile.name}</p>
+                            <p className="text-xs text-gray-500 mt-1">File siap diunggah</p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDesktopSyncFile(null)}
+                            className="mt-2 text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
+                          >
+                            Ganti File
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <Upload className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                          <p className="text-sm text-gray-600 font-medium mb-1">
+                            Pilih file hasil pengeditan
+                          </p>
+                          <p className="text-xs text-gray-400 mb-4">
+                            Format pendukung: .xlsx, .xls, .docx, .doc
+                          </p>
+                          <Button
+                            variant="secondary"
+                            className="bg-orange-100 text-orange-700 hover:bg-orange-200 border-orange-200"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (isTauri) {
+                                const tauri = (window as any).__TAURI__;
+                                const open = tauri?.dialog?.open || tauri?.plugins?.dialog?.open;
+                                const readFile = tauri?.fs?.readFile || tauri?.plugins?.fs?.readFile;
+                                if (open && readFile) {
+                                  try {
+                                    const selected = await open({
+                                      filters: [{ name: 'Document', extensions: ['xlsx', 'xls', 'xlsm', 'docx', 'doc'] }]
+                                    });
+                                    if (selected && typeof selected === 'string') {
+                                      const bytes = await readFile(selected);
+                                      const file = new File([bytes], selected.split(/[\\/]/).pop() || 'document', { type: 'application/octet-stream' });
+                                      setDesktopSyncFile(file);
+                                    }
+                                  } catch (err) {
+                                    console.error('Native file open failed:', err);
+                                  }
+                                }
+                              } else {
+                                document.getElementById('desktop-sync-file-global')?.click();
+                              }
+                            }}
+                          >
+                            <FilePlus className="w-4 h-4 mr-2" />
+                            Pilih File
+                          </Button>
+                          <input
+                            type="file"
+                            accept=".xlsx,.xls,.xlsm,.docx,.doc"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) setDesktopSyncFile(file)
+                            }}
+                            className="hidden"
+                            id="desktop-sync-file-global"
+                          />
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Info */}
+                  <Alert className="bg-amber-50 border-amber-200">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    <AlertDescription className="text-amber-800 text-sm">
+                      <strong>Penting:</strong> File akan di-checksum dan dibandingkan dengan file asli.
+                      Jika tidak ada perubahan, file tidak akan di-upload.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              )}
+
+              <DialogFooter className="gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowDesktopSyncDialog(false)}
+                  className="border-gray-300 text-gray-700 hover:bg-gray-100"
+                >
+                  Batal
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleDesktopSync}
+                  disabled={!desktopSyncFile || desktopSyncing}
+                  className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
+                >
+                  {desktopSyncing ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Syncing...</>
+                  ) : (
+                    <><RefreshCw className="w-4 h-4 mr-2" /> Sync ke R2</>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Edit User Dialog */}
           < Dialog open={showEditUserDialog} onOpenChange={setShowEditUserDialog} >
