@@ -3701,15 +3701,8 @@ export default function ESOPApp() {
 
   // Open Desktop Sync Dialog
   const handleOpenDesktopSync = () => {
-    if (!desktopEditSessionToken) {
-      toast({
-        title: '⚠️ Tidak Ada Session',
-        description: 'Download file terlebih dahulu dengan klik "Edit di Desktop"',
-        variant: 'destructive',
-        duration: 5000
-      })
-      return
-    }
+    // We allow opening the dialog even if there's no active session
+    // so users can still manually upload a file if they want to.
     setDesktopSyncFile(null)
     setShowDesktopSyncDialog(true)
   }
@@ -9730,37 +9723,41 @@ export default function ESOPApp() {
                 </DialogDescription>
               </DialogHeader>
 
-              {excelEditData && (
-                <div className="space-y-4">
-                  {/* File Info */}
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                    <div className="flex items-start gap-3">
-                      {['docx', 'doc'].includes(excelEditData.fileType || '') ? (
-                        <FileText className="w-10 h-10 text-blue-600 mt-1" />
-                      ) : (
-                        <FileSpreadsheet className="w-10 h-10 text-green-600 mt-1" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-gray-900 whitespace-nowrap">{excelEditData.fileName}</p>
-                        <p className="text-sm text-gray-600 font-medium whitespace-nowrap">{excelEditData.judul}</p>
+              <div className="space-y-4">
+                {/* Active Session Info (Only show if we have excelEditData) */}
+                {excelEditData && (
+                  <>
+                    {/* File Info */}
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        {['docx', 'doc'].includes(excelEditData.fileType || '') ? (
+                          <FileText className="w-10 h-10 text-blue-600 mt-1" />
+                        ) : (
+                          <FileSpreadsheet className="w-10 h-10 text-green-600 mt-1" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-gray-900 whitespace-nowrap">{excelEditData.fileName}</p>
+                          <p className="text-sm text-gray-600 font-medium whitespace-nowrap">{excelEditData.judul}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Session Info */}
-                  {desktopEditSessionToken && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <p className="text-sm text-blue-800">
-                        <strong>Session aktif:</strong> Tanpa batas waktu
-                      </p>
-                      <p className="text-xs text-blue-600 mt-1">
-                        Original hash: {desktopEditOriginalHash?.slice(0, 16)}...
-                      </p>
-                    </div>
-                  )}
+                    {/* Session Hash Info */}
+                    {desktopEditSessionToken && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p className="text-sm text-blue-800">
+                          <strong>Session aktif:</strong> Tanpa batas waktu
+                        </p>
+                        <p className="text-xs text-blue-600 mt-1">
+                          Original hash: {desktopEditOriginalHash?.slice(0, 16)}...
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
 
-                  {/* File Picker */}
-                  <div className="space-y-3">
+                {/* File Picker — ALWAYS VISIBLE */}
+                <div className="space-y-3">
                     <Label className="text-sm font-semibold text-gray-700">
                       Pilih File Hasil Edit
                     </Label>
@@ -9838,7 +9835,10 @@ export default function ESOPApp() {
                     </div>
                   </div>
 
-                  {/* Info */}
+                </div>
+
+                {/* Info Alert (Only show if we have excelEditData) */}
+                {excelEditData && (
                   <Alert className="bg-amber-50 border-amber-200">
                     <AlertTriangle className="w-4 h-4 text-amber-600" />
                     <AlertDescription className="text-amber-800 text-sm">
@@ -9846,8 +9846,8 @@ export default function ESOPApp() {
                       Jika tidak ada perubahan, file tidak akan di-upload.
                     </AlertDescription>
                   </Alert>
-                </div>
-              )}
+                )}
+              </div>
 
               <DialogFooter className="gap-2">
                 <Button
