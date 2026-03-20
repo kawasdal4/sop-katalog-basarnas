@@ -3,6 +3,8 @@ import { db } from '@/lib/db'
 import { cookies } from 'next/headers'
 import { downloadFromR2, isR2Configured, getR2PublicUrl } from '@/lib/r2-storage'
 
+export const dynamic = 'force-dynamic'
+
 // Content types
 const CONTENT_TYPES: Record<string, string> = {
   pdf: 'application/pdf',
@@ -155,7 +157,9 @@ export async function GET(request: NextRequest) {
         'Content-Type': contentType,
         'Content-Disposition': `inline; filename="${customFileName}"; filename*=UTF-8''${encodedFileName}`,
         'Content-Length': fileBuffer.length.toString(),
-        'Cache-Control': 'public, max-age=3600',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
         // CORS headers for cross-origin access
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, OPTIONS',

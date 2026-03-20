@@ -2033,6 +2033,7 @@ export default function ESOPApp() {
       params.append('page', page.toString())
       params.append('limit', sopPagination.limit.toString())
       params.append('sortBy', sortBy)
+      params.append('_t', Date.now().toString())
 
       const res = await fetch(`/api/sop?${params}`)
 
@@ -2883,7 +2884,7 @@ export default function ESOPApp() {
     try {
       // For PDF files - download directly from R2 and open
       if (fileExtension === 'pdf') {
-        const res = await fetch(`/api/file?action=preview&id=${id}`)
+        const res = await fetch(`/api/file?action=preview&id=${id}&_t=${Date.now()}`)
         const contentType = res.headers.get('content-type') || ''
 
         if (res.ok && (contentType.includes('application/pdf') || contentType === '')) {
@@ -2938,7 +2939,7 @@ export default function ESOPApp() {
           duration: 10000
         })
 
-        const res = await fetch('/api/preview-office', {
+        const res = await fetch(`/api/preview-office?_t=${Date.now()}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fileId: id })
@@ -2986,7 +2987,7 @@ export default function ESOPApp() {
                 const checkClosed = setInterval(() => {
                   if (previewWindow.closed) {
                     clearInterval(checkClosed)
-                    fetch('/api/preview-office', {
+                    fetch(`/api/preview-office?_t=${Date.now()}`, {
                       method: 'DELETE',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ driveItemId: data.driveItemId })
@@ -3168,7 +3169,7 @@ export default function ESOPApp() {
           duration: 10000
         })
 
-        const res = await fetch('/api/preview-office', {
+        const res = await fetch(`/api/preview-office?_t=${Date.now()}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fileId: id })
@@ -3211,7 +3212,7 @@ export default function ESOPApp() {
               const checkClosed = setInterval(() => {
                 if (previewWindow.closed) {
                   clearInterval(checkClosed)
-                  fetch('/api/preview-office', {
+                  fetch(`/api/preview-office?_t=${Date.now()}`, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ driveItemId: data.driveItemId })

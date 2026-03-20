@@ -382,9 +382,15 @@ export async function POST(request: NextRequest) {
     // Priority: downloadUrl (direct, no auth) > webUrl (might need auth)
     let viewerSourceUrl = driveItem.downloadUrl || driveItem.webUrl
     
+    // Add cache buster to the source URL to force Office Online to refresh
+    const cacheBuster = `t=${Date.now()}`
+    const finalSourceUrl = viewerSourceUrl.includes('?') 
+      ? `${viewerSourceUrl}&${cacheBuster}` 
+      : `${viewerSourceUrl}?${cacheBuster}`
+
     // Create Office Online viewer URL
-    const encodedUrl = encodeURIComponent(viewerSourceUrl)
-    const officeViewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodedUrl}`
+    const encodedUrl = encodeURIComponent(finalSourceUrl)
+    const officeViewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodedUrl}&wdOrigin=basarnas_preview`
     console.log(`📊 [Preview-Office] Office Viewer URL: ${officeViewerUrl.substring(0, 150)}...`)
     
     // Also provide direct OneDrive URL as fallback
@@ -424,6 +430,12 @@ export async function POST(request: NextRequest) {
       oneDriveUrl: oneDriveViewerUrl,
       driveItemId: driveItem.id,
       message: 'File berhasil diupload ke OneDrive temp. Buka URL di tab baru.'
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
     })
     
   } catch (error) {

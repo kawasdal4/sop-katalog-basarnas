@@ -13,10 +13,15 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  release:
+  build-and-release:
     permissions:
       contents: write
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest, macos-latest]
+
+    runs-on: ${{ matrix.platform }}
 
     steps:
       - name: Checkout repository
@@ -34,7 +39,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-pc-windows-msvc
+          targets: ${{ matrix.platform == 'windows-latest' && 'x86_64-pc-windows-msvc' || 'x86_64-apple-darwin' }}
 
       - name: Build and Release Tauri app
         id: tauri_build
@@ -44,49 +49,38 @@ jobs:
         with:
           projectPath: "./desktop"
           tauriScript: "npm run tauri"
-          tagName: "desktop-v__VERSION__" # Placeholder, tauri-action handles this or we can use run_id
+          tagName: "desktop-v__VERSION__"
           releaseName: "E-Katalog SOP Desktop v__VERSION__"
-          releaseBody: "Automated desktop release generated via GitHub Actions."
+          releaseBody: "Automated multi-platform desktop release."
           releaseDraft: false
           prerelease: false
 
-      - name: Notify Web App API
+      - name: Notify Web App API (Windows only)
+        if: matrix.platform == 'windows-latest'
         shell: pwsh
         env:
           CI_RELEASE_TOKEN: ${{ secrets.CI_RELEASE_TOKEN }}
           API_URL: ${{ secrets.API_URL }}
         run: |
-          # The tauri-action doesn't explicitly output the asset URLs in a simple way for the API.
-          # We'll extract the version from tauri.conf.json and construct the data.
           $config = Get-Content "./desktop/src-tauri/tauri.conf.json" | ConvertFrom-Json
           $version = $config.version
-          
-          # We need to find the signature file and installer URL
-          # For Tauri GitHub Actions, assets are usually published to the release tagged with the version.
           $repo = "${{ github.repository }}"
           $tag = "desktop-v$version"
-          
-          # Construct the notification payload
-          # Note: In a real scenario, you'd fetch the actual asset URLs from the GH API 
-          # but here we point to the expected release asset path.
-          $downloadUrl = "https://github.com/$repo/releases/download/$tag/E-Katalog.SOP_${version}_x64_en-US.msi"
-          # Tauri uses .msi or .exe depending on config. Current config is ["msi", "nsis"]
-          # If using NSIS, it's .exe
           $downloadUrl = "https://github.com/$repo/releases/download/$tag/E-Katalog.SOP_${version}_x64-setup.exe"
-          
-          # Signatures are usually in the same place with .sig extension
           $sigUrl = "$downloadUrl.sig"
           try {
             $sig = Invoke-RestMethod -Uri $sigUrl
           } catch {
-            $sig = "NOSIG" # Fallback if not found, though Tauri needs it
+            $sig = "NOSIG"
           }
-
           $body = @{
             version = $version
             notes = "Automated build from commit ${{ github.sha }}"
             signature = $sig
             downloadUrl = $downloadUrl
           } | ConvertTo-Json
-
-          Invoke-RestMethod -Method Post -Uri $ENV:API_URL -Headers @{ "Authorization" = "Bearer $ENV:CI_RELEASE_TOKEN" } -ContentType "application/json" -Body $body
+          if ($ENV:API_URL -and $ENV:CI_RELEASE_TOKEN) {
+            Invoke-RestMethod -Method Post -Uri $ENV:API_URL -Headers @{ "Authorization" = "Bearer $ENV:CI_RELEASE_TOKEN" } -ContentType "application/json" -Body $body
+          } else {
+            Write-Host "Skipping API notification: Missing secrets."
+          }
