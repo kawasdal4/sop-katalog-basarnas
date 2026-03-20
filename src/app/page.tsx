@@ -9812,7 +9812,7 @@ export default function ESOPApp() {
             }
           </AnimatePresence >
 
-          {/* Desktop Sync Dialog — redesigned dark compact */}
+                    {/* Desktop Sync Dialog — redesigned dark compact */}
           <Dialog open={showDesktopSyncDialog} onOpenChange={setShowDesktopSyncDialog}>
             <DialogContent
               className="p-0 overflow-hidden border-0 shadow-2xl bg-transparent max-w-md"
@@ -9966,6 +9966,164 @@ export default function ESOPApp() {
               </div>
             </DialogContent>
           </Dialog>
+
+          {/* Edit User Dialog */}
+          < Dialog open={showEditUserDialog} onOpenChange={setShowEditUserDialog} >
+            <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Edit className="w-5 h-5 text-orange-600" />
+                  Edit User
+                </DialogTitle>
+                <DialogDescription className="text-gray-600">
+                  Perbarui informasi user
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label className="font-medium text-gray-700">Nama</Label>
+                  <Input
+                    value={editUserForm.name}
+                    onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })}
+                    className="border-gray-300 bg-white text-gray-900"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-medium text-gray-700">Email</Label>
+                  <Input
+                    value={editUserForm.email}
+                    onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
+                    className="border-gray-300 bg-white text-gray-900"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-medium text-gray-700">Role</Label>
+                  <Select value={editUserForm.role} onValueChange={(v) => setEditUserForm({ ...editUserForm, role: v })}>
+                    <SelectTrigger className="border-gray-300 bg-white text-gray-900">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ADMIN">Admin</SelectItem>
+                      <SelectItem value="STAF">Staf</SelectItem>
+                      <SelectItem value="DEVELOPER">Developer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter className="gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowEditUserDialog(false)}
+                  className="border-gray-300 text-gray-700 hover:bg-gray-100"
+                >
+                  Batal
+                </Button>
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    if (!editUserData) return
+                    try {
+                      const res = await fetch('/api/users', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          id: editUserData.id,
+                          name: editUserForm.name,
+                          email: editUserForm.email,
+                          role: editUserForm.role
+                        })
+                      })
+                      const data = await res.json()
+                      if (data.error) {
+                        toast({ title: 'Error', description: data.error, variant: 'destructive' })
+                      } else {
+                        toast({ title: '✅ Berhasil', description: 'User berhasil diperbarui!' })
+                        setShowEditUserDialog(false)
+                        fetchUsers()
+                      }
+                    } catch (error) {
+                      toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
+                    }
+                  }}
+                  className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
+                >
+                  Simpan Perubahan
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog >
+
+          {/* Forgot Password Dialog */}
+          < Dialog open={showForgotPassword} onOpenChange={(open) => {
+            setShowForgotPassword(open)
+            if (!open) {
+              setForgotPasswordSuccess(false)
+            }
+          }
+          }>
+            <DialogContent className="sm:max-w-md bg-transparent border-0 overflow-visible p-0 shadow-none" aria-describedby={undefined}>
+              <DialogTitle className="sr-only">Reset Password</DialogTitle>
+
+              {/* Animated Background Container */}
+              <motion.div
+                className="relative"
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+              >
+                {/* Outer Glow Ring */}
+                <motion.div
+                  className="absolute -inset-4 rounded-3xl"
+                  style={{
+                    background: 'conic-gradient(from 0deg, #3b82f6, #8b5cf6, #3b82f6, #06b6d4, #3b82f6)',
+                    filter: 'blur(20px)',
+                    opacity: 0.4
+                  }}
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+                />
+
+                {/* Main Card */}
+                <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl border border-blue-500/30 overflow-hidden backdrop-blur-xl">
+                  {/* Header */}
+                  <div className="relative p-6 text-white border-b border-white/10">
+                    <motion.div
+                      className="absolute top-0 left-0 right-0 h-1"
+                      style={{
+                        background: 'linear-gradient(90deg, #3b82f6, #8b5cf6, #06b6d4, #3b82f6)',
+                        backgroundSize: '200% 100%',
+                      }}
+                      animate={{ backgroundPosition: ['0% 0%', '200% 0%'] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+                    />
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                        <Key className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold">Reset Password</h2>
+                        <p className="text-xs text-gray-400">Kirim link reset ke email terdaftar</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-6 space-y-4">
+                    {!forgotPasswordSuccess ? (
+                      <>
+                        <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+                          <div className="flex items-start gap-3">
+                            <Mail className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <p className="text-sm text-blue-300 font-medium">Masukkan Email Terdaftar</p>
+                              <p className="text-xs text-gray-400 mt-1">
+                                Link reset password akan dikirim ke email yang sudah terdaftar di sistem.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
 
                         <div className="space-y-2">
                           <Label className="text-gray-300 text-sm font-medium flex items-center gap-2">
