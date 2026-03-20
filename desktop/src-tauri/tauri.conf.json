@@ -48,8 +48,14 @@
     "notification": null,
     "clipboard-manager": null,
     "sql": null,
-    "dialog": null,
-    "fs": null
+    "dialog": {
+      "save": true,
+      "open": true
+    },
+    "fs": {
+      "scope": ["**"],
+      "requireLiteralLeadingDot": false
+    }
   }
 }
 

@@ -9812,88 +9812,91 @@ export default function ESOPApp() {
             }
           </AnimatePresence >
 
-          {/* Desktop Sync Dialog - Upload edited file (Global, not page-scoped) */}
+          {/* Desktop Sync Dialog — redesigned dark compact */}
           <Dialog open={showDesktopSyncDialog} onOpenChange={setShowDesktopSyncDialog}>
-            <DialogContent className="sm:max-w-none w-fit max-w-[95vw] bg-white border-2 border-orange-200 shadow-xl overflow-visible" aria-describedby={undefined}>
-              <DialogHeader>
-                <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <RefreshCw className="w-5 h-5 text-orange-600" />
-                  Selesai Edit & Sync
-                </DialogTitle>
-                <DialogDescription className="text-gray-600">
-                  Upload file hasil edit untuk disinkronkan ke storage
-                </DialogDescription>
-              </DialogHeader>
+            <DialogContent
+              className="p-0 overflow-hidden border-0 shadow-2xl bg-transparent max-w-md"
+              aria-describedby={undefined}
+            >
+              {/* Glass panel */}
+              <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-700/60 rounded-2xl overflow-hidden">
 
-              <div className="space-y-4">
-                {/* Active Session Info (Only show if we have excelEditData) */}
-                {excelEditData && (
-                  <>
-                    {/* File Info */}
-                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                      <div className="flex items-start gap-3">
-                        {['docx', 'doc'].includes(excelEditData.fileType || '') ? (
-                          <FileText className="w-10 h-10 text-blue-600 mt-1" />
-                        ) : (
-                          <FileSpreadsheet className="w-10 h-10 text-green-600 mt-1" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-gray-900 whitespace-nowrap">{excelEditData.fileName}</p>
-                          <p className="text-sm text-gray-600 font-medium whitespace-nowrap">{excelEditData.judul}</p>
-                        </div>
-                      </div>
+                {/* Gradient Header */}
+                <div className="relative px-5 pt-5 pb-4 bg-gradient-to-br from-orange-600/20 via-slate-900 to-slate-900 border-b border-slate-700/50">
+                  <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-orange-500/60 to-transparent" />
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center shrink-0">
+                      <RefreshCw className="w-4 h-4 text-orange-400" />
                     </div>
+                    <div>
+                      <h2 className="text-base font-bold text-white leading-tight">Selesai Edit & Sync</h2>
+                      <p className="text-xs text-slate-400 mt-0.5">Upload file hasil edit ke storage</p>
+                    </div>
+                  </div>
+                </div>
 
-                    {/* Session Hash Info */}
-                    {desktopEditSessionToken && (
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <p className="text-sm text-blue-800">
-                          <strong>Session aktif:</strong> Tanpa batas waktu
-                        </p>
-                        <p className="text-xs text-blue-600 mt-1">
-                          Original hash: {desktopEditOriginalHash?.slice(0, 16)}...
-                        </p>
+                <div className="px-5 py-4 space-y-4">
+
+                  {/* Active File Info */}
+                  {excelEditData && (
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
+                      <div className="w-9 h-9 rounded-lg bg-slate-700/80 flex items-center justify-center shrink-0">
+                        {['docx','doc'].includes(excelEditData.fileType || '')
+                          ? <FileText className="w-5 h-5 text-blue-400" />
+                          : <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                        }
                       </div>
-                    )}
-                  </>
-                )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-white truncate">{excelEditData.judul}</p>
+                        <p className="text-xs text-slate-400 truncate mt-0.5">{excelEditData.fileName}</p>
+                      </div>
+                      {desktopEditSessionToken && (
+                        <span className="shrink-0 text-[10px] font-medium text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-2 py-0.5 rounded-full">
+                          Sesi Aktif
+                        </span>
+                      )}
+                    </div>
+                  )}
 
-                {/* File Picker — ALWAYS VISIBLE */}
-                <div className="space-y-3">
-                    <Label className="text-sm font-semibold text-gray-700">
-                      Pilih File Hasil Edit
-                    </Label>
-                    <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-orange-300 hover:bg-orange-50/30 transition-all cursor-default">
+                  {/* File Picker */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
+                      File Hasil Edit
+                    </label>
+                    <div
+                      className={`relative rounded-xl border-2 border-dashed transition-all cursor-default ${
+                        desktopSyncFile
+                          ? 'border-emerald-500/50 bg-emerald-500/5'
+                          : 'border-slate-600/60 bg-slate-800/40 hover:border-orange-500/40 hover:bg-orange-500/5'
+                      }`}
+                    >
                       {desktopSyncFile ? (
-                        <div className="flex flex-col items-center gap-3">
-                          <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
-                            <CheckCircle className="w-6 h-6 text-green-600" />
+                        <div className="flex items-center gap-3 px-4 py-3">
+                          <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center shrink-0">
+                            <CheckCircle className="w-4 h-4 text-emerald-400" />
                           </div>
-                          <div className="text-center">
-                            <p className="text-sm font-bold text-gray-900">{desktopSyncFile.name}</p>
-                            <p className="text-xs text-gray-500 mt-1">File siap diunggah</p>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-white truncate">{desktopSyncFile.name}</p>
+                            <p className="text-xs text-emerald-400 mt-0.5">Siap diunggah</p>
                           </div>
+                          <button
+                            onClick={() => setDesktopSyncFile(null)}
+                            className="text-slate-500 hover:text-red-400 transition-colors shrink-0"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center py-6 gap-2">
+                          <div className="w-10 h-10 rounded-xl bg-slate-700/60 flex items-center justify-center mb-1">
+                            <Upload className="w-5 h-5 text-slate-400" />
+                          </div>
+                          <p className="text-sm text-slate-300 font-medium">Pilih file hasil pengeditan</p>
+                          <p className="text-xs text-slate-500">.xlsx, .xls, .xlsm, .docx, .doc</p>
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setDesktopSyncFile(null)}
-                            className="mt-2 text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
-                          >
-                            Ganti File
-                          </Button>
-                        </div>
-                      ) : (
-                        <>
-                          <Upload className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                          <p className="text-sm text-gray-600 font-medium mb-1">
-                            Pilih file hasil pengeditan
-                          </p>
-                          <p className="text-xs text-gray-400 mb-4">
-                            Format pendukung: .xlsx, .xls, .docx, .doc
-                          </p>
-                          <Button
-                            variant="secondary"
-                            className="bg-orange-100 text-orange-700 hover:bg-orange-200 border-orange-200"
+                            className="mt-2 bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20 hover:border-orange-400 gap-1.5"
                             onClick={async (e) => {
                               e.stopPropagation();
                               if (isTauri) {
@@ -9902,234 +9905,67 @@ export default function ESOPApp() {
                                 const readFile = tauri?.fs?.readFile || tauri?.plugins?.fs?.readFile;
                                 if (open && readFile) {
                                   try {
-                                    const selected = await open({
-                                      filters: [{ name: 'Document', extensions: ['xlsx', 'xls', 'xlsm', 'docx', 'doc'] }]
-                                    });
+                                    const selected = await open({ filters: [{ name: 'Document', extensions: ['xlsx','xls','xlsm','docx','doc'] }] });
                                     if (selected && typeof selected === 'string') {
                                       const bytes = await readFile(selected);
                                       const file = new File([bytes], selected.split(/[\\/]/).pop() || 'document', { type: 'application/octet-stream' });
                                       setDesktopSyncFile(file);
                                     }
-                                  } catch (err) {
-                                    console.error('Native file open failed:', err);
-                                  }
+                                  } catch (err) { console.error('Native file open failed:', err); }
                                 }
                               } else {
                                 document.getElementById('desktop-sync-file-global')?.click();
                               }
                             }}
                           >
-                            <FilePlus className="w-4 h-4 mr-2" />
+                            <FilePlus className="w-3.5 h-3.5" />
                             Pilih File
                           </Button>
-                          <input
-                            type="file"
-                            accept=".xlsx,.xls,.xlsm,.docx,.doc"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0]
-                              if (file) setDesktopSyncFile(file)
-                            }}
-                            className="hidden"
-                            id="desktop-sync-file-global"
-                          />
-                        </>
+                          <input type="file" accept=".xlsx,.xls,.xlsm,.docx,.doc" onChange={(e) => { const f = e.target.files?.[0]; if (f) setDesktopSyncFile(f); }} className="hidden" id="desktop-sync-file-global" />
+                        </div>
                       )}
-                    </div>
-                </div>
-                {/* Info Alert (Only show if we have excelEditData) */}
-                {excelEditData && (
-                  <Alert className="bg-amber-50 border-amber-200">
-                    <AlertTriangle className="w-4 h-4 text-amber-600" />
-                    <AlertDescription className="text-amber-800 text-sm">
-                      <strong>Penting:</strong> File akan di-checksum dan dibandingkan dengan file asli.
-                      Jika tidak ada perubahan, file tidak akan di-upload.
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </div>
-
-              <DialogFooter className="gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowDesktopSyncDialog(false)}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-100"
-                >
-                  Batal
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleDesktopSync}
-                  disabled={!desktopSyncFile || desktopSyncing}
-                  className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
-                >
-                  {desktopSyncing ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Syncing...</>
-                  ) : (
-                    <><RefreshCw className="w-4 h-4 mr-2" /> Sync ke R2</>
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          {/* Edit User Dialog */}
-          < Dialog open={showEditUserDialog} onOpenChange={setShowEditUserDialog} >
-            <DialogContent className="sm:max-w-md bg-white border-2 border-orange-200 shadow-xl" aria-describedby={undefined}>
-              <DialogHeader>
-                <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <Edit className="w-5 h-5 text-orange-600" />
-                  Edit User
-                </DialogTitle>
-                <DialogDescription className="text-gray-600">
-                  Perbarui informasi user
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label className="font-medium text-gray-700">Nama</Label>
-                  <Input
-                    value={editUserForm.name}
-                    onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })}
-                    className="border-gray-300 bg-white text-gray-900"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="font-medium text-gray-700">Email</Label>
-                  <Input
-                    value={editUserForm.email}
-                    onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
-                    className="border-gray-300 bg-white text-gray-900"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="font-medium text-gray-700">Role</Label>
-                  <Select value={editUserForm.role} onValueChange={(v) => setEditUserForm({ ...editUserForm, role: v })}>
-                    <SelectTrigger className="border-gray-300 bg-white text-gray-900">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ADMIN">Admin</SelectItem>
-                      <SelectItem value="STAF">Staf</SelectItem>
-                      <SelectItem value="DEVELOPER">Developer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter className="gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowEditUserDialog(false)}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-100"
-                >
-                  Batal
-                </Button>
-                <Button
-                  type="button"
-                  onClick={async () => {
-                    if (!editUserData) return
-                    try {
-                      const res = await fetch('/api/users', {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          id: editUserData.id,
-                          name: editUserForm.name,
-                          email: editUserForm.email,
-                          role: editUserForm.role
-                        })
-                      })
-                      const data = await res.json()
-                      if (data.error) {
-                        toast({ title: 'Error', description: data.error, variant: 'destructive' })
-                      } else {
-                        toast({ title: '✅ Berhasil', description: 'User berhasil diperbarui!' })
-                        setShowEditUserDialog(false)
-                        fetchUsers()
-                      }
-                    } catch (error) {
-                      toast({ title: 'Error', description: 'Terjadi kesalahan', variant: 'destructive' })
-                    }
-                  }}
-                  className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
-                >
-                  Simpan Perubahan
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog >
-
-          {/* Forgot Password Dialog */}
-          < Dialog open={showForgotPassword} onOpenChange={(open) => {
-            setShowForgotPassword(open)
-            if (!open) {
-              setForgotPasswordSuccess(false)
-            }
-          }
-          }>
-            <DialogContent className="sm:max-w-md bg-transparent border-0 overflow-visible p-0 shadow-none" aria-describedby={undefined}>
-              <DialogTitle className="sr-only">Reset Password</DialogTitle>
-
-              {/* Animated Background Container */}
-              <motion.div
-                className="relative"
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-              >
-                {/* Outer Glow Ring */}
-                <motion.div
-                  className="absolute -inset-4 rounded-3xl"
-                  style={{
-                    background: 'conic-gradient(from 0deg, #3b82f6, #8b5cf6, #3b82f6, #06b6d4, #3b82f6)',
-                    filter: 'blur(20px)',
-                    opacity: 0.4
-                  }}
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
-                />
-
-                {/* Main Card */}
-                <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl border border-blue-500/30 overflow-hidden backdrop-blur-xl">
-                  {/* Header */}
-                  <div className="relative p-6 text-white border-b border-white/10">
-                    <motion.div
-                      className="absolute top-0 left-0 right-0 h-1"
-                      style={{
-                        background: 'linear-gradient(90deg, #3b82f6, #8b5cf6, #06b6d4, #3b82f6)',
-                        backgroundSize: '200% 100%',
-                      }}
-                      animate={{ backgroundPosition: ['0% 0%', '200% 0%'] }}
-                      transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
-                    />
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                        <Key className="w-6 h-6 text-white" />
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-bold">Reset Password</h2>
-                        <p className="text-xs text-gray-400">Kirim link reset ke email terdaftar</p>
-                      </div>
                     </div>
                   </div>
 
-                  {/* Content */}
-                  <div className="p-6 space-y-4">
-                    {!forgotPasswordSuccess ? (
-                      <>
-                        <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
-                          <div className="flex items-start gap-3">
-                            <Mail className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
-                            <div>
-                              <p className="text-sm text-blue-300 font-medium">Masukkan Email Terdaftar</p>
-                              <p className="text-xs text-gray-400 mt-1">
-                                Link reset password akan dikirim ke email yang sudah terdaftar di sistem.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
+                  {/* Info Note */}
+                  {excelEditData && (
+                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-500/8 border border-amber-500/20">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                      <p className="text-xs text-amber-300/80 leading-relaxed">
+                        File akan dicek perubahannya. Jika tidak ada perubahan, upload tidak akan dilakukan.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-end gap-2.5 px-5 py-4 bg-slate-950/40 border-t border-slate-700/50">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowDesktopSyncDialog(false)}
+                    className="text-slate-400 hover:text-white hover:bg-slate-700/60"
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleDesktopSync}
+                    disabled={!desktopSyncFile || desktopSyncing}
+                    className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white border-0 gap-1.5 disabled:opacity-50"
+                  >
+                    {desktopSyncing ? (
+                      <><Loader2 className="w-3.5 h-3.5 animate-spin" />Syncing...</>
+                    ) : (
+                      <><RefreshCw className="w-3.5 h-3.5" />Sync ke R2</>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
                         <div className="space-y-2">
                           <Label className="text-gray-300 text-sm font-medium flex items-center gap-2">
