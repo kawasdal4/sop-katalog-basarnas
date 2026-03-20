@@ -3598,7 +3598,12 @@ export default function ESOPApp() {
       }
     } catch (error) {
       console.error('Desktop edit error:', error)
-      toast({ title: '❌ Error', description: error instanceof Error ? error.message : 'Gagal mengunduh file', variant: 'destructive', duration: 5000 })
+      toast({ 
+        title: '❌ Error', 
+        description: typeof error === 'string' ? error : (error instanceof Error ? error.message : 'Gagal mengunduh file'), 
+        variant: 'destructive', 
+        duration: 10000 
+      })
     } finally {
       setPreviewLoading(null)
     }
