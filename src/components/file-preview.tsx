@@ -11,13 +11,14 @@ import { useState, useEffect, useRef } from "react"
 import { createPortal } from "react-dom"
 import { ArrowLeft, ExternalLink, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { isTauri, openExternal } from "@/lib/file-actions"
 
 const R2_PUBLIC_BASE = "https://pub-a6302a3a22854799b35a15cd40f9c728.r2.dev"
 const OFFICE_EXTS    = ["doc", "docx", "xls", "xlsx", "xlsm", "ppt", "pptx"]
 const PDF_EXTS       = ["pdf"]
 
 interface FilePreviewProps {
-  /** R2 object key, e.g. "sop/2026/03/file.xlsx" */
+  /** R2 object key OR absolute local path */
   fileKey: string
   /** Judul yang ditampilkan di header (optional) */
   title?: string
@@ -29,10 +30,34 @@ export default function FilePreview({ fileKey, title, onClose }: FilePreviewProp
   const [pdfError,    setPdfError]    = useState(false)
   const [loading,     setLoading]     = useState(true)
   const [visible,     setVisible]     = useState(false)
+  const [fileUrl,     setFileUrl]     = useState("")
   const iframeRef                     = useRef<HTMLIFrameElement>(null)
 
   const ext       = fileKey.split(".").pop()?.toLowerCase() ?? ""
-  const fileUrl   = `${R2_PUBLIC_BASE}/${fileKey}`
+
+  // Resolve fileUrl (Remote vs Local)
+  useEffect(() => {
+    async function resolve() {
+      // Check if fileKey is an absolute path (starts with / or C:\ etc)
+      const isAbsolutePath = fileKey.includes('/') || fileKey.includes('\\');
+
+      if (isTauri && isAbsolutePath) {
+        try {
+          const { convertFileSrc } = await import('@tauri-apps/api/core');
+          const localUrl = convertFileSrc(fileKey);
+          setFileUrl(localUrl);
+          console.log('[FilePreview] Resolved local synced path:', fileKey);
+        } catch (err) {
+          console.error('[FilePreview] convertFileSrc failed:', err);
+          setFileUrl(`${R2_PUBLIC_BASE}/${fileKey}`);
+        }
+      } else {
+        setFileUrl(`${R2_PUBLIC_BASE}/${fileKey}`);
+      }
+    }
+    resolve();
+  }, [fileKey]);
+
   const officeUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(fileUrl)}`
 
   const isPdf    = PDF_EXTS.includes(ext)
@@ -50,23 +75,13 @@ export default function FilePreview({ fileKey, title, onClose }: FilePreviewProp
     setTimeout(onClose, 260)
   }
 
-  // Dynamically import Tauri shell only when running inside Tauri
-  const openExternal = async (url: string) => {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const isTauuri = typeof window !== "undefined" && !!(window as any).__TAURI_INTERNALS__
-      if (isTauuri) {
-        // @ts-ignore – tauri-apps/plugin-shell may not have types installed
-        const { open } = await import("@tauri-apps/plugin-shell")
-        await open(url)
-      } else {
-        window.open(url, "_blank", "noopener,noreferrer")
-      }
-    } catch (err) {
-      console.error("[FilePreview] openExternal error:", err)
-      window.open(url, "_blank", "noopener,noreferrer")
-    }
-  }
+  // Tutup dengan Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose() }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Tutup dengan Escape
   useEffect(() => {

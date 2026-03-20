@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { isTauri as isTauriFn } from '@tauri-apps/api/core';
-const isTauri = typeof window !== 'undefined' && ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined);
+import { isTauri, openExternal, handleNativeDownload } from '@/lib/file-actions'
 import { readDir, BaseDirectory, watch } from '@tauri-apps/plugin-fs';
 import { Button } from '@/components/ui/button'
 import FilePreview from '@/components/file-preview'
@@ -206,92 +205,7 @@ const COLORS = ['#f97316', '#eab308', '#22c55e', '#ef4444', '#3b82f6']
 
 const LINGKUP_COLORS = ['#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#22c55e', '#eab308', '#ef4444']
 
-// Tauri Detection & Native Helpers
-//
-// CRITICAL: In Tauri, window.open() and blob: URLs in window.open are BLOCKED.
-// - For HTTPS URLs -> use @tauri-apps/plugin-shell open()
-// - For blob: URLs -> fetch bytes, save to temp via save_temp_file, then open temp file
-// - For local file paths -> native_open command (explorer/open/xdg-open)
-
-const tauriInvoke = (): ((cmd: string, args?: object) => Promise<any>) | null => {
-  if (typeof window === 'undefined') return null;
-  const tauri = (window as any).__TAURI__;
-  return tauri?.core?.invoke || tauri?.invoke || null;
-};
-
-const openExternal = async (url: string): Promise<boolean> => {
-  if (!isTauri) {
-    window.open(url, '_blank');
-    return false;
-  }
-
-  const invoke = tauriInvoke();
-  if (!invoke) {
-    console.warn('[Native] Tauri invoke not found');
-    return false;
-  }
-
-  try {
-    if (url.startsWith('blob:')) {
-      // Blob URL: must save to temp file first, then open with native_open
-      console.log('[Native] Processing blob URL...');
-      const res = await fetch(url);
-      const blob = await res.blob();
-      const arrayBuffer = await blob.arrayBuffer();
-      const bytes = Array.from(new Uint8Array(arrayBuffer));
-      const fileName = `preview_${Date.now()}.pdf`;
-      const tempPath = await invoke('save_temp_file', { bytes, fileName });
-      if (tempPath) {
-        console.log('[Native] Opening temp file:', tempPath);
-        await invoke('native_open', { path: tempPath });
-        return true;
-      }
-    } else if (url.startsWith('http://') || url.startsWith('https://')) {
-      // HTTPS URL: use shell plugin to open in default browser
-      // native_open (explorer) does NOT reliably handle HTTP/S URLs on Windows
-      console.log('[Native] Opening HTTPS URL via shell plugin:', url);
-      const { open } = await import('@tauri-apps/plugin-shell');
-      await open(url);
-      return true;
-    } else {
-      // Local file path
-      console.log('[Native] Opening local path:', url);
-      await invoke('native_open', { path: url });
-      return true;
-    }
-  } catch (err) {
-    console.error('[Native] openExternal failed:', err);
-  }
-  return false;
-};
-
-const handleNativeDownload = async (blob: Blob, fileName: string): Promise<string | null> => {
-  if (!isTauri) return null;
-
-  try {
-    // Use the Tauri dialog plugin to show a Save As dialog
-    const { save } = await import('@tauri-apps/plugin-dialog');
-    const { invoke } = await import('@tauri-apps/api/core');
-    
-    const fileExt = fileName.split('.').pop() || 'xlsx';
-    const filePath = await save({
-      defaultPath: fileName,
-      filters: [{ name: 'Document', extensions: [fileExt] }]
-    });
-    if (!filePath) return null; // User cancelled
-    
-    const bytes = new Uint8Array(await blob.arrayBuffer());
-    
-    // Use native Rust backend command to bypass Tauri v2 frontend fs plugin ACL constraints entirely
-    await invoke('native_save', { path: filePath, bytes: Array.from(bytes) });
-    
-    console.log('[Native] File saved to:', filePath);
-    return filePath;
-  } catch (err) {
-    console.error('[Native] handleNativeDownload failed:', err);
-    throw err;
-  }
-};
+// Tauri Detection & Native Helpers moved to @/lib/file-actions
 
 
 const STATUS_COLORS: Record<string, string> = {
@@ -2828,6 +2742,7 @@ export default function ESOPApp() {
             setDownloadLoading(null)
             return // User cancelled
           }
+          // Shared handler might return 'browser' for web fallback, but here we already handled isTauri
           if (filePath) {
             setDownloadLoading(null)
             toast({ title: '✅ Download Selesai', description: `File: ${customFileName} berhasil disimpan.` })
@@ -8826,175 +8741,8 @@ export default function ESOPApp() {
                               <TableRow key={sop.id} className="hover:bg-orange-50 border-b border-gray-200">
                                 <TableCell>
                                   <div>
-                                    <p className="font-semibold text-blue-900">{sop.submitterName}</p>
-                                    <p className="text-sm text-gray-600">{sop.submitterEmail}</p>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    <FileTypeIcon fileName={sop.fileName} className="w-5 h-5 flex-shrink-0" />
-                                    <div>
-                                      <span className="font-semibold text-blue-900">{sop.judul}</span>
-                                      <div className="text-xs text-gray-500 mt-0.5">
-                                        <span className="text-gray-400">Upload:</span> {new Date(sop.uploadedAt).toLocaleString('id-ID', {
-                                          day: 'numeric',
-                                          month: 'short',
-                                          year: 'numeric',
-                                          hour: '2-digit',
-                                          minute: '2-digit'
-                                        })} <span className="text-gray-400">| Upload by:</span> <span className="text-orange-600 font-medium">{sop.user?.name || sop.submitterName || 'System'}</span>
-                                      </div>
-                                      {sop.verifiedAt && (
-                                        <div className={`text - xs mt - 0.5 ${sop.verificationStatus === 'DISETUJUI' ? 'text-green-600' : 'text-red-600'
-                                          } `}>
-                                          <span className={sop.verificationStatus === 'DISETUJUI' ? 'text-green-500' : 'text-red-500'}>
-                                            {sop.verificationStatus === 'DISETUJUI' ? 'Disetujui:' : 'Ditolak:'}
-                                          </span> {new Date(sop.verifiedAt).toLocaleString('id-ID', {
-                                            day: 'numeric',
-                                            month: 'short',
-                                            year: 'numeric',
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                          })}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge className={sop.jenis === 'SOP' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white'}>
-                                    {sop.jenis}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className="border-orange-500 bg-orange-50 text-orange-700">{sop.kategori}</Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className="border-blue-500 bg-blue-50 text-blue-700">{sop.lingkup || '-'}</Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge className={
-                                    sop.verificationStatus === 'MENUNGGU' ? 'bg-blue-500 text-white' :
-                                      sop.verificationStatus === 'DISETUJUI' ? 'bg-green-500 text-white' :
-                                        'bg-red-500 text-white'
-                                  }>
-                                    {sop.verificationStatus}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-gray-600 text-sm max-w-[200px]">
-                                  {sop.keterangan && (
-                                    <span className="text-gray-700 block">Catatan: {sop.keterangan}</span>
-                                  )}
-                                  {sop.rejectionReason && (
-                                    <span className="text-red-600 block">Alasan: {sop.rejectionReason}</span>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center justify-center gap-1">
-                                    <Button size="icon" variant="ghost" onClick={() => handleVerifikasiPreview(sop.id)} title="Preview" className="hover:bg-cyan-100" disabled={previewLoading === sop.id}>
-                                      {previewLoading === sop.id ? (
-                                        <div className="relative">
-                                          <motion.div className="w-4 h-4 border-2 border-cyan-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
-                                          <motion.div className="absolute inset-0 w-4 h-4 border-2 border-blue-400 border-b-transparent rounded-full" animate={{ rotate: -360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
-                                        </div>
-                                      ) : (
-                                        <Eye className="w-4 h-4 text-cyan-600" />
-                                      )}
-                                    </Button>
-                                    <Button size="icon" variant="ghost" onClick={() => handleVerifikasiDownload(sop.id)} title="Download" className="hover:bg-green-100" disabled={downloadLoading === sop.id}>
-                                      {downloadLoading === sop.id ? (
-                                        <div className="relative">
-                                          <motion.div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
-                                          <motion.div className="absolute inset-0 w-4 h-4 border-2 border-emerald-400 border-b-transparent rounded-full" animate={{ rotate: -360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
-                                        </div>
-                                      ) : (
-                                        <Download className="w-4 h-4 text-green-600" />
-                                      )}
-                                    </Button>
-                                    {sop.verificationStatus === 'MENUNGGU' && (
-                                      <>
-                                        <Button size="icon" variant="ghost" onClick={() => handleVerification(sop.id, 'DISETUJUI')} title="Setujui" className="hover:bg-green-100">
-                                          <Check className="w-4 h-4 text-green-600" />
-                                        </Button>
-                                        <Button size="icon" variant="ghost" onClick={() => handleOpenRejectDialog(sop.id)} title="Tolak" className="hover:bg-red-100">
-                                          <X className="w-4 h-4 text-red-600" />
-                                        </Button>
-                                        <Dialog open={showRejectDialog && rejectTargetId === sop.id} onOpenChange={(open) => {
-                                          if (!open) {
-                                            setShowRejectDialog(false)
-                                            setRejectTargetId(null)
-                                            setRejectReason('')
-                                          }
-                                        }}>
-                                          <DialogContent className="sm:max-w-none w-fit max-w-[95vw] bg-gradient-to-b from-slate-900 to-slate-800 border-2 border-orange-500 shadow-2xl overflow-visible" aria-describedby={undefined}>
-                                            <DialogHeader>
-                                              <DialogTitle className="text-xl font-bold text-white flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg">
-                                                  <XCircle className="w-6 h-6 text-white" />
-                                                </div>
-                                                <div>
-                                                  <span className="bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-400 bg-clip-text text-transparent">
-                                                    Tolak Pengajuan
-                                                  </span>
-                                                  <p className="text-xs text-gray-400 font-normal mt-0.5">BCC - SOP Katalog</p>
-                                                </div>
-                                              </DialogTitle>
-                                              <DialogDescription className="text-gray-300 pt-2">
-                                                Masukkan alasan penolakan untuk pengajuan ini. Alasan akan ditampilkan kepada pengaju.
-                                              </DialogDescription>
-                                            </DialogHeader>
-                                            <div className="py-4">
-                                              <Label className="font-medium text-orange-400 mb-2 block flex items-center gap-2">
-                                                <AlertTriangle className="w-4 h-4" />
-                                                Alasan Penolakan
-                                              </Label>
-                                              <Textarea
-                                                value={rejectReason}
-                                                onChange={(e) => setRejectReason(e.target.value)}
-                                                placeholder="Contoh: Dokumen tidak lengkap, format tidak sesuai, dll..."
-                                                rows={4}
-                                                className="border-2 border-orange-500/30 bg-slate-800/50 text-white placeholder:text-gray-500 focus:border-orange-500 focus:ring-orange-500/20 rounded-lg"
-                                              />
-                                            </div>
-                                            <DialogFooter className="gap-2">
-                                              <Button
-                                                type="button"
-                                                variant="outline"
-                                                onClick={() => {
-                                                  setShowRejectDialog(false)
-                                                  setRejectTargetId(null)
-                                                  setRejectReason('')
-                                                }}
-                                                className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
-                                              >
-                                                Batal
-                                              </Button>
-                                              <Button
-                                                type="button"
-                                                onClick={handleConfirmReject}
-                                                disabled={!rejectReason.trim()}
-                                                className="bg-gradient-to-r from-orange-500 via-red-500 to-orange-600 hover:from-orange-600 hover:via-red-600 hover:to-orange-700 text-white shadow-lg shadow-orange-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
-                                              >
-                                                <X className="w-4 h-4 mr-2" />
-                                                Tolak Pengajuan
-                                              </Button>
-                                            </DialogFooter>
-                                          </DialogContent>
-                                        </Dialog>
-                                      </>
-                                    )}
-                                    {user?.role === 'DEVELOPER' && (
-                                      <Button size="icon" variant="ghost" onClick={() => handleDeleteSop(sop.id, sop.judul)} title="Hapus Permanen (Dev)" className="hover:bg-red-100">
-                                        <Trash2 className="w-4 h-4 text-red-600" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table> */}
+                                    <p className="font */}
+                        {/* Verification Table */}
                         <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm min-h-[400px]">
                           {verifikasiLoading && (
                             <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 backdrop-blur-sm">
@@ -9009,10 +8757,11 @@ export default function ESOPApp() {
                               <TableRow>
                                 <TableHead className="text-blue-900 font-bold">Pengirim</TableHead>
                                 <TableHead className="text-blue-900 font-bold">Judul SOP</TableHead>
-                                <TableHead className="text-blue-900 font-bold">Kategori & Lingkup</TableHead>
-                                <TableHead className="text-blue-900 font-bold">Tahun</TableHead>
-                                <TableHead className="text-blue-900 font-bold">Waktu</TableHead>
-                                <TableHead className="text-right text-blue-900 font-bold">Aksi</TableHead>
+                                <TableHead className="text-blue-900 font-bold text-center">Jenis</TableHead>
+                                <TableHead className="text-blue-900 font-bold text-center">Kategori</TableHead>
+                                <TableHead className="text-blue-900 font-bold text-center">Lingkup</TableHead>
+                                <TableHead className="text-blue-900 font-bold text-center">Status</TableHead>
+                                <TableHead className="text-right text-blue-900 font-bold px-6">Aksi</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -9023,7 +8772,7 @@ export default function ESOPApp() {
                                     animate={{ opacity: 1 }}
                                     exit={{ opacity: 0 }}
                                   >
-                                    <TableCell colSpan={6} className="h-64 text-center text-gray-500">
+                                    <TableCell colSpan={7} className="h-64 text-center text-gray-500">
                                       Tidak ada pengajuan SOP baru yang perlu diverifikasi.
                                     </TableCell>
                                   </motion.tr>
@@ -9058,7 +8807,7 @@ export default function ESOPApp() {
                                               })} <span className="text-gray-400">| Upload by:</span> <span className="text-orange-600 font-medium">{sop.user?.name || sop.submitterName || 'System'}</span>
                                             </div>
                                             {sop.verifiedAt && (
-                                              <div className={`text - xs mt - 0.5 ${sop.verificationStatus === 'DISETUJUI' ? 'text-green-600' : 'text-red-600'
+                                              <div className={`text-xs mt-0.5 ${sop.verificationStatus === 'DISETUJUI' ? 'text-green-600' : 'text-red-600'
                                                 } `}>
                                                 <span className={sop.verificationStatus === 'DISETUJUI' ? 'text-green-500' : 'text-red-500'}>
                                                   {sop.verificationStatus === 'DISETUJUI' ? 'Disetujui:' : 'Ditolak:'}
@@ -9074,18 +8823,18 @@ export default function ESOPApp() {
                                           </div>
                                         </div>
                                       </TableCell>
-                                      <TableCell>
+                                      <TableCell className="text-center">
                                         <Badge className={sop.jenis === 'SOP' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white'}>
                                           {sop.jenis}
                                         </Badge>
                                       </TableCell>
-                                      <TableCell>
+                                      <TableCell className="text-center">
                                         <Badge variant="outline" className="border-orange-500 bg-orange-50 text-orange-700">{sop.kategori}</Badge>
                                       </TableCell>
-                                      <TableCell>
+                                      <TableCell className="text-center">
                                         <Badge variant="outline" className="border-blue-500 bg-blue-50 text-blue-700">{sop.lingkup || '-'}</Badge>
                                       </TableCell>
-                                      <TableCell>
+                                      <TableCell className="text-center">
                                         <Badge className={
                                           sop.verificationStatus === 'MENUNGGU' ? 'bg-blue-500 text-white' :
                                             sop.verificationStatus === 'DISETUJUI' ? 'bg-green-500 text-white' :
@@ -9093,44 +8842,53 @@ export default function ESOPApp() {
                                         }>
                                           {sop.verificationStatus}
                                         </Badge>
-                                      </TableCell>
-                                      <TableCell className="text-gray-600 text-sm max-w-[200px]">
                                         {sop.keterangan && (
-                                          <span className="text-gray-700 block">Catatan: {sop.keterangan}</span>
+                                          <p className="text-xs text-gray-700 mt-1">Catatan: {sop.keterangan}</p>
                                         )}
                                         {sop.rejectionReason && (
-                                          <span className="text-red-600 block">Alasan: {sop.rejectionReason}</span>
+                                          <p className="text-xs text-red-600 mt-1">Alasan: {sop.rejectionReason}</p>
                                         )}
                                       </TableCell>
                                       <TableCell>
-                                        <div className="flex items-center justify-center gap-1">
-                                          <Button size="icon" variant="ghost" onClick={() => handleVerifikasiPreview(sop.id)} title="Preview" className="hover:bg-cyan-100" disabled={previewLoading === sop.id}>
-                                            {previewLoading === sop.id ? (
-                                              <div className="relative">
-                                                <motion.div className="w-4 h-4 border-2 border-cyan-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
-                                                <motion.div className="absolute inset-0 w-4 h-4 border-2 border-blue-400 border-b-transparent rounded-full" animate={{ rotate: -360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
-                                              </div>
-                                            ) : (
-                                              <Eye className="w-4 h-4 text-cyan-600" />
-                                            )}
+                                        <div className="flex items-center justify-end gap-1 px-2">
+                                          {/* Preview & Download */}
+                                          <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            disabled={previewLoading === sop.id}
+                                            className="w-9 h-9 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-400 text-slate-400 transition-all border border-transparent hover:border-cyan-500/20"
+                                            onClick={() => {
+                                              if (isTauri && sop.filePath) {
+                                                setDesktopPreviewKey(sop.filePath)
+                                                setDesktopPreviewTitle(sop.judul)
+                                              } else {
+                                                handlePreview(sop.id)
+                                              }
+                                            }}
+                                            title="Preview"
+                                          >
+                                            {previewLoading === sop.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
                                           </Button>
-                                          <Button size="icon" variant="ghost" onClick={() => handleVerifikasiDownload(sop.id)} title="Download" className="hover:bg-green-100" disabled={downloadLoading === sop.id}>
-                                            {downloadLoading === sop.id ? (
-                                              <div className="relative">
-                                                <motion.div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
-                                                <motion.div className="absolute inset-0 w-4 h-4 border-2 border-emerald-400 border-b-transparent rounded-full" animate={{ rotate: -360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
-                                              </div>
-                                            ) : (
-                                              <Download className="w-4 h-4 text-green-600" />
-                                            )}
+
+                                          <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            disabled={downloadLoading === sop.id}
+                                            className="w-9 h-9 rounded-lg hover:bg-green-500/10 hover:text-green-400 text-slate-400 transition-all border border-transparent hover:border-green-500/20"
+                                            onClick={() => handleDownload(sop.id)}
+                                            title="Download"
+                                          >
+                                            {downloadLoading === sop.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                                           </Button>
+
+                                          {/* Verification Actions */}
                                           {sop.verificationStatus === 'MENUNGGU' && (
                                             <>
-                                              <Button size="icon" variant="ghost" onClick={() => handleVerification(sop.id, 'DISETUJUI')} title="Setujui" className="hover:bg-green-100">
-                                                <Check className="w-4 h-4 text-green-600" />
+                                              <Button size="icon" variant="ghost" onClick={() => handleVerification(sop.id, 'DISETUJUI')} title="Setujui" className="w-9 h-9 rounded-lg hover:bg-green-500/10 hover:text-green-600 text-slate-400 transition-all border border-transparent hover:border-green-500/20">
+                                                <Check className="w-4 h-4" />
                                               </Button>
-                                              <Button size="icon" variant="ghost" onClick={() => handleOpenRejectDialog(sop.id)} title="Tolak" className="hover:bg-red-100">
-                                                <X className="w-4 h-4 text-red-600" />
+                                              <Button size="icon" variant="ghost" onClick={() => handleOpenRejectDialog(sop.id)} title="Tolak" className="w-9 h-9 rounded-lg hover:bg-red-500/10 hover:text-red-500 text-slate-400 transition-all border border-transparent hover:border-red-500/20">
+                                                <X className="w-4 h-4" />
                                               </Button>
                                               {/* Rejection Dialog - Moved inside Verifikasi page */}
                                               <Dialog open={showRejectDialog && rejectTargetId === sop.id} onOpenChange={(open) => {
@@ -9198,8 +8956,8 @@ export default function ESOPApp() {
                                             </>
                                           )}
                                           {user?.role === 'DEVELOPER' && (
-                                            <Button size="icon" variant="ghost" onClick={() => handleDeleteSop(sop.id, sop.judul)} title="Hapus Permanen (Dev)" className="hover:bg-red-100">
-                                              <Trash2 className="w-4 h-4 text-red-600" />
+                                            <Button size="icon" variant="ghost" onClick={() => handleDeleteSop(sop.id, sop.judul)} title="Hapus Permanen (Dev)" className="w-9 h-9 rounded-lg hover:bg-red-500/10 hover:text-red-600 text-slate-400 transition-all border border-transparent hover:border-red-500/20">
+                                              <Trash2 className="w-4 h-4" />
                                             </Button>
                                           )}
                                         </div>
@@ -9341,17 +9099,17 @@ export default function ESOPApp() {
                             <TableRow className="bg-gradient-to-r from-red-400 to-orange-400">
                               <TableHead className="font-bold text-white">Pengirim</TableHead>
                               <TableHead className="font-bold text-white">Judul</TableHead>
-                              <TableHead className="font-bold text-white">Jenis</TableHead>
-                              <TableHead className="font-bold text-white">Kategori</TableHead>
-                              <TableHead className="font-bold text-white">Lingkup</TableHead>
+                              <TableHead className="font-bold text-white text-center">Jenis</TableHead>
+                              <TableHead className="font-bold text-white text-center">Kategori</TableHead>
+                              <TableHead className="font-bold text-white text-center">Lingkup</TableHead>
                               <TableHead className="font-bold text-white">Alasan Penolakan</TableHead>
-                              <TableHead className="font-bold text-white text-center">Aksi</TableHead>
+                              <TableHead className="font-bold text-white text-right px-6">Aksi</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {arsipList.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={6} className="text-center text-gray-500 py-12">
+                                <TableCell colSpan={7} className="text-center text-gray-500 py-12">
                                   <div className="flex flex-col items-center gap-2">
                                     <FolderOpen className="w-12 h-12 text-gray-400" />
                                     <p>Tidak ada file di arsip</p>
@@ -9386,15 +9144,15 @@ export default function ESOPApp() {
                                       </div>
                                     </div>
                                   </TableCell>
-                                  <TableCell>
+                                  <TableCell className="text-center">
                                     <Badge className={sop.jenis === 'SOP' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white'}>
                                       {sop.jenis}
                                     </Badge>
                                   </TableCell>
-                                  <TableCell>
+                                  <TableCell className="text-center">
                                     <Badge variant="outline" className="border-orange-500 bg-orange-50 text-orange-700">{sop.kategori}</Badge>
                                   </TableCell>
-                                  <TableCell>
+                                  <TableCell className="text-center">
                                     <Badge variant="outline" className="border-blue-500 bg-blue-50 text-blue-700">{sop.lingkup || '-'}</Badge>
                                   </TableCell>
                                   <TableCell className="text-gray-600 text-sm max-w-[200px]">
@@ -9404,26 +9162,33 @@ export default function ESOPApp() {
                                     <span className="text-red-600 block">Alasan: {sop.rejectionReason || 'Tidak ada alasan'}</span>
                                   </TableCell>
                                   <TableCell>
-                                    <div className="flex items-center justify-center gap-1">
-                                      <Button size="icon" variant="ghost" onClick={() => handleVerifikasiPreview(sop.id)} title="Preview" className="hover:bg-cyan-100" disabled={previewLoading === sop.id}>
-                                        {previewLoading === sop.id ? (
-                                          <div className="relative">
-                                            <motion.div className="w-4 h-4 border-2 border-cyan-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
-                                            <motion.div className="absolute inset-0 w-4 h-4 border-2 border-blue-400 border-b-transparent rounded-full" animate={{ rotate: -360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
-                                          </div>
-                                        ) : (
-                                          <Eye className="w-4 h-4 text-cyan-600" />
-                                        )}
+                                    <div className="flex items-center justify-end gap-1 px-2">
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        disabled={previewLoading === sop.id}
+                                        className="w-9 h-9 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-400 text-slate-400 transition-all border border-transparent hover:border-cyan-500/20"
+                                        onClick={() => {
+                                          if (isTauri && sop.filePath) {
+                                            setDesktopPreviewKey(sop.filePath)
+                                            setDesktopPreviewTitle(sop.judul)
+                                          } else {
+                                            handlePreview(sop.id)
+                                          }
+                                        }}
+                                        title="Preview"
+                                      >
+                                        {previewLoading === sop.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
                                       </Button>
-                                      <Button size="icon" variant="ghost" onClick={() => handleVerifikasiDownload(sop.id)} title="Download" className="hover:bg-green-100" disabled={downloadLoading === sop.id}>
-                                        {downloadLoading === sop.id ? (
-                                          <div className="relative">
-                                            <motion.div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full" animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} />
-                                            <motion.div className="absolute inset-0 w-4 h-4 border-2 border-emerald-400 border-b-transparent rounded-full" animate={{ rotate: -360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} />
-                                          </div>
-                                        ) : (
-                                          <Download className="w-4 h-4 text-green-600" />
-                                        )}
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        disabled={downloadLoading === sop.id}
+                                        className="w-9 h-9 rounded-lg hover:bg-green-500/10 hover:text-green-400 text-slate-400 transition-all border border-transparent hover:border-green-500/20"
+                                        onClick={() => handleDownload(sop.id)}
+                                        title="Download"
+                                      >
+                                        {downloadLoading === sop.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                                       </Button>
                                       {user?.role === 'DEVELOPER' && (
                                         <Button size="icon" variant="ghost" onClick={() => handleDeleteSop(sop.id, sop.judul)} title="Hapus Permanen (Dev)" className="hover:bg-red-100">

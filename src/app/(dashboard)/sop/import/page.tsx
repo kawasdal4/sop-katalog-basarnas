@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useDropzone } from 'react-dropzone';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
+import { isTauri, handleNativeDownload } from '@/lib/file-actions';
 
 export default function ImportSopPage() {
     const router = useRouter();
@@ -124,8 +125,32 @@ export default function ImportSopPage() {
         }
     };
 
-    const downloadTemplate = () => {
-        window.open('/api/sop-builder/import/template', '_blank');
+    const downloadTemplate = async () => {
+        const templateUrl = '/api/sop-builder/import/template';
+        const fileName = 'Template_Import_SOP_Basarnas.xlsx';
+
+        if (isTauri) {
+            try {
+                toast.loading("Menyiapkan template...", { id: 'dl-tpl' });
+                const res = await fetch(templateUrl);
+                if (!res.ok) throw new Error("Gagal mengunduh template dari server");
+                const blob = await res.blob();
+                
+                const filePath = await handleNativeDownload(blob, fileName);
+                if (filePath) {
+                    toast.success("Template berhasil disimpan!", { id: 'dl-tpl' });
+                } else {
+                    toast.dismiss('dl-tpl');
+                }
+            } catch (err) {
+                console.error("[Import] Template download failed:", err);
+                toast.error("Gagal mengunduh template", { id: 'dl-tpl' });
+                // Fallback
+                window.open(templateUrl, '_blank');
+            }
+        } else {
+            window.open(templateUrl, '_blank');
+        }
     };
 
     const resetImport = () => {
