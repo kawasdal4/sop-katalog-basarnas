@@ -3,10 +3,13 @@ name: "Release Desktop App"
 on:
   push:
     branches:
-      - main
+      - '**'
     paths-ignore:
       - '**.md'
       - '.gitignore'
+  pull_request:
+    branches:
+      - '**'
   workflow_dispatch:
 
 env:
