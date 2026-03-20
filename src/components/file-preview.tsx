@@ -79,7 +79,7 @@ export default function FilePreview({ fileKey, title, onClose }: FilePreviewProp
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col"
+      className="fixed inset-0 z-[99999] flex flex-col bg-slate-950"
       style={{ transition: "opacity 260ms ease", opacity: visible ? 1 : 0 }}
     >
       {/* Backdrop – klik untuk menutup */}
