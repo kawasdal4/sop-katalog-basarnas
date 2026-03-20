@@ -38,8 +38,15 @@ export default function FilePreview({ fileKey, title, onClose }: FilePreviewProp
   // Resolve fileUrl (Remote vs Local)
   useEffect(() => {
     async function resolve() {
-      // Check if fileKey is an absolute path (starts with / or C:\ etc)
-      const isAbsolutePath = fileKey.includes('/') || fileKey.includes('\\');
+      // Robust absolute path detection:
+      // 1. Windows: C:\... or D:/... (Drive letter)
+      // 2. Windows: \\... (UNC network path)
+      // 3. Unix/Linux/macOS: /... (Root path) - But distinguish from R2 keys which might have a leading slash (though rare)
+      const isWindowsDrive = /^[a-zA-Z]:[\\/]/.test(fileKey);
+      const isUncPath = fileKey.startsWith('\\\\');
+      const isUnixRoot = fileKey.startsWith('/');
+      
+      const isAbsolutePath = isWindowsDrive || isUncPath || isUnixRoot;
 
       if (isTauri && isAbsolutePath) {
         try {
@@ -52,7 +59,13 @@ export default function FilePreview({ fileKey, title, onClose }: FilePreviewProp
           setFileUrl(`${R2_PUBLIC_BASE}/${fileKey}`);
         }
       } else {
-        setFileUrl(`${R2_PUBLIC_BASE}/${fileKey}`);
+        // Fallback or Standard R2 public URL
+        // If it starts with http, it's already a full URL
+        if (fileKey.startsWith('http')) {
+          setFileUrl(fileKey);
+        } else {
+          setFileUrl(`${R2_PUBLIC_BASE}/${fileKey}`);
+        }
       }
     }
     resolve();

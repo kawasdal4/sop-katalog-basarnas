@@ -45,9 +45,23 @@ export const openExternal = async (url: string): Promise<boolean> => {
       return true;
     } else {
       // Local file path (absolute)
-      console.log('[FileActions] Opening local path:', url);
-      await invoke('native_open', { path: url });
-      return true;
+      const isWindowsDrive = /^[a-zA-Z]:[\\/]/.test(url);
+      const isUncPath = url.startsWith('\\\\');
+      const isUnixRoot = url.startsWith('/');
+      const isAbsolutePath = isWindowsDrive || isUncPath || isUnixRoot;
+
+      if (isAbsolutePath) {
+        console.log('[FileActions] Opening local path:', url);
+        await invoke('native_open', { path: url });
+        return true;
+      } else {
+        // Not a recognized absolute path, fallback to browser open (which handles R2 keys via base URL in other contexts)
+        console.warn('[FileActions] String passed to openExternal is not a valid absolute path or URL:', url);
+        if (typeof window !== 'undefined') {
+          window.open(url, '_blank', 'noopener,noreferrer');
+        }
+        return false;
+      }
     }
   } catch (err) {
     console.error('[FileActions] openExternal failed:', err);
