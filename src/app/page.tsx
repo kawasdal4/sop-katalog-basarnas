@@ -11357,6 +11357,10 @@ export default function ESOPApp() {
         }
       `}</style>
 
+
+
+        </main>
+
         {/* ── Desktop-only FilePreview modal ── */}
         {isTauri && desktopPreviewKey && (
           <FilePreview
@@ -11369,7 +11373,6 @@ export default function ESOPApp() {
           />
         )}
 
-        </main>
       </div>
     </div>
   )
