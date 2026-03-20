@@ -6,6 +6,7 @@ import { isTauri as isTauriFn } from '@tauri-apps/api/core';
 const isTauri = typeof window !== 'undefined' && ((window as any).__TAURI_INTERNALS__ !== undefined || (window as any).__TAURI__ !== undefined);
 import { readDir, BaseDirectory, watch } from '@tauri-apps/plugin-fs';
 import { Button } from '@/components/ui/button'
+import FilePreview from '@/components/file-preview'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -476,37 +477,112 @@ function ShimmerTitle({ children, subtitle, size = 'md' }: { children: React.Rea
     </div>
   )
 }
-// SAR Logo — cahaya putih berputar mengikuti outline logo
+// SAR Logo — cahaya putih berputar mengikuti outline logo (mask-composite benar)
 function SARLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
   const sizeClasses = { sm: 'w-8 h-8', md: 'w-12 h-12', lg: 'w-16 h-16' }
-  const logoUrl = '/logo.png?v=2'
+  const logoUrl = '/logo.png'
+  // maskUrl — path lokal, HARUS lokal agar CSS mask-image tidak diblokir CORS
+  const maskUrl = '/logo.png'
+
+  // Mask penuh logo (untuk clip shimmer & logo layer)
+  const fullMask: React.CSSProperties = {
+    WebkitMaskImage: `url(${maskUrl})`,
+    WebkitMaskSize: 'contain',
+    WebkitMaskRepeat: 'no-repeat',
+    WebkitMaskPosition: 'center',
+    maskImage: `url(${maskUrl})`,
+    maskSize: 'contain',
+    maskRepeat: 'no-repeat',
+    maskPosition: 'center',
+  }
+
+  // Outline ring mask: outer logo (100%) MINUS inner logo (80%)
+  //   → hanya ring tipis ~10% di tepi logo yang terlihat → efek benar mengikuti silhouette
+  // Chrome/Safari: WebkitMaskComposite: 'source-out'
+  // Firefox:       maskComposite: 'subtract'
+  const outlineRingMask: React.CSSProperties = {
+    WebkitMaskImage: `url(${maskUrl}), url(${maskUrl})`,
+    WebkitMaskSize: '100% 100%, 80% 80%',
+    WebkitMaskRepeat: 'no-repeat, no-repeat',
+    WebkitMaskPosition: 'center, center',
+    WebkitMaskComposite: 'source-out',
+    maskImage: `url(${maskUrl}), url(${maskUrl})`,
+    maskSize: '100% 100%, 80% 80%',
+    maskRepeat: 'no-repeat, no-repeat',
+    maskPosition: 'center, center',
+    maskComposite: 'subtract',
+  }
 
   return (
     <motion.div
       className={`relative ${sizeClasses[size]}`}
-      whileHover={{ scale: 1.05 }}
+      style={{ overflow: 'visible', isolation: 'auto' }}
+      whileHover={{ scale: 1.08 }}
       whileTap={{ scale: 0.95 }}
     >
-      {/* Simple shadow fallback */}
-      <img
-        src={logoUrl}
-        alt="BASARNAS Logo"
-        className="w-full h-full object-contain filter drop-shadow(0 2px 4px rgba(0,0,0,0.1))"
-        onError={(e) => {
-          console.error('[SARLogo] Failed to load logo image:', logoUrl);
+      {/* ── z:8 GLOW: drop-shadow mengikuti alpha PNG logo ──────────────────── */}
+      <motion.img
+        src={logoUrl} alt="" aria-hidden="true"
+        className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
+        style={{ zIndex: 8 }}
+        animate={{
+          filter: [
+            'drop-shadow(0 0 3px rgba(251,191,36,0.6)) drop-shadow(0 0 10px rgba(251,191,36,0.3))',
+            'drop-shadow(0 0 8px rgba(251,191,36,1.0)) drop-shadow(0 0 22px rgba(251,191,36,0.65))',
+            'drop-shadow(0 0 3px rgba(251,191,36,0.6)) drop-shadow(0 0 10px rgba(251,191,36,0.3))',
+          ],
         }}
+        transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
       />
-      {/* Shimmer effect without masking for now to ensure visibility */}
+
+      {/* ── z:15 OUTLINE RING CAHAYA PUTIH BERPUTAR ──────────────────────────
+          outlineRingMask = mask-composite subtract → isolasi area ring tepi logo.
+          Conic-gradient: transparan 80%, putih cerah di arc ~20%.
+          Rotasi 360° → cahaya berputar mengelilingi outline logo persis. */}
       <motion.div
-        className="absolute inset-0 pointer-events-none overflow-hidden rounded-lg"
-        style={{ zIndex: 5 }}
-      >
-        <motion.div
-          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-          animate={{ x: ['-100%', '100%'] }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'linear', repeatDelay: 3 }}
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          zIndex: 15,
+          background: 'conic-gradient(from 0deg, transparent 0%, transparent 60%, rgba(255,255,255,0.25) 72%, rgba(255,255,255,0.9) 80%, white 84%, rgba(255,255,255,0.9) 88%, rgba(255,255,255,0.25) 96%, transparent 100%)',
+          ...outlineRingMask,
+        }}
+        animate={{ rotate: [0, 360] }}
+        transition={{ duration: 2.8, repeat: Infinity, ease: 'linear' }}
+      />
+
+      {/* Kilap kedua berlawanan arah — efek berkilau silang */}
+      <motion.div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          zIndex: 16,
+          background: 'conic-gradient(from 180deg, transparent 0%, transparent 75%, rgba(255,255,255,0.5) 84%, white 88%, rgba(255,255,255,0.5) 93%, transparent 100%)',
+          ...outlineRingMask,
+        }}
+        animate={{ rotate: [360, 0] }}
+        transition={{ duration: 5.0, repeat: Infinity, ease: 'linear' }}
+      />
+
+      {/* ── z:20 LOGO + SHIMMER dalam masked container ─────────────────────── */}
+      <div className="absolute inset-0" style={{ zIndex: 20, ...fullMask }}>
+        <img
+          src={logoUrl} alt="BASARNAS Logo"
+          className="w-full h-full object-contain"
+          style={{ position: 'relative', zIndex: 1, display: 'block' }}
         />
-      </motion.div>
+        {/* Shimmer diagonal: band putih kanan-bawah → kiri-atas */}
+        <motion.div
+          className="absolute pointer-events-none"
+          style={{
+            zIndex: 2,
+            width: '45%', height: '300%',
+            top: '-100%', left: '27.5%',
+            background: 'linear-gradient(to right, transparent 0%, rgba(255,255,255,0.5) 30%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,0.5) 70%, transparent 100%)',
+            rotate: '35deg',
+          }}
+          animate={{ x: ['120%', '-170%'], y: ['80%', '-80%'] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut', repeatDelay: 2.5 }}
+        />
+      </div>
     </motion.div>
   )
 }
@@ -1072,6 +1148,9 @@ export default function ESOPApp() {
 
   // Loading states for operations with Basarnas animation
   const [previewLoading, setPreviewLoading] = useState<string | null>(null)
+  // Desktop-only: key of file currently previewed in inline modal
+  const [desktopPreviewKey, setDesktopPreviewKey] = useState<string | null>(null)
+  const [desktopPreviewTitle, setDesktopPreviewTitle] = useState<string>('')
   const [downloadLoading, setDownloadLoading] = useState<string | null>(null)
   const [printLoading, setPrintLoading] = useState<string | null>(null)
 
@@ -1347,8 +1426,12 @@ export default function ESOPApp() {
   const fetchDriveStatus = useCallback(async () => {
     try {
       const res = await fetch('/api/drive/status')
-      const data = await res.json()
-      setDriveStatus(data)
+      if (res.headers.get('content-type')?.includes('application/json')) {
+        const data = await res.json()
+        setDriveStatus(data)
+      } else {
+        console.warn('Drive status returned non-JSON response')
+      }
     } catch (error) {
       console.error('Drive status error:', error)
     }
@@ -1357,8 +1440,12 @@ export default function ESOPApp() {
   const fetchR2Status = useCallback(async () => {
     try {
       const res = await fetch('/api/r2/status')
-      const data = await res.json()
-      setR2Status(data)
+      if (res.headers.get('content-type')?.includes('application/json')) {
+        const data = await res.json()
+        setR2Status(data)
+      } else {
+        console.warn('R2 status returned non-JSON response')
+      }
     } catch (error) {
       console.error('R2 status error:', error)
     }
@@ -1367,12 +1454,16 @@ export default function ESOPApp() {
   const fetchSyncStatus = useCallback(async () => {
     try {
       const res = await fetch('/api/sync/status')
-      const data = await res.json()
-      if (data.success && data.stats) {
-        setSyncStatus(prev => ({
-          ...prev,
-          lastSync: data.stats.lastSync
-        }))
+      if (res.headers.get('content-type')?.includes('application/json')) {
+        const data = await res.json()
+        if (data.success && data.stats) {
+          setSyncStatus(prev => ({
+            ...prev,
+            lastSync: data.stats.lastSync
+          }))
+        }
+      } else {
+        console.warn('Sync status returned non-JSON response')
       }
     } catch (error) {
       console.error('Sync status error:', error)
@@ -8346,7 +8437,22 @@ export default function ESOPApp() {
                                         <TooltipProvider>
                                           <Tooltip>
                                             <TooltipTrigger asChild>
-                                              <Button size="icon" variant="ghost" onClick={() => handlePreview(sop.id)} disabled={previewLoading === sop.id} className="w-9 h-9 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-400 text-slate-400 transition-all">
+                                              <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                disabled={previewLoading === sop.id}
+                                                className="w-9 h-9 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-400 text-slate-400 transition-all"
+                                                onClick={() => {
+                                                  if (isTauri && sop.filePath) {
+                                                    // Desktop: buka modal inline FilePreview
+                                                    setDesktopPreviewKey(sop.filePath)
+                                                    setDesktopPreviewTitle(sop.judul)
+                                                  } else {
+                                                    // Web: tetap pakai handlePreview (fetch API)
+                                                    handlePreview(sop.id)
+                                                  }
+                                                }}
+                                              >
                                                 {previewLoading === sop.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
                                               </Button>
                                             </TooltipTrigger>
@@ -11256,6 +11362,19 @@ export default function ESOPApp() {
           border-bottom: 1px solid rgba(249, 115, 22, 0.2) !important;
         }
       `}</style>
+
+        {/* ── Desktop-only FilePreview modal ── */}
+        {isTauri && desktopPreviewKey && (
+          <FilePreview
+            fileKey={desktopPreviewKey}
+            title={desktopPreviewTitle}
+            onClose={() => {
+              setDesktopPreviewKey(null)
+              setDesktopPreviewTitle('')
+            }}
+          />
+        )}
+
         </main>
       </div>
     </div>
