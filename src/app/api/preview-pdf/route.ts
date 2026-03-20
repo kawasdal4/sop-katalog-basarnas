@@ -4,20 +4,22 @@ import { downloadFromR2, isR2Configured } from '@/lib/r2-storage'
 import { writeFile, existsSync, mkdirSync } from 'fs'
 import { promisify } from 'util'
 
+import path from 'path'
+
 const writeFileAsync = promisify(writeFile)
 
 export const dynamic = 'force-dynamic'
 
 // Storage paths for cached PDFs
-const STORE_DIR = '/home/z/my-project/store'
-const PDF_DIR = `${STORE_DIR}/pdf_preview`
+const STORE_DIR = path.join(process.cwd(), 'store')
+const PDF_DIR = path.join(STORE_DIR, 'pdf_preview')
 
 // Ensure directories exist
 if (!existsSync(STORE_DIR)) mkdirSync(STORE_DIR, { recursive: true })
 if (!existsSync(PDF_DIR)) mkdirSync(PDF_DIR, { recursive: true })
 
 // PDF Converter Service URL
-const PDF_CONVERTER_URL = 'http://localhost:3004'
+const PDF_CONVERTER_URL = process.env.PDF_CONVERTER_URL || 'http://localhost:3004'
 
 // Supported file types
 const EXCEL_TYPES = ['xlsx', 'xls', 'xlsm']
@@ -219,8 +221,8 @@ async function convertToPdf(fileData: Buffer, fileName: string, fileType: string
     })
 
     if (!response.ok) {
-      const error = await response.json()
-      console.error('[Preview] Converter error:', error)
+      const errorText = await response.text()
+      console.error('[Preview] Converter error:', errorText)
       return null
     }
 

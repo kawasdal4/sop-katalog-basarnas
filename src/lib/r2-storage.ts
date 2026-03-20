@@ -13,6 +13,8 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { calculateChecksum } from './sync-core'
 import fs from 'fs/promises'
 import path from 'path'
+import { validateEnv } from './env-val'
+import { v4 as uuidv4 } from 'uuid'
 
 const LOCAL_UPLOAD_DIR = path.join(process.cwd(), 'public', 'temp_uploads')
 
@@ -58,11 +60,47 @@ function extractAccountIdFromEndpoint(endpoint: string): string | null {
   return null
 }
 
-import { validateEnv } from './env-val'
+
+
+// Get R2 configuration from environment
+/**
+ * Check if storage should run in Mock Mode (local fallback)
+ */
+export function isStorageMockMode(): boolean {
+  // Check direct env first to avoid circularity with getR2Config
+  if (process.env.MOCK_STORAGE === 'true') {
+    return true
+  }
+
+  try {
+    const accountId = process.env.R2_ACCOUNT_ID || ''
+    const accessKeyId = process.env.R2_ACCESS_KEY_ID || ''
+    const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY || ''
+    
+    const isPlaceholder = 
+      accountId.includes('your-') || accountId.includes('dummy') ||
+      accessKeyId.includes('your-') || accessKeyId.includes('dummy') ||
+      secretAccessKey.includes('your-') || secretAccessKey.includes('dummy')
+
+    if (isPlaceholder) return true
+    
+    // Fallback for non-production
+    if (process.env.NODE_ENV !== 'production' && !accountId) {
+      return true
+    }
+
+    return false
+  } catch {
+    return true
+  }
+}
 
 // Get R2 configuration from environment
 export function getR2Config(): R2Config {
-  validateEnv()
+  // Only validate in non-mock mode
+  if (!isStorageMockMode()) {
+    validateEnv()
+  }
 
   let accountId: string | undefined = process.env.R2_ACCOUNT_ID
   if (!accountId && process.env.R2_ENDPOINT) {
@@ -84,44 +122,24 @@ export function getR2Config(): R2Config {
     publicUrl: sanitize(publicUrl)
   }
 
-  if (process.env.VERCEL) {
-    console.log('[R2 Config] Verified on Vercel:', {
-      bucket: config.bucketName,
-      hasAccountId: !!config.accountId,
-      hasAccessKey: !!config.accessKeyId,
-      hasSecretKey: !!config.secretAccessKey,
-      isMock: isStorageMockMode()
-    });
-  }
-
   return config
 }
 
 /**
- * Check if storage should run in Mock Mode (local fallback)
+ * Get R2 bucket name
  */
-export function isStorageMockMode(): boolean {
-  try {
-    const config = getR2Config()
-    const isMock =
-      config.accountId.includes('dummy') ||
-      config.accessKeyId.includes('dummy') ||
-      config.secretAccessKey.includes('dummy') ||
-      process.env.MOCK_STORAGE === 'true'
-
-    return isMock || (process.env.NODE_ENV !== 'production' && !config.accountId)
-  } catch {
-    return true
-  }
+export function getR2BucketName(): string {
+  return getR2Config().bucketName
 }
 
 // Check if R2 is configured
 export function isR2Configured(): boolean {
   try {
     const config = getR2Config()
-    return !!(config.accountId && config.accessKeyId && config.secretAccessKey)
+    const configured = !!(config.accountId && config.accessKeyId && config.secretAccessKey)
+    return configured || isStorageMockMode()
   } catch {
-    return false
+    return isStorageMockMode()
   }
 }
 
@@ -139,7 +157,7 @@ function createR2Client(): S3Client {
   })
 }
 
-import { v4 as uuidv4 } from 'uuid'
+
 
 /**
  * Upload file to R2 with automatic checksum calculation and naming
@@ -284,12 +302,6 @@ export async function downloadFromR2(key: string): Promise<{
   }
 }
 
-/**
- * Get R2 bucket name
- */
-export function getR2BucketName(): string {
-  return process.env.R2_BUCKET_NAME || process.env.R2_BUCKET || 'sop-katalog-basarnas'
-}
 
 /**
  * Check if file exists in R2

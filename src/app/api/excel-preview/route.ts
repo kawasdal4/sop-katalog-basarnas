@@ -47,7 +47,7 @@ async function getExcelFileBuffer(document: { id: string; filePath: string; file
 
 // Convert Excel to PNG using PDF converter service
 async function convertExcelToPng(buffer: Buffer, dpi: number = 300): Promise<{ pages: { page: number; pngBase64: string; width: number; height: number }[] }> {
-  const CONVERTER_URL = 'http://localhost:3004/convert/png'
+  const CONVERTER_URL = (process.env.PDF_CONVERTER_URL || 'http://localhost:3004') + '/convert/png'
   
   console.log(`📤 Sending to converter service: ${buffer.length} bytes`)
   

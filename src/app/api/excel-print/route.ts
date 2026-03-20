@@ -17,7 +17,7 @@ const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY || process.env.R2_
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME!
 
 // PDF Converter Service (mini-service on port 3004) - only available in development
-const PDF_CONVERTER_URL = 'http://localhost:3004'
+const PDF_CONVERTER_URL = process.env.PDF_CONVERTER_URL || 'http://localhost:3004'
 const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1'
 
 // Initialize R2 client

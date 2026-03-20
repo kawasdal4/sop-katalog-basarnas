@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { db } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
-
-// Create a fresh Prisma client instance
-const prisma = new PrismaClient()
 
 /**
  * GET /api/sync/status
@@ -26,15 +23,15 @@ export async function GET() {
       recentLogs,
       lastSync,
     ] = await Promise.all([
-      prisma.fileSync.count(),
-      prisma.fileSync.count({ where: { syncStatus: 'synced' } }),
-      prisma.fileSync.count({ where: { syncStatus: 'pending' } }),
-      prisma.fileSync.count({ where: { syncStatus: 'error' } }),
-      prisma.fileSync.count({ where: { syncStatus: 'conflict' } }),
-      prisma.fileSync.count({ where: { source: 'drive' } }),
-      prisma.fileSync.count({ where: { source: 'r2' } }),
-      prisma.fileSync.count({ where: { source: 'both' } }),
-      prisma.syncLog.findMany({
+      db.fileSync.count(),
+      db.fileSync.count({ where: { syncStatus: 'synced' } }),
+      db.fileSync.count({ where: { syncStatus: 'pending' } }),
+      db.fileSync.count({ where: { syncStatus: 'error' } }),
+      db.fileSync.count({ where: { syncStatus: 'conflict' } }),
+      db.fileSync.count({ where: { source: 'drive' } }),
+      db.fileSync.count({ where: { source: 'r2' } }),
+      db.fileSync.count({ where: { source: 'both' } }),
+      db.syncLog.findMany({
         take: 10,
         orderBy: { createdAt: 'desc' },
         select: {
@@ -47,7 +44,7 @@ export async function GET() {
           createdAt: true,
         }
       }),
-      prisma.syncLog.findFirst({
+      db.syncLog.findFirst({
         where: { status: 'success', operation: { in: ['sync', 'migrate'] } },
         orderBy: { createdAt: 'desc' },
         select: { createdAt: true },
@@ -55,7 +52,7 @@ export async function GET() {
     ])
     
     // Calculate storage usage
-    const totalSize = await prisma.fileSync.aggregate({
+    const totalSize = await db.fileSync.aggregate({
       _sum: { fileSize: true },
     })
     

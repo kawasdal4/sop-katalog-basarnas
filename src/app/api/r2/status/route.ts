@@ -5,7 +5,9 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
-    if (!isR2Configured()) {
+    const configured = isR2Configured()
+
+    if (!configured) {
       return NextResponse.json({
         connected: false,
         status: 'not_configured',
@@ -16,19 +18,17 @@ export async function GET() {
 
     const connectionTest = await testR2Connection()
     
-    if (connectionTest.success) {
-      return NextResponse.json({
-        connected: true,
-        status: 'connected',
-        message: connectionTest.message,
-      })
-    } else {
-      return NextResponse.json({
-        connected: false,
-        status: connectionTest.status,
-        message: connectionTest.message,
-      })
-    }
+    return connectionTest.success 
+      ? NextResponse.json({
+          connected: true,
+          status: 'connected',
+          message: connectionTest.message,
+        })
+      : NextResponse.json({
+          connected: false,
+          status: connectionTest.status,
+          message: connectionTest.message,
+        })
   } catch (error) {
     console.error('R2 status error:', error)
     return NextResponse.json({

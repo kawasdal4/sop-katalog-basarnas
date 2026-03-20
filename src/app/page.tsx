@@ -265,7 +265,7 @@ const openExternal = async (url: string): Promise<boolean> => {
   return false;
 };
 
-const handleNativeDownload = async (blob: Blob, fileName: string): Promise<string | null | false> => {
+const handleNativeDownload = async (blob: Blob, fileName: string): Promise<string | null> => {
   if (!isTauri) return false;
 
   try {
@@ -284,7 +284,7 @@ const handleNativeDownload = async (blob: Blob, fileName: string): Promise<strin
     return filePath;
   } catch (err) {
     console.error('[Native] handleNativeDownload failed:', err);
-    return false;
+    throw err;
   }
 };
 
@@ -2816,16 +2816,23 @@ export default function ESOPApp() {
 
       // Native download for Tauri
       if (isTauri) {
-        const success = await handleNativeDownload(blob, customFileName)
-        if (success === null) {
+        try {
+          const filePath = await handleNativeDownload(blob, customFileName)
+          if (filePath === null) {
+            setDownloadLoading(null)
+            return // User cancelled
+          }
+          if (filePath) {
+            setDownloadLoading(null)
+            toast({ title: '✅ Download Selesai', description: `File: ${customFileName} berhasil disimpan.` })
+            fetchStats()
+            return
+          }
+        } catch (err) {
+          console.error('[Tauri] Download failed during Native save:', err)
           setDownloadLoading(null)
-          return // User cancelled
-        }
-        if (success) {
-          setDownloadLoading(null)
-          toast({ title: '✅ Download Selesai', description: `File: ${customFileName}` })
-          fetchStats()
-          return
+          toast({ title: '❌ Gagal Menyimpan', description: typeof err === 'string' ? err : (err instanceof Error ? err.message : 'Pastikan aplikasi memiliki izin untuk menyimpan di lokasi tersebut.'), variant: 'destructive', duration: 10000 })
+          return // Prevent fallback to browser
         }
       }
 
