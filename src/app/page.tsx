@@ -3765,6 +3765,34 @@ export default function ESOPApp() {
     // Keep the sync dialog open so user can choose different file or cancel entirely
   }
 
+  // Handle Done Edit - User finishes editing and wants to sync final changes
+  const handleDoneEdit = async () => {
+    // 1. Perform final sync for Tauri if possible
+    if (isTauri && desktopEditLocalPath && desktopEditSessionToken && excelEditData) {
+      setDesktopSyncing(true);
+      toast({
+        title: '🔄 Final Sinkronisasi...',
+        description: 'Mengecek perubahan terakhir sebelum menutup sesi...',
+        duration: 3000
+      });
+
+      try {
+        const { readFile } = await import('@tauri-apps/plugin-fs');
+        const fileBytes = await readFile(desktopEditLocalPath);
+        const blob = new Blob([fileBytes]);
+        const fileToSync = new File([blob], excelEditData.fileName);
+        
+        // Wait for sync to finish (this shows its own toasts)
+        await autoSync(fileToSync, desktopEditSessionToken, excelEditData);
+      } catch (err) {
+        console.error('[DoneEdit] Final sync failed:', err);
+      }
+    }
+    
+    // 2. Clear session (Cleanup)
+    await handleCancelSession();
+  };
+
   // Handle Cancel Session - User cancels the entire edit session
   const handleCancelSession = async () => {
     // 1. Cleanup Watcher
@@ -8555,7 +8583,7 @@ export default function ESOPApp() {
                                                   <TooltipProvider delayDuration={300}>
                                                     <Tooltip>
                                                       <TooltipTrigger asChild>
-                                                        <Button size="icon" variant="ghost" onClick={handleCancelSession} className="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white ml-1">
+                                                        <Button size="icon" variant="ghost" onClick={handleDoneEdit} className="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white ml-1">
                                                           <Check className="w-4 h-4" />
                                                         </Button>
                                                       </TooltipTrigger>
@@ -8590,7 +8618,7 @@ export default function ESOPApp() {
                                                         <Button 
                                                           size="icon" 
                                                           variant="ghost" 
-                                                          onClick={handleCancelSession} 
+                                                          onClick={handleDoneEdit} 
                                                           className="w-9 h-9 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white"
                                                         >
                                                           <X className="w-4 h-4" />
