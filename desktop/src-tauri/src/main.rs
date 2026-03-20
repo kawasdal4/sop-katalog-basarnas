@@ -47,6 +47,12 @@ async fn native_open(path: String) -> Result<(), String> {
   Ok(())
 }
 
+#[tauri::command]
+async fn native_save(path: String, bytes: Vec<u8>) -> Result<(), String> {
+  std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+  Ok(())
+}
+
 fn main() {
   tauri::Builder::default()
     .plugin(
@@ -64,7 +70,7 @@ fn main() {
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_sql::Builder::default().build())
-    .invoke_handler(tauri::generate_handler![get_temp_dir, save_temp_file, native_open])
+    .invoke_handler(tauri::generate_handler![get_temp_dir, save_temp_file, native_open, native_save])
     .setup(|app| {
       log::info!("Application is starting up...");
       log::info!("Identifier: {}", app.package_info().name);

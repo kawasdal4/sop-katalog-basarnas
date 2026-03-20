@@ -266,20 +266,25 @@ const openExternal = async (url: string): Promise<boolean> => {
 };
 
 const handleNativeDownload = async (blob: Blob, fileName: string): Promise<string | null> => {
-  if (!isTauri) return false;
+  if (!isTauri) return null;
 
   try {
     // Use the Tauri dialog plugin to show a Save As dialog
     const { save } = await import('@tauri-apps/plugin-dialog');
-    const { writeFile } = await import('@tauri-apps/plugin-fs');
+    const { invoke } = await import('@tauri-apps/api/core');
+    
     const fileExt = fileName.split('.').pop() || 'xlsx';
     const filePath = await save({
       defaultPath: fileName,
       filters: [{ name: 'Document', extensions: [fileExt] }]
     });
     if (!filePath) return null; // User cancelled
+    
     const bytes = new Uint8Array(await blob.arrayBuffer());
-    await writeFile(filePath, bytes);
+    
+    // Use native Rust backend command to bypass Tauri v2 frontend fs plugin ACL constraints entirely
+    await invoke('native_save', { path: filePath, bytes: Array.from(bytes) });
+    
     console.log('[Native] File saved to:', filePath);
     return filePath;
   } catch (err) {
