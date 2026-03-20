@@ -6,7 +6,7 @@
     "node": ">=20.x"
   },
   "scripts": {
-    "dev": "next dev -p 3000",
+    "dev": "next dev -H 0.0.0.0 -p 3000",
     "build": "prisma generate --schema=./prisma/schema.prod.prisma && prisma db push --schema=./prisma/schema.prod.prisma --accept-data-loss && next build",
     "build:prod": "node -e \"require('fs').copyFileSync('prisma/schema.prod.prisma','prisma/schema.prisma')\" && prisma generate --schema=./prisma/schema.prisma && prisma db push --schema=./prisma/schema.prod.prisma --skip-generate --accept-data-loss && next build",
     "postinstall": "node -e \"if(process.env.VERCEL){require('fs').copyFileSync('prisma/schema.prod.prisma','prisma/schema.prisma')}\" && prisma generate --schema=./prisma/schema.prisma",
@@ -61,8 +61,10 @@
     "@supabase/supabase-js": "^2.98.0",
     "@tanstack/react-query": "^5.82.0",
     "@tanstack/react-table": "^8.21.3",
+    "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-fs": "^2.4.5",
     "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-shell": "^2.3.5",
     "@tauri-apps/plugin-sql": "^2.3.2",
     "@tauri-apps/plugin-updater": "^2.10.0",
     "@xyflow/react": "^12.10.1",

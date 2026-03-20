@@ -8,6 +8,7 @@
 ========================= */
 
 import { useState, useEffect, useRef } from "react"
+import { createPortal } from "react-dom"
 import { ArrowLeft, ExternalLink, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -77,7 +78,10 @@ export default function FilePreview({ fileKey, title, onClose }: FilePreviewProp
 
   const displayTitle = title ?? fileKey.split("/").pop() ?? fileKey
 
-  return (
+  // Don't render on server
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div
       className="fixed inset-0 z-[99999] flex flex-col bg-slate-950"
       style={{ transition: "opacity 260ms ease", opacity: visible ? 1 : 0 }}
@@ -188,7 +192,8 @@ export default function FilePreview({ fileKey, title, onClose }: FilePreviewProp
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
