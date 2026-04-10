@@ -4176,21 +4176,10 @@ export default function ESOPApp() {
   const handleDeleteSop = async (id: string, fileName: string) => {
     if (!confirm(`Yakin ingin menghapus file "${fileName}"?\n\nFile akan dihapus permanen dari sistem dan storage.`)) return
 
-    if (isTauri) {
-      try {
-        const { syncService } = await import('@/lib/sync/syncService')
-        await syncService.enqueueOperation('sop_files', 'DELETE', { id })
-        toast({
-          title: '✅ Berhasil (Offline)',
-          description: `Penghapusan "${fileName}" telah dijadwalkan.`,
-        })
-        // Update local state proactively
-        setSopFiles(prev => prev.filter(sop => sop.id !== id))
-        return
-      } catch (err) {
-        console.error('Offline delete error:', err)
-      }
-    }
+    // Update local state proactively for responsive UI across all tabs (Optimistic Update)
+    setSopFiles(prev => prev.filter(sop => sop.id !== id))
+    setVerificationList(prev => prev.filter(sop => sop.id !== id))
+    setArsipList(prev => prev.filter(sop => sop.id !== id))
 
     try {
       const res = await fetch(`/api/sop?id=${id}`, { method: 'DELETE' })
@@ -4198,19 +4187,38 @@ export default function ESOPApp() {
 
       if (data.error) {
         toast({ title: '❌ Gagal', description: data.error, variant: 'destructive' })
+        // Revert state if failed
+        fetchSopFiles()
+        fetchVerificationList(verificationFilter, verificationLingkupFilter, verificationSearch, verificationSortBy)
+        fetchArsipList(arsipLingkupFilter, arsipSearch, arsipSortBy)
       } else {
         toast({
           title: '✅ Berhasil',
           description: `File "${fileName}" berhasil dihapus!`,
           duration: 3000
         })
-        fetchSopFiles()
-        fetchVerificationList(verificationFilter, verificationLingkupFilter, verificationSearch, verificationSortBy)
-        fetchArsipList(arsipLingkupFilter, arsipSearch, arsipSortBy)
         fetchStats()
       }
     } catch (error) {
-      toast({ title: '❌ Error', description: 'Terjadi kesalahan saat menghapus file', variant: 'destructive' })
+      if (isTauri) {
+        // Fallback for offline desktop environment
+        try {
+          const { syncService } = await import('@/lib/sync/syncService')
+          await syncService.enqueueOperation('sop_files', 'DELETE', { id })
+          toast({
+            title: '✅ Berhasil (Offline)',
+            description: `Penghapusan "${fileName}" telah dijadwalkan.`,
+          })
+        } catch (err) {
+          console.error('Offline delete error:', err)
+        }
+      } else {
+        toast({ title: '❌ Error', description: 'Terjadi kesalahan saat menghapus file', variant: 'destructive' })
+        // Revert state if failed
+        fetchSopFiles()
+        fetchVerificationList(verificationFilter, verificationLingkupFilter, verificationSearch, verificationSortBy)
+        fetchArsipList(arsipLingkupFilter, arsipSearch, arsipSortBy)
+      }
     }
   }
 

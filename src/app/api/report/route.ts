@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
   <!-- Header -->
   <div class="header">
     <div class="logo-row">
-      <img src="/logo-sar.png" onerror="this.style.display='none'" />
+      <img src="https://www.e-katalog-sop.cloud/Logo_Basarnas.png" onerror="this.style.display='none'" />
       <div>
         <h1>LAPORAN ANALITIK SOP DAN IK</h1>
         <div class="subtitle">Direktorat Kesiapsiagaan – BASARNAS</div>

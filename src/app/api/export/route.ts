@@ -134,13 +134,13 @@ export async function GET(request: NextRequest) {
 
     // Logo
     try {
-      const logoPath = path.join(process.cwd(), 'public', 'logo-sar.png')
-      if (fs.existsSync(logoPath)) {
-        const buf = fs.readFileSync(logoPath)
-        const imgId = wb.addImage({ buffer: buf as any, extension: 'png' })
-        dash.addImage(imgId, { tl: { col: 0, row: 1 } as any, ext: { width: 70, height: 70 } })
+      const logoRes = await fetch('https://www.e-katalog-sop.cloud/Logo_Basarnas.png');
+      if (logoRes.ok) {
+        const logoBuffer = await logoRes.arrayBuffer();
+        const imgId = wb.addImage({ buffer: logoBuffer as any, extension: 'png' });
+        dash.addImage(imgId, { tl: { col: 0, row: 1 } as any, ext: { width: 70, height: 70 } });
       }
-    } catch { }
+    } catch (e) { console.error('Logo excel report error:', e) }
 
     dash.mergeCells('B2:J2')
     const titleCell = dash.getCell('B2')
