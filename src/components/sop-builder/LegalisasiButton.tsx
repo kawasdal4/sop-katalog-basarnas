@@ -180,13 +180,18 @@ export function LegalisasiButton({
                 return
             }
 
-            // ── STRATEGY 2: Files > 4MB -> Binary Streaming via Server (no CORS, no FormData overhead) ──
-            // Send raw binary chunk with metadata in query params. Server proxies to R2.
-            // Chunk size set to 6MB: above R2's 5MB minimum, and Vercel handles raw binary
-            // bodies larger than FormData due to no multipart parsing overhead.
-            const CHUNK_SIZE = 6 * 1024 * 1024 // 6 MB per chunk (above R2's 5MB minimum)
+            // ── STRATEGY 2: Files > 4MB → Presigned-URL Multipart Upload ──────────
+            // Vercel has a hard 4.5MB request body limit — we CANNOT proxy large chunks
+            // through the server. Instead: server generates a presigned PUT URL per part,
+            // browser uploads directly to R2 (bypassing Vercel entirely).
+            // Key rules:
+            //   • Chunk ≥ 5 MB (R2 minimum per part, except the final part)
+            //   • DO NOT add Content-Type to the PUT — UploadPartCommand doesn't sign it
+            //     → adding it causes 403 SignatureDoesNotMatch → "failed to fetch"
+            //   • Use credentials: 'omit' for cross-origin R2 requests
+            const CHUNK_SIZE = 10 * 1024 * 1024 // 10 MB (safely > R2's 5 MB minimum)
 
-            // Step 2a: Initialize multipart upload on server
+            // Step 2a: Init multipart on server (also sets R2 CORS)
             const startRes = await fetch(`${apiBase}?action=multipart-start`, {
                 method: 'POST',
                 credentials: 'include'
@@ -197,44 +202,90 @@ export function LegalisasiButton({
                 throw new Error(errData.error || `Gagal memulai sesi upload (${startRes.status})`)
             }
 
-            const { uploadId, r2Key } = await startRes.json()
+            const startData = await startRes.json()
+            const { uploadId, r2Key } = startData
+            if (startData.corsOk === false) {
+                console.warn('[upload] R2 CORS status warning:', startData.corsMessage)
+            }
             setUploadProgress(8)
 
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
             const parts: Array<{ PartNumber: number; ETag: string }> = []
 
-            // Step 2b: Upload each chunk as raw binary to server (no CORS, same-origin)
+            // Step 2b: For each chunk — get presigned URL → PUT directly to R2
             for (let i = 0; i < totalChunks; i++) {
                 const start = i * CHUNK_SIZE
                 const end = Math.min(start + CHUNK_SIZE, file.size)
                 const chunkBlob = file.slice(start, end)
                 const partNumber = i + 1
 
-                // Send raw binary body; metadata goes in query params (no FormData parsing overhead)
-                const streamUrl = `${apiBase}?action=multipart-part-stream&uploadId=${encodeURIComponent(uploadId)}&r2Key=${encodeURIComponent(r2Key)}&partNumber=${partNumber}`
-
-                const partRes = await fetch(streamUrl, {
+                // Ask server for presigned PUT URL for this part
+                const urlRes = await fetch(`${apiBase}?action=multipart-part-url`, {
                     method: 'POST',
                     credentials: 'include',
-                    body: chunkBlob,
-                    // No Content-Type header so browser sends as application/octet-stream
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ uploadId, r2Key, partNumber })
                 })
 
-                if (!partRes.ok) {
-                    const errData = await partRes.json().catch(() => ({}))
+                if (!urlRes.ok) {
+                    const errData = await urlRes.json().catch(() => ({}))
                     await fetch(`${apiBase}?action=multipart-abort`, {
-                        method: 'POST',
-                        credentials: 'include',
+                        method: 'POST', credentials: 'include',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ uploadId, r2Key })
                     }).catch(() => {})
-                    throw new Error(errData.error || `Gagal mengunggah bagian ${partNumber}/${totalChunks}`)
+                    throw new Error(errData.error || `Gagal mendapatkan URL upload bagian ${partNumber}/${totalChunks}`)
                 }
 
-                const { etag } = await partRes.json()
+                const { presignedUrl } = await urlRes.json()
+
+                // Convert to ArrayBuffer: Ensures browser sends raw binary WITHOUT
+                // auto-injecting 'Content-Type: application/pdf', which would cause
+                // Cloudflare R2 403 SignatureDoesNotMatch ("failed to fetch").
+                const chunkArrayBuffer = await chunkBlob.arrayBuffer()
+
+                let putRes: Response
+                try {
+                    putRes = await fetch(presignedUrl, {
+                        method: 'PUT',
+                        body: chunkArrayBuffer,
+                        credentials: 'omit',
+                    })
+                } catch (fetchErr: any) {
+                    await fetch(`${apiBase}?action=multipart-abort`, {
+                        method: 'POST', credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ uploadId, r2Key })
+                    }).catch(() => {})
+
+                    const isFetchError = fetchErr?.message?.includes('Failed to fetch') || fetchErr?.name === 'TypeError'
+                    if (isFetchError) {
+                        const hint = startData?.corsOk === false
+                            ? ` (${startData?.corsMessage || 'CORS belum aktif di R2'}). Silakan tambahkan CORS Policy di Cloudflare Dashboard R2.`
+                            : ' (Koneksi ke storage R2 diblokir oleh CORS browser. Pastikan CORS Policy aktif di Cloudflare R2).'
+                        throw new Error(`Upload bagian ${partNumber}/${totalChunks} gagal: ${fetchErr.message}${hint}`)
+                    }
+                    throw fetchErr
+                }
+
+                if (!putRes.ok) {
+                    const statusText = await putRes.text().catch(() => '')
+                    await fetch(`${apiBase}?action=multipart-abort`, {
+                        method: 'POST', credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ uploadId, r2Key })
+                    }).catch(() => {})
+                    throw new Error(`Upload bagian ${partNumber}/${totalChunks} ke R2 ditolak (status: ${putRes.status}). ${statusText ? statusText.substring(0, 100) : ''}`)
+                }
+
+                // ETag may include surrounding quotes — preserve them (R2 requires exact value)
+                const etag = putRes.headers.get('ETag') || putRes.headers.get('etag') || ''
+                if (!etag) {
+                    console.warn(`Part ${partNumber}: ETag header not visible (CORS ExposeHeaders might not include ETag)`)
+                }
                 parts.push({ PartNumber: partNumber, ETag: etag })
 
-                const pct = Math.round(((i + 1) / totalChunks) * 82) + 8 // 8% - 90%
+                const pct = Math.round(((i + 1) / totalChunks) * 82) + 8
                 setUploadProgress(Math.min(92, pct))
             }
 

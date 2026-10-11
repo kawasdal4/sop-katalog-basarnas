@@ -9,6 +9,7 @@ import {
   HeadObjectCommand,
   CopyObjectCommand,
   PutBucketCorsCommand,
+  GetBucketCorsCommand,
   CreateMultipartUploadCommand,
   UploadPartCommand,
   CompleteMultipartUploadCommand,
@@ -601,18 +602,40 @@ export async function getR2PresignedUploadUrl(
 }
 
 /**
- * Ensure R2 Bucket has CORS configured so browser direct uploads work
+ * Ensure R2 Bucket has CORS configured so browser direct uploads (presigned URL PUT) work.
+ * Checks existing CORS first; if missing, attempts to configure standard rules.
  */
-let corsConfigured = false
-export async function ensureR2Cors(): Promise<{ success: boolean; message: string }> {
-  if (corsConfigured || isStorageMockMode()) {
-    return { success: true, message: 'Already configured or in mock mode' }
+export async function ensureR2Cors(): Promise<{ success: boolean; message: string; existingRules?: any }> {
+  if (isStorageMockMode()) {
+    return { success: true, message: 'Mock mode — CORS not needed' }
   }
 
   try {
     const config = getR2Config()
     const client = createR2Client()
 
+    // Step 1: Check if CORS is already set up on the bucket
+    try {
+      const currentCors = await client.send(
+        new GetBucketCorsCommand({ Bucket: config.bucketName })
+      )
+      if (currentCors.CORSRules && currentCors.CORSRules.length > 0) {
+        // Verify if it allows PUT and exposes ETag
+        const hasPut = currentCors.CORSRules.some(r => r.AllowedMethods?.includes('PUT'))
+        if (hasPut) {
+          console.log(`✅ Cloudflare R2 CORS already active on bucket: ${config.bucketName}`)
+          return { success: true, message: 'CORS already configured', existingRules: currentCors.CORSRules }
+        }
+      }
+    } catch (checkErr: any) {
+      // NoSuchCORSConfiguration is expected if not set yet, continue to configure
+      const isMissing = checkErr?.name === 'NoSuchCORSConfiguration' || checkErr?.name === 'NotFound'
+      if (!isMissing) {
+        console.warn('⚠️ Could not check current R2 CORS:', checkErr?.message)
+      }
+    }
+
+    // Step 2: Attempt to configure CORS using standard rules
     await client.send(
       new PutBucketCorsCommand({
         Bucket: config.bucketName,
@@ -622,19 +645,21 @@ export async function ensureR2Cors(): Promise<{ success: boolean; message: strin
               AllowedHeaders: ['*'],
               AllowedMethods: ['GET', 'PUT', 'POST', 'DELETE', 'HEAD'],
               AllowedOrigins: ['*'],
-              ExposeHeaders: ['ETag'],
-              MaxAgeSeconds: 3600,
+              ExposeHeaders: ['ETag', 'etag'],
+              MaxAgeSeconds: 86400,
             },
           ],
         },
       })
     )
-    corsConfigured = true
     console.log(`✅ Cloudflare R2 CORS configured successfully on bucket: ${config.bucketName}`)
     return { success: true, message: 'CORS configured successfully' }
   } catch (error: any) {
-    console.warn('⚠️ Could not configure R2 CORS via API (may need manual Cloudflare dashboard config):', error?.message)
-    return { success: false, message: error?.message || 'Failed to configure CORS' }
+    const errMsg = error?.name === 'AccessDenied'
+      ? 'AccessDenied: R2 API Token lacks PutBucketCors permission. CORS must be added in Cloudflare Dashboard.'
+      : (error?.message || 'Failed to configure CORS')
+    console.warn('⚠️ Could not configure R2 CORS:', errMsg)
+    return { success: false, message: errMsg }
   }
 }
 

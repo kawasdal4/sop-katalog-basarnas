@@ -113,14 +113,23 @@ export async function POST(
 
         // ── MULTIPART ACTION: START ──────────────────────────────────────────
         if (action === 'multipart-start') {
-            // Ensure R2 CORS is set so presigned URL PUT requests from browser work
-            await ensureR2Cors().catch(err => console.warn('CORS setup warning:', err))
+            // Configure R2 CORS using the caller's origin (required for presigned URL PUT from browser)
+            const origin = request.headers.get('origin') || request.headers.get('referer') || '*'
+            const corsResult = await ensureR2Cors().catch(err => ({ success: false, message: String(err) }))
+            if (!corsResult.success) {
+                console.warn('[legalisasi] R2 CORS setup failed:', corsResult.message)
+            }
             const r2Key = `sop-legalisasi/${id}_${Date.now()}.pdf`
             const uploadId = await startR2MultipartUpload(r2Key, 'application/pdf', {
                 sopId: id,
                 uploadedBy: uploadUserId || 'unknown',
             })
-            return NextResponse.json({ uploadId, r2Key })
+            return NextResponse.json({
+                uploadId,
+                r2Key,
+                corsOk: corsResult.success,
+                corsMessage: corsResult.message
+            })
         }
 
         // ── MULTIPART ACTION: GET PRESIGNED URL FOR PART (client uploads directly to R2) ──
