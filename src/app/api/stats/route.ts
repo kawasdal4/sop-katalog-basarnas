@@ -60,6 +60,25 @@ export async function GET() {
       stats.totalKadaluarsa = 0
     }
 
+    try {
+      stats.totalLegalisasi = await db.sopFile.count({
+        where: {
+          OR: [
+            { legalisasiPdfPath: { not: null } },
+            { status: 'LEGALISASI' },
+            { status: 'Legalisasi' }
+          ],
+          AND: [
+            {
+              OR: [{ isPublicSubmission: false }, { verificationStatus: 'DISETUJUI' }]
+            }
+          ]
+        }
+      })
+    } catch (e) {
+      stats.totalLegalisasi = 0
+    }
+
     // Public submissions
     try {
       stats.totalPublikMenunggu = await db.sopFile.count({

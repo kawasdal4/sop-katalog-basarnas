@@ -63,7 +63,17 @@ export async function GET(request: NextRequest) {
       whereConditions.push({ jenis })
     }
     if (status && status !== 'SEMUA') {
-      whereConditions.push({ status })
+      if (status.toUpperCase() === 'LEGALISASI') {
+        whereConditions.push({
+          OR: [
+            { legalisasiPdfPath: { not: null } },
+            { status: 'LEGALISASI' },
+            { status: 'Legalisasi' }
+          ]
+        })
+      } else {
+        whereConditions.push({ status })
+      }
     }
     if (lingkup && lingkup !== 'SEMUA') {
       whereConditions.push({ lingkup })
@@ -214,9 +224,9 @@ export async function POST(request: NextRequest) {
     }
 
     // File Validation
-    const MAX_SIZE = 50 * 1024 * 1024 // 50MB
+    const MAX_SIZE = 100 * 1024 * 1024 // 100MB
     if (file.size > MAX_SIZE) {
-      return NextResponse.json({ error: `File terlalu besar. Maksimal 50MB.` }, { status: 400 })
+      return NextResponse.json({ error: `File terlalu besar. Maksimal 100MB.` }, { status: 400 })
     }
 
     const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'pdf'

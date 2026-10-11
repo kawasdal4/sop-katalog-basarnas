@@ -58,6 +58,10 @@ model SopFile {
   pdfPreviewDriveId    String?
   pdfPreviewGeneratedAt DateTime?
   
+  // Legalisasi PDF
+  legalisasiPdfPath    String?  // Path to uploaded legalisasi PDF
+  legalisasiUploadedAt DateTime?
+  
   // Statistics
   previewCount  Int @default(0)
   downloadCount Int @default(0)
@@ -259,6 +263,7 @@ model SopPembuatan {
   // File results
   generatedCoverPath    String?
   combinedPdfPath       String?
+  legalisasiPdfPath     String?  // Path to uploaded legalisasi PDF
 
   authorId              String
   createdAt             DateTime @default(now())

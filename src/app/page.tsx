@@ -118,6 +118,7 @@ import LogoutAnimation from '@/components/LogoutAnimation'
 import ImageCropper from '@/components/ImageCropper'
 import SARLoadingOverlay, { StatCardSkeleton, TableRowSkeleton } from '@/components/SARLoadingOverlay'
 import SopBuilderList from '@/components/sop-builder/SopBuilderList'
+import { LegalisasiButton } from '@/components/sop-builder/LegalisasiButton'
 import { SyncStatusIndicator } from '@/components/layout/SyncStatusIndicator'
 import DesktopDownloadButton from '@/components/DesktopDownloadButton'
 
@@ -166,6 +167,7 @@ interface SopFile {
   arsipFolder?: string
   previewCount?: number
   downloadCount?: number
+  legalisasiPdfPath?: string
 }
 
 interface LogEntry {
@@ -298,6 +300,7 @@ const STATUS_COLORS: Record<string, string> = {
   'AKTIF': 'bg-green-100 text-green-800 border-green-200',
   'REVIEW': 'bg-yellow-100 text-yellow-800 border-yellow-200',
   'KADALUARSA': 'bg-red-100 text-red-800 border-red-200',
+  'LEGALISASI': 'bg-red-500/15 text-red-400 border-red-500/30',
   'MENUNGGU': 'bg-blue-100 text-blue-800 border-blue-200',
   'DISETUJUI': 'bg-green-100 text-green-800 border-green-200',
   'DITOLAK': 'bg-red-100 text-red-800 border-red-200'
@@ -397,7 +400,7 @@ function FileTypeIcon({ fileName, className = "w-4 h-4" }: { fileName: string; c
 const KATEGORI_OPTIONS = ['SIAGA', 'LATIHAN', 'LAINNYA']
 const JENIS_OPTIONS = ['SOP', 'IK', 'LAINNYA']
 const LINGKUP_OPTIONS = ['BCC', 'Dit. Siaga', 'Basarnas', 'Kantor SAR', 'Antar Instansi', 'Internasional']
-const STATUS_OPTIONS = ['AKTIF', 'REVIEW', 'KADALUARSA']
+const STATUS_OPTIONS = ['AKTIF', 'REVIEW', 'KADALUARSA', 'LEGALISASI']
 
 // Animation variants - optimized for performance
 const fadeInUp = {
@@ -2478,14 +2481,14 @@ export default function ESOPApp() {
     setLoading(true)
 
     const LARGE_FILE_THRESHOLD = 10 * 1024 * 1024
-    const VERCEL_MAX_LIMIT = 50 * 1024 * 1024
+    const VERCEL_MAX_LIMIT = 100 * 1024 * 1024
     const isLargeFile = form.file!.size > LARGE_FILE_THRESHOLD
 
     try {
       if (form.file!.size > VERCEL_MAX_LIMIT) {
         toast({
           title: '⚠️ File Terlalu Besar',
-          description: `File (${(form.file!.size / 1024 / 1024).toFixed(2)} MB) melebihi batas upload (50 MB). Silakan upload file ke Google Drive secara manual, lalu hubungi admin untuk menambahkan file ke katalog.`,
+          description: `File (${(form.file!.size / 1024 / 1024).toFixed(2)} MB) melebihi batas upload (100 MB). Silakan upload file ke Google Drive secara manual, lalu hubungi admin untuk menambahkan file ke katalog.`,
           variant: 'destructive',
           duration: 8000
         })
@@ -7603,7 +7606,7 @@ export default function ESOPApp() {
                                   </motion.div>
                                   <div className="text-left">
                                     <p className="font-bold text-white text-xs"><span className="text-orange-400">Pilih File</span> atau seret ke sini</p>
-                                    <p className="text-[10px] text-slate-500 mt-0.5 font-medium">XLSX, DOCX, PDF (Maks. 50MB)</p>
+                                    <p className="text-[10px] text-slate-500 mt-0.5 font-medium">XLSX, DOCX, PDF (Maks. 100MB)</p>
                                   </div>
                                 </div>
                               )}
@@ -8093,11 +8096,15 @@ export default function ESOPApp() {
                       { label: 'Status', value: sopFilters.status, key: 'status', options: ['SEMUA', ...STATUS_OPTIONS], onChange: (v: string) => setSopFilters({ ...sopFilters, status: v }) },
                     ].map((f) => (
                       <Select key={f.key} value={f.value} onValueChange={(v) => { f.onChange(v); setSopPagination(p => ({ ...p, page: 1 })) }}>
-                        <SelectTrigger className="h-7 w-[110px] rounded-lg text-[11px] font-medium px-2" style={{ background: f.value !== 'SEMUA' ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.05)', border: f.value !== 'SEMUA' ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.08)', color: f.value !== 'SEMUA' ? '#fb923c' : '#9ca3af' }}>
+                        <SelectTrigger className="h-7 min-w-[110px] w-auto rounded-lg text-[11px] font-medium px-2.5" style={{ background: f.value !== 'SEMUA' ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.05)', border: f.value !== 'SEMUA' ? '1.5px solid rgba(249,115,22,0.4)' : '1.5px solid rgba(255,255,255,0.08)', color: f.value !== 'SEMUA' ? '#fb923c' : '#9ca3af' }}>
                           <SelectValue placeholder={f.label} />
                         </SelectTrigger>
                         <SelectContent>
-                          {f.options.map(o => <SelectItem key={o} value={o} className="text-xs">{o === 'SEMUA' ? `Semua ${f.label}` : o}</SelectItem>)}
+                          {f.options.map(o => (
+                            <SelectItem key={o} value={o} className="text-xs">
+                              {o === 'SEMUA' ? `Semua ${f.label}` : o}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     ))}
@@ -8484,7 +8491,14 @@ export default function ESOPApp() {
                                     </div>
 
                                     {/* Right: Actions */}
-                                    <div className="flex items-center gap-2 lg:pl-6 lg:border-l lg:border-slate-800/50">
+                                    <div className="flex items-center gap-3 lg:pl-6 lg:border-l lg:border-slate-800/50">
+                                      <LegalisasiButton
+                                        sopId={sop.id}
+                                        sopJudul={sop.judul}
+                                        hasFile={!!sop.legalisasiPdfPath}
+                                        endpointType="catalog"
+                                        onUploadSuccess={() => fetchSops(katalogPage, false)}
+                                      />
                                       {/* Action Group */}
                                       <div className="flex items-center p-1.5 rounded-xl bg-slate-800/40 border border-slate-700/50 group-hover:border-orange-500/20 transition-all shadow-inner">
                                         <TooltipProvider>

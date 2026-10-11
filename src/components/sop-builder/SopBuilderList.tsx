@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -9,6 +9,7 @@ import { id as localeId } from "date-fns/locale"
 import { ShimmerTitle } from "@/components/ui/shimmer-title"
 import { toast } from "sonner"
 import { syncService, isTauri } from "@/lib/sync/syncService"
+import { LegalisasiButton } from "@/components/sop-builder/LegalisasiButton"
 
 // --- Premium UI Components ---
 
@@ -33,7 +34,7 @@ export default function SopBuilderList() {
     const [pagination, setPagination] = useState<any>(null)
     const router = useRouter()
 
-    const fetchSops = async (targetPage = page) => {
+    const fetchSops = useCallback(async (targetPage = page) => {
         setLoading(true)
         try {
             const res = await fetch(`/api/sop-builder?page=${targetPage}&limit=10`, {
@@ -49,11 +50,12 @@ export default function SopBuilderList() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [page])
 
     useEffect(() => {
         fetchSops(page)
     }, [page])
+
 
     const handleDelete = async (id: string) => {
         if (!confirm("Yakin ingin menghapus draf SOP ini?")) return
@@ -135,9 +137,9 @@ export default function SopBuilderList() {
             <div className="relative z-10">
                 <div className="bg-slate-900/40 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">
                     {/* Header Columns */}
-                    <div className="grid grid-cols-[1fr_120px_120px_180px_160px_140px] gap-4 px-8 py-5 border-b border-white/5 bg-white/[0.02]">
-                        {['PROSEDUR JUDUL', 'STATUS', 'STEPS', 'ASSET MATRIX', 'TELEMETRY', 'AKSI'].map((h, i) => (
-                            <div key={h} className={`text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] ${i === 5 ? 'text-right' : ''}`}>
+                    <div className="grid grid-cols-[1fr_120px_120px_180px_150px_70px_140px] gap-4 px-8 py-5 border-b border-white/5 bg-white/[0.02]">
+                        {['PROSEDUR JUDUL', 'STATUS', 'STEPS', 'ASSET MATRIX', 'TELEMETRY', 'LEGALISASI', 'AKSI'].map((h, i) => (
+                            <div key={h} className={`text-[9px] font-black text-slate-500 uppercase tracking-[0.25em] ${i === 6 ? 'text-right' : i === 5 ? 'text-center' : ''}`}>
                                 {h}
                             </div>
                         ))}
@@ -163,7 +165,7 @@ export default function SopBuilderList() {
                                         initial={{ y: 20, opacity: 0 }}
                                         animate={{ y: 0, opacity: 1 }}
                                         transition={{ delay: idx * 0.05 }}
-                                        className="grid grid-cols-[1fr_120px_120px_180px_160px_140px] gap-4 px-8 py-6 items-center group hover:bg-white/[0.03] transition-all relative overflow-hidden"
+                                        className="grid grid-cols-[1fr_120px_120px_180px_150px_70px_140px] gap-4 px-8 py-6 items-center group hover:bg-white/[0.03] transition-all relative overflow-hidden"
                                     >
                                         {/* Scanning Animation on row hover */}
                                         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-0 group-hover:h-3/4 bg-indigo-500/60 rounded-full transition-all duration-500" />
@@ -235,6 +237,17 @@ export default function SopBuilderList() {
                                             <span className="text-[8px] font-black text-slate-600 uppercase tracking-[0.1em] mt-0.5">
                                                 {format(new Date(sop.updatedAt), 'HH:mm', { locale: localeId })} Local
                                             </span>
+                                        </div>
+
+                                        {/* Legalisasi Button */}
+                                        <div className="flex justify-center items-center">
+                                            <LegalisasiButton
+                                                sopId={sop.id}
+                                                sopJudul={sop.judul}
+                                                hasFile={!!sop.legalisasiPdfPath}
+                                                endpointType="builder"
+                                                onUploadSuccess={() => fetchSops(page)}
+                                            />
                                         </div>
 
                                         {/* Tactical Aksi */}
