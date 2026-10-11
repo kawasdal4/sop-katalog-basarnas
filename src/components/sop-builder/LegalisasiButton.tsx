@@ -121,31 +121,77 @@ export function LegalisasiButton({
         setUploadFileName(file.name)
         setUploadFileSize(sizeStr)
         setUploadState('uploading')
-        setUploadProgress(15)
+        setUploadProgress(5)
         setIsOpen(false)
 
-        // Progress simulation for responsive feedback
-        const interval = setInterval(() => {
-            setUploadProgress(prev => {
-                if (prev >= 88) return prev
-                return prev + Math.floor(Math.random() * 12) + 5
-            })
-        }, 250)
-
         try {
-            const formData = new FormData()
-            formData.append('file', file)
-
-            const res = await fetch(apiBase, {
-                method: 'POST',
-                credentials: 'include',
-                body: formData
+            // ── Step 1: Get presigned upload URL (bypass Vercel 4.5MB limit) ──
+            const urlRes = await fetch(`${apiBase}?action=upload-url`, {
+                method: 'GET',
+                credentials: 'include'
             })
 
-            clearInterval(interval)
-            const data = await res.json()
+            if (!urlRes.ok) {
+                // Fallback: direct POST for local dev or small files
+                setUploadProgress(30)
+                const formData = new FormData()
+                formData.append('file', file)
+                const res = await fetch(apiBase, {
+                    method: 'POST',
+                    credentials: 'include',
+                    body: formData
+                })
+                const data = await res.json()
+                if (res.ok) {
+                    setUploadProgress(100)
+                    setUploadState('success')
+                    setHasFile(true)
+                    toast.success('File legalisasi berhasil diupload!')
+                    onUploadSuccess?.()
+                } else {
+                    setUploadState('error')
+                    const errorMsg = data.error || data.details || 'Gagal mengunggah file legalisasi'
+                    setUploadErrorMessage(errorMsg)
+                    toast.error(errorMsg)
+                }
+                return
+            }
 
-            if (res.ok) {
+            const { uploadUrl, r2Key } = await urlRes.json()
+            setUploadProgress(10)
+
+            // ── Step 2: Upload file directly to R2 via XHR (real progress) ────
+            await new Promise<void>((resolve, reject) => {
+                const xhr = new XMLHttpRequest()
+                xhr.upload.addEventListener('progress', (ev) => {
+                    if (ev.lengthComputable) {
+                        const pct = Math.round((ev.loaded / ev.total) * 80) + 10  // 10–90
+                        setUploadProgress(Math.min(90, pct))
+                    }
+                })
+                xhr.addEventListener('load', () => {
+                    if (xhr.status >= 200 && xhr.status < 300) resolve()
+                    else reject(new Error(`Upload ke R2 gagal: ${xhr.status}`))
+                })
+                xhr.addEventListener('error', () => reject(new Error('Koneksi terputus saat upload')))
+                xhr.addEventListener('abort', () => reject(new Error('Upload dibatalkan')))
+                xhr.open('PUT', uploadUrl)
+                xhr.setRequestHeader('Content-Type', 'application/pdf')
+                xhr.send(file)
+            })
+
+            setUploadProgress(93)
+
+            // ── Step 3: Confirm to backend to save R2 key in database ─────────
+            const confirmRes = await fetch(apiBase, {
+                method: 'PATCH',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ r2Key })
+            })
+            const confirmData = await confirmRes.json()
+
+            if (confirmRes.ok) {
                 setUploadProgress(100)
                 setUploadState('success')
                 setHasFile(true)
@@ -153,15 +199,15 @@ export function LegalisasiButton({
                 onUploadSuccess?.()
             } else {
                 setUploadState('error')
-                const errorMsg = data.error || data.details || 'Gagal mengunggah file legalisasi ke server'
+                const errorMsg = confirmData.error || 'Gagal menyimpan file ke database'
                 setUploadErrorMessage(errorMsg)
                 toast.error(errorMsg)
             }
-        } catch {
-            clearInterval(interval)
+        } catch (err) {
             setUploadState('error')
-            setUploadErrorMessage('Terjadi kesalahan jaringan atau koneksi server terputus.')
-            toast.error('Terjadi kesalahan saat upload file')
+            const errorMsg = err instanceof Error ? err.message : 'Terjadi kesalahan saat upload file'
+            setUploadErrorMessage(errorMsg)
+            toast.error(errorMsg)
         } finally {
             if (fileInputRef.current) fileInputRef.current.value = ''
         }
@@ -770,8 +816,8 @@ export function LegalisasiButton({
                                 exit={{ scale: 0.94, opacity: 0, y: 15 }}
                                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                                 onClick={e => e.stopPropagation()}
-                                style={{ width: '80vw', height: '80vh' }}
                                 className="bg-slate-950 rounded-3xl overflow-hidden border border-white/15 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col relative ring-1 ring-white/10"
+                                style={{ width: '92vw', maxWidth: '1400px', height: '92vh' }}
                             >
                                 {/* Modal Header */}
                                 <div className="flex items-center gap-3 px-6 py-3.5 border-b border-white/10 bg-slate-900/80 shrink-0">
@@ -819,13 +865,21 @@ export function LegalisasiButton({
                                     </div>
                                 </div>
 
-                                {/* PDF Viewer Body occupying 100% of the 80% container */}
-                                <div className="flex-1 bg-slate-900/40 relative w-full h-full">
-                                    <iframe
-                                        src={previewUrl}
+                                {/* PDF Viewer - proper proportional display */}
+                                <div className="flex-1 bg-slate-950 relative w-full overflow-hidden">
+                                    <object
+                                        data={previewUrl + '#toolbar=1&navpanes=0&scrollbar=1&zoom=page-fit'}
+                                        type="application/pdf"
                                         className="w-full h-full border-0"
                                         title="Dokumen Legalisasi PDF"
-                                    />
+                                        style={{ minHeight: 0 }}
+                                    >
+                                        {/* Fallback for browsers that don't support object tag PDF rendering */}
+                                        <div className="flex flex-col items-center justify-center h-full gap-4 text-slate-400">
+                                            <Shield className="w-12 h-12 opacity-30" />
+                                            <p className="text-sm text-center">Browser tidak mendukung preview PDF inline.<br/>Gunakan tombol Unduh di atas.</p>
+                                        </div>
+                                    </object>
                                 </div>
                             </motion.div>
                         </motion.div>

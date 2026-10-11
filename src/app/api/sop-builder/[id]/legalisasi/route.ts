@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { validateRole } from '@/lib/auth-utils'
-import { uploadToR2, downloadFromR2, deleteFromR2 } from '@/lib/r2-storage'
+import { downloadFromR2, deleteFromR2, getR2PresignedUploadUrl } from '@/lib/r2-storage'
 
-// GET - Download/Preview file legalisasi
+// Set runtime and max duration for Vercel
+export const runtime = 'nodejs'
+export const maxDuration = 60
+
+// GET - Download/Preview/Info/Upload-URL for legalisasi of SopPembuatan (builder)
 export async function GET(
     request: NextRequest,
     { params }: { params: { id: string } }
@@ -28,6 +32,7 @@ export async function GET(
         const { searchParams } = new URL(request.url)
         const action = searchParams.get('action') || 'info'
 
+        // ── INFO (default) ──────────────────────────────────────────────────────
         if (action === 'info') {
             return NextResponse.json({
                 hasFile: !!sop.legalisasiPdfPath,
@@ -36,11 +41,18 @@ export async function GET(
             })
         }
 
+        // ── PRESIGNED UPLOAD URL (bypass Vercel 4.5MB body limit) ────────────
+        if (action === 'upload-url') {
+            const r2Key = `sop-builder/legalisasi/${id}_${Date.now()}.pdf`
+            const uploadUrl = await getR2PresignedUploadUrl(r2Key, 'application/pdf', 3600)
+            return NextResponse.json({ uploadUrl, r2Key })
+        }
+
+        // ── DOWNLOAD / PREVIEW ────────────────────────────────────────────────
         if (!sop.legalisasiPdfPath) {
             return NextResponse.json({ error: 'File legalisasi belum tersedia' }, { status: 404 })
         }
 
-        // Download/Preview
         const { buffer, contentType } = await downloadFromR2(sop.legalisasiPdfPath)
 
         const disposition = action === 'download'
@@ -61,7 +73,7 @@ export async function GET(
     }
 }
 
-// POST - Upload file legalisasi PDF
+// POST - Upload file legalisasi PDF (kept for small files / local dev)
 export async function POST(
     request: NextRequest,
     { params }: { params: { id: string } }
@@ -124,6 +136,7 @@ export async function POST(
         }
 
         // Upload to R2
+        const { uploadToR2 } = await import('@/lib/r2-storage')
         const r2Key = `sop-builder/legalisasi/${id}_${Date.now()}.pdf`
         const result = await uploadToR2(buffer, file.name, 'application/pdf', {
             key: r2Key,
@@ -135,7 +148,7 @@ export async function POST(
         })
 
         // Save path to database
-        const updated = await db.sopPembuatan.update({
+        await db.sopPembuatan.update({
             where: { id },
             data: { legalisasiPdfPath: result.key }
         })
@@ -151,6 +164,64 @@ export async function POST(
             error: 'Terjadi kesalahan saat upload',
             details: error instanceof Error ? error.message : String(error)
         }, { status: 500 })
+    }
+}
+
+// PATCH - Confirm presigned upload: save R2 key to DB after direct upload to R2
+export async function PATCH(
+    request: NextRequest,
+    { params }: { params: { id: string } }
+) {
+    try {
+        const { authenticated } = await validateRole(['ADMIN', 'DEVELOPER', 'STAF'])
+        if (!authenticated) {
+            const fallbackUser = await db.user.findFirst({
+                where: { role: { in: ['ADMIN', 'DEVELOPER', 'STAF'] } }
+            })
+            if (!fallbackUser) {
+                return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            }
+        }
+
+        const { id } = await params
+        const { r2Key } = await request.json()
+
+        if (!r2Key) {
+            return NextResponse.json({ error: 'r2Key diperlukan' }, { status: 400 })
+        }
+
+        const sop = await db.sopPembuatan.findUnique({
+            where: { id },
+            select: { id: true, legalisasiPdfPath: true }
+        })
+
+        if (!sop) {
+            return NextResponse.json({ error: 'SOP tidak ditemukan' }, { status: 404 })
+        }
+
+        // Delete old file from R2 if it exists
+        if (sop.legalisasiPdfPath) {
+            try {
+                await deleteFromR2(sop.legalisasiPdfPath)
+            } catch (e) {
+                console.warn('Failed to delete old legalisasi file:', e)
+            }
+        }
+
+        // Save new key to DB
+        await db.sopPembuatan.update({
+            where: { id },
+            data: { legalisasiPdfPath: r2Key }
+        })
+
+        return NextResponse.json({
+            success: true,
+            path: r2Key,
+            message: 'File legalisasi berhasil disimpan'
+        })
+    } catch (error) {
+        console.error('Confirm legalisasi upload error:', error)
+        return NextResponse.json({ error: 'Terjadi kesalahan saat konfirmasi upload' }, { status: 500 })
     }
 }
 
@@ -186,7 +257,11 @@ export async function DELETE(
         }
 
         // Delete from R2
-        await deleteFromR2(sop.legalisasiPdfPath)
+        try {
+            await deleteFromR2(sop.legalisasiPdfPath)
+        } catch (e) {
+            console.warn('Failed to delete from R2:', e)
+        }
 
         // Clear path from database
         await db.sopPembuatan.update({
