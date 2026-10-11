@@ -10,7 +10,8 @@ import {
     uploadR2Part,
     completeR2MultipartUpload,
     abortR2MultipartUpload,
-    uploadToR2
+    uploadToR2,
+    getR2PresignedPartUrl
 } from '@/lib/r2-storage'
 import { sanitizePdfMetadata } from '@/lib/pdf-sanitize'
 
@@ -124,7 +125,20 @@ export async function POST(
             return NextResponse.json({ uploadId, r2Key })
         }
 
-        // ── MULTIPART ACTION: UPLOAD PART (3MB chunk) ─────────────────────────
+        // ── MULTIPART ACTION: GET PRESIGNED URL FOR PART (client uploads directly to R2) ──
+        if (action === 'multipart-part-url') {
+            const body = await request.json()
+            const { uploadId, r2Key, partNumber } = body
+
+            if (!uploadId || !r2Key || !partNumber) {
+                return NextResponse.json({ error: 'Parameter multipart-part-url tidak lengkap' }, { status: 400 })
+            }
+
+            const presignedUrl = await getR2PresignedPartUrl(r2Key, uploadId, partNumber, 3600)
+            return NextResponse.json({ presignedUrl, partNumber })
+        }
+
+        // ── MULTIPART ACTION: UPLOAD PART via server (fallback for small chunks only) ────
         if (action === 'multipart-part') {
             const formData = await request.formData()
             const uploadId = formData.get('uploadId') as string

@@ -180,8 +180,9 @@ export function LegalisasiButton({
                 return
             }
 
-            // ── STRATEGY 2: Files > 4MB -> Chunked Multipart Upload (Same-origin, Bypasses Vercel 4.5MB limit, 0 CORS) ──
-            const CHUNK_SIZE = 3 * 1024 * 1024 // 3 MB per chunk (safe under Vercel 4.5MB limit)
+            // ── STRATEGY 2: Files > 4MB -> Presigned-URL Multipart Upload (Bypasses Vercel 4.5MB limit, meets R2 5MB min part size) ──
+            // Chunk size must be >= 5MB (R2 minimum) and we upload directly to R2 via presigned URL (skips Vercel body limits)
+            const CHUNK_SIZE = 10 * 1024 * 1024 // 10 MB per chunk (safely above R2's 5 MB minimum)
 
             // Step 2a: Initialize multipart upload on server
             const startRes = await fetch(`${apiBase}?action=multipart-start`, {
@@ -200,37 +201,53 @@ export function LegalisasiButton({
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
             const parts: Array<{ PartNumber: number; ETag: string }> = []
 
-            // Step 2b: Upload each chunk sequentially with real progress
+            // Step 2b: For each chunk, get a presigned URL from the server, then PUT directly to R2
             for (let i = 0; i < totalChunks; i++) {
                 const start = i * CHUNK_SIZE
                 const end = Math.min(start + CHUNK_SIZE, file.size)
                 const chunkBlob = file.slice(start, end)
+                const partNumber = i + 1
 
-                const chunkFormData = new FormData()
-                chunkFormData.append('uploadId', uploadId)
-                chunkFormData.append('r2Key', r2Key)
-                chunkFormData.append('partNumber', String(i + 1))
-                chunkFormData.append('chunk', chunkBlob, file.name)
-
-                const partRes = await fetch(`${apiBase}?action=multipart-part`, {
+                // Ask server for a presigned URL for this part
+                const urlRes = await fetch(`${apiBase}?action=multipart-part-url`, {
                     method: 'POST',
                     credentials: 'include',
-                    body: chunkFormData
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ uploadId, r2Key, partNumber })
                 })
 
-                if (!partRes.ok) {
-                    const errData = await partRes.json().catch(() => ({}))
-                    // Try aborting multipart on failure
+                if (!urlRes.ok) {
+                    const errData = await urlRes.json().catch(() => ({}))
                     await fetch(`${apiBase}?action=multipart-abort`, {
                         method: 'POST',
                         credentials: 'include',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ uploadId, r2Key })
                     }).catch(() => {})
-                    throw new Error(errData.error || `Gagal mengunggah bagian ${i + 1}/${totalChunks}`)
+                    throw new Error(errData.error || `Gagal mendapatkan URL upload untuk bagian ${partNumber}/${totalChunks}`)
                 }
 
-                const { partNumber, etag } = await partRes.json()
+                const { presignedUrl } = await urlRes.json()
+
+                // PUT chunk directly to R2 using the presigned URL (no Vercel body limit!)
+                const putRes = await fetch(presignedUrl, {
+                    method: 'PUT',
+                    body: chunkBlob,
+                    headers: { 'Content-Type': 'application/pdf' }
+                })
+
+                if (!putRes.ok) {
+                    await fetch(`${apiBase}?action=multipart-abort`, {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ uploadId, r2Key })
+                    }).catch(() => {})
+                    throw new Error(`Gagal mengunggah bagian ${partNumber}/${totalChunks} (R2 status: ${putRes.status})`)
+                }
+
+                // Extract ETag from R2 response headers
+                const etag = putRes.headers.get('ETag') || putRes.headers.get('etag') || ''
                 parts.push({ PartNumber: partNumber, ETag: etag })
 
                 const pct = Math.round(((i + 1) / totalChunks) * 82) + 8 // 8% - 90%

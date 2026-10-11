@@ -741,4 +741,32 @@ export async function abortR2MultipartUpload(key: string, uploadId: string): Pro
   }
 }
 
+/**
+ * Generate a presigned URL for uploading a single part in a multipart upload.
+ * The client uses this URL to PUT the part directly to R2, bypassing Vercel's body size limit.
+ */
+export async function getR2PresignedPartUrl(
+  key: string,
+  uploadId: string,
+  partNumber: number,
+  expiresIn = 3600
+): Promise<string> {
+  if (isStorageMockMode()) {
+    // In mock mode, return a fake presigned URL that the client will fallback from
+    return `/api/mock-part-upload?key=${key}&uploadId=${uploadId}&partNumber=${partNumber}`
+  }
+
+  const config = getR2Config()
+  const client = createR2Client()
+
+  const command = new UploadPartCommand({
+    Bucket: config.bucketName,
+    Key: key,
+    UploadId: uploadId,
+    PartNumber: partNumber,
+  })
+
+  return await getSignedUrl(client, command, { expiresIn })
+}
+
 
