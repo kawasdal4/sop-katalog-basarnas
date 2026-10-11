@@ -12,6 +12,12 @@
     },
     "src/app/api/sop-builder/[id]/export-run/route.ts": {
       "maxDuration": 60
+    },
+    "src/app/api/sop/[id]/legalisasi/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/sop-builder/[id]/legalisasi/route.ts": {
+      "maxDuration": 60
     }
   }
-}
+}

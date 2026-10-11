@@ -117,6 +117,8 @@ export async function POST(
 
         // ── MULTIPART ACTION: START ──────────────────────────────────────────
         if (action === 'multipart-start') {
+            // Ensure R2 CORS is set so presigned URL PUT requests from browser work
+            await ensureR2Cors().catch(err => console.warn('CORS setup warning:', err))
             const r2Key = `sop-builder/legalisasi/${id}_${Date.now()}.pdf`
             const uploadId = await startR2MultipartUpload(r2Key, 'application/pdf', {
                 sopId: id,
@@ -136,6 +138,29 @@ export async function POST(
 
             const presignedUrl = await getR2PresignedPartUrl(r2Key, uploadId, partNumber, 3600)
             return NextResponse.json({ presignedUrl, partNumber })
+        }
+
+        // ── MULTIPART ACTION: UPLOAD PART via server binary stream (bypass FormData/body-parser limit) ────
+        // Metadata passed via query params; body is raw binary chunk. Streams directly to R2.
+        if (action === 'multipart-part-stream') {
+            const uploadId = searchParams.get('uploadId')
+            const r2Key = searchParams.get('r2Key')
+            const partNumber = parseInt(searchParams.get('partNumber') || '0', 10)
+
+            if (!uploadId || !r2Key || !partNumber) {
+                return NextResponse.json({ error: 'Parameter stream upload tidak lengkap' }, { status: 400 })
+            }
+
+            // Read raw binary body directly — no formData() overhead
+            const chunkArrayBuffer = await request.arrayBuffer()
+            const chunkBuffer = Buffer.from(chunkArrayBuffer)
+
+            if (chunkBuffer.length === 0) {
+                return NextResponse.json({ error: 'Chunk kosong' }, { status: 400 })
+            }
+
+            const etag = await uploadR2Part(r2Key, uploadId, partNumber, chunkBuffer)
+            return NextResponse.json({ partNumber, etag })
         }
 
         // ── MULTIPART ACTION: UPLOAD PART via server (fallback for small chunks only) ────
