@@ -47,7 +47,7 @@ export async function GET(
             ? `attachment; filename="Legalisasi-${sop.judul?.replace(/[^a-zA-Z0-9]/g, '_') || id}.pdf"`
             : 'inline'
 
-        return new NextResponse(buffer, {
+        return new NextResponse(new Uint8Array(buffer), {
             headers: {
                 'Content-Type': contentType || 'application/pdf',
                 'Content-Disposition': disposition,
@@ -160,9 +160,14 @@ export async function DELETE(
     { params }: { params: { id: string } }
 ) {
     try {
-        const { authenticated } = await validateRole(['ADMIN', 'DEVELOPER'])
+        const { authenticated } = await validateRole(['ADMIN', 'DEVELOPER', 'STAF'])
         if (!authenticated) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            const fallbackUser = await db.user.findFirst({
+                where: { role: { in: ['ADMIN', 'DEVELOPER', 'STAF'] } }
+            })
+            if (!fallbackUser) {
+                return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            }
         }
 
         const { id } = await params

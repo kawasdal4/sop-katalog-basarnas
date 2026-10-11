@@ -18,7 +18,8 @@ import {
     FileCheck,
     CloudUpload,
     AlertTriangle,
-    RefreshCw
+    RefreshCw,
+    Trash2
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
@@ -38,12 +39,13 @@ type UploadState = 'idle' | 'uploading' | 'success' | 'error'
 export function LegalisasiButton({
     sopId,
     sopJudul,
-    hasFile,
+    hasFile: propHasFile = false,
     endpointType = 'catalog',
     onUploadSuccess,
     size = 'md'
 }: LegalisasiButtonProps) {
     const [mounted, setMounted] = useState(false)
+    const [hasFile, setHasFile] = useState(propHasFile)
     const [isOpen, setIsOpen] = useState(false)
     const [uploadState, setUploadState] = useState<UploadState>('idle')
     const [uploadProgress, setUploadProgress] = useState(0)
@@ -54,6 +56,8 @@ export function LegalisasiButton({
     const [isPreviewing, setIsPreviewing] = useState(false)
     const [isDownloading, setIsDownloading] = useState(false)
     const [isPrinting, setIsPrinting] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [showPreviewModal, setShowPreviewModal] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -61,6 +65,10 @@ export function LegalisasiButton({
     useEffect(() => {
         setMounted(true)
     }, [])
+
+    useEffect(() => {
+        setHasFile(propHasFile)
+    }, [propHasFile])
 
     const apiBase = endpointType === 'builder'
         ? `/api/sop-builder/${sopId}/legalisasi`
@@ -140,6 +148,7 @@ export function LegalisasiButton({
             if (res.ok) {
                 setUploadProgress(100)
                 setUploadState('success')
+                setHasFile(true)
                 toast.success('File legalisasi berhasil diupload!')
                 onUploadSuccess?.()
             } else {
@@ -270,6 +279,29 @@ export function LegalisasiButton({
         setUploadErrorMessage('')
     }, [])
 
+    const handleDelete = useCallback(async () => {
+        setIsDeleting(true)
+        try {
+            const res = await fetch(apiBase, {
+                method: 'DELETE',
+                credentials: 'include'
+            })
+            const data = await res.json()
+            if (res.ok) {
+                toast.success('File legalisasi berhasil dihapus')
+                setHasFile(false)
+                setShowDeleteConfirm(false)
+                onUploadSuccess?.()
+            } else {
+                toast.error(data.error || 'Gagal menghapus file legalisasi')
+            }
+        } catch {
+            toast.error('Terjadi kesalahan saat menghapus file')
+        } finally {
+            setIsDeleting(false)
+        }
+    }, [apiBase, onUploadSuccess])
+
     const btnDim = size === 'sm' ? 'w-8 h-8 rounded-lg' : 'w-9 h-9 rounded-xl'
     const iconDim = size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'
 
@@ -357,7 +389,7 @@ export function LegalisasiButton({
                                         Legalisasi Tersedia
                                     </p>
                                     <p className="text-[9px] text-slate-400">
-                                        Klik untuk menu preview, download, print, atau ganti
+                                        Klik untuk preview, download, print, ganti, atau hapus
                                     </p>
                                 </div>
                             ) : (
@@ -508,6 +540,29 @@ export function LegalisasiButton({
                                     <p className="text-[9px] text-slate-500">Cetak dokumen legalisasi</p>
                                 </div>
                             </button>
+
+                            {/* 5. Delete - only shown when file exists */}
+                            {hasFile && (
+                                <>
+                                    <div className="mx-2 my-1 border-t border-white/5" />
+                                    <button
+                                        onClick={() => {
+                                            setIsOpen(false)
+                                            setShowDeleteConfirm(true)
+                                        }}
+                                        disabled={isDeleting}
+                                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-red-500/10 border border-transparent hover:border-red-500/20 group/del text-red-400 hover:text-red-300 transition-all cursor-pointer"
+                                    >
+                                        <div className="w-7 h-7 rounded-lg bg-red-500/10 flex items-center justify-center group-hover/del:bg-red-500/20 text-red-400 transition-colors">
+                                            {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[11px] font-bold">Hapus File</p>
+                                            <p className="text-[9px] text-red-500/60">Hapus file legalisasi permanen</p>
+                                        </div>
+                                    </button>
+                                </>
+                            )}
                         </div>
 
                         {/* Footer status notice */}
@@ -771,6 +826,80 @@ export function LegalisasiButton({
                                         className="w-full h-full border-0"
                                         title="Dokumen Legalisasi PDF"
                                     />
+                                </div>
+                            </motion.div>
+                        </motion.div>
+                    )}
+
+                    {/* Delete Confirmation Modal */}
+                    {showDeleteConfirm && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[10000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
+                            onClick={() => !isDeleting && setShowDeleteConfirm(false)}
+                        >
+                            <motion.div
+                                initial={{ scale: 0.95, opacity: 0, y: 15 }}
+                                animate={{ scale: 1, opacity: 1, y: 0 }}
+                                exit={{ scale: 0.95, opacity: 0, y: 15 }}
+                                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                                onClick={e => e.stopPropagation()}
+                                className="w-full max-w-md bg-slate-950 border border-red-500/30 rounded-3xl p-6 shadow-[0_0_60px_rgba(239,68,68,0.25)] relative overflow-hidden ring-1 ring-white/10"
+                            >
+                                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-600 via-rose-500 to-amber-500" />
+
+                                <div className="flex items-start gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-red-500/15 border border-red-500/30 flex items-center justify-center shrink-0 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
+                                        <Trash2 className="w-6 h-6" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="text-base font-bold text-white">Hapus File Legalisasi?</h3>
+                                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-red-500/20 text-red-400 border border-red-500/30 uppercase">
+                                                Konfirmasi
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                                            File legalisasi PDF yang telah diupload akan dihapus secara permanen dari server. Status legalisasi pada dokumen ini akan dinonaktifkan.
+                                        </p>
+                                        {sopJudul && (
+                                            <div className="mt-3.5 p-3 rounded-xl bg-slate-900/90 border border-white/10">
+                                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Judul SOP</p>
+                                                <p className="text-xs text-slate-200 font-medium truncate mt-0.5">{sopJudul}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="mt-6 flex items-center justify-end gap-3 pt-3 border-t border-white/5">
+                                    <button
+                                        type="button"
+                                        disabled={isDeleting}
+                                        onClick={() => setShowDeleteConfirm(false)}
+                                        className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all cursor-pointer border border-transparent hover:border-white/10"
+                                    >
+                                        Batal
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={isDeleting}
+                                        onClick={handleDelete}
+                                        className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-95 text-white transition-all flex items-center gap-2 shadow-[0_0_20px_rgba(239,68,68,0.4)] cursor-pointer"
+                                    >
+                                        {isDeleting ? (
+                                            <>
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                <span>Menghapus...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                                <span>Ya, Hapus File</span>
+                                            </>
+                                        )}
+                                    </button>
                                 </div>
                             </motion.div>
                         </motion.div>

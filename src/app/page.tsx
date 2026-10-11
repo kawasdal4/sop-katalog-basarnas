@@ -8497,7 +8497,7 @@ export default function ESOPApp() {
                                         sopJudul={sop.judul}
                                         hasFile={!!sop.legalisasiPdfPath}
                                         endpointType="catalog"
-                                        onUploadSuccess={() => fetchSops(katalogPage, false)}
+                                        onUploadSuccess={() => fetchSopFiles(false)}
                                       />
                                       {/* Action Group */}
                                       <div className="flex items-center p-1.5 rounded-xl bg-slate-800/40 border border-slate-700/50 group-hover:border-orange-500/20 transition-all shadow-inner">
