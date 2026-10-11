@@ -13,6 +13,7 @@ import {
     abortR2MultipartUpload,
     uploadToR2
 } from '@/lib/r2-storage'
+import { sanitizePdfMetadata } from '@/lib/pdf-sanitize'
 
 // Set runtime and max duration for Vercel
 export const runtime = 'nodejs'
@@ -61,16 +62,17 @@ export async function GET(
         }
 
         const { buffer, contentType } = await downloadFromR2(sop.legalisasiPdfPath)
+        const cleanBuffer = sanitizePdfMetadata(buffer, sop.judul)
 
         const disposition = action === 'download'
             ? `attachment; filename="Legalisasi-${sop.judul?.replace(/[^a-zA-Z0-9]/g, '_') || id}.pdf"`
             : 'inline'
 
-        return new NextResponse(new Uint8Array(buffer), {
+        return new NextResponse(new Uint8Array(cleanBuffer), {
             headers: {
                 'Content-Type': contentType || 'application/pdf',
                 'Content-Disposition': disposition,
-                'Content-Length': String(buffer.length),
+                'Content-Length': String(cleanBuffer.length),
                 'Cache-Control': 'no-cache'
             }
         })
@@ -86,19 +88,13 @@ export async function POST(
     { params }: { params: { id: string } }
 ) {
     try {
-        const { authenticated, user } = await validateRole(['ADMIN', 'DEVELOPER', 'STAF'])
-        let uploadUserId = user?.id
-
-        if (!authenticated) {
-            const fallbackUser = await db.user.findFirst({
-                where: { role: { in: ['ADMIN', 'DEVELOPER', 'STAF'] } }
-            })
-            if (fallbackUser) {
-                uploadUserId = fallbackUser.id
-            } else {
-                return NextResponse.json({ error: 'Silakan login terlebih dahulu untuk mengupload file legalisasi' }, { status: 401 })
-            }
+        const { authenticated, user } = await validateRole(['ADMIN', 'DEVELOPER'])
+        if (!authenticated || !user) {
+            return NextResponse.json({ 
+                error: 'Akses ditolak: Hanya Admin dan Developer yang dapat mengupload atau mengganti file legalisasi' 
+            }, { status: 403 })
         }
+        const uploadUserId = user.id
 
         const { id } = await params
 
@@ -210,7 +206,8 @@ export async function POST(
         }
 
         const arrayBuffer = await file.arrayBuffer()
-        const buffer = Buffer.from(arrayBuffer)
+        const rawBuffer = Buffer.from(arrayBuffer)
+        const buffer = sanitizePdfMetadata(rawBuffer, sop.judul)
 
         // Delete old file if exists
         if (sop.legalisasiPdfPath) {
@@ -326,14 +323,11 @@ export async function DELETE(
     { params }: { params: { id: string } }
 ) {
     try {
-        const { authenticated } = await validateRole(['ADMIN', 'DEVELOPER', 'STAF'])
+        const { authenticated } = await validateRole(['ADMIN', 'DEVELOPER'])
         if (!authenticated) {
-            const fallbackUser = await db.user.findFirst({
-                where: { role: { in: ['ADMIN', 'DEVELOPER', 'STAF'] } }
-            })
-            if (!fallbackUser) {
-                return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-            }
+            return NextResponse.json({ 
+                error: 'Akses ditolak: Hanya Admin dan Developer yang dapat menghapus file legalisasi' 
+            }, { status: 403 })
         }
 
         const { id } = await params

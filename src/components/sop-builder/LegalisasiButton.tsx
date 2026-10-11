@@ -35,6 +35,8 @@ interface LegalisasiButtonProps {
     endpointType?: 'catalog' | 'builder'
     onUploadSuccess?: () => void
     size?: 'sm' | 'md'
+    /** Whether this user can upload/replace/delete legalisasi files. Default: true */
+    canUpload?: boolean
 }
 
 type UploadState = 'idle' | 'uploading' | 'success' | 'error'
@@ -45,7 +47,8 @@ export function LegalisasiButton({
     hasFile: propHasFile = false,
     endpointType = 'catalog',
     onUploadSuccess,
-    size = 'md'
+    size = 'md',
+    canUpload = true
 }: LegalisasiButtonProps) {
     const [mounted, setMounted] = useState(false)
     const [hasFile, setHasFile] = useState(propHasFile)
@@ -487,7 +490,9 @@ export function LegalisasiButton({
                                         Legalisasi Tersedia
                                     </p>
                                     <p className="text-[9px] text-slate-400">
-                                        Klik untuk preview, download, print, ganti, atau hapus
+                                        {canUpload
+                                            ? 'Klik untuk preview, download, print, ganti, atau hapus'
+                                            : 'Klik untuk preview, download, atau print'}
                                     </p>
                                 </div>
                             ) : (
@@ -497,7 +502,7 @@ export function LegalisasiButton({
                                         file legalisasi belum tersedia
                                     </p>
                                     <p className="text-[9px] text-slate-400">
-                                        Klik untuk upload PDF legalisasi
+                                        {canUpload ? 'Klik untuk upload PDF legalisasi' : 'File belum diupload'}
                                     </p>
                                 </div>
                             )}
@@ -544,28 +549,30 @@ export function LegalisasiButton({
                             </button>
                         </div>
 
-                        {/* Action List: 4 Functions (Upload, Preview, Download, Print) */}
+                        {/* Action List: Functions (Upload, Preview, Download, Print) */}
                         <div className="p-2 flex flex-col gap-1">
-                            {/* 1. Upload File PDF */}
-                            <button
-                                onClick={() => {
-                                    setIsOpen(false)
-                                    setTimeout(() => {
-                                        fileInputRef.current?.click()
-                                    }, 100)
-                                }}
-                                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left group/act hover:bg-indigo-500/10 border border-transparent hover:border-indigo-500/20 transition-all cursor-pointer"
-                            >
-                                <div className="w-7 h-7 rounded-lg bg-indigo-500/15 flex items-center justify-center group-hover/act:bg-indigo-500/25 text-indigo-400 transition-colors">
-                                    <Upload className="w-3.5 h-3.5" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-[11px] font-bold text-slate-200 group-hover/act:text-white transition-colors">
-                                        {hasFile ? 'Ganti File PDF' : 'Upload File PDF'}
-                                    </p>
-                                    <p className="text-[9px] text-slate-500">Maksimal 100MB • Format PDF</p>
-                                </div>
-                            </button>
+                            {/* 1. Upload File PDF - Only if user has upload permission (Admin/Developer) */}
+                            {canUpload && (
+                                <button
+                                    onClick={() => {
+                                        setIsOpen(false)
+                                        setTimeout(() => {
+                                            fileInputRef.current?.click()
+                                        }, 100)
+                                    }}
+                                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left group/act hover:bg-indigo-500/10 border border-transparent hover:border-indigo-500/20 transition-all cursor-pointer"
+                                >
+                                    <div className="w-7 h-7 rounded-lg bg-indigo-500/15 flex items-center justify-center group-hover/act:bg-indigo-500/25 text-indigo-400 transition-colors">
+                                        <Upload className="w-3.5 h-3.5" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[11px] font-bold text-slate-200 group-hover/act:text-white transition-colors">
+                                            {hasFile ? 'Ganti File PDF' : 'Upload File PDF'}
+                                        </p>
+                                        <p className="text-[9px] text-slate-500">Maksimal 100MB • Format PDF</p>
+                                    </div>
+                                </button>
+                            )}
 
                             {/* 2. Preview */}
                             <button
@@ -639,8 +646,8 @@ export function LegalisasiButton({
                                 </div>
                             </button>
 
-                            {/* 5. Delete - only shown when file exists */}
-                            {hasFile && (
+                            {/* 5. Delete - only shown when file exists AND user has permission */}
+                            {hasFile && canUpload && (
                                 <>
                                     <div className="mx-2 my-1 border-t border-white/5" />
                                     <button
@@ -660,6 +667,15 @@ export function LegalisasiButton({
                                         </div>
                                     </button>
                                 </>
+                            )}
+
+                            {/* Informational banner when file is not yet uploaded and user is staff */}
+                            {!hasFile && !canUpload && (
+                                <div className="py-2.5 px-3 text-center flex flex-col items-center gap-1.5 bg-slate-900/60 rounded-xl border border-white/5 my-1">
+                                    <Shield className="w-4 h-4 text-slate-500 opacity-60" />
+                                    <p className="text-[10px] font-bold text-slate-300">File Belum Tersedia</p>
+                                    <p className="text-[8.5px] text-slate-500 leading-tight">Pengunggahan dokumen legalisasi hanya dapat dilakukan oleh Admin atau Developer.</p>
+                                </div>
                             )}
                         </div>
 
@@ -952,13 +968,13 @@ export function LegalisasiButton({
                                         data={`${previewUrl}#toolbar=1&navpanes=0&scrollbar=1&view=Fit`}
                                         type="application/pdf"
                                         className="w-full h-full border-0 block"
-                                        title="Dokumen Legalisasi PDF"
+                                        title={sopJudul || "Dokumen Legalisasi PDF"}
                                         style={{ minHeight: 0, width: '100%', height: '100%' }}
                                     >
                                         <iframe
                                             src={`${previewUrl}#toolbar=1&navpanes=0&scrollbar=1&view=Fit`}
                                             className="w-full h-full border-0 block"
-                                            title="Dokumen Legalisasi PDF Fallback"
+                                            title={sopJudul || "Dokumen Legalisasi PDF"}
                                             style={{ minHeight: 0, width: '100%', height: '100%' }}
                                         >
                                             {/* Fallback if browser doesn't support inline PDF */}

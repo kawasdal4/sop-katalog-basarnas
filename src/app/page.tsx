@@ -8497,6 +8497,7 @@ export default function ESOPApp() {
                                         sopJudul={sop.judul}
                                         hasFile={!!sop.legalisasiPdfPath}
                                         endpointType="catalog"
+                                        canUpload={user?.role === 'ADMIN' || user?.role === 'DEVELOPER'}
                                         onUploadSuccess={() => fetchSopFiles(false)}
                                       />
                                       {/* Action Group */}

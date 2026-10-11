@@ -32,7 +32,17 @@ export default function SopBuilderList() {
     const [loading, setLoading] = useState(true)
     const [page, setPage] = useState(1)
     const [pagination, setPagination] = useState<any>(null)
+    const [userRole, setUserRole] = useState<string>('STAF')
     const router = useRouter()
+
+    useEffect(() => {
+        fetch('/api/auth', { credentials: 'include' })
+            .then(res => res.json())
+            .then(data => {
+                if (data?.user?.role) setUserRole(data.user.role)
+            })
+            .catch(() => {})
+    }, [])
 
     const fetchSops = useCallback(async (targetPage = page) => {
         setLoading(true)
@@ -246,6 +256,7 @@ export default function SopBuilderList() {
                                                 sopJudul={sop.judul}
                                                 hasFile={!!sop.legalisasiPdfPath}
                                                 endpointType="builder"
+                                                canUpload={userRole === 'ADMIN' || userRole === 'DEVELOPER'}
                                                 onUploadSuccess={() => fetchSops(page)}
                                             />
                                         </div>
