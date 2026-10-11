@@ -19,7 +19,10 @@ import {
     CloudUpload,
     AlertTriangle,
     RefreshCw,
-    Trash2
+    Trash2,
+    Maximize2,
+    Minimize2,
+    ExternalLink
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
@@ -60,6 +63,7 @@ export function LegalisasiButton({
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [showPreviewModal, setShowPreviewModal] = useState(false)
+    const [isWideView, setIsWideView] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
@@ -124,85 +128,133 @@ export function LegalisasiButton({
         setUploadProgress(5)
         setIsOpen(false)
 
+        const MAX_DIRECT_SERVER_SIZE = 4 * 1024 * 1024 // 4 MB (safe under Vercel's 4.5MB limit)
+
         try {
-            // ── Step 1: Get presigned upload URL (bypass Vercel 4.5MB limit) ──
-            const urlRes = await fetch(`${apiBase}?action=upload-url`, {
-                method: 'GET',
-                credentials: 'include'
-            })
+            // ── STRATEGY 1: Files <= 4MB -> Direct Server POST (100% immune to CORS) ──
+            if (file.size <= MAX_DIRECT_SERVER_SIZE) {
+                await new Promise<void>((resolve, reject) => {
+                    const xhr = new XMLHttpRequest()
+                    const formData = new FormData()
+                    formData.append('file', file)
 
-            if (!urlRes.ok) {
-                // Fallback: direct POST for local dev or small files
-                setUploadProgress(30)
-                const formData = new FormData()
-                formData.append('file', file)
-                const res = await fetch(apiBase, {
-                    method: 'POST',
-                    credentials: 'include',
-                    body: formData
+                    xhr.upload.addEventListener('progress', (ev) => {
+                        if (ev.lengthComputable) {
+                            const pct = Math.round((ev.loaded / ev.total) * 90) + 5
+                            setUploadProgress(Math.min(95, pct))
+                        }
+                    })
+
+                    xhr.addEventListener('load', () => {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            resolve()
+                        } else {
+                            try {
+                                const data = JSON.parse(xhr.responseText)
+                                reject(new Error(data.error || data.details || `Upload gagal (${xhr.status})`))
+                            } catch {
+                                reject(new Error(`Upload gagal (${xhr.status})`))
+                            }
+                        }
+                    })
+
+                    xhr.addEventListener('error', () => {
+                        reject(new Error('Koneksi terputus saat mengunggah file ke server'))
+                    })
+
+                    xhr.addEventListener('abort', () => reject(new Error('Upload dibatalkan')))
+
+                    xhr.open('POST', apiBase)
+                    xhr.withCredentials = true
+                    xhr.send(formData)
                 })
-                const data = await res.json()
-                if (res.ok) {
-                    setUploadProgress(100)
-                    setUploadState('success')
-                    setHasFile(true)
-                    toast.success('File legalisasi berhasil diupload!')
-                    onUploadSuccess?.()
-                } else {
-                    setUploadState('error')
-                    const errorMsg = data.error || data.details || 'Gagal mengunggah file legalisasi'
-                    setUploadErrorMessage(errorMsg)
-                    toast.error(errorMsg)
-                }
-                return
-            }
 
-            const { uploadUrl, r2Key } = await urlRes.json()
-            setUploadProgress(10)
-
-            // ── Step 2: Upload file directly to R2 via XHR (real progress) ────
-            await new Promise<void>((resolve, reject) => {
-                const xhr = new XMLHttpRequest()
-                xhr.upload.addEventListener('progress', (ev) => {
-                    if (ev.lengthComputable) {
-                        const pct = Math.round((ev.loaded / ev.total) * 80) + 10  // 10–90
-                        setUploadProgress(Math.min(90, pct))
-                    }
-                })
-                xhr.addEventListener('load', () => {
-                    if (xhr.status >= 200 && xhr.status < 300) resolve()
-                    else reject(new Error(`Upload ke R2 gagal: ${xhr.status}`))
-                })
-                xhr.addEventListener('error', () => reject(new Error('Koneksi terputus saat upload')))
-                xhr.addEventListener('abort', () => reject(new Error('Upload dibatalkan')))
-                xhr.open('PUT', uploadUrl)
-                xhr.setRequestHeader('Content-Type', 'application/pdf')
-                xhr.send(file)
-            })
-
-            setUploadProgress(93)
-
-            // ── Step 3: Confirm to backend to save R2 key in database ─────────
-            const confirmRes = await fetch(apiBase, {
-                method: 'PATCH',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ r2Key })
-            })
-            const confirmData = await confirmRes.json()
-
-            if (confirmRes.ok) {
                 setUploadProgress(100)
                 setUploadState('success')
                 setHasFile(true)
                 toast.success('File legalisasi berhasil diupload!')
                 onUploadSuccess?.()
-            } else {
-                setUploadState('error')
-                const errorMsg = confirmData.error || 'Gagal menyimpan file ke database'
-                setUploadErrorMessage(errorMsg)
-                toast.error(errorMsg)
+                return
             }
+
+            // ── STRATEGY 2: Files > 4MB -> Chunked Multipart Upload (Same-origin, Bypasses Vercel 4.5MB limit, 0 CORS) ──
+            const CHUNK_SIZE = 3 * 1024 * 1024 // 3 MB per chunk (safe under Vercel 4.5MB limit)
+
+            // Step 2a: Initialize multipart upload on server
+            const startRes = await fetch(`${apiBase}?action=multipart-start`, {
+                method: 'POST',
+                credentials: 'include'
+            })
+
+            if (!startRes.ok) {
+                const errData = await startRes.json().catch(() => ({}))
+                throw new Error(errData.error || `Gagal memulai sesi upload (${startRes.status})`)
+            }
+
+            const { uploadId, r2Key } = await startRes.json()
+            setUploadProgress(8)
+
+            const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
+            const parts: Array<{ PartNumber: number; ETag: string }> = []
+
+            // Step 2b: Upload each chunk sequentially with real progress
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * CHUNK_SIZE
+                const end = Math.min(start + CHUNK_SIZE, file.size)
+                const chunkBlob = file.slice(start, end)
+
+                const chunkFormData = new FormData()
+                chunkFormData.append('uploadId', uploadId)
+                chunkFormData.append('r2Key', r2Key)
+                chunkFormData.append('partNumber', String(i + 1))
+                chunkFormData.append('chunk', chunkBlob, file.name)
+
+                const partRes = await fetch(`${apiBase}?action=multipart-part`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    body: chunkFormData
+                })
+
+                if (!partRes.ok) {
+                    const errData = await partRes.json().catch(() => ({}))
+                    // Try aborting multipart on failure
+                    await fetch(`${apiBase}?action=multipart-abort`, {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ uploadId, r2Key })
+                    }).catch(() => {})
+                    throw new Error(errData.error || `Gagal mengunggah bagian ${i + 1}/${totalChunks}`)
+                }
+
+                const { partNumber, etag } = await partRes.json()
+                parts.push({ PartNumber: partNumber, ETag: etag })
+
+                const pct = Math.round(((i + 1) / totalChunks) * 82) + 8 // 8% - 90%
+                setUploadProgress(Math.min(92, pct))
+            }
+
+            setUploadProgress(95)
+
+            // Step 2c: Complete multipart upload on server
+            const completeRes = await fetch(`${apiBase}?action=multipart-complete`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uploadId, r2Key, parts })
+            })
+
+            const completeData = await completeRes.json().catch(() => ({}))
+            if (!completeRes.ok) {
+                throw new Error(completeData.error || 'Gagal menggabungkan file di server')
+            }
+
+            setUploadProgress(100)
+            setUploadState('success')
+            setHasFile(true)
+            toast.success('File legalisasi berhasil diupload!')
+            onUploadSuccess?.()
+            return
         } catch (err) {
             setUploadState('error')
             const errorMsg = err instanceof Error ? err.message : 'Terjadi kesalahan saat upload file'
@@ -816,8 +868,12 @@ export function LegalisasiButton({
                                 exit={{ scale: 0.94, opacity: 0, y: 15 }}
                                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                                 onClick={e => e.stopPropagation()}
-                                className="bg-slate-950 rounded-3xl overflow-hidden border border-white/15 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col relative ring-1 ring-white/10"
-                                style={{ width: '92vw', maxWidth: '1400px', height: '92vh' }}
+                                className="bg-slate-950 rounded-3xl overflow-hidden border border-white/15 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col relative ring-1 ring-white/10 transition-all duration-300"
+                                style={{
+                                    width: isWideView ? '96vw' : 'min(900px, 94vw)',
+                                    maxWidth: isWideView ? '1500px' : '900px',
+                                    height: '92vh'
+                                }}
                             >
                                 {/* Modal Header */}
                                 <div className="flex items-center gap-3 px-6 py-3.5 border-b border-white/10 bg-slate-900/80 shrink-0">
@@ -830,13 +886,37 @@ export function LegalisasiButton({
                                             <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-red-500/15 text-red-400 border border-red-500/30">
                                                 RESMI
                                             </span>
-                                            <span className="text-[10px] text-slate-500 font-medium hidden sm:inline">• Ukuran 80% Layar</span>
+                                            <span className="text-[10px] text-slate-500 font-medium hidden sm:inline">
+                                                • {isWideView ? 'Tampilan Lebar' : 'Proporsi Asli Dokumen (A4)'}
+                                            </span>
                                         </div>
                                         <p className="text-[11px] text-slate-400 truncate mt-0.5 max-w-xl">{sopJudul || 'Dokumen Legalisasi SOP'}</p>
                                     </div>
 
                                     {/* Action buttons + Close button on top right */}
-                                    <div className="ml-auto flex items-center gap-2.5">
+                                    <div className="ml-auto flex items-center gap-2">
+                                        {/* View Mode Toggle (Proportional A4 vs Wide) */}
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsWideView(!isWideView)}
+                                            className="px-2.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                                            title={isWideView ? "Ganti ke Proporsi Dokumen Asli (A4)" : "Ganti ke Tampilan Lebar"}
+                                        >
+                                            {isWideView ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                                            <span className="hidden md:inline">{isWideView ? 'Proporsi A4' : 'Layar Lebar'}</span>
+                                        </button>
+
+                                        {/* Open in New Tab for full native browser viewer */}
+                                        <button
+                                            type="button"
+                                            onClick={() => window.open(previewUrl, '_blank')}
+                                            className="px-2.5 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-[0_0_10px_rgba(6,182,212,0.15)]"
+                                            title="Buka Dokumen di Tab Baru Browser"
+                                        >
+                                            <ExternalLink className="w-3.5 h-3.5" />
+                                            <span className="hidden md:inline">Tab Baru</span>
+                                        </button>
+
                                         <button
                                             type="button"
                                             onClick={handleDownload}
@@ -844,6 +924,7 @@ export function LegalisasiButton({
                                         >
                                             <Download className="w-3.5 h-3.5" /> Unduh
                                         </button>
+
                                         <button
                                             type="button"
                                             onClick={handlePrint}
@@ -865,20 +946,27 @@ export function LegalisasiButton({
                                     </div>
                                 </div>
 
-                                {/* PDF Viewer - proper proportional display */}
-                                <div className="flex-1 bg-slate-950 relative w-full overflow-hidden">
+                                {/* PDF Viewer - strictly proportional display maintaining original document aspect ratio */}
+                                <div className="flex-1 bg-slate-950 relative w-full h-full overflow-hidden flex items-center justify-center">
                                     <object
-                                        data={previewUrl + '#toolbar=1&navpanes=0&scrollbar=1&zoom=page-fit'}
+                                        data={`${previewUrl}#toolbar=1&navpanes=0&scrollbar=1&view=Fit`}
                                         type="application/pdf"
-                                        className="w-full h-full border-0"
+                                        className="w-full h-full border-0 block"
                                         title="Dokumen Legalisasi PDF"
-                                        style={{ minHeight: 0 }}
+                                        style={{ minHeight: 0, width: '100%', height: '100%' }}
                                     >
-                                        {/* Fallback for browsers that don't support object tag PDF rendering */}
-                                        <div className="flex flex-col items-center justify-center h-full gap-4 text-slate-400">
-                                            <Shield className="w-12 h-12 opacity-30" />
-                                            <p className="text-sm text-center">Browser tidak mendukung preview PDF inline.<br/>Gunakan tombol Unduh di atas.</p>
-                                        </div>
+                                        <iframe
+                                            src={`${previewUrl}#toolbar=1&navpanes=0&scrollbar=1&view=Fit`}
+                                            className="w-full h-full border-0 block"
+                                            title="Dokumen Legalisasi PDF Fallback"
+                                            style={{ minHeight: 0, width: '100%', height: '100%' }}
+                                        >
+                                            {/* Fallback if browser doesn't support inline PDF */}
+                                            <div className="flex flex-col items-center justify-center h-full gap-4 text-slate-400 p-8">
+                                                <Shield className="w-12 h-12 opacity-30" />
+                                                <p className="text-sm text-center">Browser tidak mendukung preview PDF inline.<br/>Gunakan tombol Unduh atau Tab Baru di atas.</p>
+                                            </div>
+                                        </iframe>
                                     </object>
                                 </div>
                             </motion.div>

@@ -7,7 +7,12 @@ import {
   CreateBucketCommand,
   ListObjectsV2Command,
   HeadObjectCommand,
-  CopyObjectCommand
+  CopyObjectCommand,
+  PutBucketCorsCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { calculateChecksum } from './sync-core'
@@ -74,8 +79,8 @@ export function isStorageMockMode(): boolean {
 
   try {
     const accountId = process.env.R2_ACCOUNT_ID || ''
-    const accessKeyId = process.env.R2_ACCESS_KEY_ID || ''
-    const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY || ''
+    const accessKeyId = process.env.R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY || ''
+    const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_KEY || ''
     
     const isPlaceholder = 
       accountId.includes('your-') || accountId.includes('dummy') ||
@@ -85,7 +90,7 @@ export function isStorageMockMode(): boolean {
     if (isPlaceholder) return true
     
     // Fallback for non-production
-    if (process.env.NODE_ENV !== 'production' && !accountId) {
+    if (process.env.NODE_ENV !== 'production' && (!accountId || !accessKeyId || !secretAccessKey)) {
       return true
     }
 
@@ -594,3 +599,146 @@ export async function getR2PresignedUploadUrl(
 
   return await getSignedUrl(client, command, { expiresIn })
 }
+
+/**
+ * Ensure R2 Bucket has CORS configured so browser direct uploads work
+ */
+let corsConfigured = false
+export async function ensureR2Cors(): Promise<{ success: boolean; message: string }> {
+  if (corsConfigured || isStorageMockMode()) {
+    return { success: true, message: 'Already configured or in mock mode' }
+  }
+
+  try {
+    const config = getR2Config()
+    const client = createR2Client()
+
+    await client.send(
+      new PutBucketCorsCommand({
+        Bucket: config.bucketName,
+        CORSConfiguration: {
+          CORSRules: [
+            {
+              AllowedHeaders: ['*'],
+              AllowedMethods: ['GET', 'PUT', 'POST', 'DELETE', 'HEAD'],
+              AllowedOrigins: ['*'],
+              ExposeHeaders: ['ETag'],
+              MaxAgeSeconds: 3600,
+            },
+          ],
+        },
+      })
+    )
+    corsConfigured = true
+    console.log(`✅ Cloudflare R2 CORS configured successfully on bucket: ${config.bucketName}`)
+    return { success: true, message: 'CORS configured successfully' }
+  } catch (error: any) {
+    console.warn('⚠️ Could not configure R2 CORS via API (may need manual Cloudflare dashboard config):', error?.message)
+    return { success: false, message: error?.message || 'Failed to configure CORS' }
+  }
+}
+
+/**
+ * Start S3 Multipart Upload on R2
+ */
+export async function startR2MultipartUpload(
+  key: string,
+  contentType = 'application/pdf',
+  metadata?: Record<string, string>
+): Promise<string> {
+  const config = getR2Config()
+  const client = createR2Client()
+
+  const command = new CreateMultipartUploadCommand({
+    Bucket: config.bucketName,
+    Key: key,
+    ContentType: contentType,
+    Metadata: metadata,
+  })
+
+  const res = await client.send(command)
+  if (!res.UploadId) {
+    throw new Error('Failed to initiate multipart upload: No UploadId received')
+  }
+  return res.UploadId
+}
+
+/**
+ * Upload a single part in S3 Multipart Upload
+ */
+export async function uploadR2Part(
+  key: string,
+  uploadId: string,
+  partNumber: number,
+  buffer: Buffer
+): Promise<string> {
+  const config = getR2Config()
+  const client = createR2Client()
+
+  const command = new UploadPartCommand({
+    Bucket: config.bucketName,
+    Key: key,
+    UploadId: uploadId,
+    PartNumber: partNumber,
+    Body: buffer,
+  })
+
+  const res = await client.send(command)
+  if (!res.ETag) {
+    throw new Error(`Failed to upload part ${partNumber}: No ETag returned`)
+  }
+  return res.ETag
+}
+
+/**
+ * Complete S3 Multipart Upload on R2
+ */
+export async function completeR2MultipartUpload(
+  key: string,
+  uploadId: string,
+  parts: Array<{ PartNumber: number; ETag: string }>
+): Promise<{ key: string; url: string; publicUrl?: string }> {
+  const config = getR2Config()
+  const client = createR2Client()
+
+  // S3 requires parts to be sorted in ascending order by PartNumber
+  const sortedParts = [...parts].sort((a, b) => a.PartNumber - b.PartNumber)
+
+  const command = new CompleteMultipartUploadCommand({
+    Bucket: config.bucketName,
+    Key: key,
+    UploadId: uploadId,
+    MultipartUpload: {
+      Parts: sortedParts,
+    },
+  })
+
+  await client.send(command)
+
+  return {
+    key,
+    url: `https://${config.accountId}.r2.cloudflarestorage.com/${config.bucketName}/${key}`,
+    publicUrl: config.publicUrl ? `${config.publicUrl}/${key}` : undefined,
+  }
+}
+
+/**
+ * Abort S3 Multipart Upload on R2
+ */
+export async function abortR2MultipartUpload(key: string, uploadId: string): Promise<void> {
+  try {
+    const config = getR2Config()
+    const client = createR2Client()
+    await client.send(
+      new AbortMultipartUploadCommand({
+        Bucket: config.bucketName,
+        Key: key,
+        UploadId: uploadId,
+      })
+    )
+  } catch (err: any) {
+    console.warn(`Could not abort multipart upload ${uploadId}:`, err?.message)
+  }
+}
+
+

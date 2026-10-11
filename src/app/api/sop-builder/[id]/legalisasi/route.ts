@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { validateRole } from '@/lib/auth-utils'
-import { downloadFromR2, deleteFromR2, getR2PresignedUploadUrl } from '@/lib/r2-storage'
+import {
+    downloadFromR2,
+    deleteFromR2,
+    getR2PresignedUploadUrl,
+    ensureR2Cors,
+    startR2MultipartUpload,
+    uploadR2Part,
+    completeR2MultipartUpload,
+    abortR2MultipartUpload,
+    uploadToR2
+} from '@/lib/r2-storage'
 
 // Set runtime and max duration for Vercel
 export const runtime = 'nodejs'
@@ -41,8 +51,9 @@ export async function GET(
             })
         }
 
-        // ── PRESIGNED UPLOAD URL (bypass Vercel 4.5MB body limit) ────────────
+        // ── PRESIGNED UPLOAD URL (kept for fallback) ─────────────────────────
         if (action === 'upload-url') {
+            await ensureR2Cors().catch(err => console.warn('CORS check warning:', err))
             const r2Key = `sop-builder/legalisasi/${id}_${Date.now()}.pdf`
             const uploadUrl = await getR2PresignedUploadUrl(r2Key, 'application/pdf', 3600)
             return NextResponse.json({ uploadUrl, r2Key })
@@ -73,7 +84,7 @@ export async function GET(
     }
 }
 
-// POST - Upload file legalisasi PDF (kept for small files / local dev)
+// POST - Upload file legalisasi PDF (Direct POST <= 4MB OR Chunked Multipart Upload > 4MB)
 export async function POST(
     request: NextRequest,
     { params }: { params: { id: string } }
@@ -104,6 +115,82 @@ export async function POST(
             return NextResponse.json({ error: 'SOP tidak ditemukan' }, { status: 404 })
         }
 
+        const { searchParams } = new URL(request.url)
+        const action = searchParams.get('action')
+
+        // ── MULTIPART ACTION: START ──────────────────────────────────────────
+        if (action === 'multipart-start') {
+            const r2Key = `sop-builder/legalisasi/${id}_${Date.now()}.pdf`
+            const uploadId = await startR2MultipartUpload(r2Key, 'application/pdf', {
+                sopId: id,
+                uploadedBy: uploadUserId || 'unknown',
+            })
+            return NextResponse.json({ uploadId, r2Key })
+        }
+
+        // ── MULTIPART ACTION: UPLOAD PART (3MB chunk) ─────────────────────────
+        if (action === 'multipart-part') {
+            const formData = await request.formData()
+            const uploadId = formData.get('uploadId') as string
+            const r2Key = formData.get('r2Key') as string
+            const partNumber = parseInt(formData.get('partNumber') as string, 10)
+            const chunk = formData.get('chunk') as File | null
+
+            if (!uploadId || !r2Key || isNaN(partNumber) || !chunk) {
+                return NextResponse.json({ error: 'Parameter multipart part tidak lengkap' }, { status: 400 })
+            }
+
+            const chunkArrayBuffer = await chunk.arrayBuffer()
+            const chunkBuffer = Buffer.from(chunkArrayBuffer)
+            const etag = await uploadR2Part(r2Key, uploadId, partNumber, chunkBuffer)
+
+            return NextResponse.json({ partNumber, etag })
+        }
+
+        // ── MULTIPART ACTION: COMPLETE ───────────────────────────────────────
+        if (action === 'multipart-complete') {
+            const body = await request.json()
+            const { uploadId, r2Key, parts } = body
+
+            if (!uploadId || !r2Key || !Array.isArray(parts)) {
+                return NextResponse.json({ error: 'Parameter multipart complete tidak lengkap' }, { status: 400 })
+            }
+
+            // Delete old file if exists
+            if (sop.legalisasiPdfPath && sop.legalisasiPdfPath !== r2Key) {
+                try {
+                    await deleteFromR2(sop.legalisasiPdfPath)
+                } catch (e) {
+                    console.warn('Failed to delete old legalisasi file:', e)
+                }
+            }
+
+            await completeR2MultipartUpload(r2Key, uploadId, parts)
+
+            // Save path to database
+            await db.sopPembuatan.update({
+                where: { id },
+                data: { legalisasiPdfPath: r2Key }
+            })
+
+            return NextResponse.json({
+                success: true,
+                path: r2Key,
+                message: 'File legalisasi berhasil diunggah'
+            })
+        }
+
+        // ── MULTIPART ACTION: ABORT ──────────────────────────────────────────
+        if (action === 'multipart-abort') {
+            const body = await request.json().catch(() => ({}))
+            const { uploadId, r2Key } = body
+            if (uploadId && r2Key) {
+                await abortR2MultipartUpload(r2Key, uploadId)
+            }
+            return NextResponse.json({ success: true })
+        }
+
+        // ── STANDARD DIRECT UPLOAD (Single file <= 4MB) ──────────────────────
         const formData = await request.formData()
         const file = formData.get('file') as File | null
 
@@ -136,7 +223,6 @@ export async function POST(
         }
 
         // Upload to R2
-        const { uploadToR2 } = await import('@/lib/r2-storage')
         const r2Key = `sop-builder/legalisasi/${id}_${Date.now()}.pdf`
         const result = await uploadToR2(buffer, file.name, 'application/pdf', {
             key: r2Key,
