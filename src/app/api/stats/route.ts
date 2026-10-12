@@ -61,20 +61,23 @@ export async function GET() {
     }
 
     try {
-      stats.totalLegalisasi = await db.sopFile.count({
+      const sopFileLegalisasi = await db.sopFile.count({
         where: {
-          OR: [
-            { legalisasiPdfPath: { not: null } },
-            { status: 'LEGALISASI' },
-            { status: 'Legalisasi' }
-          ],
-          AND: [
-            {
-              OR: [{ isPublicSubmission: false }, { verificationStatus: 'DISETUJUI' }]
-            }
-          ]
+          legalisasiPdfPath: { not: null },
+          NOT: { legalisasiPdfPath: '' },
+          OR: [{ isPublicSubmission: false }, { verificationStatus: 'DISETUJUI' }]
         }
       })
+      const builderLegalisasi = await db.sopPembuatan.count({
+        where: {
+          legalisasiPdfPath: { not: null },
+          NOT: { legalisasiPdfPath: '' }
+        }
+      }).catch(() => 0)
+
+      stats.totalLegalisasi = sopFileLegalisasi
+      stats.totalLegalisasiAll = sopFileLegalisasi + builderLegalisasi
+      stats.totalLegalisasiBuilder = builderLegalisasi
     } catch (e) {
       stats.totalLegalisasi = 0
     }
@@ -196,18 +199,29 @@ export async function GET() {
       stats.recentUploadsError = e instanceof Error ? e.message : 'Unknown'
     }
 
-    // Recent logs - without sopFile relation first
+    // Recent logs
     try {
       stats.recentLogs = await db.log.findMany({
         include: {
-          user: { select: { name: true } }
+          user: { select: { name: true } },
+          sopFile: { select: { judul: true, nomorSop: true } }
         },
         orderBy: { createdAt: 'desc' },
         take: 10
       })
-    } catch (e) {
-      stats.recentLogs = []
-      stats.recentLogsError = e instanceof Error ? e.message : 'Unknown'
+    } catch {
+      try {
+        stats.recentLogs = await db.log.findMany({
+          include: {
+            user: { select: { name: true } }
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 10
+        })
+      } catch (e) {
+        stats.recentLogs = []
+        stats.recentLogsError = e instanceof Error ? e.message : 'Unknown'
+      }
     }
 
     // Recent Activity

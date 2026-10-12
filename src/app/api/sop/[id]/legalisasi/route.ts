@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { db } from '@/lib/db'
 import { validateRole } from '@/lib/auth-utils'
 import {
@@ -15,6 +16,23 @@ import {
     getR2PresignedPartUrl
 } from '@/lib/r2-storage'
 import { sanitizePdfMetadata } from '@/lib/pdf-sanitize'
+
+// Helper to resolve user ID for activity logging
+async function getUserIdForLog(userIdFromAuth?: string): Promise<string | null> {
+    if (userIdFromAuth) return userIdFromAuth
+    try {
+        const cookieStore = await cookies()
+        const cookieUserId = cookieStore.get('userId')?.value
+        if (cookieUserId) return cookieUserId
+        const fallback = await db.user.findFirst({
+            where: { role: { in: ['ADMIN', 'DEVELOPER', 'STAF'] } },
+            select: { id: true }
+        })
+        return fallback?.id || null
+    } catch {
+        return null
+    }
+}
 
 // Set runtime and max duration for Vercel
 export const runtime = 'nodejs'
@@ -68,6 +86,25 @@ export async function GET(
         const disposition = action === 'download'
             ? `attachment; filename="Legalisasi-${sop.judul?.replace(/[^a-zA-Z0-9]/g, '_') || id}.pdf"`
             : 'inline'
+
+        // Log recent activity for GET legalisasi (preview / download)
+        try {
+            const logUserId = await getUserIdForLog()
+            if (logUserId) {
+                const isDownload = action === 'download'
+                await db.log.create({
+                    data: {
+                        userId: logUserId,
+                        aktivitas: 'LEGALISASI',
+                        deskripsi: `${isDownload ? 'Download' : 'Preview'} File Legalisasi: ${sop.judul}`,
+                        fileId: sop.id,
+                        metadata: JSON.stringify({ action: isDownload ? 'DOWNLOAD' : 'PREVIEW', judul: sop.judul, type: 'catalog' })
+                    }
+                })
+            }
+        } catch (logErr) {
+            console.warn('Failed to log legalisasi GET:', logErr)
+        }
 
         return new NextResponse(new Uint8Array(cleanBuffer), {
             headers: {
@@ -216,6 +253,24 @@ export async function POST(
                 }
             })
 
+            // Log upload activity
+            try {
+                const logUserId = await getUserIdForLog(uploadUserId)
+                if (logUserId) {
+                    await db.log.create({
+                        data: {
+                            userId: logUserId,
+                            aktivitas: 'LEGALISASI',
+                            deskripsi: `Upload File Legalisasi: ${sop.judul}`,
+                            fileId: sop.id,
+                            metadata: JSON.stringify({ action: 'UPLOAD', mode: 'multipart', r2Key, judul: sop.judul, type: 'catalog' })
+                        }
+                    })
+                }
+            } catch (logErr) {
+                console.warn('Failed to log legalisasi upload:', logErr)
+            }
+
             return NextResponse.json({
                 success: true,
                 path: r2Key,
@@ -286,6 +341,24 @@ export async function POST(
             }
         })
 
+        // Log upload activity
+        try {
+            const logUserId = await getUserIdForLog(uploadUserId)
+            if (logUserId) {
+                await db.log.create({
+                    data: {
+                        userId: logUserId,
+                        aktivitas: 'LEGALISASI',
+                        deskripsi: `Upload File Legalisasi: ${sop.judul}`,
+                        fileId: sop.id,
+                        metadata: JSON.stringify({ action: 'UPLOAD', fileName: file.name, r2Key: result.key, judul: sop.judul, type: 'catalog' })
+                    }
+                })
+            }
+        } catch (logErr) {
+            console.warn('Failed to log legalisasi direct upload:', logErr)
+        }
+
         return NextResponse.json({
             success: true,
             path: result.key,
@@ -354,6 +427,24 @@ export async function PATCH(
             }
         })
 
+        // Log upload activity
+        try {
+            const logUserId = await getUserIdForLog(uploadUserId)
+            if (logUserId) {
+                await db.log.create({
+                    data: {
+                        userId: logUserId,
+                        aktivitas: 'LEGALISASI',
+                        deskripsi: `Upload File Legalisasi: ${sop.judul}`,
+                        fileId: sop.id,
+                        metadata: JSON.stringify({ action: 'UPLOAD', r2Key, judul: sop.judul, type: 'catalog' })
+                    }
+                })
+            }
+        } catch (logErr) {
+            console.warn('Failed to log legalisasi upload confirm:', logErr)
+        }
+
         return NextResponse.json({
             success: true,
             path: r2Key,
@@ -402,6 +493,24 @@ export async function DELETE(
                 legalisasiUploadedAt: null
             }
         })
+
+        // Log delete activity
+        try {
+            const logUserId = await getUserIdForLog()
+            if (logUserId) {
+                await db.log.create({
+                    data: {
+                        userId: logUserId,
+                        aktivitas: 'LEGALISASI',
+                        deskripsi: `Hapus File Legalisasi: ${sop.judul}`,
+                        fileId: sop.id,
+                        metadata: JSON.stringify({ action: 'DELETE', judul: sop.judul, type: 'catalog' })
+                    }
+                })
+            }
+        } catch (logErr) {
+            console.warn('Failed to log legalisasi delete:', logErr)
+        }
 
         return NextResponse.json({ success: true, message: 'File legalisasi berhasil dihapus' })
     } catch (error) {

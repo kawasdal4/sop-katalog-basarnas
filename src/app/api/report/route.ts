@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
         const whereBase: any = { OR: [{ isPublicSubmission: false }, { verificationStatus: 'DISETUJUI' }] }
 
-        const [sopFiles, totalSop, totalIk, totalAktif, totalReview, totalKadaluarsa,
+        const [sopFiles, totalSop, totalIk, totalAktif, totalReview, totalKadaluarsa, totalLegalisasi,
             previewsRaw, downloadsRaw, byTahunRaw, byKategoriRaw, byStatusRaw, byLingkupRaw] = await Promise.all([
                 db.sopFile.findMany({ where: whereBase, include: { user: { select: { name: true } } }, orderBy: { uploadedAt: 'desc' } }),
                 db.sopFile.count({ where: { ...whereBase, jenis: 'SOP' } }),
@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
                 db.sopFile.count({ where: { ...whereBase, status: 'AKTIF' } }),
                 db.sopFile.count({ where: { ...whereBase, status: 'REVIEW' } }),
                 db.sopFile.count({ where: { ...whereBase, status: 'KADALUARSA' } }),
+                db.sopFile.count({ where: { ...whereBase, legalisasiPdfPath: { not: null }, NOT: { legalisasiPdfPath: '' } } }),
                 db.sopFile.aggregate({ where: whereBase, _sum: { previewCount: true } }),
                 db.sopFile.aggregate({ where: whereBase, _sum: { downloadCount: true } }),
                 (db.sopFile.groupBy as any)({ by: ['tahun'], where: whereBase, _count: { tahun: true } }),
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
 
         const totalPreviews = previewsRaw._sum.previewCount || 0
         const totalDownloads = downloadsRaw._sum.downloadCount || 0
+        const totalBelumLegalisasi = Math.max(0, (totalSop + totalIk) - totalLegalisasi)
 
         const byTahun = (byTahunRaw as any[]).map(x => ({ label: String(x.tahun || ''), count: x._count?.tahun || 0 }))
             .sort((a, b) => Number(a.label) - Number(b.label))
@@ -91,7 +93,7 @@ export async function GET(request: NextRequest) {
     .date-info { color:#64748b; font-size:10px; margin-top:6px; }
 
     /* ── Stats Grid ── */
-    .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px; }
+    .stats-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:24px; }
     .stat-card { background:white; border-radius:10px; padding:14px 16px; display:flex; align-items:center; gap:12px; border-left:4px solid; box-shadow:0 1px 4px rgba(0,0,0,.06); }
     .stat-icon { font-size:22px; }
     .stat-value { font-size:26px; font-weight:800; line-height:1; }
@@ -99,14 +101,16 @@ export async function GET(request: NextRequest) {
     .c-orange { border-color:#f97316; } .c-orange .stat-value { color:#f97316; }
     .c-yellow  { border-color:#eab308; } .c-yellow  .stat-value { color:#eab308; }
     .c-green   { border-color:#22c55e; } .c-green   .stat-value { color:#22c55e; }
+    .c-emerald { border-color:#10b981; } .c-emerald .stat-value { color:#10b981; }
     .c-red     { border-color:#ef4444; } .c-red     .stat-value { color:#ef4444; }
     .c-cyan    { border-color:#06b6d4; } .c-cyan    .stat-value { color:#06b6d4; }
     .c-purple  { border-color:#8b5cf6; } .c-purple  .stat-value { color:#8b5cf6; }
     .c-blue    { border-color:#3b82f6; } .c-blue    .stat-value { color:#3b82f6; }
+    .c-slate   { border-color:#64748b; } .c-slate   .stat-value { color:#64748b; }
 
     /* ── Distribution ── */
     .section-title { color:#1e3a5f; font-size:14px; font-weight:800; margin-bottom:12px; padding-bottom:8px; border-bottom:2px solid #e2e8f0; }
-    .dist-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px; }
+    .dist-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:24px; }
     .dist-table h4 { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
     .dist-table table { width:100%; border-collapse:collapse; background:white; border-radius:6px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.07); }
     .dist-table th { color:white; font-weight:700; font-size:9px; padding:6px 8px; text-transform:uppercase; }
@@ -152,25 +156,31 @@ export async function GET(request: NextRequest) {
     <div class="date-info">${currentDate}</div>
   </div>
 
-  <!-- Stats Cards -->
+  <!-- Stats Cards (10 Cards: 2 Rows x 5 Cols) -->
   <div class="stats-grid">
     <div class="stat-card c-orange"><div class="stat-icon">📋</div><div><div class="stat-value">${totalSop}</div><div class="stat-label">Total SOP</div></div></div>
     <div class="stat-card c-yellow"><div class="stat-icon">📝</div><div><div class="stat-value">${totalIk}</div><div class="stat-label">Total IK</div></div></div>
+    <div class="stat-card c-emerald"><div class="stat-icon">🛡️</div><div><div class="stat-value">${totalLegalisasi}</div><div class="stat-label">File Legalisasi</div></div></div>
     <div class="stat-card c-cyan"  ><div class="stat-icon">👁️</div><div><div class="stat-value">${totalPreviews}</div><div class="stat-label">Total Preview</div></div></div>
     <div class="stat-card c-purple"><div class="stat-icon">⬇️</div><div><div class="stat-value">${totalDownloads}</div><div class="stat-label">Total Download</div></div></div>
     <div class="stat-card c-green" ><div class="stat-icon">✅</div><div><div class="stat-value">${totalAktif}</div><div class="stat-label">Aktif</div></div></div>
     <div class="stat-card c-yellow"><div class="stat-icon">⏳</div><div><div class="stat-value">${totalReview}</div><div class="stat-label">Review</div></div></div>
     <div class="stat-card c-red"   ><div class="stat-icon">❌</div><div><div class="stat-value">${totalKadaluarsa}</div><div class="stat-label">Kadaluarsa</div></div></div>
     <div class="stat-card c-blue"  ><div class="stat-icon">🌐</div><div><div class="stat-value">${byLingkup.length}</div><div class="stat-label">Total Lingkup</div></div></div>
+    <div class="stat-card c-slate" ><div class="stat-icon">📑</div><div><div class="stat-value">${totalBelumLegalisasi}</div><div class="stat-label">Belum Legalisasi</div></div></div>
   </div>
 
-  <!-- Distribution -->
+  <!-- Distribution (5 Tables) -->
   <div class="section-title">📊 Distribusi Data</div>
   <div class="dist-grid">
     ${makeDistTable('Per Tahun', byTahun, '#f97316')}
     ${makeDistTable('Per Kategori', byKategori, '#3b82f6')}
     ${makeDistTable('Per Lingkup', byLingkup, '#8b5cf6')}
     ${makeDistTable('Per Status', byStatus, '#22c55e')}
+    ${makeDistTable('Status Legalisasi', [
+      { label: 'Terlegalisasi', count: totalLegalisasi },
+      { label: 'Belum Legalisasi', count: totalBelumLegalisasi }
+    ], '#10b981')}
   </div>
 
   <!-- Data Table -->
@@ -180,19 +190,20 @@ export async function GET(request: NextRequest) {
       <thead>
         <tr>
           <th>No</th><th>Judul Dokumen</th><th>Tahun</th><th>Kategori</th>
-          <th>Jenis</th><th>Lingkup</th><th>Status</th>
+          <th>Jenis</th><th>Lingkup</th><th>Status</th><th>Legalisasi</th>
           <th>Preview</th><th>Download</th><th>Diupload Oleh</th>
         </tr>
       </thead>
       <tbody>
         ${sopFiles.map((sop, i) => `<tr>
           <td style="text-align:center">${i + 1}</td>
-          <td>${sop.judul.length > 65 ? sop.judul.substring(0, 65) + '…' : sop.judul}</td>
+          <td>${sop.judul.length > 55 ? sop.judul.substring(0, 55) + '…' : sop.judul}</td>
           <td style="text-align:center">${sop.tahun}</td>
           <td>${sop.kategori}</td>
           <td style="text-align:center">${sop.jenis}</td>
           <td>${(sop as any).lingkup || 'N/A'}</td>
           <td style="text-align:center"><span class="badge" style="background:${getStatusColor(sop.status)}">${sop.status}</span></td>
+          <td style="text-align:center">${sop.legalisasiPdfPath ? '<span class="badge" style="background:#10b981">✓ Ada</span>' : '<span class="badge" style="background:#94a3b8">Belum</span>'}</td>
           <td style="text-align:center">${sop.previewCount || 0}</td>
           <td style="text-align:center">${sop.downloadCount || 0}</td>
           <td>${(sop.user as any)?.name || 'N/A'}</td>

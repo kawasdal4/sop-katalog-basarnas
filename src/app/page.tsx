@@ -192,6 +192,9 @@ interface Stats {
   totalPublikDitolakBaru?: number
   totalPreviews: number
   totalDownloads: number
+  totalLegalisasi?: number
+  totalLegalisasiAll?: number
+  totalLegalisasiBuilder?: number
   byTahun: { tahun: number; count: number }[]
   byKategori: { kategori: string; count: number }[]
   byJenis: { jenis: string; count: number }[]
@@ -678,6 +681,15 @@ function StatCard({
       accentColor: 'text-red-500',
       glowColor: 'shadow-red-200/50',
       patternColor: 'text-red-100'
+    },
+    emerald: {
+      gradient: 'from-emerald-50 via-teal-50/50 to-cyan-50/70',
+      iconBg: 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600',
+      iconColor: 'text-white',
+      valueColor: 'text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700',
+      accentColor: 'text-emerald-500',
+      glowColor: 'shadow-emerald-200/50',
+      patternColor: 'text-emerald-100'
     },
     cyan: {
       gradient: 'from-cyan-50 via-white to-sky-50',
@@ -6406,8 +6418,8 @@ export default function ESOPApp() {
                     </motion.div>
 
                     {/* Stats Cards Skeleton */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {[0, 1, 2, 3].map((i) => (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                      {[0, 1, 2, 3, 4].map((i) => (
                         <StatCardSkeleton key={i} />
                       ))}
                     </div>
@@ -6608,7 +6620,7 @@ export default function ESOPApp() {
 
                     {/* Stats Cards - Row 1: Document Counts */}
                     <motion.div
-                      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+                      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4"
                       variants={staggerContainer}
                     >
                       <StatCard
@@ -6629,6 +6641,16 @@ export default function ESOPApp() {
                         delay={0.1}
                         subtitle="Instruksi Kerja"
                         total={stats.totalSop + stats.totalIk}
+                      />
+                      <StatCard
+                        title="File Legalisasi"
+                        value={stats.totalLegalisasi || 0}
+                        icon={Shield}
+                        color="emerald"
+                        delay={0.15}
+                        subtitle="Dokumen terverifikasi legalisasi"
+                        total={stats.totalSop + stats.totalIk}
+                        trend={(stats.totalLegalisasi || 0) > 0 ? 'up' : undefined}
                       />
                       <StatCard
                         title="Total Preview"
@@ -7233,34 +7255,104 @@ export default function ESOPApp() {
 
                       <Card className="bg-white border-2 border-orange-200 shadow-xl">
                         <CardHeader>
-                          <CardTitle className="text-lg text-blue-900 font-bold flex items-center gap-2">
-                            <Activity className="w-5 h-5 text-cyan-500" />
-                            Aktivitas Terbaru
-                          </CardTitle>
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-lg text-blue-900 font-bold flex items-center gap-2">
+                              <Activity className="w-5 h-5 text-cyan-500" />
+                              Aktivitas Terbaru
+                            </CardTitle>
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-bold tracking-wider uppercase">
+                              Audit Realtime
+                            </Badge>
+                          </div>
                         </CardHeader>
                         <CardContent>
                           <ScrollArea className="h-64">
-                            <div className="space-y-3">
-                              <AnimatePresence mode="popLayout">
-                                {stats.recentLogs.map((log, index) => (
-                                  <motion.div
-                                    key={log.id}
-                                    className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg"
-                                    initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, scale: 0.95 }}
-                                    transition={{ delay: index * 0.05 }}
-                                  >
-                                    <div className="w-2 h-2 mt-2 rounded-full bg-orange-500 animate-pulse" />
-                                    <div>
-                                      <p className="text-sm font-medium text-blue-900">{log.user?.name}</p>
-                                      <p className="text-sm text-gray-600">{log.deskripsi}</p>
-                                      <p className="text-xs text-gray-500">{new Date(log.createdAt).toLocaleString('id-ID')}</p>
-                                    </div>
-                                  </motion.div>
-                                ))}
-                              </AnimatePresence>
-                            </div>
+                            {(!stats.recentLogs || stats.recentLogs.length === 0) ? (
+                              <div className="flex flex-col items-center justify-center h-48 text-center text-slate-400">
+                                <History className="w-8 h-8 mb-2 opacity-30" />
+                                <p className="text-sm font-medium">Belum ada aktivitas tercatat</p>
+                              </div>
+                            ) : (
+                              <div className="space-y-3 pr-2">
+                                <AnimatePresence mode="popLayout">
+                                  {stats.recentLogs.map((log, index) => {
+                                    const isLegalisasi = log.aktivitas === 'LEGALISASI' || log.deskripsi?.toLowerCase().includes('legalisasi')
+                                    return (
+                                      <motion.div
+                                        key={log.id}
+                                        className={`flex items-start gap-3 p-3 rounded-xl border transition-all ${
+                                          isLegalisasi
+                                            ? 'bg-gradient-to-r from-emerald-50 via-teal-50/50 to-blue-50/30 border-emerald-300 shadow-sm ring-1 ring-emerald-200/50'
+                                            : 'bg-blue-50/70 border-blue-100 hover:border-blue-200'
+                                        }`}
+                                        initial={{ opacity: 0, x: -20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        transition={{ delay: index * 0.04 }}
+                                      >
+                                        <div
+                                          className={`w-2.5 h-2.5 mt-1.5 rounded-full flex-shrink-0 animate-pulse ${
+                                            isLegalisasi
+                                              ? 'bg-emerald-500 ring-4 ring-emerald-200'
+                                              : log.aktivitas === 'UPLOAD'
+                                              ? 'bg-green-500'
+                                              : log.aktivitas === 'DOWNLOAD'
+                                              ? 'bg-purple-500'
+                                              : log.aktivitas === 'PREVIEW'
+                                              ? 'bg-cyan-500'
+                                              : log.aktivitas === 'VERIFIKASI'
+                                              ? 'bg-orange-500'
+                                              : 'bg-blue-500'
+                                          }`}
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                            <span className="text-sm font-bold text-blue-950 truncate">
+                                              {log.user?.name || 'Pengguna'}
+                                            </span>
+                                            <Badge
+                                              variant="outline"
+                                              className={`text-[10px] px-1.5 py-0 font-bold uppercase tracking-wide flex items-center gap-1 ${
+                                                isLegalisasi
+                                                  ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm'
+                                                  : log.aktivitas === 'UPLOAD'
+                                                  ? 'bg-green-100 text-green-700 border-green-300'
+                                                  : log.aktivitas === 'DOWNLOAD'
+                                                  ? 'bg-purple-100 text-purple-700 border-purple-300'
+                                                  : log.aktivitas === 'PREVIEW'
+                                                  ? 'bg-cyan-100 text-cyan-700 border-cyan-300'
+                                                  : log.aktivitas === 'VERIFIKASI'
+                                                  ? 'bg-orange-100 text-orange-700 border-orange-300'
+                                                  : 'bg-blue-100 text-blue-700 border-blue-300'
+                                              }`}
+                                            >
+                                              {isLegalisasi && <Shield className="w-2.5 h-2.5" />}
+                                              {log.aktivitas}
+                                            </Badge>
+                                            <span className="text-[11px] text-slate-400 ml-auto">
+                                              {new Date(log.createdAt).toLocaleString('id-ID', {
+                                                day: 'numeric',
+                                                month: 'short',
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                              })}
+                                            </span>
+                                          </div>
+                                          <p className={`text-xs mt-0.5 ${isLegalisasi ? 'font-medium text-emerald-900' : 'text-slate-600'}`}>
+                                            {log.deskripsi}
+                                          </p>
+                                          {log.sopFile?.judul && (
+                                            <p className="text-[11px] text-orange-600 font-semibold truncate mt-0.5">
+                                              📄 {log.sopFile.judul}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </motion.div>
+                                    )
+                                  })}
+                                </AnimatePresence>
+                              </div>
+                            )}
                           </ScrollArea>
                         </CardContent>
                       </Card>
@@ -9550,6 +9642,7 @@ export default function ESOPApp() {
                           <SelectItem value="UPLOAD" className="text-xs">Upload</SelectItem>
                           <SelectItem value="DOWNLOAD" className="text-xs">Download</SelectItem>
                           <SelectItem value="PREVIEW" className="text-xs">Preview</SelectItem>
+                          <SelectItem value="LEGALISASI" className="text-xs">Legalisasi</SelectItem>
                           <SelectItem value="VERIFIKASI" className="text-xs">Verifikasi</SelectItem>
                         </SelectContent>
                       </Select>
@@ -9615,8 +9708,9 @@ export default function ESOPApp() {
                                         log.aktivitas === 'UPLOAD' ? 'bg-green-100 text-green-700 border-green-300' :
                                           log.aktivitas === 'DOWNLOAD' ? 'bg-purple-100 text-purple-700 border-purple-300' :
                                             log.aktivitas === 'PREVIEW' ? 'bg-cyan-100 text-cyan-700 border-cyan-300' :
-                                              log.aktivitas === 'VERIFIKASI' ? 'bg-orange-100 text-orange-700 border-orange-300' :
-                                                'bg-gray-100 text-gray-700 border-gray-300'
+                                              log.aktivitas === 'LEGALISASI' ? 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold' :
+                                                log.aktivitas === 'VERIFIKASI' ? 'bg-orange-100 text-orange-700 border-orange-300' :
+                                                  'bg-gray-100 text-gray-700 border-gray-300'
                                     }>
                                       {log.aktivitas}
                                     </Badge>
@@ -10766,8 +10860,9 @@ export default function ESOPApp() {
                                   log.aktivitas === 'UPLOAD' ? 'bg-green-50 text-green-600 border-green-200 text-[10px] px-1.5 py-0' :
                                     log.aktivitas === 'DOWNLOAD' ? 'bg-purple-50 text-purple-600 border-purple-200 text-[10px] px-1.5 py-0' :
                                       log.aktivitas === 'PREVIEW' ? 'bg-cyan-50 text-cyan-600 border-cyan-200 text-[10px] px-1.5 py-0' :
-                                        log.aktivitas === 'VERIFIKASI' ? 'bg-orange-50 text-orange-600 border-orange-200 text-[10px] px-1.5 py-0' :
-                                          'bg-gray-50 text-gray-600 border-gray-200 text-[10px] px-1.5 py-0'
+                                        log.aktivitas === 'LEGALISASI' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] px-1.5 py-0 font-semibold' :
+                                          log.aktivitas === 'VERIFIKASI' ? 'bg-orange-50 text-orange-600 border-orange-200 text-[10px] px-1.5 py-0' :
+                                            'bg-gray-50 text-gray-600 border-gray-200 text-[10px] px-1.5 py-0'
                               }>
                                 {log.aktivitas}
                               </Badge>

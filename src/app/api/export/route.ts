@@ -56,7 +56,8 @@ export async function GET(request: NextRequest) {
     const sg = async (by: string[], w: any) => { try { return await (db.sopFile.groupBy as any)({ by, where: w, _count: { [by[0]]: true } }) } catch { return [] } }
 
     const [totalSop, totalIk, totalAktif, totalReview, totalKadaluarsa, previews, downloads,
-      byTahunRaw, byKategoriRaw, byJenisRaw, byStatusRaw, byLingkupRaw, totalMenunggu, totalDitolak
+      byTahunRaw, byKategoriRaw, byJenisRaw, byStatusRaw, byLingkupRaw, totalMenunggu, totalDitolak,
+      totalLegalisasi
     ] = await Promise.all([
       sc({ ...whereBase, jenis: 'SOP' }), sc({ ...whereBase, jenis: 'IK' }),
       sc({ ...whereBase, status: 'AKTIF' }), sc({ ...whereBase, status: 'REVIEW' }),
@@ -65,11 +66,15 @@ export async function GET(request: NextRequest) {
       sg(['tahun'], whereBase), sg(['kategori'], whereBase), sg(['jenis'], whereBase),
       sg(['status'], whereBase), sg(['lingkup'], whereBase),
       sc({ isPublicSubmission: true, verificationStatus: 'MENUNGGU' }),
-      sc({ isPublicSubmission: true, verificationStatus: 'DITOLAK' })
+      sc({ isPublicSubmission: true, verificationStatus: 'DITOLAK' }),
+      sc({ ...whereBase, legalisasiPdfPath: { not: null }, NOT: { legalisasiPdfPath: '' } })
     ])
+
+    const totalBelumLegalisasi = Math.max(0, (totalSop + totalIk) - totalLegalisasi)
 
     const stats = {
       totalSop, totalIk, totalAktif, totalReview, totalKadaluarsa,
+      totalLegalisasi, totalBelumLegalisasi,
       totalPreviews: previews, totalDownloads: downloads,
       totalPublikMenunggu: totalMenunggu, totalPublikDitolak: totalDitolak,
       byTahun: (byTahunRaw as any[]).map(x => ({ label: String(x.tahun), count: x._count?.tahun || 0 })),
@@ -173,15 +178,17 @@ export async function GET(request: NextRequest) {
     // ── Stats Cards ───────────────────────────────────────────────
     // 4 cards × 2 rows (8 cards total), each card spans 1 column
     interface Card { label: string; value: number; color: string; lightColor: string; icon: string }
+    const C_emerald = 'FF10b981'
+    const C_emeraldLight = 'FFd1fae5'
     const cards: Card[] = [
       { label: 'Total SOP', value: totalSop, color: C.orange, lightColor: C.orangeLight, icon: '📋' },
       { label: 'Total IK', value: totalIk, color: C.yellow, lightColor: C.yellowLight, icon: '📝' },
+      { label: 'File Legalisasi', value: totalLegalisasi, color: C_emerald, lightColor: C_emeraldLight, icon: '🛡️' },
       { label: 'Total Preview', value: previews, color: C.cyan, lightColor: C.cyanLight, icon: '👁️' },
-      { label: 'Total Download', value: downloads, color: C.purple, lightColor: C.purpleLight, icon: '⬇️' },
       { label: 'Aktif', value: totalAktif, color: C.green, lightColor: C.greenLight, icon: '✅' },
       { label: 'Review', value: totalReview, color: C.yellow, lightColor: C.yellowLight, icon: '⏳' },
       { label: 'Kadaluarsa', value: totalKadaluarsa, color: C.red, lightColor: C.redLight, icon: '❌' },
-      { label: 'Total Lingkup', value: stats.byLingkup.length, color: C.blue, lightColor: C.blueLight, icon: '🌐' },
+      { label: 'Belum Legalisasi', value: totalBelumLegalisasi, color: C.slate, lightColor: 'FFf1f5f9', icon: '📑' },
     ]
 
     // cards go in columns B, C, D, E (row 7-9) and G, H, I, J (second row 7-9 using col G-J with gap F)
@@ -383,6 +390,7 @@ export async function GET(request: NextRequest) {
       { header: 'Jenis', key: 'jenis', width: 8 },
       { header: 'Lingkup', key: 'lingkup', width: 18 },
       { header: 'Status', key: 'status', width: 13 },
+      { header: 'Legalisasi', key: 'legalisasi', width: 14 },
       { header: 'Preview', key: 'preview', width: 10 },
       { header: 'Download', key: 'download', width: 10 },
       { header: 'Diupload Oleh', key: 'uploadedBy', width: 25 },
@@ -395,9 +403,11 @@ export async function GET(request: NextRequest) {
     }
 
     sopFiles.forEach((sop, i) => {
+      const hasLegalisasi = !!(sop.legalisasiPdfPath && sop.legalisasiPdfPath !== '')
       const r = s2.addRow({
         no: i + 1, judul: sop.judul, tahun: sop.tahun, kategori: sop.kategori, jenis: sop.jenis,
         lingkup: (sop as any).lingkup || 'N/A', status: sop.status,
+        legalisasi: hasLegalisasi ? '✓ Ada' : 'Belum',
         preview: sop.previewCount || 0, download: sop.downloadCount || 0,
         uploadedBy: (sop.user as any)?.name || 'N/A',
         uploadedAt: sop.uploadedAt.toLocaleDateString('id-ID')
@@ -411,6 +421,9 @@ export async function GET(request: NextRequest) {
       const sc2 = r.getCell(7)
       const clr = statusColorMap[sop.status] || C.slate
       sc2.font = { name: 'Arial', size: 10, bold: true, color: { argb: clr } }
+      // Color legalisasi cell (col 8)
+      const legCell = r.getCell(8)
+      legCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: hasLegalisasi ? 'FF10b981' : C.slate } }
     })
 
     // ─────────────────────────────────────────────────────────────
@@ -438,6 +451,7 @@ export async function GET(request: NextRequest) {
     styleHdr(s3.addRow(['Statistik', 'Jumlah']))
       ;[
         ['Total SOP', totalSop], ['Total IK', totalIk],
+        ['File Legalisasi', totalLegalisasi], ['Belum Legalisasi', totalBelumLegalisasi],
         ['Dokumen Aktif', totalAktif], ['Dokumen Review', totalReview],
         ['Dokumen Kadaluarsa', totalKadaluarsa],
         ['Total Preview', previews], ['Total Download', downloads],
@@ -474,6 +488,10 @@ export async function GET(request: NextRequest) {
     addDistrib3(s3, 'Distribusi per Lingkup', stats.byLingkup, C.purple)
     addDistrib3(s3, 'Distribusi per Jenis', stats.byJenis, C.cyan)
     addDistrib3(s3, 'Distribusi per Status', stats.byStatus, C.green)
+    addDistrib3(s3, 'Status Legalisasi', [
+      { label: 'Terlegalisasi', count: totalLegalisasi },
+      { label: 'Belum Legalisasi', count: totalBelumLegalisasi }
+    ], 'FF10b981')
 
     // ─── Generate and return ──────────────────────────────────────
     const buffer = await wb.xlsx.writeBuffer()

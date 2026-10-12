@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { db } from '@/lib/db'
 import { validateRole } from '@/lib/auth-utils'
 import {
@@ -14,6 +15,23 @@ import {
     getR2PresignedPartUrl
 } from '@/lib/r2-storage'
 import { sanitizePdfMetadata } from '@/lib/pdf-sanitize'
+
+// Helper to resolve user ID for activity logging
+async function getUserIdForLog(userIdFromAuth?: string): Promise<string | null> {
+    if (userIdFromAuth) return userIdFromAuth
+    try {
+        const cookieStore = await cookies()
+        const cookieUserId = cookieStore.get('userId')?.value
+        if (cookieUserId) return cookieUserId
+        const fallback = await db.user.findFirst({
+            where: { role: { in: ['ADMIN', 'DEVELOPER', 'STAF'] } },
+            select: { id: true }
+        })
+        return fallback?.id || null
+    } catch {
+        return null
+    }
+}
 
 // Set runtime and max duration for Vercel
 export const runtime = 'nodejs'
@@ -72,6 +90,25 @@ export async function GET(
         const disposition = action === 'download'
             ? `attachment; filename="Legalisasi-${sop.judul?.replace(/[^a-zA-Z0-9]/g, '_') || id}.pdf"`
             : 'inline'
+
+        // Log recent activity for GET legalisasi builder (preview / download)
+        try {
+            const logUserId = await getUserIdForLog()
+            if (logUserId) {
+                const isDownload = action === 'download'
+                await db.log.create({
+                    data: {
+                        userId: logUserId,
+                        aktivitas: 'LEGALISASI',
+                        deskripsi: `${isDownload ? 'Download' : 'Preview'} File Legalisasi Builder: ${sop.judul}`,
+                        fileId: null,
+                        metadata: JSON.stringify({ action: isDownload ? 'DOWNLOAD' : 'PREVIEW', builderId: sop.id, judul: sop.judul, type: 'builder' })
+                    }
+                })
+            }
+        } catch (logErr) {
+            console.warn('Failed to log builder legalisasi GET:', logErr)
+        }
 
         return new NextResponse(new Uint8Array(cleanBuffer), {
             headers: {
@@ -216,6 +253,24 @@ export async function POST(
                 data: { legalisasiPdfPath: r2Key }
             })
 
+            // Log upload activity
+            try {
+                const logUserId = await getUserIdForLog(uploadUserId)
+                if (logUserId) {
+                    await db.log.create({
+                        data: {
+                            userId: logUserId,
+                            aktivitas: 'LEGALISASI',
+                            deskripsi: `Upload File Legalisasi Builder: ${sop.judul}`,
+                            fileId: null,
+                            metadata: JSON.stringify({ action: 'UPLOAD', mode: 'multipart', builderId: sop.id, r2Key, judul: sop.judul, type: 'builder' })
+                        }
+                    })
+                }
+            } catch (logErr) {
+                console.warn('Failed to log builder legalisasi upload:', logErr)
+            }
+
             return NextResponse.json({
                 success: true,
                 path: r2Key,
@@ -283,6 +338,24 @@ export async function POST(
             data: { legalisasiPdfPath: result.key }
         })
 
+        // Log upload activity
+        try {
+            const logUserId = await getUserIdForLog(uploadUserId)
+            if (logUserId) {
+                await db.log.create({
+                    data: {
+                        userId: logUserId,
+                        aktivitas: 'LEGALISASI',
+                        deskripsi: `Upload File Legalisasi Builder: ${sop.judul}`,
+                        fileId: null,
+                        metadata: JSON.stringify({ action: 'UPLOAD', fileName: file.name, builderId: sop.id, r2Key: result.key, judul: sop.judul, type: 'builder' })
+                    }
+                })
+            }
+        } catch (logErr) {
+            console.warn('Failed to log builder legalisasi direct upload:', logErr)
+        }
+
         return NextResponse.json({
             success: true,
             path: result.key,
@@ -344,6 +417,24 @@ export async function PATCH(
             data: { legalisasiPdfPath: r2Key }
         })
 
+        // Log upload confirm
+        try {
+            const logUserId = await getUserIdForLog()
+            if (logUserId) {
+                await db.log.create({
+                    data: {
+                        userId: logUserId,
+                        aktivitas: 'LEGALISASI',
+                        deskripsi: `Upload File Legalisasi Builder: ${sop.judul}`,
+                        fileId: null,
+                        metadata: JSON.stringify({ action: 'UPLOAD', builderId: sop.id, r2Key, judul: sop.judul, type: 'builder' })
+                    }
+                })
+            }
+        } catch (logErr) {
+            console.warn('Failed to log builder legalisasi patch confirm:', logErr)
+        }
+
         return NextResponse.json({
             success: true,
             path: r2Key,
@@ -395,6 +486,24 @@ export async function DELETE(
             where: { id },
             data: { legalisasiPdfPath: null }
         })
+
+        // Log delete activity
+        try {
+            const logUserId = await getUserIdForLog()
+            if (logUserId) {
+                await db.log.create({
+                    data: {
+                        userId: logUserId,
+                        aktivitas: 'LEGALISASI',
+                        deskripsi: `Hapus File Legalisasi Builder: ${sop.judul}`,
+                        fileId: null,
+                        metadata: JSON.stringify({ action: 'DELETE', builderId: sop.id, judul: sop.judul, type: 'builder' })
+                    }
+                })
+            }
+        } catch (logErr) {
+            console.warn('Failed to log builder legalisasi delete:', logErr)
+        }
 
         return NextResponse.json({ success: true, message: 'File legalisasi berhasil dihapus' })
     } catch (error) {
